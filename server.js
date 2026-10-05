@@ -11,13 +11,17 @@ const cors = require('cors');
 dotenv.config();
 
 const app = express();
+
+// Use Render's PORT in production, otherwise 3000 locally
 const PORT = process.env.PORT || 3000;
 
 // Security Headers
-app.use(helmet({
-  contentSecurityPolicy: false, // Allow CDNs for Google Fonts, FontAwesome, Razorpay
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Allow CDNs for Google Fonts, FontAwesome, Razorpay
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })
+);
 
 // CORS
 app.use(cors());
@@ -26,9 +30,14 @@ app.use(cors());
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 2000, // 2000 requests per IP
-  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1' || process.env.NODE_ENV !== 'production',
+  skip: (req) =>
+    req.ip === '127.0.0.1' ||
+    req.ip === '::1' ||
+    req.ip === '::ffff:127.0.0.1' ||
+    process.env.NODE_ENV !== 'production',
   message: 'Too many requests from this IP, please try again after 15 minutes.'
 });
+
 app.use(limiter);
 
 // Body Parsing
@@ -36,20 +45,24 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Static Files (public directory)
+// Static Files
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // Session Management
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'aruvi_embroidery_secret_stitch_key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
-  }
-}));
+app.use(
+  session({
+    secret:
+      process.env.SESSION_SECRET ||
+      'aruvi_embroidery_secret_stitch_key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production'
+    }
+  })
+);
 
 // Flash Messages
 app.use(flash());
@@ -62,46 +75,110 @@ app.use(csrfProtection);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// App-level global defaults for all EJS templates (Baseline safety against ReferenceErrors)
+// App-level global defaults
 app.locals.siteSettings = {
   shop_name: 'ARUVI EMBROIDERY STUDIO',
   tagline: 'Where Threads Tell Stories',
+
   logo_url: '/public/images/logo.jpg',
   mobile_logo_url: '/public/images/logo.jpg',
   favicon_url: '/public/images/logo.jpg',
-  contact_email: 'aruviembroidery@gmail.com',
-  contact_phone: '+91 98765 43210',
-  address: 'Erode, Tamil Nadu, 638001, India',
+
+  contact_email:
+    process.env.CONTACT_EMAIL || 'aruviembroidery@gmail.com',
+
+  contact_phone:
+    process.env.CONTACT_PHONE || '+91 98765 43210',
+
+  address:
+    process.env.SHOP_ADDRESS ||
+    'Erode, Tamil Nadu, 638001, India',
+
   currency_symbol: '₹',
-  announcement_bar: 'Premium Machine Embroidery Designs — DST, PES, JEF, EXP & More | Instant Download',
-  facebook_url: 'https://facebook.com/aruviembroidery',
-  instagram_url: 'https://instagram.com/aruviembroidery',
-  linkedin_url: 'https://linkedin.com/company/aruviembroidery',
-  youtube_url: 'https://youtube.com/aruviembroidery',
-  upi_id: 'aruviembroidery@upi',
-  upiId: 'aruviembroidery@upi',
-  upi_name: 'ARUVI EMBROIDERY STUDIO',
-  upiName: 'ARUVI EMBROIDERY STUDIO',
-  upiMerchantName: 'ARUVI EMBROIDERY STUDIO',
-  bank_name: 'State Bank of India',
-  bankName: 'State Bank of India',
-  account_number: '39849201928',
-  accountNumber: '39849201928',
-  ifsc_code: 'SBIN0001234',
-  ifscCode: 'SBIN0001234',
-  account_holder: 'ARUVI EMBROIDERY STUDIO',
-  accountHolder: 'ARUVI EMBROIDERY STUDIO',
-  accountHolderName: 'ARUVI EMBROIDERY STUDIO',
-  pinterest_url: '',
-  twitter_url: ''
+
+  announcement_bar:
+    'Premium Machine Embroidery Designs — DST, PES, JEF, EXP & More | Instant Download',
+
+  facebook_url:
+    process.env.FACEBOOK_URL ||
+    'https://facebook.com/aruviembroidery',
+
+  instagram_url:
+    process.env.INSTAGRAM_URL ||
+    'https://instagram.com/aruviembroidery',
+
+  linkedin_url:
+    process.env.LINKEDIN_URL ||
+    'https://linkedin.com/company/aruviembroidery',
+
+  youtube_url:
+    process.env.YOUTUBE_URL ||
+    'https://youtube.com/aruviembroidery',
+
+  // UPI
+  upi_id: process.env.UPI_ID || '',
+  upiId: process.env.UPI_ID || '',
+
+  upi_name:
+    process.env.UPI_NAME || 'ARUVI EMBROIDERY STUDIO',
+
+  upiName:
+    process.env.UPI_NAME || 'ARUVI EMBROIDERY STUDIO',
+
+  upiMerchantName:
+    process.env.UPI_NAME || 'ARUVI EMBROIDERY STUDIO',
+
+  // Bank Details
+  bank_name:
+    process.env.BANK_NAME || '',
+
+  bankName:
+    process.env.BANK_NAME || '',
+
+  account_number:
+    process.env.BANK_ACCOUNT_NUMBER || '',
+
+  accountNumber:
+    process.env.BANK_ACCOUNT_NUMBER || '',
+
+  ifsc_code:
+    process.env.BANK_IFSC || '',
+
+  ifscCode:
+    process.env.BANK_IFSC || '',
+
+  account_holder:
+    process.env.BANK_ACCOUNT_HOLDER ||
+    'ARUVI EMBROIDERY STUDIO',
+
+  accountHolder:
+    process.env.BANK_ACCOUNT_HOLDER ||
+    'ARUVI EMBROIDERY STUDIO',
+
+  accountHolderName:
+    process.env.BANK_ACCOUNT_HOLDER ||
+    'ARUVI EMBROIDERY STUDIO',
+
+  pinterest_url:
+    process.env.PINTEREST_URL || '',
+
+  twitter_url:
+    process.env.TWITTER_URL || ''
 };
+
+// Global defaults
 app.locals.currentUser = null;
 app.locals.currentPath = '';
 app.locals.cartCount = 0;
-app.locals.flash = { success: [], error: [], info: [] };
+app.locals.flash = {
+  success: [],
+  error: [],
+  info: []
+};
 app.locals.csrfToken = '';
 
-// Custom Middleware: Attach user, cart, flash & global settings
+// Custom Middleware
+// Attach user, cart, flash & global settings
 const { attachUserAndCart } = require('./middleware/auth');
 app.use(attachUserAndCart);
 
@@ -127,7 +204,8 @@ app.use((req, res, next) => {
   res.status(404).render('pages/error', {
     title: '404 - Page Not Found',
     statusCode: 404,
-    message: 'The requested page or embroidery design could not be found.'
+    message:
+      'The requested page or embroidery design could not be found.'
   });
 });
 
@@ -136,10 +214,11 @@ const errorHandler = require('./middleware/errorHandler');
 app.use(errorHandler);
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`====================================================`);
+// 0.0.0.0 is required so Render can access the application
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('====================================================');
   console.log(`🌸 Aruvi Embroidery Web App running on port ${PORT}`);
-  console.log(`📌 Tagline: "Where Threads Tell Stories"`);
-  console.log(`🌐 Local URL: http://localhost:${PORT}`);
-  console.log(`====================================================`);
+  console.log('📌 Tagline: "Where Threads Tell Stories"');
+  console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
+  console.log('====================================================');
 });
