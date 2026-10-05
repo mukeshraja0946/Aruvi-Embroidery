@@ -1,0 +1,98 @@
+<%- include('../../partials/header') %>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div style="padding: 0 1.8rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem;">
+      <h3 style="color: white; font-size: 1.1rem;"><i class="fa-solid fa-crown" style="color: var(--primary);"></i> Admin Studio</h3>
+    </div>
+    <ul class="admin-menu">
+      <li><a href="/admin"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
+      <li><a href="/admin/designs"><i class="fa-solid fa-palette"></i> Manage Designs</a></li>
+      <li><a href="/admin/categories"><i class="fa-solid fa-list-check"></i> Categories</a></li>
+      <li><a href="/admin/orders"><i class="fa-solid fa-cart-flatbed"></i> Orders</a></li>
+      <li><a href="/admin/customers"><i class="fa-solid fa-users"></i> Customers</a></li>
+      <li><a href="/admin/coupons" class="active"><i class="fa-solid fa-ticket"></i> Coupons</a></li>
+      <li><a href="/admin/messages"><i class="fa-solid fa-comments"></i> Contact Messages</a></li>
+      <li><a href="/admin/settings"><i class="fa-solid fa-gears"></i> Site Settings</a></li>
+    </ul>
+  </aside>
+
+  <main class="admin-content">
+    <div class="admin-header">
+      <div>
+        <h2 style="font-size: 1.8rem;">Coupons & Promo Codes</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Create percentage or flat discounts for checkout</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 2.5rem;">
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Discount</th>
+              <th>Min Spend</th>
+              <th>Times Used</th>
+              <th>Status</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% coupons.forEach(coup => { %>
+              <tr>
+                <td><strong><code><%= coup.code %></code></strong></td>
+                <td>
+                  <strong><%= coup.discount_type === 'percentage' ? coup.discount_value + '%' : '₹' + coup.discount_value %> OFF</strong>
+                </td>
+                <td>₹<%= coup.min_purchase %></td>
+                <td><%= coup.times_used || 0 %></td>
+                <td><span class="badge badge-<%= coup.is_active ? 'success' : 'danger' %>"><%= coup.is_active ? 'Active' : 'Expired' %></span></td>
+                <td style="text-align: right;">
+                  <form action="/admin/coupons/delete/<%= coup.id %>" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-outline btn-sm" style="color: var(--error); border-color: var(--border-light);"><i class="fa-solid fa-trash"></i></button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+        <h3 style="font-size: 1.15rem; margin-bottom: 1.2rem; border-bottom: 2px dashed var(--border-light); padding-bottom: 0.5rem;">Add Coupon</h3>
+        <form action="/admin/coupons/create" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          
+          <div class="form-group">
+            <label class="form-label">Coupon Code *</label>
+            <input type="text" name="code" class="form-control" placeholder="e.g. FESTIVE25" required style="text-transform: uppercase;">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Discount Type *</label>
+            <select name="discount_type" class="form-control">
+              <option value="percentage">Percentage (%)</option>
+              <option value="fixed">Fixed Amount (₹)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Discount Value *</label>
+            <input type="number" step="0.01" name="discount_value" class="form-control" placeholder="e.g. 15 or 100" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Min Purchase (₹)</label>
+            <input type="number" step="0.01" name="min_purchase" class="form-control" placeholder="299.00">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Create Coupon</button>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<%- include('../../partials/footer') %>

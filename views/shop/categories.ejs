@@ -1,0 +1,110 @@
+<%- include('../partials/header') %>
+
+<div class="container" style="margin-top: 2rem; margin-bottom: 5rem;">
+  <!-- Categories Hero Banner matching Reference -->
+  <div class="page-banner-card" style="margin-bottom: 3rem;">
+    <div class="banner-content">
+      <div class="breadcrumb-trail">
+        <a href="/">Home</a> &nbsp;>&nbsp; <span>Categories</span>
+      </div>
+      <h1 class="page-banner-title">Categories</h1>
+      <p class="page-banner-subtitle">
+        Explore our wide range of machine embroidery design categories. Find the perfect design for your creative projects.
+      </p>
+    </div>
+    <div class="banner-image-box">
+      <img src="/public/images/hero_embroidery.jpg" alt="Categories Collection">
+    </div>
+  </div>
+
+  <!-- 8 Category Cards Grid matching Reference (4 Columns x 2 Rows) -->
+  <div class="grid-4-strict" style="margin-bottom: 3.5rem;">
+    <% categories.forEach(cat => { %>
+      <a href="/category/<%= cat.slug %>" class="category-card">
+        <div class="category-card-img-box">
+          <img src="<%= cat.image_url || '/public/images/logo.jpg' %>" alt="<%= cat.name %>">
+        </div>
+        <div class="category-card-info">
+          <div class="category-card-meta">
+            <h3><%= cat.name %></h3>
+            <span class="design-count"><%= cat.description || '300+ Designs' %></span>
+          </div>
+          <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        </div>
+      </a>
+    <% }) %>
+  </div>
+
+  <!-- Middle Trust Feature Strip matching Reference -->
+  <div class="hero-feature-pills" style="margin-bottom: 4rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-award"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Premium Quality Designs</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Crafted with precision</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Instant Download</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Get files immediately</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">100% Tested Machine Fills</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Quality assured designs</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Featured Designs Section matching Reference -->
+  <% if (typeof featuredDesigns !== 'undefined' && featuredDesigns.length > 0) { %>
+    <section>
+      <div class="section-heading-box flex-between">
+        <div>
+          <div class="eyebrow-tag">
+            <span>DISCOVER POPULAR DESIGNS</span>
+            <span class="eyebrow-line"></span>
+          </div>
+          <h2 class="section-title">Featured Designs</h2>
+        </div>
+        <a href="/designs" class="view-all-link">View All Designs <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+
+      <div class="grid-6">
+        <% featuredDesigns.forEach(design => { %>
+          <div class="mini-product-card">
+            <button class="mini-wishlist-btn wishlist-btn" data-id="<%= design.id %>"><i class="fa-regular fa-heart"></i></button>
+            <div class="mini-card-img">
+              <a href="/design/<%= design.slug %>">
+                <img src="<%= design.primary_image || '/public/images/logo.jpg' %>" alt="<%= design.title %>">
+              </a>
+            </div>
+            <div class="mini-card-body">
+              <h4><a href="/design/<%= design.slug %>"><%= design.title %></a></h4>
+              <div class="mini-bottom-row">
+                <span class="mini-price">₹<%= design.sale_price || design.price %></span>
+                <form class="ajax-add-to-cart" style="display: inline;">
+                  <input type="hidden" name="design_id" value="<%= design.id %>">
+                  <button type="submit" class="mini-cart-btn"><i class="fa-solid fa-cart-shopping"></i></button>
+                </form>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

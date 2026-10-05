@@ -1,0 +1,85 @@
+<%- include('../../partials/header') %>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div style="padding: 0 1.8rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem;">
+      <h3 style="color: white; font-size: 1.1rem;"><i class="fa-solid fa-crown" style="color: var(--primary);"></i> Admin Studio</h3>
+    </div>
+    <ul class="admin-menu">
+      <li><a href="/admin"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
+      <li><a href="/admin/designs"><i class="fa-solid fa-palette"></i> Manage Designs</a></li>
+      <li><a href="/admin/categories"><i class="fa-solid fa-list-check"></i> Categories</a></li>
+      <li><a href="/admin/orders" class="active"><i class="fa-solid fa-cart-flatbed"></i> Orders</a></li>
+      <li><a href="/admin/customers"><i class="fa-solid fa-users"></i> Customers</a></li>
+      <li><a href="/admin/coupons"><i class="fa-solid fa-ticket"></i> Coupons</a></li>
+      <li><a href="/admin/messages"><i class="fa-solid fa-comments"></i> Contact Messages</a></li>
+      <li><a href="/admin/settings"><i class="fa-solid fa-gears"></i> Site Settings</a></li>
+    </ul>
+  </aside>
+
+  <main class="admin-content">
+    <div class="admin-header">
+      <div>
+        <h2 style="font-size: 1.8rem;">Order #<%= order.order_number %> Details</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Placed on <%= new Date(order.created_at).toLocaleString() %></p>
+      </div>
+      <a href="/admin/orders" class="btn btn-outline"><i class="fa-solid fa-arrow-left"></i> Back to Orders</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 2rem;">
+      <div>
+        <div class="table-responsive" style="margin-bottom: 2rem;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Design Title</th>
+                <th>Purchased Price</th>
+                <th>File Format</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (order.items) { %>
+                <% order.items.forEach(item => { %>
+                  <tr>
+                    <td><strong><%= item.title %></strong></td>
+                    <td><strong style="color: var(--primary);">₹<%= item.price_at_purchase %></strong></td>
+                    <td><span class="badge badge-info"><%= item.formats || 'ZIP' %></span></td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <!-- Update Order Status Card -->
+        <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+          <h3 style="font-size: 1.1rem; margin-bottom: 1rem; border-bottom: 2px dashed var(--border-light); padding-bottom: 0.5rem;">Update Order Status</h3>
+          
+          <form action="/admin/orders/status/<%= order.id %>" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div class="form-group">
+              <label class="form-label">Current Status</label>
+              <select name="status" class="form-control">
+                <option value="pending" <%= order.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                <option value="completed" <%= order.status === 'completed' ? 'selected' : '' %>>Completed (Unlocked Files)</option>
+                <option value="cancelled" <%= order.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+                <option value="refunded" <%= order.status === 'refunded' ? 'selected' : '' %>>Refunded</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Update Status</button>
+          </form>
+
+          <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-light); font-size: 0.88rem;">
+            <p><strong>Customer:</strong> <%= order.guest_name || order.user_name %></p>
+            <p><strong>Email:</strong> <%= order.guest_email || order.user_email %></p>
+            <p><strong>Razorpay Payment ID:</strong> <code><%= order.razorpay_payment_id || 'N/A' %></code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<%- include('../../partials/footer') %>

@@ -1,0 +1,335 @@
+<%- include('partials/header') %>
+
+<div class="container">
+  <!-- Hero Section matching Reference Screenshot 1 & 2 -->
+  <section class="hero-card-container">
+    <!-- Prev / Next Slider Arrows -->
+    <button class="hero-slider-arrow prev" title="Previous Slide"><i class="fa-solid fa-chevron-left"></i></button>
+    <button class="hero-slider-arrow next" title="Next Slide"><i class="fa-solid fa-chevron-right"></i></button>
+
+    <div class="hero-grid">
+      <div class="hero-content">
+        <div class="eyebrow-tag">
+          <span><%= (typeof siteSettings !== 'undefined' && siteSettings.hero_eyebrow) ? siteSettings.hero_eyebrow : 'PREMIUM EMBROIDERY STUDIO' %></span>
+          <span class="eyebrow-line"></span>
+        </div>
+        <h1 class="hero-title">
+          Stitch Your <span class="highlight-italic">Imagination</span> Into Life
+        </h1>
+        <p class="hero-description">
+          <%= (typeof siteSettings !== 'undefined' && siteSettings.hero_subtitle) ? siteSettings.hero_subtitle : 'Explore high-precision digitized embroidery designs crafted for passionate makers. Instant digital downloads in DST, PES, JEF, and EXP formats.' %>
+        </p>
+        <div class="hero-actions">
+          <a href="/designs" class="btn btn-primary btn-lg">Explore Designs <i class="fa-solid fa-arrow-right"></i></a>
+          <a href="/custom-order" class="btn btn-outline btn-lg">Request Custom Design</a>
+        </div>
+      </div>
+      <div class="hero-image-wrapper">
+        <img src="<%= (typeof siteSettings !== 'undefined' && siteSettings.hero_image) ? siteSettings.hero_image : '/public/images/hero_embroidery.jpg' %>" alt="Embroidery Hoop Masterpiece Preview">
+        <div class="crafted-badge-text">Crafted for Creators</div>
+      </div>
+    </div>
+
+    <!-- Feature Pills Bar -->
+    <div class="hero-feature-pills">
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-ribbon"></i></div>
+        <div>
+          <strong>Premium</strong>
+          <span>Quality Designs</span>
+        </div>
+      </div>
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
+        <div>
+          <strong>Instant</strong>
+          <span>Download</span>
+        </div>
+      </div>
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div>
+          <strong>100% Tested</strong>
+          <span>Machine Fills</span>
+        </div>
+      </div>
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
+        <div>
+          <strong>Dedicated</strong>
+          <span>Support</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Carousel Indicator Dots -->
+    <div class="hero-carousel-dots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  </section>
+
+  <!-- Popular Categories Section (6 in a single row) -->
+  <section style="margin-bottom: 1.5rem;">
+    <div class="section-heading-box flex-between">
+      <div>
+        <div class="eyebrow-tag">
+          <span>BROWSE BY CATEGORY</span>
+          <span class="eyebrow-line"></span>
+        </div>
+        <h2 class="section-title">Popular Categories</h2>
+      </div>
+      <a href="/categories" class="view-all-link">
+        View All Categories <i class="fa-solid fa-arrow-right"></i>
+      </a>
+    </div>
+
+    <div class="grid-6">
+      <% if (categories && categories.length > 0) { %>
+        <% categories.slice(0, 6).forEach(cat => { %>
+          <a href="/category/<%= cat.slug %>" class="category-card">
+            <div class="category-card-img-box">
+              <img src="<%= cat.image_url || '/public/images/cat_floral.jpg' %>" alt="<%= cat.name %>">
+            </div>
+            <div class="category-card-info">
+              <div class="category-card-meta">
+                <h3><%= cat.name %></h3>
+                <span class="design-count"><%= cat.description || (cat.design_count || 300) + '+ Designs' %></span>
+              </div>
+              <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            </div>
+          </a>
+        <% }) %>
+      <% } %>
+    </div>
+  </section>
+
+  <!-- Featured Designs Section (6 in a single row matching Screenshot 2) -->
+  <section style="margin-bottom: 1.5rem;">
+    <div class="section-heading-box flex-between">
+      <div>
+        <h2 class="section-title" style="margin-bottom: 2px;">Featured Designs</h2>
+        <p style="color: var(--text-muted); font-size: 0.85rem;">Handpicked designs loved by our customers.</p>
+      </div>
+      <a href="/designs" class="view-all-link">
+        View All Designs <i class="fa-solid fa-arrow-right"></i>
+      </a>
+    </div>
+
+    <div class="grid-6">
+      <% if (featuredDesigns && featuredDesigns.length > 0) { %>
+        <% featuredDesigns.forEach(design => { %>
+          <div class="product-card-exact">
+            <button class="heart-top-btn wishlist-btn" data-id="<%= design.id %>" title="Wishlist"><i class="fa-regular fa-heart"></i></button>
+            <div class="product-exact-img" style="background: #FAF6F0; position: relative;">
+              <a href="/design/<%= design.slug %>" style="display: block; width: 100%; height: 100%;">
+                <% if (design.primary_image) { %>
+                  <img src="<%= design.primary_image %>" alt="<%= design.title %>" style="object-fit: contain; width: 100%; height: 100%;">
+                <% } else { %>
+                  <div style="width: 100%; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">
+                    <i class="fa-regular fa-image" style="font-size: 1.8rem; margin-bottom: 4px; opacity: 0.5;"></i>
+                    <span>No Preview</span>
+                  </div>
+                <% } %>
+              </a>
+            </div>
+            <div class="product-exact-content">
+              <h4><a href="/design/<%= design.slug %>" style="color: inherit; text-decoration: none;"><%= design.title %></a></h4>
+              <div class="price-row">
+                <span class="current-price">₹<%= design.sale_price !== null && design.sale_price !== undefined ? design.sale_price : design.price %></span>
+                <% if (design.sale_price && design.price > design.sale_price) { %>
+                  <span class="old-price">₹<%= design.price %></span>
+                <% } %>
+                <button class="heart-bottom-btn wishlist-btn" data-id="<%= design.id %>"><i class="fa-regular fa-heart"></i></button>
+              </div>
+              <% const isOwnedHome = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+              <% if (isOwnedHome) { %>
+                <div style="margin-top: 6px;">
+                  <a href="/design/<%= design.slug %>" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; background: #F4EBE0; color: #2E7D32; border: 1px solid #C8E6C9; text-decoration: none;">
+                    <i class="fa-solid fa-circle-check"></i> ✓ Owned
+                  </a>
+                </div>
+              <% } else { %>
+                <% const homeFmts = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : []; %>
+                <% if (homeFmts.length > 0) { %>
+                  <div class="format-badges">
+                    <% homeFmts.forEach(fmt => { %>
+                      <span><%= fmt %></span>
+                    <% }) %>
+                  </div>
+                <% } %>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <p style="grid-column: span 6; text-align: center; color: var(--text-muted); padding: 2rem;">No featured designs available at the moment.</p>
+      <% } %>
+    </div>
+  </section>
+
+  <!-- Need a Custom Design? Card Section matching Screenshot 2 -->
+  <section style="margin-bottom: 1.5rem;">
+    <div class="custom-design-card">
+      <div class="custom-card-left">
+        <div class="custom-img-wrap">
+          <img src="/public/images/hero_embroidery.jpg" alt="Hands embroidering hoop">
+        </div>
+        <div class="custom-left-info">
+          <h2>Need a Custom Design?</h2>
+          <p>Share your ideas and we'll create a unique embroidery design just for you.</p>
+          <a href="/custom-order" class="btn btn-primary">Request Custom Design <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+      </div>
+      <div class="custom-card-right">
+        <div class="step-item">
+          <div class="step-icon"><i class="fa-regular fa-pen-to-square"></i></div>
+          <div class="step-text">
+            <h5>Share Your Idea</h5>
+            <span>Tell us your requirements</span>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-icon"><i class="fa-solid fa-user-check"></i></div>
+          <div class="step-text">
+            <h5>Get a Preview</h5>
+            <span>We create and send preview</span>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-icon"><i class="fa-solid fa-box-archive"></i></div>
+          <div class="step-text">
+            <h5>Receive Your Design</h5>
+            <span>Get final files in your format</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why Choose ARUVI? Section matching Screenshot 2 -->
+  <section style="margin-bottom: 1.5rem; text-align: center;">
+    <h2 class="section-title" style="margin-bottom: 2px;">Why Choose ARUVI?</h2>
+    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">Trusted by embroidery lovers, creators and small businesses.</p>
+
+    <div class="why-choose-grid">
+      <div class="why-card">
+        <div class="why-icon"><i class="fa-solid fa-gem"></i></div>
+        <h4>High Quality Designs</h4>
+        <p>Professionally digitized with clean stitches and smooth fills.</p>
+      </div>
+
+      <div class="why-card">
+        <div class="why-icon"><i class="fa-solid fa-download"></i></div>
+        <h4>Instant Download</h4>
+        <p>Get your design files immediately after purchase.</p>
+      </div>
+
+      <div class="why-card">
+        <div class="why-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <h4>100% Tested</h4>
+        <p>All designs are tested on real machines.</p>
+      </div>
+
+      <div class="why-card">
+        <div class="why-icon"><i class="fa-solid fa-headset"></i></div>
+        <h4>Dedicated Support</h4>
+        <p>We're here to help with any questions or custom requests.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- What Our Customers Say & Latest Guides 2-Column Section matching Screenshot 2 -->
+  <section style="margin-bottom: 1.5rem;">
+    <div class="bottom-two-col-grid">
+      <!-- Left Column: Testimonials -->
+      <div class="testimonials-block">
+        <div class="section-heading-box" style="margin-bottom: 0.8rem;">
+          <h3 style="font-size: 1.35rem; font-family: var(--font-heading);">What Our Customers Say</h3>
+          <p style="color: var(--text-muted); font-size: 0.82rem;">Real feedback from our happy customers.</p>
+        </div>
+
+        <div class="testimonials-slider-box">
+          <button class="slider-nav-btn prev"><i class="fa-solid fa-chevron-left"></i></button>
+          
+          <div class="testimonial-cards-wrapper">
+            <div class="testimonial-card">
+              <p class="review-quote">"Amazing designs! The quality is excellent and the files work perfectly on my machine."</p>
+              <div class="user-profile-row">
+                <img src="/public/images/logo.jpg" alt="Priya S." class="avatar">
+                <div class="user-meta">
+                  <h5>Priya S.</h5>
+                  <div class="stars">★★★★★</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="testimonial-card">
+              <p class="review-quote">"Very beautiful and unique designs. Fast download and great customer support."</p>
+              <div class="user-profile-row">
+                <img src="/public/images/logo.jpg" alt="Karthik M." class="avatar">
+                <div class="user-meta">
+                  <h5>Karthik M.</h5>
+                  <div class="stars">★★★★★</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="testimonial-card">
+              <p class="review-quote">"I requested a custom design and it came out exactly as I wanted. Highly recommended!"</p>
+              <div class="user-profile-row">
+                <img src="/public/images/logo.jpg" alt="Divya R." class="avatar">
+                <div class="user-meta">
+                  <h5>Divya R.</h5>
+                  <div class="stars">★★★★★</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="slider-nav-btn next"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Right Column: Latest Guides & Tips -->
+      <div class="blog-guides-block">
+        <div class="section-heading-box flex-between" style="margin-bottom: 0.8rem;">
+          <div>
+            <h3 style="font-size: 1.35rem; font-family: var(--font-heading);">Latest Guides & Tips</h3>
+            <p style="color: var(--text-muted); font-size: 0.82rem;">Helpful tips for embroidery lovers.</p>
+          </div>
+          <a href="/blog" class="view-all-link" style="font-size: 0.82rem;">View All <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+
+        <div class="guide-list">
+          <a href="/faq" class="guide-item">
+            <img src="/public/images/cat_floral.jpg" alt="Guide 1">
+            <div class="guide-info">
+              <h5>How to Choose the Right Embroidery File Format</h5>
+              <span class="date">10 Sep 2026</span>
+            </div>
+          </a>
+
+          <a href="/faq" class="guide-item">
+            <img src="/public/images/hero_embroidery.jpg" alt="Guide 2">
+            <div class="guide-info">
+              <h5>Tips for Perfect Embroidery Results</h5>
+              <span class="date">05 Sep 2026</span>
+            </div>
+          </a>
+
+          <a href="/faq" class="guide-item">
+            <img src="/public/images/cat_blouse.jpg" alt="Guide 3">
+            <div class="guide-info">
+              <h5>Creative Blouse Design Ideas</h5>
+              <span class="date">28 Aug 2026</span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<%- include('partials/footer') %>

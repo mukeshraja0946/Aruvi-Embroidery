@@ -1,0 +1,446 @@
+<%- include('../partials/header') %>
+
+<div class="container designs-page-container" style="margin-top: 2rem; margin-bottom: 4rem;">
+  <!-- Listing Page Top Banner matching Reference -->
+  <div class="page-banner-card">
+    <div class="banner-content">
+      <div class="breadcrumb-trail">
+        <a href="/">Home</a> &nbsp;>&nbsp; <span><%= selectedCategory ? selectedCategory.name : 'Designs' %></span>
+      </div>
+      <h1 class="page-banner-title"><%= selectedCategory ? selectedCategory.name : 'All Designs' %></h1>
+      <p class="page-banner-subtitle">
+        Explore our collection of premium machine embroidery designs. Perfect for personal and commercial use.
+      </p>
+    </div>
+    <div class="banner-image-box">
+      <img src="/public/images/hero_embroidery.jpg" alt="Embroidery Designs Collection">
+    </div>
+  </div>
+
+  <!-- Standalone Search Bar matching Reference UI -->
+  <div class="designs-search-bar">
+    <form action="/designs" method="GET">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" name="search" placeholder="Search designs..." value="<%= search || '' %>">
+      <% if (selectedCategory) { %><input type="hidden" name="category" value="<%= selectedCategory.slug %>"><% } %>
+      <% if (selectedFormat) { %><input type="hidden" name="format" value="<%= selectedFormat %>"><% } %>
+      <% if (max_price) { %><input type="hidden" name="max_price" value="<%= max_price %>"><% } %>
+    </form>
+  </div>
+
+  <!-- Overlay for Mobile Filter Drawer -->
+  <div class="mobile-filter-overlay" id="filterOverlay"></div>
+
+  <!-- Main Grid: Left Filter Sidebar + Right 4-Column Product Grid -->
+  <div class="shop-listing-layout">
+    <!-- Left Filter Sidebar -->
+    <aside class="filter-sidebar" id="filterSidebar">
+      <!-- Drawer Header matching Reference UI -->
+      <div class="filter-drawer-header">
+        <div class="drawer-header-left">
+          <i class="fa-solid fa-sliders red-filter-icon"></i>
+          <h2 class="drawer-title">Filters</h2>
+        </div>
+        <div class="drawer-header-right">
+          <a href="/designs" class="clear-all-link">Clear All</a>
+          <button type="button" class="close-filter-btn" id="closeFilterBtn" aria-label="Close filters">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <form action="/designs" method="GET" id="filterForm" class="filter-form-body">
+        <!-- 1. Categories Accordion -->
+        <div class="filter-accordion-group">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <h3>Categories</h3>
+            <i class="fa-solid fa-chevron-up accordion-icon"></i>
+          </div>
+          <div class="accordion-content open">
+            <div class="category-chips-wrap">
+              <label class="cat-chip-label <%= !selectedCategory ? 'active' : '' %>">
+                <input type="radio" name="category" value="" <%= !selectedCategory ? 'checked' : '' %> onchange="this.form.submit()">
+                All Categories (300+)
+              </label>
+              <% categories.forEach(cat => { %>
+                <label class="cat-chip-label <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
+                  <input type="radio" name="category" value="<%= cat.slug %>" <%= selectedCategory && selectedCategory.slug === cat.slug ? 'checked' : '' %> onchange="this.form.submit()">
+                  <%= cat.name %> (<%= cat.description ? cat.description.replace(/\D/g, '') || '300' : '300' %>)
+                </label>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Price Range Accordion -->
+        <div class="filter-accordion-group">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <h3>Price Range</h3>
+            <i class="fa-solid fa-chevron-up accordion-icon"></i>
+          </div>
+          <div class="accordion-content open">
+            <div class="price-range-top">
+              <span>₹0</span>
+              <span id="priceValDisplay">₹<%= max_price || 500 %></span>
+            </div>
+            <input type="range" min="0" max="2000" step="50" name="max_price" value="<%= max_price || 500 %>" class="custom-red-range" oninput="document.getElementById('priceValDisplay').innerText = '₹' + this.value" onchange="this.form.submit()">
+            
+            <div class="price-presets-wrap">
+              <label class="price-preset-chip <%= !max_price || max_price == 2000 ? 'active' : '' %>">
+                <input type="radio" name="price_preset" value="2000" onchange="this.form.max_price.value=this.value; this.form.submit()"> All
+              </label>
+              <label class="price-preset-chip <%= max_price == 100 ? 'active' : '' %>">
+                <input type="radio" name="price_preset" value="100" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹0 - ₹100
+              </label>
+              <label class="price-preset-chip <%= max_price == 200 ? 'active' : '' %>">
+                <input type="radio" name="price_preset" value="200" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹101 - ₹200
+              </label>
+              <label class="price-preset-chip <%= max_price == 300 ? 'active' : '' %>">
+                <input type="radio" name="price_preset" value="300" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹201 - ₹300
+              </label>
+              <label class="price-preset-chip <%= max_price == 400 ? 'active' : '' %>">
+                <input type="radio" name="price_preset" value="400" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹301 - ₹400
+              </label>
+              <label class="price-preset-chip <%= max_price == 500 ? 'active' : '' %>">
+                <input type="radio" name="price_preset" value="500" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹401 - ₹500
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. File Format Accordion -->
+        <div class="filter-accordion-group">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <h3>File Format</h3>
+            <i class="fa-solid fa-chevron-down accordion-icon"></i>
+          </div>
+          <div class="accordion-content">
+            <div class="format-checkbox-grid">
+              <label class="format-check-item">
+                <input type="checkbox" name="format" value="DST" <%= selectedFormat === 'DST' ? 'checked' : '' %> onchange="this.form.submit()"> DST
+              </label>
+              <label class="format-check-item">
+                <input type="checkbox" name="format" value="PES" <%= selectedFormat === 'PES' ? 'checked' : '' %> onchange="this.form.submit()"> PES
+              </label>
+              <label class="format-check-item">
+                <input type="checkbox" name="format" value="JEF" <%= selectedFormat === 'JEF' ? 'checked' : '' %> onchange="this.form.submit()"> JEF
+              </label>
+              <label class="format-check-item">
+                <input type="checkbox" name="format" value="EXP" <%= selectedFormat === 'EXP' ? 'checked' : '' %> onchange="this.form.submit()"> EXP
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Rating Accordion -->
+        <div class="filter-accordion-group">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <h3>Rating</h3>
+            <i class="fa-solid fa-chevron-down accordion-icon"></i>
+          </div>
+          <div class="accordion-content">
+            <div class="rating-radio-list">
+              <label class="rating-radio-item">
+                <input type="radio" name="min_rating" value="4.0" <%= min_rating === '4.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <span class="stars-gold">★★★★★</span> 4 & above
+              </label>
+              <label class="rating-radio-item">
+                <input type="radio" name="min_rating" value="3.0" <%= min_rating === '3.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <span class="stars-gold">★★★★☆</span> 3 & above
+              </label>
+              <label class="rating-radio-item">
+                <input type="radio" name="min_rating" value="2.0" <%= min_rating === '2.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <span class="stars-gold">★★★☆☆</span> 2 & above
+              </label>
+              <label class="rating-radio-item">
+                <input type="radio" name="min_rating" value="1.0" <%= min_rating === '1.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <span class="stars-gold">★★☆☆☆</span> 1 & above
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Sort By Accordion -->
+        <div class="filter-accordion-group">
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <h3>Sort By</h3>
+            <i class="fa-solid fa-chevron-down accordion-icon"></i>
+          </div>
+          <div class="accordion-content">
+            <div class="sort-radio-list">
+              <label class="sort-radio-item">
+                <input type="radio" name="sort" value="newest" <%= !sort || sort === 'newest' ? 'checked' : '' %> onchange="this.form.submit()"> Latest
+              </label>
+              <label class="sort-radio-item">
+                <input type="radio" name="sort" value="price_low" <%= sort === 'price_low' ? 'checked' : '' %> onchange="this.form.submit()"> Price: Low to High
+              </label>
+              <label class="sort-radio-item">
+                <input type="radio" name="sort" value="price_high" <%= sort === 'price_high' ? 'checked' : '' %> onchange="this.form.submit()"> Price: High to Low
+              </label>
+              <label class="sort-radio-item">
+                <input type="radio" name="sort" value="popular" <%= sort === 'popular' ? 'checked' : '' %> onchange="this.form.submit()"> Most Popular
+              </label>
+              <label class="sort-radio-item">
+                <input type="radio" name="sort" value="rating" <%= sort === 'rating' ? 'checked' : '' %> onchange="this.form.submit()"> Highest Rated
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Sticky Apply Filters Button -->
+        <div class="drawer-apply-footer">
+          <button type="submit" class="apply-filters-btn">
+            Apply Filters (<%= total || designs.length %>+ Designs)
+          </button>
+        </div>
+      </form>
+    </aside>
+
+    <!-- Right Main Content Area -->
+    <main class="shop-main-content">
+
+      <%
+        function buildRemoveUrl(keyToRemove) {
+          let queryObj = {};
+          if (keyToRemove !== 'search' && search) queryObj.search = search;
+          if (keyToRemove !== 'category' && selectedCategory) queryObj.category = selectedCategory.slug;
+          if (keyToRemove !== 'format' && selectedFormat) queryObj.format = selectedFormat;
+          if (keyToRemove !== 'max_price' && max_price && Number(max_price) < 2000) queryObj.max_price = max_price;
+          if (keyToRemove !== 'min_rating' && min_rating) queryObj.min_rating = min_rating;
+          if (sort && sort !== 'newest') queryObj.sort = sort;
+          let qs = new URLSearchParams(queryObj).toString();
+          return '/designs' + (qs ? '?' + qs : '');
+        }
+        let hasActiveFilters = search || selectedCategory || selectedFormat || (max_price && Number(max_price) < 2000) || min_rating;
+      %>
+
+      <!-- Controls Top Bar -->
+      <div class="shop-controls-bar">
+        <button type="button" class="mobile-filter-toggle-btn" id="openFilterBtn">
+          <i class="fa-solid fa-sliders"></i> Filters <% if (hasActiveFilters) { %><span class="filter-dot-badge"></span><% } %>
+        </button>
+
+        <div class="results-count">
+          Showing <strong>1–<%= designs.length %></strong> of <strong><%= total || designs.length %>+</strong> designs
+        </div>
+        
+        <div class="controls-right">
+          <div class="sort-wrapper">
+            <span class="sort-label">Sort by:</span>
+            <select name="sort" class="sort-select" onchange="location = '/designs?sort=' + this.value + '&category=<%= selectedCategory ? selectedCategory.slug : '' %>';">
+              <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Latest</option>
+              <option value="price_low" <%= sort === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
+              <option value="price_high" <%= sort === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
+              <option value="popular" <%= sort === 'popular' ? 'selected' : '' %>>Most Popular</option>
+            </select>
+          </div>
+
+          <div class="view-toggle-btns">
+            <button class="view-btn active" title="Grid View"><i class="fa-solid fa-border-all"></i></button>
+            <button class="view-btn" title="List View"><i class="fa-solid fa-list"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horizontal Scrollable Category Filter Pills matching Reference -->
+      <div class="category-pills-scroll-row">
+        <a href="/designs" class="cat-pill-btn <%= !selectedCategory ? 'active' : '' %>">All (300+)</a>
+        <% categories.forEach(cat => { %>
+          <a href="/designs?category=<%= cat.slug %>" class="cat-pill-btn <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
+            <%= cat.name %> (<%= cat.description ? cat.description.replace(/\D/g, '') || '300' : '300' %>)
+          </a>
+        <% }) %>
+      </div>
+
+      <% if (hasActiveFilters) { %>
+        <div class="active-filters-bar">
+          <span class="active-filters-label">Active Filters:</span>
+          <div class="active-chips-wrapper">
+            <% if (search) { %>
+              <a href="<%= buildRemoveUrl('search') %>" class="active-filter-chip">
+                Search: "<%= search %>" <i class="fa-solid fa-xmark"></i>
+              </a>
+            <% } %>
+
+            <% if (selectedCategory) { %>
+              <a href="<%= buildRemoveUrl('category') %>" class="active-filter-chip">
+                Category: <%= selectedCategory.name %> <i class="fa-solid fa-xmark"></i>
+              </a>
+            <% } %>
+
+            <% if (selectedFormat) { %>
+              <a href="<%= buildRemoveUrl('format') %>" class="active-filter-chip">
+                Format: <%= selectedFormat %> <i class="fa-solid fa-xmark"></i>
+              </a>
+            <% } %>
+
+            <% if (max_price && Number(max_price) < 2000) { %>
+              <a href="<%= buildRemoveUrl('max_price') %>" class="active-filter-chip">
+                Max Price: ₹<%= max_price %> <i class="fa-solid fa-xmark"></i>
+              </a>
+            <% } %>
+
+            <% if (min_rating) { %>
+              <a href="<%= buildRemoveUrl('min_rating') %>" class="active-filter-chip">
+                Rating: <%= min_rating %>★+ <i class="fa-solid fa-xmark"></i>
+              </a>
+            <% } %>
+
+            <a href="/designs" class="clear-all-filters-btn">Clear All</a>
+          </div>
+        </div>
+      <% } %>
+
+      <!-- 4-Column Product Grid matching Reference -->
+      <% if (designs.length === 0) { %>
+        <div class="no-results-box">
+          <i class="fa-solid fa-folder-open"></i>
+          <h3>No designs found matching your filter criteria</h3>
+          <p>Try adjusting search keywords or resetting price and format filters.</p>
+          <a href="/designs" class="btn btn-primary" style="margin-top: 1rem;">View All Designs</a>
+        </div>
+      <% } else { %>
+        <div class="grid-4-strict">
+          <% designs.forEach(design => { %>
+            <div class="listing-product-card">
+              <!-- Wishlist Heart Button -->
+              <button class="wishlist-round-btn wishlist-btn" data-id="<%= design.id %>" title="Wishlist">
+                <i class="fa-regular fa-heart"></i>
+              </button>
+              
+              <!-- Image Banner -->
+              <div class="card-image-box" style="background: #FAF6F0; position: relative;">
+                <a href="/design/<%= design.slug %>" style="display: block; width: 100%; height: 100%;">
+                  <% if (design.primary_image) { %>
+                    <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;">
+                  <% } else { %>
+                    <div style="width: 100%; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">
+                      <i class="fa-regular fa-image" style="font-size: 1.8rem; margin-bottom: 4px; opacity: 0.5;"></i>
+                      <span>No Preview</span>
+                    </div>
+                  <% } %>
+                </a>
+              </div>
+
+              <!-- Card Body -->
+              <div class="card-body-content">
+                <h3 class="card-item-title">
+                  <a href="/design/<%= design.slug %>"><%= design.title %></a>
+                </h3>
+                <span class="card-item-category"><%= design.category_name || 'Embroidery Designs' %></span>
+
+                <% const cardFmts = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : []; %>
+                <% if (cardFmts.length > 0) { %>
+                  <div class="format-pill-row">
+                    <% cardFmts.forEach(fmt => { %>
+                      <span class="fmt-pill"><%= fmt %></span>
+                    <% }) %>
+                  </div>
+                <% } %>
+
+                <!-- Star Rating Row matching Reference -->
+                <div class="card-rating-row">
+                  <i class="fa-solid fa-star star-yellow"></i>
+                  <span class="rating-num"><%= (design.rating || 4.9).toFixed(1) %></span>
+                  <span class="rating-count">(<%= design.reviews_count || (design.id * 17 % 80 + 40) %>)</span>
+                </div>
+
+                <!-- Price & Discount Tag -->
+                <div class="card-price-row">
+                  <span class="current-price">₹<%= design.sale_price || design.price %></span>
+                  <% if (design.sale_price && design.price > design.sale_price) { %>
+                    <span class="old-price">₹<%= design.price %></span>
+                    <span class="discount-badge"><%= Math.round(((design.price - design.sale_price) / design.price) * 100) %>% OFF</span>
+                  <% } else if (design.discount_pct) { %>
+                    <span class="old-price">₹<%= Math.round(design.price * 1.25) %></span>
+                    <span class="discount-badge"><%= design.discount_pct %>% OFF</span>
+                  <% } %>
+                </div>
+
+                <!-- Dual Action Buttons: Add to Cart & Buy Now OR Owned Badge -->
+                <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+                <% if (isOwned) { %>
+                  <div class="card-actions-row">
+                    <a href="/design/<%= design.slug %>" class="btn btn-owned" style="display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 38px; border-radius: 8px; font-weight: 600; font-size: 0.88rem; background: #F4EBE0; color: #2E7D32; border: 1px solid #C8E6C9; text-decoration: none;">
+                      <i class="fa-solid fa-circle-check"></i> ✓ Owned
+                    </a>
+                  </div>
+                <% } else { %>
+                  <div class="card-actions-row">
+                    <form class="ajax-add-to-cart" style="flex: 1;">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="design_id" value="<%= design.id %>">
+                      <button type="submit" class="btn btn-outline card-btn-add">
+                        <i class="fa-solid fa-cart-plus"></i> Add
+                      </button>
+                    </form>
+
+                    <form action="/cart/buy-now?_csrf=<%= csrfToken %>" method="POST" style="flex: 1;">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="design_id" value="<%= design.id %>">
+                      <button type="submit" class="btn btn-primary card-btn-buy">
+                        <i class="fa-solid fa-bolt"></i> Buy Now
+                      </button>
+                    </form>
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+
+        <!-- Pagination Controls Bar matching Reference -->
+        <div class="pagination-wrapper">
+          <a href="#" class="page-nav-btn disabled"><i class="fa-solid fa-chevron-left"></i></a>
+          <a href="#" class="page-num-btn active">1</a>
+          <a href="#" class="page-num-btn">2</a>
+          <a href="#" class="page-num-btn">3</a>
+          <a href="#" class="page-num-btn">4</a>
+          <a href="#" class="page-num-btn">5</a>
+          <span class="page-dots">...</span>
+          <a href="#" class="page-num-btn">104</a>
+          <a href="#" class="page-nav-btn"><i class="fa-solid fa-chevron-right"></i></a>
+        </div>
+      <% } %>
+    </main>
+  </div>
+</div>
+
+<script>
+  function toggleAccordion(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.accordion-icon');
+    if (content.classList.contains('open')) {
+      content.classList.remove('open');
+      if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); }
+    } else {
+      content.classList.add('open');
+      if (icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const openBtn = document.getElementById('openFilterBtn');
+    const closeBtn = document.getElementById('closeFilterBtn');
+    const sidebar = document.getElementById('filterSidebar');
+    const overlay = document.getElementById('filterOverlay');
+
+    function openSidebar() {
+      if (sidebar) sidebar.classList.add('open');
+      if (overlay) overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+      if (sidebar) sidebar.classList.remove('open');
+      if (overlay) overlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    if (openBtn) openBtn.addEventListener('click', openSidebar);
+    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+  });
+</script>
+
+<%- include('../partials/footer') %>

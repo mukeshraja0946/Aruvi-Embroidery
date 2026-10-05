@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers Directory - ARUVI Admin</title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .action-icon-btn {
+      width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; text-decoration: none; transition: var(--transition);
+    }
+    .action-icon-btn:hover { border-color: var(--admin-primary); color: var(--admin-primary); background: #FAF6F0; }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header matching Master Manage Designs UI -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <!-- Global Search -->
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search designs, orders, customers...">
+    </div>
+
+    <!-- Right User Header Icons -->
+    <div class="admin-header-right">
+      <a href="#" class="admin-icon-btn" title="Notifications">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge-count">3</span>
+      </a>
+
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--admin-text-muted); margin-left: 4px;"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Main Layout with Sidebar -->
+  <div class="admin-main-container">
+    <!-- Left Sidebar matching Master Manage Designs UI -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/orders?status=pending">
+              <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
+              <span class="sidebar-badge">5</span>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers" class="active"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CONTENT Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CONTENT</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+
+      <!-- Breadcrumbs & Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.8rem;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+            <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; <span style="color: var(--admin-primary); font-weight: 600;">Customers</span>
+          </div>
+          <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Customers</h1>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">View and manage registered shoppers and account profiles.</p>
+        </div>
+
+        <button class="btn btn-outline" style="height: 44px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #FFF;"><i class="fa-solid fa-file-export"></i> Export Customers</button>
+      </div>
+
+      <!-- 4 Stat Summary Cards Row matching Master Manage Designs UI -->
+      <div class="admin-stats-row" style="margin-bottom: 1.8rem;">
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-users"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Total Customers</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num"><%= customers ? customers.length : 312 %></span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 10%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+          </div>
+        </div>
+
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-regular fa-eye"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Active Customers</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num">298</span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 95%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">active accounts</span>
+          </div>
+        </div>
+
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-user-plus"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">New Customers</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num">24</span>
+              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-up"></i> 24 this mo</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">new signups</span>
+          </div>
+        </div>
+
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-rotate-left"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Repeat Customers</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num">186</span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 62%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">repeat buyers</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Controls Bar Card -->
+      <div class="admin-card-box" style="padding: 1rem 1.4rem; margin-bottom: 1.5rem;">
+        <form action="/admin/customers" method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 280px; position: relative;">
+            <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--admin-text-muted); font-size: 0.88rem;"></i>
+            <input type="text" name="search" placeholder="Search customer by name, email, phone..." style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding-left: 2.5rem; font-size: 0.85rem;">
+          </div>
+
+          <select name="status" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          <select name="sort" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
+            <option value="newest">Sort by Newest</option>
+            <option value="name">Sort by Name</option>
+            <option value="spent_high">Total Spent: High to Low</option>
+          </select>
+
+          <a href="/admin/customers" class="btn btn-outline" style="height: 40px; border-radius: 8px; font-size: 0.85rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 6px; background: #FFF;">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </a>
+        </form>
+      </div>
+
+      <!-- Main Customers Table Card matching Master Manage Designs UI -->
+      <div class="admin-card-box" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
+        <table class="admin-table-styled">
+          <thead>
+            <tr>
+              <th style="width: 38px; text-align: center;"><input type="checkbox"></th>
+              <th>Customer</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Orders</th>
+              <th>Total Spent</th>
+              <th>Status</th>
+              <th>Joined Date</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (customers && customers.length > 0) { %>
+              <% customers.forEach((user, idx) => { %>
+                <tr>
+                  <td style="text-align: center;"><input type="checkbox"></td>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 36px; height: 36px; border-radius: 50%; background: #231815; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem;">
+                        <%= user.full_name ? user.full_name.charAt(0).toUpperCase() : 'C' %>
+                      </div>
+                      <div>
+                        <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);"><%= user.full_name %></strong>
+                        <span style="font-size: 0.72rem; color: var(--admin-text-muted);">#CUST-<%= user.id %></span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span style="font-size: 0.85rem; color: var(--admin-text-dark);"><%= user.email %></span></td>
+                  <td><span style="font-size: 0.82rem; color: var(--admin-text-muted);"><%= user.phone || '+91 98765 43210' %></span></td>
+                  <td><strong style="font-size: 0.88rem; color: var(--admin-text-dark);"><%= 3 + (idx * 2) %> orders</strong></td>
+                  <td><strong style="font-size: 0.88rem; color: var(--admin-primary);">₹<%= 1499 + (idx * 450) %></strong></td>
+                  <td>
+                    <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 600;">Active</span>
+                  </td>
+                  <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
+                    <%= user.created_at ? new Date(user.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '01 Oct 2026' %>
+                  </td>
+                  <td style="text-align: right;">
+                    <div style="display: inline-flex; gap: 6px;">
+                      <a href="#" class="action-icon-btn" title="View Profile"><i class="fa-regular fa-eye"></i></a>
+                      <a href="mailto:<%= user.email %>" class="action-icon-btn" title="Send Email"><i class="fa-regular fa-envelope"></i></a>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <tr>
+                <td colspan="9" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                  No registered customers found.
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+
+        <!-- Pagination Bar matching Master Manage Designs UI -->
+        <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
+            Showing 1 to <%= customers ? customers.length : 3 %> of <strong><%= customers ? customers.length : 312 %></strong> customers
+          </div>
+
+          <div style="display: flex; gap: 6px;">
+            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-left" style="font-size: 0.7rem;"></i></a>
+            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px; background: var(--admin-primary); color: #FFFFFF; border-color: var(--admin-primary); font-weight: 700;">1</a>
+            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i></a>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

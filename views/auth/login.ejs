@@ -1,0 +1,98 @@
+<%- include('../partials/header') %>
+
+<div class="container" style="margin-top: 3.5rem; margin-bottom: 5.5rem;">
+  <div style="max-width: 480px; margin: 0 auto; background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 18px; padding: 2.8rem 2.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
+    
+    <div style="text-align: center; margin-bottom: 2rem;">
+      <% if (siteSettings && siteSettings.logo_url) { %>
+        <img src="<%= siteSettings.logo_url %>" alt="ARUVI EMBROIDERY STUDIO" style="max-height: 54px; width: auto; margin: 0 auto 0.8rem; object-fit: contain;">
+      <% } else { %>
+        <img src="/public/images/logo.jpg" alt="ARUVI EMBROIDERY STUDIO" style="max-height: 54px; width: auto; margin: 0 auto 0.8rem; object-fit: contain;">
+      <% } %>
+      <h2 style="font-family: var(--font-heading); font-size: 2rem; color: var(--text-dark); margin-bottom: 0.3rem;">Customer Login</h2>
+      <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">Sign in to access your purchased design files and order history</p>
+    </div>
+
+    <% if (flash && flash.error && flash.error.length > 0) { %>
+      <div class="alert alert-error" style="margin-bottom: 1.5rem; border-radius: 10px; font-size: 0.85rem;">
+        <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
+      </div>
+    <% } %>
+
+    <form action="/auth/login" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      
+      <div class="form-group" style="margin-bottom: 1.2rem;">
+        <label class="form-label">Email Address</label>
+        <div style="position: relative;">
+          <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
+          <input type="email" name="email" class="form-control" placeholder="you@example.com" required style="padding-left: 2.6rem;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <label class="form-label" style="margin: 0;">Password</label>
+          <a href="/auth/forgot-password" style="font-size: 0.82rem; color: var(--primary); font-weight: 500;">Forgot Password?</a>
+        </div>
+        <div style="position: relative;">
+          <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
+          <input type="password" id="customerPassword" name="password" class="form-control" placeholder="Enter your password" required style="padding-left: 2.6rem; padding-right: 2.6rem;">
+          <i class="fa-regular fa-eye" id="togglePasswordBtn" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem; cursor: pointer;"></i>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="height: 48px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <i class="fa-solid fa-right-to-bracket"></i> Sign In
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--border-light); font-size: 0.88rem; color: var(--text-muted);">
+      Don't have an account? <a href="/register" style="font-weight: 600; color: var(--primary);">Register here</a>
+    </div>
+
+  </div>
+</div>
+
+<% if (flash && flash.account_not_found && flash.account_not_found.length > 0) { %>
+  <!-- Account Not Found Modal Popup matching Requirement 3 -->
+  <div id="accountNotFoundModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #FFFFFF; border-radius: 18px; max-width: 440px; width: 90%; padding: 2.2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; border: 1px solid var(--border-light);">
+      <div style="width: 60px; height: 60px; border-radius: 50%; background: #FDE8E8; color: #C62828; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem;">
+        <i class="fa-solid fa-user-xmark"></i>
+      </div>
+
+      <h3 style="font-family: var(--font-heading); font-size: 1.6rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0.6rem;">Account not found</h3>
+      
+      <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.8rem;">
+        We couldn't find an account with this email address. Please create an account to continue.
+      </p>
+
+      <div style="display: flex; gap: 1rem; justify-content: center;">
+        <button type="button" onclick="document.getElementById('accountNotFoundModal').style.display='none'" class="btn btn-outline" style="flex: 1; height: 44px; border-radius: 10px; font-weight: 600; background: #FFF;">
+          Close
+        </button>
+        <a href="/register" class="btn btn-primary" style="flex: 1.2; height: 44px; border-radius: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+          Create Account
+        </a>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script>
+  document.getElementById('togglePasswordBtn').addEventListener('click', function() {
+    const pwdInput = document.getElementById('customerPassword');
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      this.classList.remove('fa-eye');
+      this.classList.add('fa-eye-slash');
+    } else {
+      pwdInput.type = 'password';
+      this.classList.remove('fa-eye-slash');
+      this.classList.add('fa-eye');
+    }
+  });
+</script>
+
+<%- include('../partials/footer') %>

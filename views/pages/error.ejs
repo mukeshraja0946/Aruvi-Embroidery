@@ -1,0 +1,22 @@
+<%- include('../partials/header') %>
+
+<div class="container section" style="padding: 3rem 1rem;">
+  <div style="max-width: 600px; margin: 0 auto; text-align: center; padding: 3rem 1rem; background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+    
+    <div style="font-size: 4rem; color: var(--primary); margin-bottom: 1rem;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+
+    <h2 style="font-size: 2.2rem; margin-bottom: 0.8rem;"><%= typeof title !== 'undefined' ? title : 'Error Occurred' %></h2>
+    <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 2rem;">
+      <%= typeof message !== 'undefined' ? message : 'An unexpected error occurred.' %>
+    </p>
+
+    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+      <a href="javascript:location.reload()" class="btn btn-primary"><i class="fa-solid fa-rotate-right"></i> Refresh & Try Again</a>
+      <a href="/" class="btn btn-outline"><i class="fa-solid fa-house"></i> Return to Home</a>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

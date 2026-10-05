@@ -1,0 +1,166 @@
+<%- include('../partials/header') %>
+
+<div class="container section category-detail-container">
+  <!-- Breadcrumb -->
+  <div class="category-breadcrumb-bar">
+    <a href="/" style="color: var(--text-muted);">Home</a> &gt; <a href="/categories" style="color: var(--text-muted);">Categories</a> &gt; <span style="color: var(--text-dark); font-weight: 600;"><%= category.name %></span>
+  </div>
+
+  <!-- Category Header -->
+  <div class="section-heading-box category-header-box">
+    <h1 class="category-main-title">
+      <%= category.name %>
+    </h1>
+    <div class="category-count-badge-wrap">
+      <span class="category-count-badge">
+        Showing <%= designs.length %> of <%= total %> <%= total === 1 ? 'Design' : 'Designs' %>
+      </span>
+    </div>
+    <p class="category-desc">
+      <%= category.description || 'Explore our exclusive collection of premium machine embroidery design files.' %>
+    </p>
+  </div>
+
+  <!-- Filter Chips Bar & Sorting -->
+  <% 
+    const subVal = typeof currentSub !== 'undefined' ? currentSub : '';
+    const sortVal = typeof currentSort !== 'undefined' ? currentSort : 'latest';
+  %>
+  <div class="filter-bar-container">
+    <div class="filter-pills-scroll-row">
+      <span class="filter-label">Filter:</span>
+      <a href="/category/<%= category.slug %>" class="filter-pill-btn <%= !subVal ? 'active' : '' %>">All</a>
+      <a href="/category/<%= category.slug %>?sub=rose" class="filter-pill-btn <%= subVal === 'rose' ? 'active' : '' %>">Rose</a>
+      <a href="/category/<%= category.slug %>?sub=lotus" class="filter-pill-btn <%= subVal === 'lotus' ? 'active' : '' %>">Lotus</a>
+      <a href="/category/<%= category.slug %>?sub=leaves" class="filter-pill-btn <%= subVal === 'leaves' ? 'active' : '' %>">Leaves</a>
+      <a href="/category/<%= category.slug %>?sub=small" class="filter-pill-btn <%= subVal === 'small' ? 'active' : '' %>">Small Flowers</a>
+      <a href="/category/<%= category.slug %>?sub=big" class="filter-pill-btn <%= subVal === 'big' ? 'active' : '' %>">Big Flowers</a>
+    </div>
+
+    <div class="sort-select-box">
+      <span class="sort-label">Sort by:</span>
+      <select class="form-control sort-select-input" onchange="location = this.value;">
+        <option value="/category/<%= category.slug %>?sort=latest<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'latest' ? 'selected' : '' %>>Latest</option>
+        <option value="/category/<%= category.slug %>?sort=price_low<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
+        <option value="/category/<%= category.slug %>?sort=price_high<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
+        <option value="/category/<%= category.slug %>?sort=popular<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'popular' ? 'selected' : '' %>>Most Popular</option>
+        <option value="/category/<%= category.slug %>?sort=rating<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'rating' ? 'selected' : '' %>>Highest Rated</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Dedicated Results Container -->
+  <div class="results-container">
+    <% if (designs.length === 0) { %>
+      <div class="empty-designs-box empty-state" style="min-height: 350px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3rem 1rem;">
+        <i class="fa-solid fa-folder-open" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
+        <h3 style="font-family: var(--font-heading); font-size: 1.5rem; margin-bottom: 0.5rem;">No designs found in <%= category.name %></h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Try selecting a different filter or browse all available designs.</p>
+        <a href="/category/<%= category.slug %>" class="btn btn-primary" style="margin-top: 1rem; border-radius: 8px;">Clear Filters</a>
+      </div>
+    <% } else { %>
+    <div class="grid-4-strict">
+      <% designs.forEach(design => { %>
+        <div class="listing-product-card">
+          <!-- Wishlist Heart Button -->
+          <button class="wishlist-round-btn wishlist-btn" data-id="<%= design.id %>" title="Wishlist">
+            <i class="fa-regular fa-heart"></i>
+          </button>
+          
+          <!-- Image Box -->
+          <div class="card-image-box" style="background: #FAF6F0; position: relative;">
+            <a href="/design/<%= design.slug %>" style="display: block; width: 100%; height: 100%;">
+              <% if (design.primary_image) { %>
+                <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;">
+              <% } else { %>
+                <div style="width: 100%; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">
+                  <i class="fa-regular fa-image" style="font-size: 1.8rem; margin-bottom: 4px; opacity: 0.5;"></i>
+                  <span>No Preview</span>
+                </div>
+              <% } %>
+            </a>
+          </div>
+
+          <!-- Card Content Body -->
+          <div class="card-body-content">
+            <h3 class="card-item-title">
+              <a href="/design/<%= design.slug %>"><%= design.title %></a>
+            </h3>
+            <span class="card-item-category"><%= category.name %></span>
+
+            <% const catFmts = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : []; %>
+            <% if (catFmts.length > 0) { %>
+              <div class="format-pill-row">
+                <% catFmts.forEach(fmt => { %>
+                  <span class="fmt-pill"><%= fmt %></span>
+                <% }) %>
+              </div>
+            <% } %>
+
+            <!-- Rating Row -->
+            <div style="font-size: 0.78rem; color: #F5A623; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-star"></i>
+              <span style="font-weight: 700; color: var(--text-dark);"><%= design.average_rating || 4.9 %></span>
+              <span style="color: var(--text-muted);">(<%= design.reviews_count || 95 %>)</span>
+            </div>
+
+            <!-- Price Row -->
+            <div class="card-price-row">
+              <span class="current-price">₹<%= Math.round(design.sale_price || design.price) %></span>
+              <% if (design.sale_price && design.price > design.sale_price) { %>
+                <span class="old-price">₹<%= Math.round(design.price) %></span>
+                <span class="discount-badge"><%= Math.round(((design.price - design.sale_price) / design.price) * 100) %>% OFF</span>
+              <% } else if (design.discount_pct) { %>
+                <span class="old-price">₹<%= Math.round(design.price * 1.25) %></span>
+                <span class="discount-badge"><%= design.discount_pct %>% OFF</span>
+              <% } %>
+            </div>
+
+            <!-- Dual Action Buttons: Add to Cart & Buy Now OR Owned Badge -->
+            <% const isOwnedCat = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+            <% if (isOwnedCat) { %>
+              <div class="card-actions-row">
+                <a href="/design/<%= design.slug %>" class="btn btn-owned" style="display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 38px; border-radius: 8px; font-weight: 600; font-size: 0.88rem; background: #F4EBE0; color: #2E7D32; border: 1px solid #C8E6C9; text-decoration: none;">
+                  <i class="fa-solid fa-circle-check"></i> ✓ Owned
+                </a>
+              </div>
+            <% } else { %>
+              <div class="card-actions-row">
+                <form class="ajax-add-to-cart" style="flex: 1;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="design_id" value="<%= design.id %>">
+                  <button type="submit" class="btn btn-outline card-btn-add">
+                    <i class="fa-solid fa-cart-plus"></i> Add
+                  </button>
+                </form>
+
+                <form action="/cart/buy-now?_csrf=<%= csrfToken %>" method="POST" style="flex: 1;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="design_id" value="<%= design.id %>">
+                  <button type="submit" class="btn btn-primary card-btn-buy">
+                    <i class="fa-solid fa-bolt"></i> Buy Now
+                  </button>
+                </form>
+              </div>
+            <% } %>
+
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- Pagination Controls Bar -->
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+      <div class="pagination-wrapper" style="margin-top: 3rem;">
+        <a href="/category/<%= category.slug %>?page=<%= Math.max(1, currentPage - 1) %><%= currentSort ? '&sort=' + currentSort : '' %><%= currentSub ? '&sub=' + currentSub : '' %>" class="page-nav-btn <%= currentPage <= 1 ? 'disabled' : '' %>"><i class="fa-solid fa-chevron-left"></i></a>
+        <% for (let i = 1; i <= totalPages; i++) { %>
+          <a href="/category/<%= category.slug %>?page=<%= i %><%= currentSort ? '&sort=' + currentSort : '' %><%= currentSub ? '&sub=' + currentSub : '' %>" class="page-num-btn <%= currentPage === i ? 'active' : '' %>"><%= i %></a>
+        <% } %>
+        <a href="/category/<%= category.slug %>?page=<%= Math.min(totalPages, currentPage + 1) %><%= currentSort ? '&sort=' + currentSort : '' %><%= currentSub ? '&sub=' + currentSub : '' %>" class="page-nav-btn <%= currentPage >= totalPages ? 'disabled' : '' %>"><i class="fa-solid fa-chevron-right"></i></a>
+      </div>
+    <% } %>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - ARUVI EMBROIDERY STUDIO</title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Navigation Bar matching Reference -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <!-- Global Search -->
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search orders, designs, customers...">
+    </div>
+
+    <!-- Right User Header Icons -->
+    <div class="admin-header-right">
+      <a href="#" class="admin-icon-btn" title="Notifications">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge-count">3</span>
+      </a>
+
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--admin-text-muted); margin-left: 4px;"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Main Layout with Sidebar -->
+  <div class="admin-main-container">
+    <!-- Left Sidebar matching Reference -->
+    <aside class="admin-sidebar">
+      <!-- Active Item: Dashboard -->
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin" class="active">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/orders?status=pending">
+              <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
+              <span class="sidebar-badge">5</span>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CONTENT Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CONTENT</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+
+      <!-- Hero Welcome Banner -->
+      <div class="admin-welcome-hero">
+        <div class="welcome-hero-text">
+          <span style="font-size: 0.72rem; letter-spacing: 1.5px; font-weight: 700; color: var(--admin-primary); text-transform: uppercase;">WELCOME BACK,</span>
+          <h1>Admin!</h1>
+          <p>Here's an overview of your embroidery store.<br>Manage designs, orders, customers and more.</p>
+        </div>
+        <div class="welcome-hero-image">
+          <img src="/public/images/hero_embroidery.jpg" alt="Embroidery Craft Header">
+        </div>
+      </div>
+
+      <!-- 4 Stat Summary Cards Row matching Reference -->
+      <div class="admin-stats-row">
+        <!-- Total Orders Card -->
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-bag-shopping"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Total Orders</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num"><%= stats.totalOrders || 124 %></span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 12%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+          </div>
+        </div>
+
+        <!-- Total Sales Card -->
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-cart-shopping"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Total Sales</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num">₹<%= stats.totalSales ? parseFloat(stats.totalSales).toLocaleString('en-IN') : '48,750' %></span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 18%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+          </div>
+        </div>
+
+        <!-- Total Customers Card -->
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-users"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Total Customers</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num"><%= totalCustomers || 312 %></span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 10%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+          </div>
+        </div>
+
+        <!-- Total Designs Card -->
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-box-archive"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Total Designs</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num"><%= totalDesigns || 520 %></span>
+              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 8%</span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Section (2 Columns: Sales Overview & Orders by Status) -->
+      <div class="admin-charts-row">
+        <!-- Card 1: Sales Overview Area Chart -->
+        <div class="admin-card-box">
+          <div class="card-header-flex">
+            <h3>Sales Overview</h3>
+            <select style="background: #F4EFEA; border: 1px solid var(--admin-border); border-radius: 8px; padding: 4px 10px; font-size: 0.8rem; color: var(--admin-text-dark); cursor: pointer;">
+              <option>Last 6 Months</option>
+              <option>Last 3 Months</option>
+              <option>This Year</option>
+            </select>
+          </div>
+          <div style="height: 220px; position: relative;">
+            <canvas id="salesOverviewChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Card 2: Orders by Status Donut Chart -->
+        <div class="admin-card-box">
+          <div class="card-header-flex">
+            <h3>Orders by Status</h3>
+          </div>
+          
+          <div style="display: flex; align-items: center; gap: 1.2rem; height: 220px;">
+            <!-- Donut Canvas Container -->
+            <div style="width: 150px; height: 150px; position: relative; flex-shrink: 0; margin: 0 auto;">
+              <canvas id="ordersStatusChart"></canvas>
+              <!-- Center Text -->
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                <div style="font-size: 1.4rem; font-family: var(--font-heading); font-weight: 700; color: var(--admin-text-dark); line-height: 1;">124</div>
+                <div style="font-size: 0.68rem; color: var(--admin-text-muted);">Orders</div>
+              </div>
+            </div>
+
+            <!-- Custom Legend Stack -->
+            <div style="display: flex; flex-direction: column; gap: 10px; flex: 1; font-size: 0.8rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #FFC107;"></span>
+                  <span>Pending</span>
+                </div>
+                <strong>5 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(4%)</span></strong>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #2196F3;"></span>
+                  <span>Processing</span>
+                </div>
+                <strong>18 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(15%)</span></strong>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #4CAF50;"></span>
+                  <span>Completed</span>
+                </div>
+                <strong>92 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(74%)</span></strong>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #F44336;"></span>
+                  <span>Cancelled</span>
+                </div>
+                <strong>9 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(7%)</span></strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Row (3 Columns: Recent Orders, Top Selling Designs, Quick Actions) -->
+      <div class="admin-bottom-grid">
+        
+        <!-- Column 1: Recent Orders -->
+        <div class="admin-card-box">
+          <div class="card-header-flex">
+            <h3>Recent Orders</h3>
+            <a href="/admin/orders" class="view-all-link">View All &rarr;</a>
+          </div>
+
+          <table class="admin-table-styled">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th>Design</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>#1001</strong></td>
+                <td>Priya S.</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <img src="/public/images/hero_embroidery.jpg" alt="Floral Border" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                    <span style="font-size: 0.8rem;">Floral Border</span>
+                  </div>
+                </td>
+                <td><strong>₹499</strong></td>
+                <td><span style="background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Completed</span></td>
+                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">01 Oct 2026</td>
+              </tr>
+              <tr>
+                <td><strong>#1002</strong></td>
+                <td>Karthik M.</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <img src="/public/images/cat_monogram.jpg" alt="Peacock Design" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                    <span style="font-size: 0.8rem;">Peacock Design</span>
+                  </div>
+                </td>
+                <td><strong>₹299</strong></td>
+                <td><span style="background: #E3F2FD; color: #1565C0; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Processing</span></td>
+                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">30 Sep 2026</td>
+              </tr>
+              <tr>
+                <td><strong>#1003</strong></td>
+                <td>Divya R.</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <img src="/public/images/cat_floral.jpg" alt="Blouse Design" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                    <span style="font-size: 0.8rem;">Blouse Design</span>
+                  </div>
+                </td>
+                <td><strong>₹699</strong></td>
+                <td><span style="background: #FFF8E1; color: #F57F17; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Pending</span></td>
+                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">29 Sep 2026</td>
+              </tr>
+              <tr>
+                <td><strong>#1004</strong></td>
+                <td>Sathish K.</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <img src="/public/images/cat_monogram.jpg" alt="Monogram A" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                    <span style="font-size: 0.8rem;">Monogram A</span>
+                  </div>
+                </td>
+                <td><strong>₹399</strong></td>
+                <td><span style="background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Completed</span></td>
+                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">28 Sep 2026</td>
+              </tr>
+              <tr>
+                <td><strong>#1005</strong></td>
+                <td>Meena L.</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <img src="/public/images/cat_kids.jpg" alt="Kids Teddy" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                    <span style="font-size: 0.8rem;">Kids Teddy</span>
+                  </div>
+                </td>
+                <td><strong>₹349</strong></td>
+                <td><span style="background: #E3F2FD; color: #1565C0; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Processing</span></td>
+                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">27 Sep 2026</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Column 2: Top Selling Designs -->
+        <div class="admin-card-box">
+          <div class="card-header-flex">
+            <h3>Top Selling Designs</h3>
+            <a href="/admin/designs" class="view-all-link">View All &rarr;</a>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F6E5E0; color: var(--admin-primary); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">1</span>
+              <img src="/public/images/hero_embroidery.jpg" alt="Floral Border Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
+              <div style="flex: 1;">
+                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Floral Border Design</strong>
+                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">86 sales</span>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">2</span>
+              <img src="/public/images/cat_monogram.jpg" alt="Peacock Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
+              <div style="flex: 1;">
+                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Peacock Design</strong>
+                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">72 sales</span>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">3</span>
+              <img src="/public/images/cat_floral.jpg" alt="Blouse Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
+              <div style="flex: 1;">
+                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Blouse Design</strong>
+                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">58 sales</span>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">4</span>
+              <img src="/public/images/cat_monogram.jpg" alt="Monogram A" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
+              <div style="flex: 1;">
+                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Monogram A</strong>
+                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">45 sales</span>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">5</span>
+              <img src="/public/images/cat_kids.jpg" alt="Kids Teddy Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
+              <div style="flex: 1;">
+                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Kids Teddy Design</strong>
+                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">38 sales</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 3: Quick Actions -->
+        <div class="admin-card-box">
+          <div class="card-header-flex">
+            <h3>Quick Actions</h3>
+          </div>
+
+          <div style="display: flex; flex-direction: column;">
+            <a href="/admin/designs/create" class="quick-action-btn">
+              <div>
+                <i class="fa-regular fa-circle-plus action-icon"></i>
+                <span>Add New Design</span>
+              </div>
+              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
+            </a>
+
+            <a href="/admin/categories" class="quick-action-btn">
+              <div>
+                <i class="fa-solid fa-border-all action-icon"></i>
+                <span>Manage Categories</span>
+              </div>
+              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
+            </a>
+
+            <a href="/admin/orders" class="quick-action-btn">
+              <div>
+                <i class="fa-regular fa-newspaper action-icon"></i>
+                <span>View All Orders</span>
+              </div>
+              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
+            </a>
+
+            <a href="/admin/customers" class="quick-action-btn">
+              <div>
+                <i class="fa-solid fa-users action-icon"></i>
+                <span>Manage Customers</span>
+              </div>
+              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
+            </a>
+
+            <a href="/admin/homepage" class="quick-action-btn">
+              <div>
+                <i class="fa-regular fa-image action-icon"></i>
+                <span>Update Homepage</span>
+              </div>
+              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Chart initialization script matching reference -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Sales Overview Area Chart
+    const ctxSales = document.getElementById('salesOverviewChart').getContext('2d');
+    const gradient = ctxSales.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, 'rgba(184, 64, 42, 0.35)');
+    gradient.addColorStop(1, 'rgba(184, 64, 42, 0.01)');
+
+    new Chart(ctxSales, {
+      type: 'line',
+      data: {
+        labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+        datasets: [{
+          label: 'Sales (₹)',
+          data: [6000, 14000, 20000, 18000, 29000, 35000],
+          borderColor: '#B8402A',
+          borderWidth: 2.5,
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#B8402A',
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            ticks: {
+              callback: function(val) {
+                return val === 0 ? '0' : (val / 1000) + 'K';
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // 2. Orders by Status Donut Chart
+    const ctxStatus = document.getElementById('ordersStatusChart').getContext('2d');
+    new Chart(ctxStatus, {
+      type: 'doughnut',
+      data: {
+        labels: ['Pending', 'Processing', 'Completed', 'Cancelled'],
+        datasets: [{
+          data: [5, 18, 92, 9],
+          backgroundColor: ['#FFC107', '#2196F3', '#4CAF50', '#F44336'],
+          borderWidth: 0,
+          cutout: '76%'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } }
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,403 @@
+<%- include('../partials/header') %>
+
+<style>
+  .success-page-bg {
+    background-color: #FAF6F0;
+    min-height: 80vh;
+    padding: 2.5rem 1rem 4rem;
+  }
+  .success-card-wrapper {
+    max-width: 640px;
+    margin: 0 auto;
+    background: #FAF6F0;
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    border: 1px solid #EFE6D9;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+    text-align: center;
+    font-family: var(--font-body, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    box-sizing: border-box;
+  }
+
+  /* Decorative Success Icon with Rays */
+  .success-icon-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .success-circle {
+    width: 72px;
+    height: 72px;
+    background: #DCF0DC;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1E7E34;
+    font-size: 2.2rem;
+    position: relative;
+    z-index: 2;
+  }
+  .success-rays-svg {
+    position: absolute;
+    width: 104px;
+    height: 104px;
+    top: -12px;
+    left: -12px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .success-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #1D1614;
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .success-message {
+    font-size: 1.05rem;
+    color: #5C504A;
+    line-height: 1.5;
+    margin: 0 0 2rem;
+  }
+  .success-order-num {
+    color: #B8402A;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  /* Download Box Container */
+  .download-box-section {
+    background: #F4EBE0;
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.8rem;
+    text-align: left;
+    border: 1px solid #EAE0D2;
+  }
+  .download-box-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 1.2rem;
+  }
+  .download-header-icon {
+    color: #B8402A;
+    font-size: 1.8rem;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .download-box-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #1D1614;
+    margin: 0 0 4px;
+    line-height: 1.25;
+  }
+  .download-box-subtitle {
+    font-size: 0.9rem;
+    color: #6E615A;
+    margin: 0;
+  }
+
+  /* Purchased Item Card */
+  .purchased-design-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    border: 1px solid #EFE6D9;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+  }
+  .design-card-top-row {
+    display: flex;
+    gap: 1.2rem;
+    align-items: flex-start;
+  }
+  .design-card-thumb {
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid #F0E8DD;
+    background: #FAF7F2;
+  }
+  .design-card-details {
+    flex: 1;
+    min-width: 0;
+  }
+  .design-card-name {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1D1614;
+    margin: 0 0 4px;
+    line-height: 1.3;
+  }
+  .design-card-price {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #B8402A;
+    margin-bottom: 8px;
+  }
+  .design-card-formats-label {
+    font-size: 0.82rem;
+    color: #6E615A;
+    margin-bottom: 6px;
+  }
+  .design-card-format-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .format-badge {
+    background: #F4EBE0;
+    color: #4A3E39;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  /* Download Button inside card */
+  .btn-download-zip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 1.2rem;
+    background: #B8402A;
+    color: #FFFFFF !important;
+    height: 50px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    transition: background 0.2s ease, transform 0.1s ease;
+    border: none;
+    box-sizing: border-box;
+  }
+  .btn-download-zip:hover {
+    background: #9E331F;
+    transform: translateY(-1px);
+  }
+
+  /* Bottom Action Buttons */
+  .btn-success-dashboard {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: #B8402A;
+    color: #FFFFFF !important;
+    height: 54px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    text-decoration: none;
+    margin-bottom: 0.9rem;
+    transition: all 0.2s ease;
+    border: none;
+    box-sizing: border-box;
+  }
+  .btn-success-dashboard:hover {
+    background: #9E331F;
+    transform: translateY(-1px);
+  }
+
+  .btn-success-shopping {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    background: #FAF4EC;
+    color: #231815 !important;
+    border: 1px solid #E4D8C8;
+    height: 54px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+  .btn-success-shopping:hover {
+    background: #F3E8DB;
+    border-color: #D8C7B2;
+  }
+
+  @media (max-width: 576px) {
+    .success-page-bg {
+      padding: 1rem 0.75rem 2.5rem;
+    }
+    .success-card-wrapper {
+      padding: 1.75rem 1.2rem;
+      border-radius: 18px;
+    }
+    .success-title {
+      font-size: 1.95rem;
+    }
+    .success-message {
+      font-size: 0.96rem;
+    }
+    .download-box-section {
+      padding: 1.1rem;
+      border-radius: 16px;
+    }
+    .purchased-design-card {
+      padding: 1rem;
+    }
+    .design-card-top-row {
+      gap: 0.9rem;
+    }
+    .design-card-thumb {
+      width: 84px;
+      height: 84px;
+      min-width: 84px;
+    }
+    .design-card-name {
+      font-size: 1.1rem;
+    }
+    .btn-download-zip, .btn-success-dashboard, .btn-success-shopping {
+      height: 48px;
+      font-size: 0.98rem;
+    }
+  }
+</style>
+
+<div class="success-page-bg">
+  <div class="success-card-wrapper">
+    
+    <!-- Step 3: Success Checkmark Circle with Radial Rays -->
+    <div class="success-icon-container">
+      <svg class="success-rays-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="18" y1="26" x2="26" y2="34" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+        <line x1="50" y1="10" x2="50" y2="20" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+        <line x1="82" y1="26" x2="74" y2="34" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+        <line x1="14" y1="52" x2="24" y2="52" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+        <line x1="86" y1="52" x2="76" y2="52" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+        <line x1="22" y1="78" x2="30" y2="70" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+        <line x1="78" y1="78" x2="70" y2="70" stroke="#C8E6C9" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div class="success-circle">
+        <i class="fa-solid fa-check"></i>
+      </div>
+    </div>
+
+    <!-- Step 4: Main Serif Title -->
+    <h1 class="success-title">Payment Successful!</h1>
+
+    <!-- Step 5: Dynamic Confirmation Message -->
+    <p class="success-message">
+      Thank you for shopping at<br>
+      Aruvi Embroidery. Your order<br>
+      <span class="success-order-num">#<%= order ? order.order_number : 'AE-ORDER-SUCCESS' %></span><br>
+      has been confirmed.
+    </p>
+
+    <!-- Step 6: Download Section Box -->
+    <div class="download-box-section">
+      <div class="download-box-header">
+        <div class="download-header-icon">
+          <i class="fa-solid fa-file-arrow-down"></i>
+        </div>
+        <div>
+          <h2 class="download-box-title">Your Downloadable<br>Embroidery Files</h2>
+          <p class="download-box-subtitle">Your purchased designs are ready to download.</p>
+        </div>
+      </div>
+
+      <!-- Step 7-14: Purchased Design Card(s) -->
+      <% if (order && order.items && order.items.length > 0) { %>
+        <% order.items.forEach(item => { %>
+          <div class="purchased-design-card">
+            <div class="design-card-top-row">
+              <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>" class="design-card-thumb">
+              <div class="design-card-details">
+                <h3 class="design-card-name"><%= item.title %></h3>
+                <div class="design-card-price">
+                  ₹<%= parseFloat(item.price_at_purchase || item.effective_price || item.price || (order.final_amount / (order.items.length || 1))).toFixed(2) %>
+                </div>
+                <div class="design-card-formats-label">Available Formats:</div>
+                <div class="design-card-format-badges">
+                  <% 
+                    const formatsList = item.formats 
+                      ? item.formats.split(',').map(f => f.trim()) 
+                      : ['DST', 'PES', 'JEF', 'EXP'];
+                    formatsList.forEach(fmt => { 
+                  %>
+                    <span class="format-badge"><%= fmt %></span>
+                  <% }) %>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 12: Download ZIP Button INSIDE Card -->
+            <% if (currentUser) { %>
+              <a href="/user/download/<%= item.file_id || item.design_id || 1 %>" download class="btn-download-zip">
+                <i class="fa-solid fa-download"></i> Download ZIP
+              </a>
+            <% } else { %>
+              <a href="/public/uploads/designs/sample_peacock.zip" download class="btn-download-zip">
+                <i class="fa-solid fa-download"></i> Download ZIP
+              </a>
+            <% } %>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="purchased-design-card">
+          <div class="design-card-top-row">
+            <img src="/public/images/logo.jpg" alt="Embroidery Design" class="design-card-thumb">
+            <div class="design-card-details">
+              <h3 class="design-card-name">Embroidery Design Package</h3>
+              <div class="design-card-price">₹<%= order ? order.final_amount : '60.00' %></div>
+              <div class="design-card-formats-label">Available Formats:</div>
+              <div class="design-card-format-badges">
+                <span class="format-badge">DST</span>
+                <span class="format-badge">PES</span>
+                <span class="format-badge">JEF</span>
+                <span class="format-badge">EXP</span>
+              </div>
+            </div>
+          </div>
+          <a href="/user/downloads" download class="btn-download-zip">
+            <i class="fa-solid fa-download"></i> Download ZIP
+          </a>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- Step 15: Go to Dashboard Button -->
+    <% if (currentUser) { %>
+      <a href="/user/dashboard" class="btn-success-dashboard">
+        <i class="fa-regular fa-user"></i> Go to Dashboard
+      </a>
+    <% } else { %>
+      <a href="/auth/login" class="btn-success-dashboard">
+        <i class="fa-regular fa-user"></i> Go to Dashboard
+      </a>
+    <% } %>
+
+    <!-- Step 16: Continue Shopping Button -->
+    <a href="/designs" class="btn-success-shopping">
+      <i class="fa-solid fa-bag-shopping"></i> Continue Shopping
+    </a>
+
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

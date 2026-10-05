@@ -1,0 +1,224 @@
+<%- include('../partials/header') %>
+
+<div class="container" style="margin-top: 2rem; margin-bottom: 5rem;">
+  <!-- Hero Banner matching Reference -->
+  <div class="page-banner-card" style="margin-bottom: 2.5rem; padding: 3rem;">
+    <div class="banner-content" style="max-width: 620px;">
+      <div class="eyebrow-tag" style="margin-bottom: 0.5rem;">
+        <span>GET IN TOUCH</span>
+        <span class="eyebrow-line"></span>
+      </div>
+      <h1 class="page-banner-title" style="font-size: 3.2rem;">
+        We're Here to <span class="highlight-italic">Help</span>
+      </h1>
+      <p class="page-banner-subtitle" style="font-size: 0.98rem; line-height: 1.6;">
+        Have a question, need a custom design, or want to collaborate? We'd love to hear from you. Reach out to us and we'll get back to you as soon as possible.
+      </p>
+    </div>
+
+    <div class="banner-image-box" style="width: 440px; height: 220px;">
+      <img src="/public/images/hero_embroidery.jpg" alt="Get In Touch ARUVI Embroidery">
+    </div>
+  </div>
+
+  <!-- Breadcrumb & Section Title -->
+  <div style="margin-bottom: 2rem;">
+    <div class="breadcrumb-trail" style="margin-bottom: 0.5rem;">
+      <a href="/">Home</a> &nbsp;>&nbsp; <span>Contact</span>
+    </div>
+    <h2 class="section-title" style="font-size: 2.4rem; margin-bottom: 0.2rem;">Contact Us</h2>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">Fill out the form and we'll get back to you shortly.</p>
+  </div>
+
+  <!-- Main 3-Column Layout Grid (Form + Contact Info + Location & FAQs) -->
+  <div class="contact-main-grid">
+    <!-- Column 1: Send Us a Message Form Card -->
+    <div class="checkout-section-box" style="margin-bottom: 0;">
+      <div class="section-box-header">
+        <div class="section-icon-badge"><i class="fa-regular fa-envelope"></i></div>
+        <div>
+          <h3>Send Us a Message</h3>
+        </div>
+      </div>
+
+      <form action="/contact" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="form-grid-2" style="margin-bottom: 1.2rem;">
+          <div class="form-group-field">
+            <label>Full Name <span class="req">*</span></label>
+            <input type="text" name="name" value="<%= currentUser ? currentUser.full_name : '' %>" placeholder="Enter your full name" required>
+          </div>
+
+          <div class="form-group-field">
+            <label>Email Address <span class="req">*</span></label>
+            <input type="email" name="email" value="<%= currentUser ? currentUser.email : '' %>" placeholder="you@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-grid-2" style="margin-bottom: 1.2rem;">
+          <div class="form-group-field">
+            <label>Subject <span class="req">*</span></label>
+            <select name="subject" required>
+              <option value="">Select a subject</option>
+              <option value="General Inquiry">General Inquiry</option>
+              <option value="Custom Order Question">Custom Order Question</option>
+              <option value="File Download Help">File Download Help</option>
+              <option value="Payment / Refund">Payment / Refund</option>
+            </select>
+          </div>
+
+          <div class="form-group-field">
+            <label>Phone Number (Optional)</label>
+            <input type="tel" name="phone" placeholder="+91 98765 43210">
+          </div>
+        </div>
+
+        <div class="form-group-field" style="margin-bottom: 1.5rem; position: relative;">
+          <label>Message <span class="req">*</span></label>
+          <textarea name="message" rows="5" placeholder="Tell us about your requirement..." required></textarea>
+          <span style="position: absolute; right: 10px; bottom: 8px; font-size: 0.75rem; color: var(--text-muted);">0/500</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block place-order-btn">
+          <i class="fa-regular fa-paper-plane"></i> Send Message
+        </button>
+      </form>
+    </div>
+
+    <!-- Column 2: Contact Information Card -->
+    <div class="summary-box-card" style="display: flex; flex-direction: column;">
+      <div class="section-box-header">
+        <div class="section-icon-badge"><i class="fa-solid fa-phone"></i></div>
+        <div>
+          <h3 style="font-size: 1.25rem;">Contact Information</h3>
+          <p>We're always happy to help!</p>
+        </div>
+      </div>
+
+      <div class="contact-info-list" style="display: flex; flex-direction: column; gap: 1.2rem; margin-bottom: 2rem;">
+        <div class="contact-info-item" style="display: flex; gap: 12px; align-items: flex-start;">
+          <div class="how-icon-box"><i class="fa-regular fa-envelope"></i></div>
+          <div>
+            <strong style="display: block; font-size: 0.9rem; color: var(--text-dark); margin-bottom: 1px;">Email Us</strong>
+            <a href="mailto:aruviembroidery@gmail.com" style="font-size: 0.88rem; font-weight: 600; color: var(--text-dark);">aruviembroidery@gmail.com</a>
+            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">We usually respond within 24 hours</span>
+          </div>
+        </div>
+
+        <div class="contact-info-item" style="display: flex; gap: 12px; align-items: flex-start;">
+          <div class="how-icon-box"><i class="fa-solid fa-headset"></i></div>
+          <div>
+            <strong style="display: block; font-size: 0.9rem; color: var(--text-dark); margin-bottom: 1px;">Support</strong>
+            <a href="mailto:aruviembroidery@gmail.com" style="font-size: 0.88rem; font-weight: 600; color: var(--text-dark);">aruviembroidery@gmail.com</a>
+            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">For any support or queries</span>
+          </div>
+        </div>
+
+        <div class="contact-info-item" style="display: flex; gap: 12px; align-items: flex-start;">
+          <div class="how-icon-box"><i class="fa-regular fa-clock"></i></div>
+          <div>
+            <strong style="display: block; font-size: 0.9rem; color: var(--text-dark); margin-bottom: 1px;">Working Hours</strong>
+            <span style="display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-dark);">Monday - Saturday</span>
+            <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">9:00 AM - 6:00 PM (IST)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Follow Us Social Links Row -->
+      <div style="margin-top: auto; padding-top: 1.2rem; border-top: 1px solid var(--border-light);">
+        <strong style="display: block; font-size: 0.88rem; color: var(--text-dark); margin-bottom: 2px;">Follow Us</strong>
+        <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 1rem;">Stay connected for new designs, updates and offers.</span>
+        
+        <div style="display: flex; gap: 10px;">
+          <a href="https://instagram.com" target="_blank" class="btn btn-outline btn-sm" style="flex: 1; border-radius: var(--radius-full); justify-content: center; font-size: 0.82rem;">
+            <i class="fa-brands fa-instagram" style="color: #E1306C;"></i> Instagram <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.68rem; margin-left: 2px;"></i>
+          </a>
+          <a href="https://linkedin.com" target="_blank" class="btn btn-outline btn-sm" style="flex: 1; border-radius: var(--radius-full); justify-content: center; font-size: 0.82rem;">
+            <i class="fa-brands fa-linkedin" style="color: #0077B5;"></i> LinkedIn <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.68rem; margin-left: 2px;"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 3: Location Map & FAQs Accordion Stack -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <!-- Card 1: Our Location -->
+      <div class="summary-box-card" style="padding: 1.4rem;">
+        <div class="section-box-header" style="margin-bottom: 1rem; padding-bottom: 0.6rem;">
+          <div class="section-icon-badge" style="width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-location-dot"></i></div>
+          <div>
+            <h4 style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700;">Our Location</h4>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">We're based in India and serve customers worldwide.</span>
+          </div>
+        </div>
+
+        <div style="border-radius: 12px; overflow: hidden; border: 1px solid var(--border-light); height: 160px; position: relative;">
+          <img src="/public/images/map_erode.jpg" alt="ARUVI Embroidery Location Map" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+      </div>
+
+      <!-- Card 2: Frequently Asked Questions Accordion -->
+      <div class="summary-box-card" style="padding: 1.4rem;">
+        <div class="section-box-header" style="margin-bottom: 1rem; padding-bottom: 0.6rem;">
+          <div class="section-icon-badge" style="width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-regular fa-circle-question"></i></div>
+          <div>
+            <h4 style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700;">Frequently Asked Questions</h4>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Quick answers to common questions.</span>
+          </div>
+        </div>
+
+        <div class="contact-faq-accordion" style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="faq-item-box" style="background: #F6F1EA; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span>How will I receive my design files?</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+          </div>
+
+          <div class="faq-item-box" style="background: #F6F1EA; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span>What file formats do you provide?</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+          </div>
+
+          <div class="faq-item-box" style="background: #F6F1EA; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span>Can I request a custom design?</span>
+            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Feature Pills Bar matching Reference -->
+  <div class="hero-feature-pills" style="margin-top: 4rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-regular fa-gem"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Premium Quality Designs</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Crafted with precision</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Instant Download</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Get files immediately</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">100% Tested Machine Fills</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Quality assured designs</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

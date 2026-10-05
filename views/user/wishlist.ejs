@@ -1,0 +1,48 @@
+<%- include('../partials/header') %>
+
+<div class="container section">
+  <div class="section-header" style="text-align: left; margin-bottom: 2rem;">
+    <h2>My Saved Wishlist</h2>
+    <p>Your saved favorite embroidery designs for quick access and purchasing</p>
+  </div>
+
+  <% if (!items || items.length === 0) { %>
+    <div style="text-align: center; padding: 4rem 2rem; background: var(--bg-soft); border-radius: var(--radius-md);">
+      <i class="fa-regular fa-heart" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
+      <h3>Your wishlist is currently empty</h3>
+      <p style="color: var(--text-muted); margin-top: 0.5rem;">Click the heart icon on any design to save it here for later.</p>
+      <a href="/shop" class="btn btn-primary" style="margin-top: 1.5rem;">Explore Designs</a>
+    </div>
+  <% } else { %>
+    <div class="grid-3">
+      <% items.forEach(design => { %>
+        <div class="design-card">
+          <button class="wishlist-btn active" data-id="<%= design.id %>" title="Remove from Wishlist">
+            <i class="fa-solid fa-heart"></i>
+          </button>
+          <div class="card-img-container">
+            <img src="<%= design.primary_image || '/public/images/logo.jpg' %>" alt="<%= design.title %>">
+            <div class="watermark-overlay">
+              <span class="watermark-text">Aruvi Embroidery</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <span class="card-category"><%= design.category_name %></span>
+            <h3 class="card-title"><a href="/design/<%= design.slug %>"><%= design.title %></a></h3>
+            <div class="card-footer">
+              <div class="price-box">
+                <span class="current-price">₹<%= design.sale_price || design.price %></span>
+              </div>
+              <form class="ajax-add-to-cart">
+                <input type="hidden" name="design_id" value="<%= design.id %>">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-cart-plus"></i> Add to Cart</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

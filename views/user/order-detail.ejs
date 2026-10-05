@@ -1,0 +1,92 @@
+<%- include('../partials/header') %>
+
+<div class="container section">
+  <div style="margin-bottom: 1.5rem;">
+    <a href="/user/dashboard" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Back to Dashboard</a>
+  </div>
+
+  <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 2rem; box-shadow: var(--shadow-sm);">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--border-light); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+      <div>
+        <h2 style="font-size: 1.8rem; margin-bottom: 4px;">Order #<%= order.order_number %></h2>
+        <span style="color: var(--text-muted); font-size: 0.9rem;">Placed on <%= new Date(order.created_at).toLocaleString() %></span>
+      </div>
+      <div>
+        <span class="badge badge-<%= order.status === 'completed' ? 'success' : (order.status === 'pending' ? 'warning' : 'danger') %>" style="font-size: 0.9rem; padding: 6px 14px;">
+          <%= order.status %>
+        </span>
+      </div>
+    </div>
+
+    <!-- Order Items Table -->
+    <h3 style="font-size: 1.15rem; margin-bottom: 1rem;">Items Included</h3>
+    <div class="table-responsive" style="margin-bottom: 2rem;">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Design</th>
+            <th>Specs</th>
+            <th>Price</th>
+            <th style="text-align: right;">Download File</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (order.items && order.items.length > 0) { %>
+            <% order.items.forEach(item => { %>
+              <tr>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 1rem;">
+                    <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= item.title %>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
+                    <div>
+                      <strong><a href="/design/<%= item.slug %>" style="color: var(--text-dark);"><%= item.title %></a></strong>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span style="font-size: 0.82rem; color: var(--text-muted);"><%= item.hoop_size %></span>
+                </td>
+                <td><strong>₹<%= item.price_at_purchase %></strong></td>
+                <td style="text-align: right;">
+                  <% if (order.status === 'completed' || order.payment_status === 'completed' || order.payment_status === 'PAID') { %>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;">
+                      <% 
+                        const fmtList = (item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : []);
+                        fmtList.forEach(fmt => {
+                      %>
+                        <a href="/user/download-format/<%= item.design_id || item.id %>/<%= fmt %>" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.75rem;">
+                          <i class="fa-solid fa-download"></i> <%= fmt %>
+                        </a>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <span style="font-size: 0.82rem; color: var(--text-muted);">Unlocks after payment</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Summary Box -->
+    <div style="max-width: 350px; margin-left: auto; background: var(--bg-soft); padding: 1.2rem; border-radius: var(--radius-sm);">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+        <span>Subtotal Amount:</span>
+        <strong>₹<%= order.total_amount %></strong>
+      </div>
+      <% if (order.discount_amount > 0) { %>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; color: var(--success);">
+          <span>Discount Applied:</span>
+          <strong>- ₹<%= order.discount_amount %></strong>
+        </div>
+      <% } %>
+      <div style="display: flex; justify-content: space-between; padding-top: 0.8rem; border-top: 1px solid var(--border-light); font-size: 1.15rem;">
+        <strong>Total Paid:</strong>
+        <strong style="color: var(--primary);">₹<%= order.final_amount %></strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

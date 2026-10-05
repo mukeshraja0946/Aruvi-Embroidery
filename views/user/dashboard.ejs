@@ -1,0 +1,156 @@
+<%- include('../partials/header') %>
+
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+      <h2>My Account Dashboard</h2>
+      <p style="color: var(--text-muted);">Welcome back, <strong><%= currentUser.full_name %></strong></p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <% if (currentUser && currentUser.role === 'admin') { %>
+        <a href="/admin" class="btn btn-primary btn-sm"><i class="fa-solid fa-gauge-high"></i> Go to Admin Panel</a>
+      <% } %>
+      <a href="/auth/logout" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</a>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem;">
+    <!-- Profile Card Sidebar -->
+    <div>
+      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;">
+        <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; padding-bottom: 0.5rem; border-bottom: 2px dashed var(--border-light);"><i class="fa-solid fa-user-gear"></i> Profile Information</h3>
+        
+        <form action="/user/profile/update" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="full_name" class="form-control" value="<%= currentUser.full_name %>" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email (Read-only)</label>
+            <input type="email" class="form-control" value="<%= currentUser.email %>" disabled style="background: #f8f9fa;">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input type="tel" name="phone" class="form-control" value="<%= currentUser.phone || '' %>">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-sm">Update Profile</button>
+        </form>
+      </div>
+
+      <div style="background: var(--bg-soft); border-radius: var(--radius-md); padding: 1.2rem;">
+        <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-heart" style="color: var(--primary);"></i> Saved Wishlist</h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">You have <%= wishlistItems ? wishlistItems.length : 0 %> saved items in your wishlist.</p>
+        <a href="/user/wishlist" class="btn btn-outline btn-sm btn-block">View Wishlist</a>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Area -->
+    <div>
+      <!-- Purchased Design Downloads -->
+      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.8rem; box-shadow: var(--shadow-sm); margin-bottom: 2.5rem;">
+        <h3 style="font-size: 1.3rem; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 2px dashed var(--border-light);">
+          <i class="fa-solid fa-cloud-arrow-down" style="color: var(--primary);"></i> Purchased Embroidery Downloads
+        </h3>
+
+        <% if (!purchasedDesigns || purchasedDesigns.length === 0) { %>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">You have not purchased any embroidery designs yet. Purchased designs will be instantly downloadable here forever!</p>
+          <a href="/shop" class="btn btn-primary btn-sm" style="margin-top: 1rem;">Explore Designs</a>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Design Title</th>
+                  <th>Hoop & Formats</th>
+                  <th>Purchase Date</th>
+                  <th style="text-align: right;">Download</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% purchasedDesigns.forEach(item => { %>
+                  <tr>
+                    <td>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= item.title %>" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px;">
+                        <div>
+                          <strong><a href="/design/<%= item.slug %>" style="color: var(--text-dark);"><%= item.title %></a></strong><br>
+                          <span style="font-size: 0.75rem; color: var(--text-muted);">Order #<%= item.order_number %></span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span style="font-size: 0.82rem;"><%= item.hoop_size %></span><br>
+                      <span class="badge badge-info" style="font-size: 0.7rem;"><%= item.formats %></span>
+                    </td>
+                    <td><span style="font-size: 0.85rem;"><%= new Date(item.purchase_date).toLocaleDateString() %></span></td>
+                    <td style="text-align: right;">
+                      <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;">
+                        <% 
+                          const fmtList = (item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : []);
+                          fmtList.forEach(fmt => {
+                        %>
+                          <a href="/user/download-format/<%= item.design_id || item.id %>/<%= fmt %>" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fa-solid fa-download"></i> <%= fmt %>
+                          </a>
+                        <% }); %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- Order History -->
+      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.8rem; box-shadow: var(--shadow-sm);">
+        <h3 style="font-size: 1.3rem; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 2px dashed var(--border-light);">
+          <i class="fa-solid fa-receipt"></i> Order History
+        </h3>
+
+        <% if (!orders || orders.length === 0) { %>
+          <p style="color: var(--text-muted);">No order history found.</p>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Date</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% orders.forEach(ord => { %>
+                  <tr>
+                    <td><strong><%= ord.order_number %></strong></td>
+                    <td><%= new Date(ord.created_at).toLocaleDateString() %></td>
+                    <td><strong style="color: var(--primary);">₹<%= ord.final_amount %></strong></td>
+                    <td>
+                      <span class="badge badge-<%= ord.status === 'completed' ? 'success' : (ord.status === 'pending' ? 'warning' : 'danger') %>">
+                        <%= ord.status %>
+                      </span>
+                    </td>
+                    <td style="text-align: right;">
+                      <a href="/user/orders/<%= ord.id %>" class="btn btn-outline btn-sm">View</a>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

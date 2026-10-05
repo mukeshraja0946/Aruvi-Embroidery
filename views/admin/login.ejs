@@ -1,0 +1,200 @@
+<%- include('../partials/header') %>
+
+<div class="container" style="margin-top: 2.5rem; margin-bottom: 4rem;">
+  <div class="admin-login-layout" style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 2.5rem; align-items: center; background: #FAF6F0; border-radius: 20px; padding: 3rem; border: 1px solid var(--border-light); position: relative; overflow: hidden;">
+    
+    <!-- Left Section: Welcome to Aruvi Admin -->
+    <div style="padding-right: 1.5rem; z-index: 2;">
+      <div class="eyebrow-tag" style="margin-bottom: 0.6rem; font-size: 0.78rem; letter-spacing: 1.5px; font-weight: 700; color: var(--primary);">
+        <span>ADMIN PANEL</span>
+      </div>
+      
+      <h1 style="font-family: var(--font-heading); font-size: 3.2rem; font-weight: 700; color: var(--text-dark); line-height: 1.15; margin-bottom: 1rem;">
+        Welcome to <br><span style="font-style: italic; color: var(--primary);">Aruvi Admin</span>
+      </h1>
+      
+      <p style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 2.5rem; max-width: 440px;">
+        Manage your embroidery designs, categories, orders, customers and more — all in one place.
+      </p>
+
+      <!-- 4 Features List -->
+      <div style="display: flex; flex-direction: column; gap: 1.3rem; max-width: 380px;">
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #F2E8DC; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+            <i class="fa-solid fa-box-archive"></i>
+          </div>
+          <div>
+            <strong style="display: block; font-size: 0.95rem; color: var(--text-dark);">Manage Designs</strong>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Add, edit and organize designs</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #F2E8DC; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+            <i class="fa-solid fa-border-all"></i>
+          </div>
+          <div>
+            <strong style="display: block; font-size: 0.95rem; color: var(--text-dark);">Update Categories</strong>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Manage categories and banners</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #F2E8DC; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+            <i class="fa-regular fa-file-lines"></i>
+          </div>
+          <div>
+            <strong style="display: block; font-size: 0.95rem; color: var(--text-dark);">Track Orders</strong>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">View and manage customer orders</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #F2E8DC; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div>
+            <strong style="display: block; font-size: 0.95rem; color: var(--text-dark);">Manage Customers</strong>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">View customer details and enquiries</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background Embroidery Hoop Image decor -->
+    <div style="position: absolute; left: 35%; top: 50%; transform: translateY(-50%); width: 320px; height: 320px; pointer-events: none; opacity: 0.85; z-index: 1;">
+      <img src="/public/images/hero_embroidery.jpg" alt="Embroidery Hoop" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+    </div>
+
+    <!-- Right Section: Floating Admin Login Card -->
+    <div style="background: #FFFFFF; border-radius: 18px; padding: 2.5rem 2.2rem; border: 1px solid var(--border-light); box-shadow: 0 12px 35px rgba(0,0,0,0.05); z-index: 2;">
+      <!-- Logo Badge -->
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <% if (siteSettings && siteSettings.logo_url) { %>
+          <img src="<%= siteSettings.logo_url %>" alt="ARUVI Admin Logo" style="max-height: 56px; width: auto; object-fit: contain; margin: 0 auto 0.8rem;">
+        <% } else { %>
+          <img src="/public/images/logo.jpg" alt="ARUVI Admin Logo" style="max-height: 56px; width: auto; object-fit: contain; margin: 0 auto 0.8rem;">
+        <% } %>
+
+        <h2 style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; color: var(--text-dark); margin-top: 1.2rem; margin-bottom: 0.2rem;">Admin Login</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Sign in to access your admin dashboard</p>
+      </div>
+
+      <% if (flash && flash.error && flash.error.length > 0) { %>
+        <div class="alert alert-error" style="font-size: 0.85rem; margin-bottom: 1.2rem;">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
+        </div>
+      <% } %>
+
+      <!-- Login Form -->
+      <form action="/admin/login" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="form-group-field" style="margin-bottom: 1.1rem; position: relative;">
+          <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
+          <input type="email" name="email" placeholder="Enter your admin email" required style="padding-left: 2.6rem; height: 46px; border-radius: 10px; font-size: 0.88rem; border: 1px solid var(--border-light); width: 100%;">
+        </div>
+
+        <div class="form-group-field" style="margin-bottom: 1.1rem; position: relative;">
+          <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
+          <input type="password" id="adminPassword" name="password" placeholder="Enter your password" required style="padding-left: 2.6rem; padding-right: 2.6rem; height: 46px; border-radius: 10px; font-size: 0.88rem; border: 1px solid var(--border-light); width: 100%;">
+          <i class="fa-regular fa-eye" id="togglePasswordBtn" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem; cursor: pointer;"></i>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; font-size: 0.82rem;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-dark); font-weight: 500;">
+            <input type="checkbox" name="remember" checked style="accent-color: var(--primary); width: 16px; height: 16px;"> Keep me signed in
+          </label>
+          <a href="#" style="color: var(--primary); font-weight: 500; text-decoration: none;">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="height: 48px; border-radius: 10px; font-size: 0.92rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 1.2rem; width: 100%;">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Login to Admin Panel
+        </button>
+
+        <div style="margin-top: 1.5rem; text-align: center; font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i>
+          <div>
+            <strong style="color: var(--text-dark); font-weight: 600;">Secure Admin Access</strong> &bull; Only authorized users can access this area.
+          </div>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Bottom Feature Strip -->
+  <div class="hero-feature-pills" style="margin-top: 3rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Secure Access</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Protected admin panel</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-gear"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Easy Management</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Simple and user-friendly</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-chart-line"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Real-time Updates</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Manage everything instantly</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (flash && flash.account_not_found && flash.account_not_found.length > 0) { %>
+  <!-- Account Not Found Modal Popup matching Requirement 3 -->
+  <div id="accountNotFoundModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #FFFFFF; border-radius: 18px; max-width: 440px; width: 90%; padding: 2.2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.2); text-align: center; border: 1px solid var(--border-light);">
+      <div style="width: 60px; height: 60px; border-radius: 50%; background: #FDE8E8; color: #C62828; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem;">
+        <i class="fa-solid fa-user-xmark"></i>
+      </div>
+
+      <h3 style="font-family: var(--font-heading); font-size: 1.6rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0.6rem;">Account not found</h3>
+      
+      <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.8rem;">
+        We couldn't find an account with this email address. Please create an account to continue.
+      </p>
+
+      <div style="display: flex; gap: 1rem; justify-content: center;">
+        <button type="button" onclick="document.getElementById('accountNotFoundModal').style.display='none'" class="btn btn-outline" style="flex: 1; height: 44px; border-radius: 10px; font-weight: 600; background: #FFF;">
+          Close
+        </button>
+        <a href="/register" class="btn btn-primary" style="flex: 1.2; height: 44px; border-radius: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+          Create Account
+        </a>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script>
+  document.getElementById('togglePasswordBtn').addEventListener('click', function() {
+    const pwdInput = document.getElementById('adminPassword');
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      this.classList.remove('fa-eye');
+      this.classList.add('fa-eye-slash');
+    } else {
+      pwdInput.type = 'password';
+      this.classList.remove('fa-eye-slash');
+      this.classList.add('fa-eye');
+    }
+  });
+</script>
+
+<%- include('../partials/footer') %>

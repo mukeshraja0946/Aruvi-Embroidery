@@ -1,0 +1,305 @@
+<%- include('../partials/header') %>
+
+<div class="container cart-container">
+  <!-- Breadcrumb Trail -->
+  <div class="breadcrumb-trail cart-breadcrumb">
+    <a href="/">Home</a> &nbsp;>&nbsp; <span>Cart</span>
+  </div>
+
+  <!-- Page Title Row -->
+  <div class="cart-header-row">
+    <div>
+      <h1 class="cart-page-title">Your Cart (<%= cart.count %> items)</h1>
+      <p class="cart-page-subtitle">Review your selected designs and proceed to checkout.</p>
+    </div>
+    <a href="/designs" class="continue-shopping-link">
+      <i class="fa-solid fa-arrow-left"></i> Continue Shopping
+    </a>
+  </div>
+
+  <% if (cart.items.length === 0) { %>
+    <div class="empty-cart-box">
+      <i class="fa-solid fa-bag-shopping"></i>
+      <h3>Your cart is empty</h3>
+      <p>Explore our digitized embroidery design catalog and add your favorite patterns.</p>
+      <a href="/designs" class="btn btn-primary" style="margin-top: 1.5rem;">Browse Designs</a>
+    </div>
+  <% } else { %>
+    <!-- Main Cart Layout Grid (Table + Right Summary Sidebar) -->
+    <div class="cart-main-layout">
+      <!-- Left: Cart Items Table Container -->
+      <div class="cart-table-card">
+        <div class="cart-table-header">
+          <div class="col-product">
+            <input type="checkbox" checked class="custom-checkbox"> Product
+          </div>
+          <div class="col-price">Price</div>
+          <div class="col-qty">Quantity</div>
+          <div class="col-total">Total</div>
+          <div class="col-action">Action</div>
+        </div>
+
+        <div class="cart-items-body">
+          <% cart.items.forEach(item => { %>
+            <div class="cart-item-row">
+              <!-- Select Checkbox & Product Info -->
+              <div class="col-product product-info-col">
+                <input type="checkbox" checked class="custom-checkbox">
+                <div class="cart-item-thumb">
+                  <a href="/design/<%= item.slug %>">
+                    <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>">
+                  </a>
+                </div>
+                <div class="cart-item-meta">
+                  <h4><a href="/design/<%= item.slug %>"><%= item.title %></a></h4>
+                  <span class="cart-item-cat">Category: <%= item.category_name || 'Embroidery Designs' %></span>
+                  <div class="format-pill-row" style="margin-bottom: 0;">
+                    <% (item.formats ? item.formats.split(',').map(s => s.trim()).filter(Boolean) : []).forEach(fmt => { %>
+                      <span class="fmt-pill"><%= fmt %></span>
+                    <% }) %>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Price -->
+              <div class="col-price price-col">
+                <span class="price-val">₹<%= item.effective_price %></span>
+                <% if (item.price && item.price > item.effective_price) { %>
+                  <span class="price-old">₹<%= item.price %></span>
+                  <span class="discount-badge">25% OFF</span>
+                <% } else if (item.title === 'Rose Floral Design') { %>
+                  <span class="price-old">₹399</span>
+                  <span class="discount-badge">25% OFF</span>
+                <% } else if (item.title === 'Letter A Monogram') { %>
+                  <span class="price-old">₹249</span>
+                  <span class="discount-badge">20% OFF</span>
+                <% } %>
+              </div>
+
+              <!-- Bottom Bar for Mobile (Contents on Desktop) -->
+              <div class="cart-item-bottom-bar">
+                <!-- Quantity Controls -->
+                <div class="col-qty qty-col">
+                  <div class="qty-pill-box">
+                    <button type="button" class="qty-btn-minus">-</button>
+                    <input type="number" value="1" readonly class="qty-num-input">
+                    <button type="button" class="qty-btn-plus">+</button>
+                  </div>
+                </div>
+
+                <!-- Item Total -->
+                <div class="col-total total-col">
+                  <strong>₹<%= item.effective_price %></strong>
+                </div>
+
+                <!-- Delete Action -->
+                <div class="col-action action-col">
+                  <form action="/cart/remove" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="design_id" value="<%= item.design_id %>">
+                    <button type="submit" class="trash-btn" title="Remove item">
+                      <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+
+        <!-- Table Bottom Actions Row -->
+        <div class="cart-table-footer">
+          <label class="select-all-label">
+            <input type="checkbox" checked class="custom-checkbox"> Select All (<%= cart.count %> items)
+          </label>
+          <a href="#" class="remove-selected-btn">
+            <i class="fa-regular fa-trash-can"></i> Remove Selected
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: Summary Sidebar & Trust Cards -->
+      <div class="cart-sidebar-stack">
+        <!-- Order Summary Card -->
+        <div class="order-summary-card">
+          <h3 class="summary-title">Order Summary</h3>
+          
+          <div class="summary-line">
+            <span>Subtotal (<%= cart.count %> items)</span>
+            <strong>₹<%= cart.subtotal %></strong>
+          </div>
+
+          <div class="summary-line discount-line">
+            <span>Discount</span>
+            <strong>- ₹100</strong>
+          </div>
+
+          <div class="summary-line">
+            <span>Shipping</span>
+            <span class="free-badge">Free</span>
+          </div>
+
+          <div class="summary-total-line">
+            <span>Total</span>
+            <strong class="grand-total-val">₹<%= Math.max(0, cart.subtotal - 100) %></strong>
+          </div>
+
+          <a href="/checkout" class="btn btn-primary btn-block checkout-btn">
+            Proceed to Checkout <i class="fa-solid fa-arrow-right"></i>
+          </a>
+
+          <!-- Coupon Dropdown Accordion -->
+          <div class="coupon-accordion-box">
+            <div class="coupon-accordion-header">
+              <span><i class="fa-solid fa-scissors" style="transform: rotate(-90deg); color: var(--primary);"></i> Have a Coupon Code?</span>
+              <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem;"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trust Features Stack Card -->
+        <div class="trust-features-card">
+          <div class="trust-item">
+            <div class="trust-icon"><i class="fa-solid fa-download"></i></div>
+            <div>
+              <h4>Instant Download</h4>
+              <p>Get files immediately after purchase</p>
+            </div>
+          </div>
+
+          <div class="trust-item">
+            <div class="trust-icon"><i class="fa-solid fa-shield-halved"></i></div>
+            <div>
+              <h4>100% Tested Designs</h4>
+              <p>Quality assured for smooth machine fills</p>
+            </div>
+          </div>
+
+          <div class="trust-item">
+            <div class="trust-icon"><i class="fa-solid fa-lock"></i></div>
+            <div>
+              <h4>Secure Payment</h4>
+              <p>Your transactions are safe with us</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- "You May Also Like" Recommended Designs Section matching Reference -->
+    <section class="recommended-section" style="margin-top: 4rem;">
+      <div class="section-heading-box flex-between">
+        <h2 class="section-title">You May Also Like</h2>
+        <a href="/designs" class="view-all-link">View All Designs <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+
+      <div class="grid-4-strict">
+        <div class="listing-product-card">
+          <button class="wishlist-round-btn wishlist-btn" data-id="2"><i class="fa-regular fa-heart"></i></button>
+          <div class="card-image-box">
+            <a href="/design/lotus-mandala"><img src="/public/images/cat_traditional.jpg" alt="Lotus Mandala"></a>
+          </div>
+          <div class="card-body-content">
+            <h3 class="card-item-title"><a href="/design/lotus-mandala">Lotus Mandala</a></h3>
+            <span class="card-item-category">Traditional Designs</span>
+            <div class="format-pill-row">
+              <span class="fmt-pill">DST</span><span class="fmt-pill">PES</span><span class="fmt-pill">JEF</span><span class="fmt-pill">EXP</span>
+            </div>
+            <div class="card-price-row">
+              <span class="current-price">₹349</span>
+              <button class="mini-cart-btn" style="margin-left: auto; width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-cart-shopping"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="listing-product-card">
+          <button class="wishlist-round-btn wishlist-btn" data-id="3"><i class="fa-regular fa-heart"></i></button>
+          <div class="card-image-box">
+            <a href="/design/butterfly-floral"><img src="/public/images/cat_kids.jpg" alt="Butterfly Floral"></a>
+          </div>
+          <div class="card-body-content">
+            <h3 class="card-item-title"><a href="/design/butterfly-floral">Butterfly Floral</a></h3>
+            <span class="card-item-category">Kids Designs</span>
+            <div class="format-pill-row">
+              <span class="fmt-pill">DST</span><span class="fmt-pill">PES</span><span class="fmt-pill">JEF</span><span class="fmt-pill">EXP</span>
+            </div>
+            <div class="card-price-row">
+              <span class="current-price">₹249</span>
+              <button class="mini-cart-btn" style="margin-left: auto; width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-cart-shopping"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="listing-product-card">
+          <button class="wishlist-round-btn wishlist-btn" data-id="6"><i class="fa-regular fa-heart"></i></button>
+          <div class="card-image-box">
+            <a href="/design/border-pattern"><img src="/public/images/cat_border.jpg" alt="Border Pattern"></a>
+          </div>
+          <div class="card-body-content">
+            <h3 class="card-item-title"><a href="/design/border-pattern">Border Pattern</a></h3>
+            <span class="card-item-category">Border Designs</span>
+            <div class="format-pill-row">
+              <span class="fmt-pill">DST</span><span class="fmt-pill">PES</span><span class="fmt-pill">JEF</span><span class="fmt-pill">EXP</span>
+            </div>
+            <div class="card-price-row">
+              <span class="current-price">₹299</span>
+              <button class="mini-cart-btn" style="margin-left: auto; width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-cart-shopping"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="listing-product-card">
+          <button class="wishlist-round-btn wishlist-btn" data-id="8"><i class="fa-regular fa-heart"></i></button>
+          <div class="card-image-box">
+            <a href="/design/blouse-neck-design"><img src="/public/images/cat_blouse.jpg" alt="Blouse Neck Design"></a>
+          </div>
+          <div class="card-body-content">
+            <h3 class="card-item-title"><a href="/design/blouse-neck-design">Blouse Neck Design</a></h3>
+            <span class="card-item-category">Blouse Designs</span>
+            <div class="format-pill-row">
+              <span class="fmt-pill">DST</span><span class="fmt-pill">PES</span><span class="fmt-pill">JEF</span><span class="fmt-pill">EXP</span>
+            </div>
+            <div class="card-price-row">
+              <span class="current-price">₹349</span>
+              <button class="mini-cart-btn" style="margin-left: auto; width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-cart-shopping"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Feature Pills Bar matching Reference -->
+    <div class="hero-feature-pills" style="margin-top: 4rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-award"></i></div>
+        <div>
+          <strong style="display: block; font-size: 0.88rem;">Premium Quality Designs</strong>
+          <span style="font-size: 0.76rem; color: var(--text-muted);">Crafted with precision</span>
+        </div>
+      </div>
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
+        <div>
+          <strong style="display: block; font-size: 0.88rem;">Instant Download</strong>
+          <span style="font-size: 0.76rem; color: var(--text-muted);">Get files immediately</span>
+        </div>
+      </div>
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div>
+          <strong style="display: block; font-size: 0.88rem;">100% Tested Machine Fills</strong>
+          <span style="font-size: 0.76rem; color: var(--text-muted);">Quality assured designs</span>
+        </div>
+      </div>
+      <div class="hero-pill-item">
+        <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
+        <div>
+          <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
+          <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
+        </div>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

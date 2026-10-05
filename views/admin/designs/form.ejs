@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= design ? 'Edit Design' : 'Add New Design' %> - ARUVI Admin</title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .form-section-card {
+      background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 16px; padding: 1.6rem; margin-bottom: 1.5rem;
+    }
+    .form-section-card h3 {
+      font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 1.2rem;
+    }
+    .form-label-custom {
+      display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;
+    }
+    .form-label-custom .req { color: var(--admin-primary); }
+    .form-control-custom {
+      width: 100%; height: 44px; border-radius: 10px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.88rem; background: #FFFFFF; color: var(--admin-text-dark); transition: var(--transition);
+    }
+    .form-control-custom:focus { border-color: var(--admin-primary); outline: none; box-shadow: 0 0 0 3px rgba(184,64,42,0.1); }
+    textarea.form-control-custom { height: auto; padding: 0.8rem 1rem; font-family: inherit; }
+
+    /* Dropzone box */
+    .dropzone-box {
+      border: 2px dashed var(--admin-border); border-radius: 14px; padding: 1.8rem 1rem; text-align: center; background: #FAF6F0; cursor: pointer; transition: var(--transition);
+    }
+    .dropzone-box:hover { border-color: var(--admin-primary); background: #FAF0E8; }
+
+    /* Tags Pill Box */
+    .tag-pill {
+      display: inline-flex; align-items: center; gap: 6px; background: #F4EFEA; color: var(--admin-text-dark); font-size: 0.78rem; font-weight: 500; padding: 4px 10px; border-radius: 14px; margin-right: 4px; margin-bottom: 4px;
+    }
+    .tag-pill i { cursor: pointer; color: var(--admin-text-muted); font-size: 0.7rem; }
+    .tag-pill i:hover { color: var(--admin-primary); }
+
+    /* Switch toggle mini */
+    .switch-toggle { position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+    .slider-round { width: 42px; height: 22px; background-color: #CCC; transition: .3s; border-radius: 22px; position: relative; }
+    .slider-round:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider-round { background-color: #4CAF50; }
+    input:checked + .slider-round:before { transform: translateX(20px); }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header matching Reference -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <!-- Global Search -->
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search designs, orders, customers...">
+    </div>
+
+    <!-- Right User Header Icons -->
+    <div class="admin-header-right">
+      <a href="#" class="admin-icon-btn" title="Notifications">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge-count">3</span>
+      </a>
+
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--admin-text-muted); margin-left: 4px;"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Main Layout with Sidebar -->
+  <div class="admin-main-container">
+    <!-- Left Sidebar matching Reference -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create" class="active"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/orders?status=pending">
+              <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
+              <span class="sidebar-badge">5</span>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CONTENT Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CONTENT</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+
+      <!-- Breadcrumbs & Header -->
+      <div style="margin-bottom: 1.8rem;">
+        <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+          <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; <a href="/admin/designs" style="color: var(--admin-text-muted); text-decoration: none;">Designs</a> &nbsp;>&nbsp; <span style="color: var(--admin-primary); font-weight: 600;"><%= design ? 'Edit Design' : 'Add New Design' %></span>
+        </div>
+        <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;"><%= design ? 'Edit Design #' + design.id : 'Add New Design' %></h1>
+        <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Upload and add a new embroidery design. All details will be reflected on the website.</p>
+      </div>
+
+      <!-- Flash Messages -->
+      <div id="formFlashMessage" style="display: none; margin-bottom: 1.5rem; border-radius: 10px; padding: 0.8rem 1.2rem; align-items: center; gap: 8px;"></div>
+
+      <% if (flash && flash.success && flash.success.length > 0) { %>
+        <div class="alert alert-success" style="margin-bottom: 1.5rem; border-radius: 10px; background: #E8F5E9; color: #2E7D32; padding: 0.8rem 1.2rem; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-check"></i> <%= flash.success[0] %>
+        </div>
+      <% } %>
+
+      <% if (flash && flash.error && flash.error.length > 0) { %>
+        <div class="alert alert-error" style="margin-bottom: 1.5rem; border-radius: 10px; background: #FFEBEE; color: #C62828; padding: 0.8rem 1.2rem; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
+        </div>
+      <% } %>
+
+      <!-- Main Form Grid (2 Columns: Left 60% Width, Right 40% Width) -->
+      <form id="designForm" action="<%= (design ? '/admin/designs/edit/' + design.id : '/admin/designs/create') + '?_csrf=' + (typeof csrfToken !== 'undefined' ? csrfToken : '') %>" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div style="display: grid; grid-template-columns: 1.35fr 0.85fr; gap: 1.8rem; align-items: flex-start;">
+          
+          <!-- LEFT COLUMN -->
+          <div>
+            <!-- Card 1: Basic Information -->
+            <div class="form-section-card">
+              <h3>Basic Information</h3>
+
+              <!-- 2-Col: Design Name & SKU -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem;">
+                <div>
+                  <label class="form-label-custom">Design Name <span class="req">*</span></label>
+                  <input type="text" name="title" class="form-control-custom" value="<%= design ? design.title : '' %>" required placeholder="e.g. Rose Floral Design">
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Design Code / SKU <span class="req">*</span></label>
+                  <input type="text" name="sku" class="form-control-custom" value="<%= design ? (design.sku || 'ARV-FL-00' + (design ? design.id : '')) : 'ARV-FL-' + Math.floor(100 + Math.random() * 900) %>" required placeholder="e.g. ARV-FL-001">
+                </div>
+              </div>
+
+              <!-- Category -->
+              <div>
+                <label class="form-label-custom">Category <span class="req">*</span></label>
+                <select name="category_id" class="form-control-custom" required>
+                  <option value="">Select Category</option>
+                  <% categories.forEach(cat => { %>
+                    <option value="<%= cat.id %>" <%= (design && design.category_id == cat.id) ? 'selected' : '' %>>
+                      <%= cat.name %>
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+            </div>
+
+            <!-- Card 2: Design Files -->
+            <div class="form-section-card">
+              <h3>Design Files</h3>
+              <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: -0.8rem 0 1.2rem;">Select machine formats and upload matching embroidery files.</p>
+
+              <!-- Available Machine Formats Checkboxes -->
+              <div style="margin-bottom: 1.2rem; background: #FAF6F0; border-radius: 12px; padding: 1.1rem; border: 1px solid var(--admin-border);">
+                <label class="form-label-custom" style="margin-bottom: 4px;">Available Machine Formats <span class="req">*</span></label>
+                <p style="font-size: 0.76rem; color: var(--admin-text-muted); margin: 0 0 10px;">Select the embroidery machine formats you want to make available for this design:</p>
+                <% 
+                  const existingFormats = (design && design.files && design.files.length > 0)
+                    ? design.files.filter(f => !f.is_preview && !['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase())).map(f => (f.file_format||'').toUpperCase())
+                    : (design && design.formats ? design.formats.split(',').map(s=>s.trim().toUpperCase()) : []);
+                %>
+                <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
+                    <input type="checkbox" name="selected_formats" value="DST" id="chkDST" <%= existingFormats.includes('DST') ? 'checked' : '' %> onchange="toggleFormatBox('DST')"> DST
+                  </label>
+                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
+                    <input type="checkbox" name="selected_formats" value="PES" id="chkPES" <%= existingFormats.includes('PES') ? 'checked' : '' %> onchange="toggleFormatBox('PES')"> PES
+                  </label>
+                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
+                    <input type="checkbox" name="selected_formats" value="JEF" id="chkJEF" <%= existingFormats.includes('JEF') ? 'checked' : '' %> onchange="toggleFormatBox('JEF')"> JEF
+                  </label>
+                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
+                    <input type="checkbox" name="selected_formats" value="EXP" id="chkEXP" <%= existingFormats.includes('EXP') ? 'checked' : '' %> onchange="toggleFormatBox('EXP')"> EXP
+                  </label>
+                </div>
+              </div>
+
+              <!-- Format-Specific Upload Areas -->
+              <div id="formatUploadContainers" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.2rem;">
+                <% ['DST','PES','JEF','EXP'].forEach(fmt => { %>
+                  <% 
+                    const isChecked = existingFormats.includes(fmt); 
+                    const existingFmtFile = design && design.files ? design.files.find(f => !f.is_preview && (f.file_format||'').toUpperCase() === fmt) : null;
+                  %>
+                  <div id="box_<%= fmt %>" style="display: <%= isChecked ? 'block' : 'none' %>; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 0.9rem 1.1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <strong style="font-size: 0.85rem; color: var(--admin-text-dark);"><i class="fa-solid fa-file-code" style="color: var(--admin-primary); margin-right: 6px;"></i> <%= fmt %> File (. <%= fmt.toLowerCase() %> or .zip)</strong>
+                      <% if (existingFmtFile) { %>
+                        <span style="font-size: 0.75rem; color: #2E7D32; font-weight: 600; background: #E8F5E9; padding: 2px 8px; border-radius: 4px;"><i class="fa-solid fa-check"></i> Uploaded: <%= existingFmtFile.file_name %></span>
+                      <% } %>
+                    </div>
+                    <input type="file" name="file_<%= fmt.toLowerCase() %>" accept=".<%= fmt.toLowerCase() %>,.zip" class="form-control-custom" style="padding-top: 8px; background: #FFFFFF; height: 42px;" onchange="validateFormatFile(this, '<%= fmt %>')">
+                    <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Upload a .<%= fmt.toLowerCase() %> machine file or a ZIP containing <%= fmt %> format.</span>
+                  </div>
+                <% }) %>
+              </div>
+
+              <!-- Package Archive / Folder / Drag & Drop Upload Zone -->
+              <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1.5rem; align-items: flex-start;">
+                <!-- Drag & Drop Box with File / ZIP / Folder Buttons -->
+                <div class="dropzone-box" id="dropzoneBox" style="border: 2px dashed var(--admin-primary); border-radius: 14px; padding: 1.2rem; text-align: center; background: #FAF6F0; transition: all 0.2s ease;">
+                  <i class="fa-solid fa-folder-open" style="font-size: 2.2rem; color: var(--admin-primary); margin-bottom: 0.4rem; display: block;"></i>
+                  <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 2px;">Drag & Drop machine files, ZIP, or Folder here</strong>
+                  <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: block; margin-bottom: 10px;">Supports .dst, .pes, .jef, .exp, .zip archives, or entire design folders</span>
+                  
+                  <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-sm" style="background: var(--admin-primary); color: #FFF; font-weight: 600; border-radius: 8px; font-size: 0.78rem; padding: 6px 12px;" onclick="document.getElementById('packageFileInput').click()">
+                      <i class="fa-solid fa-file-archive"></i> Choose Files / ZIP
+                    </button>
+                    <button type="button" class="btn btn-sm" style="background: #FFFFFF; color: var(--admin-text-dark); border: 1px solid var(--admin-border); font-weight: 600; border-radius: 8px; font-size: 0.78rem; padding: 6px 12px;" onclick="document.getElementById('folderFileInput').click()">
+                      <i class="fa-solid fa-folder-tree"></i> Choose Folder
+                    </button>
+                  </div>
+
+                  <input type="file" id="packageFileInput" name="package_file" multiple accept=".zip,.dst,.pes,.jef,.exp,.jpg,.jpeg,.png,.webp" style="display: none;" onchange="showSelectedFiles(this)">
+                  <input type="file" id="folderFileInput" name="folder_files" webkitdirectory directory multiple style="display: none;" onchange="showSelectedFiles(this)">
+                  <input type="file" id="designFileInput" name="design_file" multiple style="display: none;" onchange="showSelectedFiles(this)">
+                </div>
+
+                <!-- Uploaded Machine Files List -->
+                <div style="display: flex; flex-direction: column; gap: 8px; background: #FAF6F0; border-radius: 12px; padding: 1rem; min-height: 140px;">
+                  <span style="font-size: 0.75rem; font-weight: 700; color: var(--admin-text-muted); text-transform: uppercase;">Uploaded Machine Files</span>
+
+                  <div id="attachedFilesContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                    <% 
+                      const machineFilesList = design && design.files ? design.files.filter(f => !f.is_preview && ['DST','PES','JEF','EXP'].includes((f.file_format || '').toUpperCase())) : [];
+                    %>
+                    <% if (machineFilesList.length > 0) { %>
+                      <% machineFilesList.forEach(f => { %>
+                        <div class="file-row-item" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFFFFF; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--admin-border);">
+                          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                            <i class="fa-regular fa-file-code" style="color: var(--admin-primary);"></i>
+                            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;"><%= f.file_name %></strong>
+                            <span style="font-size: 0.7rem; color: var(--admin-text-muted);"><%= (f.file_format || '').toUpperCase() %></span>
+                          </div>
+                          <div style="display: flex; gap: 8px; align-items: center;">
+                            <span style="background: #E3F2FD; color: #1565C0; font-size: 0.68rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;"><%= (f.file_format||'').toUpperCase() %></span>
+                            <button type="button" onclick="deleteFileRecord('<%= f.id %>', this)" style="background: none; border: none; padding: 0; cursor: pointer;">
+                              <i class="fa-regular fa-trash-can" style="color: #C62828; font-size: 0.85rem;" title="Delete File"></i>
+                            </button>
+                          </div>
+                        </div>
+                      <% }) %>
+                    <% } else { %>
+                      <div id="noMachineFilesMsg" style="font-size: 0.76rem; color: var(--admin-text-muted); font-style: italic;">No machine format files attached yet. Upload a file or ZIP archive above.</div>
+                    <% } %>
+                  </div>
+                  <div id="newSelectedFiles" style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 600;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN -->
+          <div>
+            <!-- Card 1: Design Preview -->
+            <div class="form-section-card">
+              <h3>Design Preview</h3>
+
+              <!-- Main Preview Image Box: Flexible height, object-fit: contain to show FULL portrait & landscape images without cropping -->
+              <div id="mainPreviewBox" style="border-radius: 14px; overflow: hidden; border: 1px solid var(--admin-border); min-height: 240px; max-height: 480px; width: 100%; background: #FAF6F0; margin-bottom: 1.2rem; position: relative; display: flex; align-items: center; justify-content: center; padding: 12px;">
+                <% if (design && design.primary_image) { %>
+                  <img id="mainImagePreview" src="<%= design.primary_image %>" alt="Embroidery Design Preview" style="max-width: 100%; max-height: 450px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                  <div id="noPreviewState" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; color: var(--admin-text-muted);">
+                    <i class="fa-regular fa-image" style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5; display: block;"></i>
+                    <span style="font-size: 0.88rem; font-weight: 500;">No preview image uploaded</span>
+                  </div>
+                <% } else { %>
+                  <img id="mainImagePreview" src="" alt="Embroidery Design Preview" style="display: none; max-width: 100%; max-height: 450px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                  <div id="noPreviewState" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; color: var(--admin-text-muted);">
+                    <i class="fa-regular fa-image" style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5; display: block;"></i>
+                    <span style="font-size: 0.88rem; font-weight: 500;">No preview image uploaded</span>
+                  </div>
+                <% } %>
+                <button type="button" onclick="document.getElementById('designFileInput').click()" style="position: absolute; right: 14px; bottom: 14px; background: rgba(0,0,0,0.82); color: #FFF; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: var(--transition);">
+                  <i class="fa-solid fa-camera"></i> Upload / Change Images
+                </button>
+              </div>
+
+              <!-- Thumbnails Carousel Strip -->
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-chevron-left" onclick="scrollThumbnails(-60)" style="font-size: 0.75rem; color: var(--admin-text-muted); cursor: pointer;"></i>
+                <div style="display: flex; gap: 8px; overflow-x: auto; flex: 1; scroll-behavior: smooth; padding: 4px 0;" id="thumbnailStrip">
+                  <% if (design && design.images && design.images.length > 0) { %>
+                    <% design.images.forEach((img, idx) => { %>
+                      <div class="thumb-wrapper" style="position: relative; display: inline-block; flex-shrink: 0;">
+                        <img src="<%= img.image_url %>" onclick="setMainPreview('<%= img.image_url %>', this)" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: <%= img.is_primary ? '2px solid var(--admin-primary)' : '1px solid var(--admin-border)' %>; cursor: pointer;" title="Preview image">
+                        <button type="button" onclick="deleteImageRecord('<%= img.id %>', this)" style="position: absolute; top: -6px; right: -6px; background: #C62828; color: #FFF; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2);" title="Delete image">&times;</button>
+                        <% if (!img.is_primary) { %>
+                          <button type="button" onclick="makePrimaryImage('<%= img.id %>', this)" style="position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: #FFD700; border: none; border-radius: 4px; padding: 1px 5px; font-size: 0.6rem; cursor: pointer; white-space: nowrap;" title="Set as Primary"><i class="fa-solid fa-star"></i></title>
+                        <% } %>
+                      </div>
+                    <% }) %>
+                  <% } %>
+                </div>
+                <i class="fa-solid fa-chevron-right" onclick="scrollThumbnails(60)" style="font-size: 0.75rem; color: var(--admin-text-muted); cursor: pointer;"></i>
+              </div>
+            </div>
+
+            <!-- Card 2: Pricing & Availability -->
+            <div class="form-section-card">
+              <h3>Pricing & Availability</h3>
+
+              <!-- 3-Col: Original Price, Discount Price, Discount % -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.2rem;">
+                <div>
+                  <label class="form-label-custom">Original Price (₹) <span class="req">*</span></label>
+                  <input type="number" step="0.01" name="price" id="originalPrice" class="form-control-custom" value="<%= design ? design.price : '399' %>" required oninput="calcDiscount()">
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Discount Price (₹) <span class="req">*</span></label>
+                  <input type="number" step="0.01" name="sale_price" id="discountPrice" class="form-control-custom" value="<%= design ? (design.sale_price !== null && design.sale_price !== undefined ? design.sale_price : '299') : '299' %>" oninput="calcDiscount()">
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Discount (%)</label>
+                  <div style="position: relative;">
+                    <input type="text" id="discountPercent" class="form-control-custom" value="25%" readonly style="background: #FAF6F0;">
+                    <i class="fa-solid fa-arrows-rotate" onclick="calcDiscount()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--admin-text-muted); cursor: pointer;" title="Recalculate"></i>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2-Col: Status & Download Count -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; align-items: center;">
+                <div>
+                  <label class="form-label-custom">Status</label>
+                  <label class="switch-toggle">
+                    <input type="checkbox" name="is_active" value="1" <%= (design && design.is_active) || (!design) ? 'checked' : '' %>>
+                    <span class="slider-round"></span>
+                    <span style="font-size: 0.82rem; font-weight: 500; color: var(--admin-text-dark);">Active (Visible on website)</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Download Count</label>
+                  <div style="position: relative;">
+                    <input type="number" name="download_count" class="form-control-custom" value="<%= design ? (design.download_count !== undefined && design.download_count !== null ? design.download_count : (design.total_sales || 256)) : 256 %>">
+                    <i class="fa-regular fa-circle-question" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--admin-text-muted);" title="Tracked downloads count"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Additional Options -->
+            <div class="form-section-card">
+              <h3>Additional Options</h3>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
+                <div>
+                  <label class="switch-toggle">
+                    <input type="checkbox" name="is_featured" value="1" <%= (design && design.is_featured) || (!design) ? 'checked' : '' %>>
+                    <span class="slider-round"></span>
+                    <div>
+                      <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);">Featured Design</strong>
+                      <span style="font-size: 0.72rem; color: var(--admin-text-muted);">Show on homepage</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div>
+                  <label class="switch-toggle">
+                    <input type="checkbox" name="is_trending" value="1" <%= (design && design.is_trending) ? 'checked' : '' %>>
+                    <span class="slider-round"></span>
+                    <div>
+                      <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);">Trending Design</strong>
+                      <span style="font-size: 0.72rem; color: var(--admin-text-muted);">Show in trending section</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 4: Tags (Optional) -->
+            <div class="form-section-card">
+              <h3>Tags (Optional)</h3>
+
+              <input type="hidden" name="tags" id="tagsHiddenInput" value="<%= design ? (design.tags || 'rose, floral, blouse, saree, flower') : 'rose, floral, blouse, saree, flower' %>">
+              <div id="tagPillsContainer" style="border: 1px solid var(--admin-border); border-radius: 10px; padding: 8px 10px; background: #FFFFFF; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px;">
+                <!-- Tag Pills inserted dynamically via JS -->
+                <input type="text" id="tagTextInput" placeholder="Type and press Enter to add tag..." style="border: none; outline: none; font-size: 0.8rem; background: transparent; flex: 1; min-width: 160px;" onkeydown="handleTagKeyDown(event)">
+              </div>
+            </div>
+
+            <!-- Action Buttons Row -->
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+              <button type="submit" id="draftBtn" name="status_draft" value="1" class="btn btn-outline" style="height: 46px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; padding: 0 1.4rem; background: #FFFFFF;">
+                <i class="fa-regular fa-file"></i> Save as Draft
+              </button>
+
+              <button type="submit" id="publishBtn" class="btn btn-primary" style="height: 46px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; padding: 0 1.6rem; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fa-regular fa-paper-plane"></i> Publish Design
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      </form>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  let tagList = [];
+
+  function toggleFormatBox(fmt) {
+    const chk = document.getElementById('chk' + fmt);
+    const box = document.getElementById('box_' + fmt);
+    if (box) {
+      box.style.display = chk && chk.checked ? 'block' : 'none';
+    }
+  }
+
+  function validateFormatFile(input, fmt) {
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      const ext = file.name.split('.').pop().toLowerCase();
+      const allowedExts = [fmt.toLowerCase(), 'zip', 'rar', '7z'];
+      if (!allowedExts.includes(ext)) {
+        alert(`Invalid file extension .${ext}! For ${fmt} format, please upload a .${fmt.toLowerCase()} file or a .zip archive containing ${fmt} format.`);
+        input.value = '';
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    calcDiscount();
+    initTags();
+    initDragAndDrop();
+    initFormSubmit();
+  });
+
+  function initDragAndDrop() {
+    const dropzone = document.getElementById('dropzoneBox');
+    const packageInput = document.getElementById('packageFileInput');
+    if (!dropzone || !packageInput) return;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.style.borderColor = 'var(--admin-primary)';
+        dropzone.style.background = '#FAF0E8';
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.style.borderColor = 'var(--admin-primary)';
+        dropzone.style.background = '#FAF6F0';
+      }, false);
+    });
+
+    dropzone.addEventListener('drop', async (e) => {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+
+      const files = [];
+      const items = dt.items;
+
+      if (items && items.length > 0 && items[0].webkitGetAsEntry) {
+        const entryPromises = [];
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === 'file') {
+            const entry = item.webkitGetAsEntry();
+            if (entry) {
+              entryPromises.push(scanFilesFromEntry(entry));
+            }
+          }
+        }
+        const scannedArrays = await Promise.all(entryPromises);
+        scannedArrays.forEach(arr => files.push(...arr));
+      } else if (dt.files && dt.files.length > 0) {
+        Array.from(dt.files).forEach(f => files.push(f));
+      }
+
+      if (files.length > 0) {
+        const dataTransfer = new DataTransfer();
+        files.forEach(f => dataTransfer.items.add(f));
+        packageInput.files = dataTransfer.files;
+        showSelectedFiles(packageInput);
+      }
+    }, false);
+  }
+
+  function scanFilesFromEntry(entry) {
+    return new Promise((resolve) => {
+      if (entry.isFile) {
+        entry.file(file => resolve([file]), () => resolve([]));
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        dirReader.readEntries(async (entries) => {
+          const promises = entries.map(e => scanFilesFromEntry(e));
+          const results = await Promise.all(promises);
+          resolve(results.flat());
+        }, () => resolve([]));
+      } else {
+        resolve([]);
+      }
+    });
+  }
+
+  function handleImageSelection(input) {
+    if (input.files && input.files.length > 0) {
+      const strip = document.getElementById('thumbnailStrip');
+      Array.from(input.files).forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          if (index === 0) {
+            document.getElementById('mainImagePreview').src = e.target.result;
+          }
+          const wrapper = document.createElement('div');
+          wrapper.className = 'thumb-wrapper new-thumb-item';
+          wrapper.style.cssText = 'position: relative; display: inline-block; flex-shrink: 0;';
+          wrapper.innerHTML = `
+            <img src="${e.target.result}" onclick="setMainPreview('${e.target.result}', this)" style="width: 48px; height: 48px; border-radius: 6px; object-fit: cover; border: 2px solid var(--admin-primary); cursor: pointer;" title="New Image Preview">
+            <button type="button" onclick="removeThumbRow(this)" style="position: absolute; top: -4px; right: -4px; background: #C62828; color: #FFF; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove image">&times;</button>
+          `;
+          strip.appendChild(wrapper);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  }
+
+  function setMainPreview(url, el) {
+    document.getElementById('mainImagePreview').src = url;
+    if (el) {
+      document.querySelectorAll('#thumbnailStrip img').forEach(img => {
+        img.style.borderColor = 'var(--admin-border)';
+      });
+      el.style.borderColor = 'var(--admin-primary)';
+    }
+  }
+
+  function scrollThumbnails(amount) {
+    const strip = document.getElementById('thumbnailStrip');
+    if (strip) strip.scrollBy({ left: amount, behavior: 'smooth' });
+  }
+
+  function showSelectedFiles(input) {
+    const container = document.getElementById('attachedFilesContainer');
+    const strip = document.getElementById('thumbnailStrip');
+    const mainImg = document.getElementById('mainImagePreview');
+    const noPrevState = document.getElementById('noPreviewState');
+
+    if (input.files && input.files.length > 0) {
+      Array.from(input.files).forEach(file => {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+        const ext = file.name.split('.').pop().toLowerCase();
+        const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
+
+        if (isImage) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            if (mainImg) {
+              mainImg.src = e.target.result;
+              mainImg.style.display = 'block';
+            }
+            if (noPrevState) {
+              noPrevState.style.display = 'none';
+            }
+
+            if (strip) {
+              const wrapper = document.createElement('div');
+              wrapper.className = 'thumb-wrapper new-thumb-item';
+              wrapper.style.cssText = 'position: relative; display: inline-block; flex-shrink: 0;';
+              wrapper.innerHTML = `
+                <img src="${e.target.result}" onclick="setMainPreview('${e.target.result}', this)" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 2px solid var(--admin-primary); cursor: pointer;" title="Uploaded Preview Image">
+                <button type="button" onclick="removeThumbRow(this)" style="position: absolute; top: -6px; right: -6px; background: #C62828; color: #FFF; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove preview">&times;</button>
+              `;
+              strip.appendChild(wrapper);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+
+        const div = document.createElement('div');
+        div.className = 'file-row-item new-file-item';
+        div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFF9F5; padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--admin-primary);';
+        div.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+            <i class="${isImage ? 'fa-regular fa-image' : 'fa-solid fa-cloud-arrow-up'}" style="color: var(--admin-primary);"></i>
+            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${file.name}</strong>
+            <span style="font-size: 0.7rem; color: var(--admin-text-muted);">${sizeMB}</span>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            ${isImage ? '<span style="background:#E8F5E9; color:#2E7D32; font-size:0.68rem; font-weight:600; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;"><i class="fa-solid fa-check"></i> Preview</span>' : '<span style="font-size: 0.68rem; color: var(--admin-primary); font-weight: 600;">Ready to upload</span>'}
+            <button type="button" onclick="removeFileRow(this)" style="background: none; border: none; padding: 0; cursor: pointer;">
+              <i class="fa-regular fa-trash-can" style="color: #C62828; font-size: 0.85rem;" title="Remove File"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+  }
+
+  function removeFileRow(btn) {
+    const row = btn.closest('.file-row-item');
+    if (row) {
+      row.style.opacity = '0';
+      row.style.transition = 'opacity 0.2s ease';
+      setTimeout(() => row.remove(), 200);
+    }
+  }
+
+  function removeThumbRow(btn) {
+    const wrapper = btn.closest('.thumb-wrapper');
+    if (wrapper) {
+      wrapper.remove();
+      const remainingImgs = document.querySelectorAll('#thumbnailStrip img');
+      const mainImg = document.getElementById('mainImagePreview');
+      const noPrevState = document.getElementById('noPreviewState');
+      if (remainingImgs.length > 0 && mainImg) {
+        mainImg.src = remainingImgs[0].src;
+        mainImg.style.display = 'block';
+        if (noPrevState) noPrevState.style.display = 'none';
+      } else if (mainImg) {
+        mainImg.src = '';
+        mainImg.style.display = 'none';
+        if (noPrevState) noPrevState.style.display = 'flex';
+      }
+    }
+  }
+
+  function calcDiscount() {
+    const orig = parseFloat(document.getElementById('originalPrice').value) || 0;
+    const disc = parseFloat(document.getElementById('discountPrice').value) || 0;
+    if (orig > 0 && disc > 0 && orig > disc) {
+      const pct = Math.round(((orig - disc) / orig) * 100);
+      document.getElementById('discountPercent').value = pct + '%';
+    } else {
+      document.getElementById('discountPercent').value = '0%';
+    }
+  }
+
+  function initTags() {
+    const raw = document.getElementById('tagsHiddenInput').value || '';
+    tagList = raw.split(',').map(t => t.trim()).filter(Boolean);
+    renderTagPills();
+  }
+
+  function renderTagPills() {
+    const container = document.getElementById('tagPillsContainer');
+    const inputField = document.getElementById('tagTextInput');
+
+    const existingPills = container.querySelectorAll('.tag-pill');
+    existingPills.forEach(p => p.remove());
+
+    tagList.forEach((tag, idx) => {
+      const pill = document.createElement('span');
+      pill.className = 'tag-pill';
+      pill.innerHTML = `${tag} <i class="fa-solid fa-xmark" onclick="removeTag(${idx})"></i>`;
+      container.insertBefore(pill, inputField);
+    });
+
+    document.getElementById('tagsHiddenInput').value = tagList.join(', ');
+  }
+
+  function handleTagKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = e.target.value.trim().replace(/,/g, '');
+      if (val && !tagList.includes(val)) {
+        tagList.push(val);
+        renderTagPills();
+      }
+      e.target.value = '';
+    }
+  }
+
+  function removeTag(index) {
+    tagList.splice(index, 1);
+    renderTagPills();
+  }
+
+  function deleteFileRecord(fileId, btn) {
+    const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
+    fetch('/admin/designs/delete-file/' + fileId + '?format=json&_csrf=' + encodeURIComponent(csrfToken), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.message || 'Unable to remove file');
+        }
+      })
+      .catch(err => {
+        window.location.reload();
+      });
+  }
+
+  function deleteImageRecord(imageId, btn) {
+    const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
+    fetch('/admin/designs/delete-image/' + imageId + '?format=json&_csrf=' + encodeURIComponent(csrfToken), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.message || 'Unable to delete image');
+        }
+      })
+      .catch(err => {
+        window.location.reload();
+      });
+  }
+
+  function makePrimaryImage(imageId, btn) {
+    const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
+    fetch('/admin/designs/set-primary-image/' + imageId + '?format=json&_csrf=' + encodeURIComponent(csrfToken), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        }
+      })
+      .catch(err => {
+        window.location.reload();
+      });
+  }
+
+  function initFormSubmit() {
+    const form = document.getElementById('designForm');
+    const publishBtn = document.getElementById('publishBtn');
+    const draftBtn = document.getElementById('draftBtn');
+    if (!form || !publishBtn) return;
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const submitter = e.submitter || document.activeElement;
+      const isDraft = submitter && (submitter.name === 'status_draft' || submitter.id === 'draftBtn');
+      const targetBtn = isDraft ? draftBtn : publishBtn;
+      const originalHtml = targetBtn ? targetBtn.innerHTML : '';
+
+      if (publishBtn) publishBtn.disabled = true;
+      if (draftBtn) draftBtn.disabled = true;
+
+      if (targetBtn) {
+        targetBtn.innerHTML = isDraft 
+          ? '<i class="fa-solid fa-spinner fa-spin"></i> Saving Draft...' 
+          : '<i class="fa-solid fa-spinner fa-spin"></i> Publishing...';
+      }
+
+      let isSuccess = false;
+
+      try {
+        const formData = new FormData(form);
+        formData.append('is_ajax', '1');
+        if (isDraft) {
+          formData.append('status_draft', '1');
+        }
+
+        const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
+        let actionUrl = form.getAttribute('action') || window.location.pathname;
+        if (!actionUrl.includes('format=json')) {
+          actionUrl += (actionUrl.includes('?') ? '&' : '?') + 'format=json';
+        }
+
+        const response = await fetch(actionUrl, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': csrfToken
+          },
+          body: formData
+        });
+
+        let data;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          if (response.ok) {
+            data = { success: true, message: 'Design saved successfully!' };
+          } else {
+            data = { success: false, message: response.status === 401 || response.status === 403 ? 'Admin session expired. Please log in again.' : `Server error (${response.status})` };
+          }
+        }
+
+        if (response.ok && data && data.success) {
+          isSuccess = true;
+          if (targetBtn) {
+            targetBtn.innerHTML = isDraft 
+              ? '<i class="fa-solid fa-check"></i> Draft Saved ✓' 
+              : '<i class="fa-solid fa-check"></i> Published ✓';
+            targetBtn.style.background = '#2E7D32';
+            targetBtn.style.borderColor = '#2E7D32';
+          }
+
+          const flashAlert = document.getElementById('formFlashMessage');
+          if (flashAlert) {
+            flashAlert.className = 'alert alert-success';
+            flashAlert.style.background = '#E8F5E9';
+            flashAlert.style.color = '#2E7D32';
+            flashAlert.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message || 'Design published successfully!'}`;
+            flashAlert.style.display = 'flex';
+          }
+
+          setTimeout(() => {
+            window.location.href = data.redirectUrl || '/admin/designs';
+          }, 600);
+        } else {
+          if (data && data.redirectUrl && (response.status === 401 || response.status === 403 || (data.message && data.message.includes('expired')))) {
+            const flashAlert = document.getElementById('formFlashMessage');
+            if (flashAlert) {
+              flashAlert.className = 'alert alert-error';
+              flashAlert.style.background = '#FFEBEE';
+              flashAlert.style.color = '#C62828';
+              flashAlert.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${data.message || 'Session expired. Redirecting to login...'}`;
+              flashAlert.style.display = 'flex';
+            }
+            setTimeout(() => {
+              window.location.href = data.redirectUrl;
+            }, 1200);
+            return;
+          }
+          const msg = (data && (data.message || data.error)) 
+            ? (data.message || data.error) 
+            : (response.status === 401 || response.status === 403 ? 'Admin session expired. Please log in again.' : `Server error (${response.status})`);
+          throw new Error(msg);
+        }
+      } catch (err) {
+        console.error('[PUBLISH FORM ERROR]:', err);
+        const userFriendlyMsg = (err.name === 'TypeError' && String(err.message).toLowerCase() === 'failed to fetch')
+          ? 'Unable to connect to the server. Please check that the backend server is running.'
+          : err.message;
+
+        const flashAlert = document.getElementById('formFlashMessage');
+        if (flashAlert) {
+          flashAlert.className = 'alert alert-error';
+          flashAlert.style.background = '#FFEBEE';
+          flashAlert.style.color = '#C62828';
+          flashAlert.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${userFriendlyMsg}`;
+          flashAlert.style.display = 'flex';
+        } else {
+          alert(`Unable to publish design: ${userFriendlyMsg}`);
+        }
+      } finally {
+        if (!isSuccess) {
+          if (publishBtn) publishBtn.disabled = false;
+          if (draftBtn) draftBtn.disabled = false;
+          if (targetBtn && originalHtml) targetBtn.innerHTML = originalHtml;
+        }
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
+

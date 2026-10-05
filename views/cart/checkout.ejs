@@ -1,0 +1,270 @@
+<%- include('../partials/header') %>
+
+<div class="container checkout-container">
+  <!-- Breadcrumb Trail -->
+  <div class="breadcrumb-trail checkout-breadcrumb">
+    <a href="/">Home</a> &nbsp;>&nbsp;
+    <a href="/cart">Cart</a> &nbsp;>&nbsp;
+    <span>Checkout</span>
+  </div>
+
+  <!-- Page Title Header -->
+  <div class="checkout-header-box">
+    <h1 class="checkout-page-title">Checkout</h1>
+    <p class="checkout-page-subtitle">Complete your purchase and get instant access to your embroidery designs.</p>
+  </div>
+
+  <% if (!cart || cart.count === 0) { %>
+    <!-- Empty Checkout State -->
+    <div style="max-width: 600px; margin: 3rem auto; text-align: center; padding: 3.5rem 2rem; background: white; border-radius: 16px; border: 1px solid var(--border-light); box-shadow: var(--shadow-sm);">
+      <div style="font-size: 3.5rem; color: var(--primary); margin-bottom: 1rem;">
+        <i class="fa-solid fa-bag-shopping"></i>
+      </div>
+      <h2 style="font-family: var(--font-heading); font-size: 2rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0.6rem;">
+        Your cart is empty
+      </h2>
+      <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem;">
+        Browse our embroidery designs and add a design to continue.
+      </p>
+      <a href="/designs" class="btn btn-primary" style="padding: 0.8rem 2rem; border-radius: 30px; font-weight: 600;">
+        <i class="fa-solid fa-magnifying-glass"></i> Browse Designs
+      </a>
+    </div>
+  <% } else { %>
+
+  <!-- Main Checkout Grid (Left Form + Right Order Summary Sidebar) -->
+  <div class="checkout-main-grid">
+    <!-- Left Main Checkout Form -->
+    <div class="checkout-form-container">
+      <!-- Step Indicator Bar matching Reference -->
+      <div class="checkout-steps-bar">
+        <div class="step-item active">
+          <div class="step-num">1</div>
+          <div class="step-info">
+            <strong>Contact Details</strong>
+            <span>Enter your name, email & phone</span>
+          </div>
+        </div>
+        <i class="fa-solid fa-chevron-right step-chevron"></i>
+        
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div class="step-info">
+            <strong>Payment Method</strong>
+            <span>Choose a payment option</span>
+          </div>
+        </div>
+        <i class="fa-solid fa-chevron-right step-chevron"></i>
+
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div class="step-info">
+            <strong>Review & Place Order</strong>
+            <span>Confirm your order</span>
+          </div>
+        </div>
+      </div>
+
+      <form id="checkoutForm" action="/checkout" method="POST">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <!-- Section 1: Shipping & Contact Information -->
+        <div class="checkout-section-box">
+          <div class="section-box-header">
+            <div class="section-icon-badge"><i class="fa-regular fa-user"></i></div>
+            <div>
+              <h3>Shipping & Contact Information</h3>
+              <p>We'll use this information to send your order details.</p>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group-field span-2">
+              <label>Full Name <span class="req">*</span></label>
+              <input type="text" name="full_name" value="<%= currentUser ? currentUser.full_name : '' %>" placeholder="Enter your full name" required>
+            </div>
+
+            <div class="form-group-field">
+              <label>Email Address <span class="req">*</span></label>
+              <input type="email" name="email" value="<%= currentUser ? currentUser.email : '' %>" placeholder="youremail@example.com" required>
+            </div>
+
+            <div class="form-group-field">
+              <label>Phone Number <span class="req">*</span></label>
+              <div class="phone-input-group">
+                <div class="country-code-picker">
+                  <span class="flag-icon">🇮🇳</span> <span>+91</span> <i class="fa-solid fa-chevron-down" style="font-size: 0.7rem;"></i>
+                </div>
+                <input type="tel" name="phone" value="<%= currentUser ? currentUser.phone : '' %>" placeholder="98765 43210" required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <!-- Section 3: Order Notes (Optional) -->
+        <div class="checkout-section-box" style="margin-bottom: 0;">
+          <div class="section-box-header">
+            <div class="section-icon-badge"><i class="fa-regular fa-pen-to-square"></i></div>
+            <div>
+              <h3>Order Notes (Optional)</h3>
+            </div>
+          </div>
+
+          <div class="form-group-field">
+            <textarea name="notes" rows="3" placeholder="Any special instructions for your order..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Order Summary & Payment Sidebar -->
+    <aside class="checkout-summary-sidebar">
+      <div class="summary-box-card">
+        <div class="summary-card-header">
+          <h3>Order Summary (<%= cart.count %> items)</h3>
+          <a href="/cart" class="back-cart-link"><i class="fa-solid fa-arrow-left"></i> Back to Cart</a>
+        </div>
+
+        <!-- Cart Items List inside Summary -->
+        <div class="summary-items-list">
+          <% cart.items.forEach(item => { %>
+            <div class="summary-item-row">
+              <div class="summary-item-thumb">
+                <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>">
+              </div>
+              <div class="summary-item-info">
+                <h4><%= item.title %></h4>
+                <span class="cat-label"><%= item.category_name || 'Embroidery Designs' %></span>
+                <span class="formats-label"><%= item.formats || '' %></span>
+              </div>
+              <div class="summary-item-qty-price">
+                <span class="qty-text">Qty: 1</span>
+                <div class="price-wrap">
+                  <strong class="item-price-val">₹<%= item.effective_price %></strong>
+                  <% if (item.price && item.price > item.effective_price) { %>
+                    <span class="item-price-old">₹<%= item.price %></span>
+                    <span class="item-discount-tag">25% OFF</span>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+
+        <!-- Coupon Code Box -->
+        <div class="summary-coupon-box">
+          <div class="coupon-title-row">
+            <span><i class="fa-solid fa-scissors" style="transform: rotate(-90deg); color: var(--primary);"></i> Have a Coupon Code?</span>
+            <i class="fa-solid fa-chevron-up" style="font-size: 0.8rem;"></i>
+          </div>
+          <form class="coupon-apply-form" action="/cart/coupon" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="text" name="coupon_code" placeholder="Enter coupon code">
+            <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+          </form>
+        </div>
+
+        <!-- Price Totals matching exact Requirement 1 -->
+        <div class="summary-totals-block">
+          <%
+            const dispOriginal = typeof originalTotal !== 'undefined' ? originalTotal : (cart.originalTotal || cart.subtotal);
+            const dispItemDiscount = typeof itemDiscount !== 'undefined' ? itemDiscount : (cart.totalDiscount || 0);
+            const dispCouponDiscount = typeof couponDiscount !== 'undefined' ? couponDiscount : 0;
+            const dispTotalDiscount = dispItemDiscount + dispCouponDiscount;
+            const dispFinalTotal = typeof finalTotal !== 'undefined' ? finalTotal : Math.max(0, cart.subtotal - dispCouponDiscount);
+          %>
+          <div class="total-line">
+            <span>Original Price (<%= cart.count %> items)</span>
+            <strong>₹<%= dispOriginal %></strong>
+          </div>
+
+          <% if (dispTotalDiscount > 0) { %>
+            <div class="total-line discount-text" style="color: #2E7D32; font-weight: 600;">
+              <span>Discount</span>
+              <strong>- ₹<%= dispTotalDiscount %> OFF</strong>
+            </div>
+          <% } %>
+
+          <div class="total-line">
+            <span>Shipping / Instant Delivery</span>
+            <span style="color: #2E7D32; font-weight: 600;">FREE</span>
+          </div>
+
+          <!-- Total Amount Box -->
+          <div class="grand-total-banner" style="margin-top: 0.8rem;">
+            <span>Total Payable</span>
+            <strong class="grand-price" id="checkoutGrandTotal">₹<%= dispFinalTotal %></strong>
+          </div>
+
+          <div class="download-notice-bar" style="margin-top: 0.8rem; font-size: 0.8rem;">
+            <i class="fa-solid fa-circle-check"></i> Files unlocked for instant download immediately upon successful payment.
+          </div>
+        </div>
+
+        <!-- Payment Gateway Section -->
+        <div class="summary-payment-block" style="margin-top: 1.2rem;">
+          <div class="payment-block-header">
+            <div class="pm-icon"><i class="fa-solid fa-lock" style="color: var(--primary);"></i></div>
+            <div>
+              <h4 style="font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700; color: #231815; margin: 0 0 2px;">Payment Gateway</h4>
+              <p style="font-size: 0.85rem; color: #8C7F79; margin: 0;">Secure Razorpay Checkout</p>
+            </div>
+          </div>
+
+          <div style="background: #FAF6F0; border: 1px solid #E8E0D5; border-radius: 12px; padding: 1rem; margin-top: 0.8rem; font-size: 0.84rem; color: #4A3E39; line-height: 1.5;">
+            Pay securely using UPI, Cards, Net Banking, and other Razorpay-supported payment methods.
+          </div>
+        </div>
+
+        <!-- Primary Place Order CTA Button -->
+        <button type="submit" form="checkoutForm" class="btn btn-primary btn-block place-order-btn" id="payBtn" style="margin-top: 1.2rem; height: 50px; font-size: 1rem; border-radius: 12px; font-weight: 700; background-color: var(--primary); display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <i class="fa-solid fa-lock"></i> Pay ₹<%= dispFinalTotal %> & Download Designs <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <div class="secure-badge-footer" style="margin-top: 0.8rem; text-align: center; font-size: 0.82rem; color: #2E7D32; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <i class="fa-solid fa-circle-check"></i> ✓ Secure Razorpay Payment
+        </div>
+      </div>
+    </aside>
+  </div>
+  <% } %>
+
+  <!-- Bottom Feature Pills Bar matching Reference -->
+  <div class="hero-feature-pills" style="margin-top: 4rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-award"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Premium Quality Designs</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Crafted with precision</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Instant Download</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Get files immediately</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">100% Tested Machine Fills</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">Quality assured designs</span>
+      </div>
+    </div>
+    <div class="hero-pill-item">
+      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
+      <div>
+        <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
+        <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="/public/js/checkout.js"></script>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homepage Content Management - ARUVI Admin</title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header matching Master Manage Designs UI -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <!-- Global Search -->
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search designs, orders, customers...">
+    </div>
+
+    <!-- Right User Header Icons -->
+    <div class="admin-header-right">
+      <a href="#" class="admin-icon-btn" title="Notifications">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge-count">3</span>
+      </a>
+
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--admin-text-muted); margin-left: 4px;"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Main Layout with Sidebar -->
+  <div class="admin-main-container">
+    <!-- Left Sidebar matching Master Manage Designs UI -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/orders?status=pending">
+              <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
+              <span class="sidebar-badge">5</span>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CONTENT Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CONTENT</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/homepage" class="active"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+
+      <!-- Breadcrumbs & Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.8rem;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+            <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; <span style="color: var(--admin-primary); font-weight: 600;">Homepage Management</span>
+          </div>
+          <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Homepage Content Management</h1>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Manage hero banner, featured sections, counters, and call-to-action blocks. All updates automatically sync with the customer site.</p>
+        </div>
+
+        <a href="/" target="_blank" class="btn btn-outline" style="height: 44px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #FFF; display: inline-flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Preview Customer Homepage
+        </a>
+      </div>
+
+      <% if (flash && flash.success && flash.success.length > 0) { %>
+        <div id="adminToastPopup" style="position: fixed; top: 25px; right: 25px; background: #1B5E20; color: white; padding: 1.1rem 1.8rem; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 999999; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 1rem; border: 2px solid #81C784;">
+          <i class="fa-solid fa-circle-check" style="font-size: 1.5rem; color: #66BB6A;"></i>
+          <span><%= flash.success[0] %></span>
+          <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: white; margin-left: 15px; cursor: pointer; font-size: 1.3rem;">&times;</button>
+        </div>
+        <script>
+          setTimeout(() => {
+            const popup = document.getElementById('adminToastPopup');
+            if (popup) popup.style.display = 'none';
+          }, 4500);
+        </script>
+        <div class="alert alert-success" style="margin-bottom: 1.5rem; border-radius: 10px;">
+          <i class="fa-solid fa-circle-check"></i> <%= flash.success[0] %>
+        </div>
+      <% } %>
+
+      <form action="/admin/homepage?_csrf=<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <!-- Card 1: Top Announcement Bar -->
+        <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 1.2rem;">1. Top Announcement Bar</h3>
+          
+          <div style="margin-bottom: 0;">
+            <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Announcement Bar Text <span style="color: var(--admin-primary);">*</span></label>
+            <input type="text" name="announcement_bar" class="form-control" value="<%= settings.announcement_bar || 'Premium Machine Embroidery Designs — DST, PES, JEF, EXP & More | Instant Download' %>" required>
+          </div>
+        </div>
+
+        <!-- Card 2: Hero Banner Section -->
+        <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 1.2rem;">2. Hero Banner Section</h3>
+
+          <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.8rem;">
+            <div>
+              <div style="margin-bottom: 1.2rem;">
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Eyebrow Tag <span style="color: var(--admin-primary);">*</span></label>
+                <input type="text" name="hero_eyebrow" class="form-control" value="<%= settings.hero_eyebrow || 'PREMIUM EMBROIDERY STUDIO' %>" required>
+              </div>
+
+              <div style="margin-bottom: 1.2rem;">
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Hero Heading Title <span style="color: var(--admin-primary);">*</span></label>
+                <input type="text" name="hero_title" class="form-control" value="<%= settings.hero_title || 'Stitch Your Imagination Into Life' %>" required>
+              </div>
+
+              <div>
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Hero Subtitle Description <span style="color: var(--admin-primary);">*</span></label>
+                <textarea name="hero_subtitle" rows="3" class="form-control" required><%= settings.hero_subtitle || 'Explore high-precision digitized embroidery designs crafted for passionate makers. Instant digital downloads in DST, PES, JEF, and EXP formats.' %></textarea>
+              </div>
+            </div>
+
+            <!-- Hero Image Preview & Upload -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 14px; padding: 1.2rem; text-align: center;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark); margin-bottom: 0.8rem;">Current Hero Image</strong>
+              
+              <div style="height: 140px; border-radius: 10px; overflow: hidden; border: 1px solid var(--admin-border); margin-bottom: 1rem;">
+                <img id="heroImagePreview" src="<%= settings.hero_image || '/public/images/hero_embroidery.jpg' %>" alt="Hero Banner" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+
+              <input type="file" name="hero_image" id="heroImageInput" accept="image/*" style="display: none;" onchange="previewImg(this, 'heroImagePreview')">
+              <button type="button" onclick="document.getElementById('heroImageInput').click()" class="btn btn-outline btn-sm" style="font-size: 0.78rem; background: #FFF;">
+                <i class="fa-solid fa-camera"></i> Change Hero Image
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Counter Statistics -->
+        <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;" id="about">
+          <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 1.2rem;">3. Statistics & Counter Section</h3>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.4rem;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Total Designs Counter</label>
+              <input type="text" name="stat_designs_count" class="form-control" value="<%= settings.stat_designs_count || '5,000+' %>" required>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Happy Customers Counter</label>
+              <input type="text" name="stat_customers_count" class="form-control" value="<%= settings.stat_customers_count || '10,000+' %>" required>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Average Rating Score</label>
+              <input type="text" name="stat_rating" class="form-control" value="<%= settings.stat_rating || '4.9/5' %>" required>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end;">
+          <button type="submit" class="btn btn-primary btn-lg" style="height: 48px; border-radius: 10px; font-weight: 600; padding: 0 2rem; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Homepage
+          </button>
+        </div>
+
+      </form>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  function previewImg(input, targetId) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById(targetId).src = e.target.result;
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+</script>
+
+</body>
+</html>
