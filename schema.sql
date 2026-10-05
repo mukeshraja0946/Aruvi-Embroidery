@@ -3,8 +3,11 @@
 -- Tagline: Where Threads Tell Stories
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS `aruvi_embroidery` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `aruvi_embroidery`;
+-- ------------------------------------------------------------
+-- Database creation & selection (Commented out for phpMyAdmin / Hostinger compatibility)
+-- CREATE DATABASE IF NOT EXISTS `aruvi_embroidery` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE `aruvi_embroidery`;
+-- ------------------------------------------------------------
 
 -- 1. Roles
 CREATE TABLE IF NOT EXISTS `roles` (

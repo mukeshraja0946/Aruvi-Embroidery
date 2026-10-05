@@ -3,7 +3,10 @@
 -- Tagline: Where Threads Tell Stories
 -- ============================================================
 
-USE `aruvi_embroidery`;
+-- ------------------------------------------------------------
+-- Database selection (Commented out for phpMyAdmin / Hostinger compatibility)
+-- USE `aruvi_embroidery`;
+-- ------------------------------------------------------------
 
 -- 1. Roles
 INSERT IGNORE INTO `roles` (`id`, `name`, `description`) VALUES
