@@ -1,0 +1,71 @@
+====================================================================
+ARUVI EMBROIDERY WEB - ENVIRONMENT VARIABLES & DEPLOYMENT CONFIG
+====================================================================
+
+# ------------------------------------------------------------------
+# 1. APP & SERVER CONFIGURATION
+# ------------------------------------------------------------------
+PORT=3000
+NODE_ENV=development
+SESSION_SECRET=aruvi_embroidery_super_secret_key_2026_stitch
+APP_URL=http://localhost:3000
+SITE_URL=http://localhost:3000
+
+# ------------------------------------------------------------------
+# 2. DATABASE CONFIGURATION (MySQL)
+# ------------------------------------------------------------------
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=aruvi_embroidery
+
+# ------------------------------------------------------------------
+# 3. RAZORPAY PAYMENT GATEWAY (INR India)
+# ------------------------------------------------------------------
+RAZORPAY_KEY_ID=rzp_test_samplekey123
+RAZORPAY_KEY_SECRET=sample_secret_key_456
+
+# ------------------------------------------------------------------
+# 4. CASHFREE PAYMENT GATEWAY
+# ------------------------------------------------------------------
+CASHFREE_APP_ID=
+CASHFREE_SECRET_KEY=
+CASHFREE_ENVIRONMENT=sandbox
+CASHFREE_WEBHOOK_SECRET=
+
+# ------------------------------------------------------------------
+# 5. EMAIL / SMTP CONFIGURATION (Nodemailer)
+# ------------------------------------------------------------------
+SMTP_HOST=smtp.mailtrap.io
+SMTP_PORT=2525
+SMTP_USER=your_smtp_user
+SMTP_PASS=your_smtp_password
+EMAIL_FROM="Aruvi Embroidery <noreply@aruviembroidery.com>"
+
+# ------------------------------------------------------------------
+# 6. STORE CONTACT INFORMATION
+# ------------------------------------------------------------------
+CONTACT_EMAIL=aruviembroidery@gmail.com
+CONTACT_PHONE="+91 98765 43210"
+SHOP_ADDRESS="Erode, Tamil Nadu, 638001, India"
+
+# ------------------------------------------------------------------
+# 7. DIRECT UPI & BANK TRANSFER DETAILS
+# ------------------------------------------------------------------
+UPI_ID=aruviembroidery@upi
+UPI_NAME="ARUVI EMBROIDERY STUDIO"
+BANK_NAME="State Bank of India"
+BANK_ACCOUNT_NUMBER="39849201928"
+BANK_IFSC="SBIN0001234"
+BANK_ACCOUNT_HOLDER="ARUVI EMBROIDERY STUDIO"
+
+# ------------------------------------------------------------------
+# 8. SOCIAL MEDIA LINKS
+# ------------------------------------------------------------------
+FACEBOOK_URL="https://facebook.com/aruviembroidery"
+INSTAGRAM_URL="https://instagram.com/aruviembroidery"
+LINKEDIN_URL="https://linkedin.com/company/aruviembroidery"
+YOUTUBE_URL="https://youtube.com/aruviembroidery"
+PINTEREST_URL=""
+TWITTER_URL=""
