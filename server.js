@@ -12,6 +12,9 @@ dotenv.config();
 
 const app = express();
 
+// Enable trust proxy for production HTTPS reverse proxies (Nginx, Cloudflare, Render, Cpanel)
+app.set('trust proxy', 1);
+
 // Use Render's PORT in production, otherwise 3000 locally
 const PORT = process.env.PORT || 3000;
 
@@ -23,8 +26,26 @@ app.use(
   })
 );
 
-// CORS
-app.use(cors());
+// CORS configuration supporting credentials across production domains
+const allowedOrigins = [
+  process.env.APP_URL,
+  process.env.SITE_URL,
+  'https://aruvimembroidery.com',
+  'http://localhost:3000'
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.some(o => origin.startsWith(o)) || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
+    credentials: true
+  })
+);
 
 // Rate Limiter
 const limiter = rateLimit({

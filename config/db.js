@@ -8,7 +8,7 @@ let pool = null;
 let isConnected = false;
 let initPromise = null;
 
-const dbConfig = {
+let dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER || 'root',
@@ -19,6 +19,21 @@ const dbConfig = {
   queueLimit: 0,
   multipleStatements: true
 };
+
+// Support cloud database connection strings (DATABASE_URL / MYSQL_URL / CLEARDB_DATABASE_URL)
+const dbUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL;
+if (dbUrl) {
+  try {
+    const parsedUrl = new URL(dbUrl);
+    dbConfig.host = parsedUrl.hostname || dbConfig.host;
+    dbConfig.port = parsedUrl.port ? parseInt(parsedUrl.port) : dbConfig.port;
+    dbConfig.user = decodeURIComponent(parsedUrl.username || dbConfig.user);
+    dbConfig.password = decodeURIComponent(parsedUrl.password || dbConfig.password);
+    dbConfig.database = parsedUrl.pathname ? parsedUrl.pathname.replace(/^\//, '') : dbConfig.database;
+  } catch (urlErr) {
+    console.warn('[DB Config Warning] Failed to parse DATABASE_URL string, falling back to individual DB_* vars:', urlErr.message);
+  }
+}
 
 async function initPool() {
   if (initPromise) return initPromise;
