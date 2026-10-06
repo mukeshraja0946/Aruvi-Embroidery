@@ -324,6 +324,7 @@
       <!-- Step 7-14: Purchased Design Card(s) -->
       <% if (order && order.items && order.items.length > 0) { %>
         <% order.items.forEach(item => { %>
+          <% const cleanTitle = item.title || item.slug || ('AED_' + (item.design_id || item.id)); %>
           <div class="purchased-design-card">
             <div class="design-card-top-row">
               <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>" class="design-card-thumb">
@@ -336,9 +337,9 @@
                 <div class="design-card-format-badges">
                   <% 
                     const formatsList = item.formats 
-                      ? item.formats.split(',').map(f => f.trim()) 
-                      : ['DST', 'PES', 'JEF', 'EXP'];
-                    formatsList.forEach(fmt => { 
+                      ? item.formats.split(',').map(f => f.trim().toUpperCase()) 
+                      : ['DST'];
+                    [...new Set(formatsList)].forEach(fmt => { 
                   %>
                     <span class="format-badge"><%= fmt %></span>
                   <% }) %>
@@ -348,12 +349,12 @@
 
             <!-- Step 12: Download ZIP Button INSIDE Card -->
             <% if (currentUser) { %>
-              <a href="/user/download/<%= item.file_id || item.design_id || 1 %>" download class="btn-download-zip">
-                <i class="fa-solid fa-download"></i> Download ZIP
+              <a href="/user/download/<%= item.design_id || item.id %>" download class="btn-download-zip">
+                <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
               </a>
             <% } else { %>
-              <a href="/public/uploads/designs/sample_peacock.zip" download class="btn-download-zip">
-                <i class="fa-solid fa-download"></i> Download ZIP
+              <a href="/user/download/<%= item.design_id || item.id %>" download class="btn-download-zip">
+                <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
               </a>
             <% } %>
           </div>
@@ -368,14 +369,11 @@
               <div class="design-card-formats-label">Available Formats:</div>
               <div class="design-card-format-badges">
                 <span class="format-badge">DST</span>
-                <span class="format-badge">PES</span>
-                <span class="format-badge">JEF</span>
-                <span class="format-badge">EXP</span>
               </div>
             </div>
           </div>
-          <a href="/user/downloads" download class="btn-download-zip">
-            <i class="fa-solid fa-download"></i> Download ZIP
+          <a href="/user/dashboard" class="btn-download-zip">
+            <i class="fa-solid fa-download"></i> Go to Dashboard Downloads
           </a>
         </div>
       <% } %>

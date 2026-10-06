@@ -307,11 +307,8 @@
                   if (catName.includes('Animal')) catClass = 'cat-tag-animals';
                   else if (catName.includes('Blouse')) catClass = 'cat-tag-blouse';
                   else if (catName.includes('Monogram')) catClass = 'cat-tag-monogram';
-                  else if (catName.includes('Kids')) catClass = 'cat-tag-kids';
-                  else if (catName.includes('Traditional')) catClass = 'cat-tag-traditional';
-                  else if (catName.includes('Border')) catClass = 'cat-tag-border';
                 %>
-                <tr>
+                <tr id="designRow-<%= d.id %>">
                   <td style="text-align: center;"><input type="checkbox"></td>
                   <td><strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong></td>
                   <td>
@@ -333,9 +330,9 @@
                     <% if (fmtList.length > 0) { %>
                       <% fmtList.forEach(fmt => { %>
                         <span class="fmt-pill"><%= fmt %></span>
-                      <% }) %>
+                      <% }); %>
                     <% } else { %>
-                      <span style="font-size: 0.7rem; color: var(--admin-text-muted);">None</span>
+                      <span style="font-size: 0.75rem; color: var(--admin-text-muted);">None</span>
                     <% } %>
                   </td>
                   <td>
@@ -366,10 +363,7 @@
                     <div style="display: inline-flex; gap: 6px;">
                       <a href="/admin/designs/edit/<%= d.id %>" class="action-icon-btn" title="Edit Design"><i class="fa-regular fa-pen-to-square"></i></a>
                       <a href="/design/<%= d.slug %>" target="_blank" class="action-icon-btn" title="View on Site"><i class="fa-regular fa-eye"></i></a>
-                      <form action="/admin/designs/delete/<%= d.id %>" method="POST" style="display: inline;">
-                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                        <button type="submit" class="action-icon-btn" style="color: #C62828;" title="Delete Design"><i class="fa-regular fa-trash-can"></i></button>
-                      </form>
+                      <button type="button" onclick="confirmDeleteDesign('<%= d.id %>', '<%= d.title.replace(/'/g, "\\'") %>')" class="action-icon-btn" style="color: #C62828; border: none; background: transparent; cursor: pointer;" title="Delete Design"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
                   </td>
                 </tr>

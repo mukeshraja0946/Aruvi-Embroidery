@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const path = require('path');
+const fs = require('fs');
 
 const fallbackDesigns = [
   {
@@ -197,6 +199,8 @@ class Design {
         whereClause.push('d.is_active = 1');
       } else if (status === 'inactive' || status === 'draft') {
         whereClause.push('d.is_active = 0');
+      } else {
+        whereClause.push('d.is_active >= 0');
       }
 
       if (is_featured !== null && is_featured !== undefined) {
@@ -541,6 +545,16 @@ class Design {
     const imgs = await db.query('SELECT * FROM design_images WHERE id = ?', [imageId]);
     if (imgs && imgs.length > 0) {
       const { design_id, image_url, is_primary } = imgs[0];
+      
+      if (image_url) {
+        let relPath = image_url;
+        if (relPath.startsWith('/')) relPath = relPath.substring(1);
+        const fullPath = path.join(__dirname, '..', relPath);
+        if (fs.existsSync(fullPath)) {
+          try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete image from disk:', fullPath); }
+        }
+      }
+
       await db.query('DELETE FROM design_images WHERE id = ?', [imageId]);
       await db.query('DELETE FROM design_files WHERE design_id = ? AND file_path = ?', [design_id, image_url]);
 
@@ -597,6 +611,16 @@ class Design {
     const files = await db.query('SELECT * FROM design_files WHERE id = ?', [fileId]);
     if (files && files.length > 0) {
       const { design_id, file_path, file_format, is_preview } = files[0];
+
+      if (file_path) {
+        let relPath = file_path;
+        if (relPath.startsWith('/')) relPath = relPath.substring(1);
+        const fullPath = path.join(__dirname, '..', relPath);
+        if (fs.existsSync(fullPath)) {
+          try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete file from disk:', fullPath); }
+        }
+      }
+
       await db.query('DELETE FROM design_files WHERE id = ?', [fileId]);
 
       const isImg = is_preview || ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((file_format || '').toUpperCase());
@@ -651,6 +675,69 @@ class Design {
       return res[0].total;
     }
     return fallbackDesigns.filter(d => d.is_active === 0).length;
+  }
+
+  static async delete(id) {
+    if (!id) return false;
+    if (db.isConnected()) {
+      try {
+        // 1. Get associated design_files to clean up physical machine & preview files on disk
+        const files = await db.query('SELECT * FROM design_files WHERE design_id = ?', [id]) || [];
+        for (const f of files) {
+          if (f.file_path) {
+            let relPath = f.file_path;
+            if (relPath.startsWith('/')) relPath = relPath.substring(1);
+            const fullPath = path.join(__dirname, '..', relPath);
+            if (fs.existsSync(fullPath)) {
+              try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical file:', fullPath, e.message); }
+            }
+          }
+        }
+
+        // 2. Get associated design_images to clean up physical preview images on disk
+        const images = await db.query('SELECT * FROM design_images WHERE design_id = ?', [id]) || [];
+        for (const img of images) {
+          if (img.image_url) {
+            let relPath = img.image_url;
+            if (relPath.startsWith('/')) relPath = relPath.substring(1);
+            const fullPath = path.join(__dirname, '..', relPath);
+            if (fs.existsSync(fullPath)) {
+              try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical image:', fullPath, e.message); }
+            }
+          }
+        }
+
+        // 3. Clean up database child records (files, images, cart_items, wishlist)
+        await db.query('DELETE FROM design_files WHERE design_id = ?', [id]);
+        await db.query('DELETE FROM design_images WHERE design_id = ?', [id]);
+        await db.query('DELETE FROM cart_items WHERE design_id = ?', [id]);
+        await db.query('DELETE FROM wishlist WHERE design_id = ?', [id]);
+
+        // 4. Safely handle designs referenced in completed/paid customer orders
+        const orderItemsRes = await db.query('SELECT COUNT(*) as cnt FROM order_items WHERE design_id = ?', [id]);
+        const hasPurchases = orderItemsRes && orderItemsRes[0] && orderItemsRes[0].cnt > 0;
+
+        if (hasPurchases) {
+          // Soft-delete to preserve financial/order history and satisfy MySQL FK ON DELETE RESTRICT
+          await db.query('UPDATE designs SET is_active = -1 WHERE id = ?', [id]);
+        } else {
+          // Hard-delete row if design was never purchased
+          await db.query('DELETE FROM designs WHERE id = ?', [id]);
+        }
+
+        return true;
+      } catch (err) {
+        console.error('Design.delete DB error:', err.message);
+        throw err;
+      }
+    }
+
+    // Fallback array handling
+    const idx = fallbackDesigns.findIndex(d => d.id == id);
+    if (idx !== -1) {
+      fallbackDesigns.splice(idx, 1);
+    }
+    return true;
   }
 }
 

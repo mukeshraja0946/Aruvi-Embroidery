@@ -15,6 +15,7 @@ const userController = require('../controllers/userController');
 // Product detail page & API
 router.get('/design/:slug', shopController.getDesignDetail);
 router.get('/api/designs/:designId/download', userController.downloadDesignApi);
+router.get('/api/customer/designs/:designId/download', userController.downloadDesignApi);
 router.get('/api/designs/:id', shopController.getDesignApi);
 
 // Review submission

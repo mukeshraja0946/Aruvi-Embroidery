@@ -73,6 +73,11 @@
               </thead>
               <tbody>
                 <% purchasedDesigns.forEach(item => { %>
+                  <% 
+                    const cleanTitle = item.title || item.slug || ('AED_' + (item.design_id || item.id));
+                    const rawFmts = item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : ['DST'];
+                    const displayFmts = [...new Set(rawFmts)].join(' • ');
+                  %>
                   <tr>
                     <td>
                       <div style="display: flex; align-items: center; gap: 10px;">
@@ -84,21 +89,17 @@
                       </div>
                     </td>
                     <td>
-                      <span style="font-size: 0.82rem;"><%= item.hoop_size %></span><br>
-                      <span class="badge badge-info" style="font-size: 0.7rem;"><%= item.formats %></span>
+                      <% if (item.hoop_size) { %>
+                        <span style="font-size: 0.82rem;"><%= item.hoop_size %></span><br>
+                      <% } %>
+                      <span style="font-size: 0.78rem; font-weight: 600; color: #5C504A;">Available Formats:</span><br>
+                      <span class="badge badge-info" style="font-size: 0.72rem; letter-spacing: 0.03em;"><%= displayFmts %></span>
                     </td>
                     <td><span style="font-size: 0.85rem;"><%= new Date(item.purchase_date).toLocaleDateString() %></span></td>
                     <td style="text-align: right;">
-                      <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;">
-                        <% 
-                          const fmtList = (item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : []);
-                          fmtList.forEach(fmt => {
-                        %>
-                          <a href="/user/download-format/<%= item.design_id || item.id %>/<%= fmt %>" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.75rem;">
-                            <i class="fa-solid fa-download"></i> <%= fmt %>
-                          </a>
-                        <% }); %>
-                      </div>
+                      <a href="/user/download/<%= item.design_id || item.id %>" download class="btn btn-primary btn-sm" style="padding: 8px 14px; font-size: 0.85rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
+                        <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
+                      </a>
                     </td>
                   </tr>
                 <% }) %>

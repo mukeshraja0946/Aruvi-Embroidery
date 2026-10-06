@@ -122,27 +122,16 @@
               <i class="fa-solid fa-circle-check" style="font-size: 1.2rem; color: #2E7D32;"></i>
               <span>✓ Purchased — Available Downloads</span>
             </div>
-            <p style="font-size: 0.88rem; color: #5C504A; margin-bottom: 1rem;">
-              Download your machine format files securely below:
+            <p style="font-size: 0.88rem; color: #5C504A; margin-bottom: 0.6rem;">
+              Your purchased design is ready to download.
             </p>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <% 
-                const machineFiles = (design.files || []).filter(f => 
-                  !f.is_preview && 
-                  !['PNG', 'JPG', 'JPEG', 'WEBP', 'IMAGE'].includes((f.file_format || '').toUpperCase())
-                );
-              %>
-              <% if (machineFiles.length > 0) { %>
-                <% machineFiles.forEach(file => { %>
-                  <% const fmtExt = (file.file_format || (file.file_name ? file.file_name.split('.').pop() : 'FILE')).toUpperCase(); %>
-                  <a href="/user/download/<%= file.id %>" download class="btn btn-primary" style="padding: 0.75rem 1.2rem; font-size: 0.95rem; border-radius: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; background-color: var(--primary);">
-                    <i class="fa-solid fa-download"></i> Download <%= fmtExt %>
-                  </a>
-                <% }); %>
-              <% } else { %>
-                <div style="font-size: 0.88rem; color: #666;">No downloadable machine files are currently available for this design.</div>
-              <% } %>
+            <div style="font-size: 0.85rem; color: #6E615A; margin-bottom: 1rem;">
+              <strong>Available Formats:</strong> <%= (design.formats ? [...new Set(design.formats.split(',').map(f => f.trim().toUpperCase()))].join(' • ') : 'DST') %>
             </div>
+            <% const cleanTitle = design.title || design.slug || ('AED_' + design.id); %>
+            <a href="/user/download/<%= design.id %>" download class="btn btn-primary" style="padding: 0.75rem 1.2rem; font-size: 0.95rem; border-radius: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; background-color: var(--primary);">
+              <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
+            </a>
           </div>
         <% } else { %>
           <button type="submit" form="addToCartForm" class="btn btn-outline btn-block" style="border-radius: 25px; font-weight: 600; padding: 0.8rem; border-color: var(--primary); color: var(--primary);">

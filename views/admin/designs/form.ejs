@@ -284,9 +284,9 @@
                     </button>
                   </div>
 
-                  <input type="file" id="packageFileInput" name="package_file" multiple accept=".zip,.dst,.pes,.jef,.exp,.jpg,.jpeg,.png,.webp" style="display: none;" onchange="showSelectedFiles(this)">
+                  <input type="file" id="packageFileInput" name="package_file" multiple accept=".zip,.dst,.pes,.jef,.exp" style="display: none;" onchange="showSelectedFiles(this)">
                   <input type="file" id="folderFileInput" name="folder_files" webkitdirectory directory multiple style="display: none;" onchange="showSelectedFiles(this)">
-                  <input type="file" id="designFileInput" name="design_file" multiple style="display: none;" onchange="showSelectedFiles(this)">
+                  <input type="file" id="machineFileInput" name="machine_files" multiple accept=".zip,.dst,.pes,.jef,.exp" style="display: none;" onchange="showSelectedFiles(this)">
                 </div>
 
                 <!-- Uploaded Machine Files List -->
@@ -329,6 +329,9 @@
             <div class="form-section-card">
               <h3>Design Preview</h3>
 
+              <!-- Dedicated Preview Image Upload Input -->
+              <input type="file" id="previewImageInput" name="preview_images" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple style="display: none;" onchange="handlePreviewImageSelect(this)">
+
               <!-- Main Preview Image Box: Flexible height, object-fit: contain to show FULL portrait & landscape images without cropping -->
               <div id="mainPreviewBox" style="border-radius: 14px; overflow: hidden; border: 1px solid var(--admin-border); min-height: 240px; max-height: 480px; width: 100%; background: #FAF6F0; margin-bottom: 1.2rem; position: relative; display: flex; align-items: center; justify-content: center; padding: 12px;">
                 <% if (design && design.primary_image) { %>
@@ -344,8 +347,8 @@
                     <span style="font-size: 0.88rem; font-weight: 500;">No preview image uploaded</span>
                   </div>
                 <% } %>
-                <button type="button" onclick="document.getElementById('designFileInput').click()" style="position: absolute; right: 14px; bottom: 14px; background: rgba(0,0,0,0.82); color: #FFF; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: var(--transition);">
-                  <i class="fa-solid fa-camera"></i> Upload / Change Images
+                <button type="button" onclick="document.getElementById('previewImageInput').click()" style="position: absolute; right: 14px; bottom: 14px; background: rgba(0,0,0,0.82); color: #FFF; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: var(--transition);">
+                  <i class="fa-solid fa-camera"></i> Upload / Change Preview Image
                 </button>
               </div>
 
@@ -751,6 +754,25 @@
   function removeTag(index) {
     tagList.splice(index, 1);
     renderTagPills();
+  }
+
+  function handlePreviewImageSelect(input) {
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const mainImg = document.getElementById('mainImagePreview');
+        const noState = document.getElementById('noPreviewState');
+        if (mainImg) {
+          mainImg.src = e.target.result;
+          mainImg.style.display = 'block';
+        }
+        if (noState) {
+          noState.style.display = 'none';
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   function deleteFileRecord(fileId, btn) {

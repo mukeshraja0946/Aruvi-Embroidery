@@ -106,11 +106,9 @@ class Order {
       const order = rows[0];
       const itemsSql = `
         SELECT oi.*, d.title, d.slug, d.hoop_size, d.formats,
-               (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image,
-               df.file_name, df.file_path, df.id as file_id
+               (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
         FROM order_items oi
         JOIN designs d ON oi.design_id = d.id
-        LEFT JOIN design_files df ON d.id = df.design_id
         WHERE oi.order_id = ?
       `;
       order.items = await db.query(itemsSql, [order.id]);
@@ -226,16 +224,18 @@ class Order {
   static async getPurchasedDesignsByUser(userId) {
     if (db.isConnected()) {
       const sql = `
-        SELECT DISTINCT d.id as design_id, d.title, d.slug, d.hoop_size, d.formats,
-                        oi.price_at_purchase, o.created_at as purchase_date, o.order_number, oi.id as order_item_id,
-                        (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image,
-                        df.id as file_id, df.file_name, df.file_path, df.file_size
+        SELECT d.id as design_id, d.title, d.slug, d.hoop_size, d.formats,
+               MAX(oi.price_at_purchase) as price_at_purchase,
+               MAX(o.created_at) as purchase_date,
+               MAX(o.order_number) as order_number,
+               MIN(oi.id) as order_item_id,
+               (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
         FROM orders o
         JOIN order_items oi ON o.id = oi.order_id
         JOIN designs d ON oi.design_id = d.id
-        LEFT JOIN design_files df ON d.id = df.design_id
-        WHERE o.user_id = ? AND o.status = 'completed'
-        ORDER BY o.created_at DESC
+        WHERE o.user_id = ? AND (o.status = 'completed' OR LOWER(o.status) = 'paid')
+        GROUP BY d.id, d.title, d.slug, d.hoop_size, d.formats
+        ORDER BY purchase_date DESC
       `;
       return await db.query(sql, [userId]);
     }

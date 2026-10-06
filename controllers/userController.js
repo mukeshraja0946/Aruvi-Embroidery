@@ -54,166 +54,130 @@ exports.getOrderDetail = async (req, res, next) => {
   }
 };
 
-exports.downloadDesignFile = async (req, res, next) => {
+const AdmZip = require('adm-zip');
+
+exports.downloadDesignZip = async (req, res, next) => {
   try {
-    const fileId = req.params.fileId;
+    const isApi = req.originalUrl.startsWith('/api/');
+
+    // 1. Authenticate customer
+    if (!req.user) {
+      if (isApi) {
+        return res.status(401).json({ success: false, message: 'Please log in to download designs.' });
+      }
+      req.flash('error', 'Please log in to download your purchased designs.');
+      return res.redirect('/auth/login');
+    }
+
     const userId = req.user.id;
+    let targetDesignId = req.params.designId || req.params.fileId || req.params.id;
 
-    // Verify ownership of design file
-    let fileInfo = null;
-
-    if (db.isConnected()) {
-      const sql = `
-        SELECT df.file_name, df.file_path, d.title, d.id as design_id
-        FROM design_files df
-        JOIN designs d ON df.design_id = d.id
-        JOIN order_items oi ON d.id = oi.design_id
-        JOIN orders o ON oi.order_id = o.id
-        WHERE df.id = ? AND o.user_id = ? AND (o.status = 'completed' OR LOWER(o.status) = 'paid')
-        LIMIT 1
-      `;
-      const rows = await db.query(sql, [fileId, userId]);
-      fileInfo = rows ? rows[0] : null;
-    } else {
-      fileInfo = {
-        design_id: 1,
-        file_name: 'Royal_Bridal_Peacock_Set.zip',
-        file_path: '/public/uploads/designs/sample_peacock.zip',
-        title: 'Royal Bridal Peacock Neckline & Sleeve Set'
-      };
+    // Resolve fileId to design_id if legacy fileId route was hit
+    if (db.isConnected() && req.params.fileId) {
+      const fileRows = await db.query('SELECT design_id FROM design_files WHERE id = ? LIMIT 1', [req.params.fileId]);
+      if (fileRows && fileRows[0]) {
+        targetDesignId = fileRows[0].design_id;
+      }
     }
 
-    if (!fileInfo) {
-      req.flash('error', 'Download link unauthorized or invalid.');
-      return res.redirect('/user/dashboard');
-    }
+    // 2. Verify customer ownership of design (or admin access)
+    const hasPurchased = await Order.hasUserPurchasedDesign(userId, targetDesignId);
+    const isAdmin = req.user.role === 'admin';
 
-    const absoluteFilePath = path.join(__dirname, '..', fileInfo.file_path);
-
-    if (!fs.existsSync(absoluteFilePath)) {
-      req.flash('error', 'Requested design package file was not found on server.');
-      return res.redirect('/user/dashboard');
-    }
-
-    if (fileInfo.design_id) {
-      await Design.incrementDownloadCount(fileInfo.design_id);
-    }
-
-    res.download(absoluteFilePath, fileInfo.file_name);
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.downloadDesignFormat = async (req, res, next) => {
-  try {
-    const { designId, format } = req.params;
-    const userId = req.user.id;
-
-    // Verify customer purchase authorization
-    const hasPurchased = await Order.hasUserPurchasedDesign(userId, designId);
-    if (!hasPurchased && req.user.role !== 'admin') {
+    if (!hasPurchased && !isAdmin) {
+      if (isApi) {
+        return res.status(403).json({ success: false, message: 'You have not purchased this design.' });
+      }
       req.flash('error', 'You must purchase this design before downloading.');
       return res.redirect('/user/dashboard');
     }
 
-    let fileInfo = null;
+    // 3. Retrieve design details
+    let design = null;
     if (db.isConnected()) {
-      const sql = `
-        SELECT df.file_name, df.file_path, df.file_format, d.title
-        FROM design_files df
-        JOIN designs d ON df.design_id = d.id
-        WHERE df.design_id = ? AND UPPER(df.file_format) = UPPER(?)
-        LIMIT 1
-      `;
-      const rows = await db.query(sql, [designId, format]);
-      if (rows && rows[0]) fileInfo = rows[0];
+      const rows = await db.query('SELECT * FROM designs WHERE id = ? LIMIT 1', [targetDesignId]);
+      if (rows && rows[0]) design = rows[0];
+    }
+    if (!design) {
+      design = await Design.getById(targetDesignId);
     }
 
-    if (!fileInfo) {
-      const design = await Design.getById(designId);
-      if (design && design.files) {
-        fileInfo = design.files.find(f => (f.file_format || '').toUpperCase() === (format || '').toUpperCase());
+    if (!design) {
+      if (isApi) {
+        return res.status(404).json({ success: false, message: 'Design requested was not found.' });
       }
-      if (!fileInfo) {
-        fileInfo = {
-          file_name: `${(design ? design.slug : 'design')}_${format.toUpperCase()}.${format.toLowerCase()}`,
-          file_path: '/public/uploads/designs/sample_peacock.zip',
-          title: design ? design.title : 'Embroidery Design'
-        };
-      }
-    }
-
-    const absoluteFilePath = path.join(__dirname, '..', fileInfo.file_path);
-
-    if (!fs.existsSync(absoluteFilePath)) {
-      req.flash('error', 'Requested design package file was not found on server.');
+      req.flash('error', 'Design requested was not found.');
       return res.redirect('/user/dashboard');
     }
 
-    await Design.incrementDownloadCount(designId);
-
-    const downloadFileName = fileInfo.file_name || `Design_${designId}_${format.toUpperCase()}.${format.toLowerCase()}`;
-    return res.download(absoluteFilePath, downloadFileName);
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.downloadDesignApi = async (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(403).json({
-        success: false,
-        message: 'Payment required to download this design'
-      });
-    }
-
-    const { designId } = req.params;
-    const userId = req.user.id;
-
-    const hasPurchased = await Order.hasUserPurchasedDesign(userId, designId);
-    if (!hasPurchased && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Payment required to download this design'
-      });
-    }
-
-    let fileInfo = null;
+    // 4. Retrieve uploaded machine files from design_files table
+    let files = [];
     if (db.isConnected()) {
-      const sql = `
-        SELECT df.file_name, df.file_path, d.title
-        FROM design_files df
-        JOIN designs d ON df.design_id = d.id
-        WHERE df.design_id = ?
-        LIMIT 1
-      `;
-      const rows = await db.query(sql, [designId]);
-      if (rows && rows[0]) fileInfo = rows[0];
+      files = await db.query(
+        'SELECT * FROM design_files WHERE design_id = ? AND is_preview = 0 ORDER BY id ASC',
+        [targetDesignId]
+      ) || [];
+    } else if (design.files) {
+      files = design.files.filter(f => !f.is_preview);
     }
 
-    if (!fileInfo) {
-      const design = await Design.getById(designId);
-      fileInfo = {
-        file_name: `${(design ? design.slug : 'design')}.zip`,
-        file_path: '/public/uploads/designs/sample_peacock.zip',
-        title: design ? design.title : 'Embroidery Design'
-      };
+    // Filter machine files (exclude PNG, JPG, JPEG, WEBP, IMAGE)
+    const machineFiles = files.filter(f => {
+      const ext = (f.file_format || (f.file_name ? f.file_name.split('.').pop() : '')).toUpperCase();
+      return !['PNG', 'JPG', 'JPEG', 'WEBP', 'IMAGE'].includes(ext);
+    });
+
+    // 5. Generate ZIP package using AdmZip
+    const zip = new AdmZip();
+    let filesAddedCount = 0;
+
+    const rawTitle = design.title || design.slug || `AED_${targetDesignId}`;
+    const cleanFileName = rawTitle.replace(/[/\\?%*:|"<>]/g, '').trim();
+    const zipFileName = `${cleanFileName}.zip`;
+
+    for (const file of machineFiles) {
+      let relPath = file.file_path || '';
+      if (relPath.startsWith('/')) relPath = relPath.substring(1);
+      const fullPath = path.join(__dirname, '..', relPath);
+
+      if (fs.existsSync(fullPath)) {
+        const outName = file.file_name || path.basename(fullPath);
+        zip.addLocalFile(fullPath, '', outName);
+        filesAddedCount++;
+      }
     }
 
-    const absoluteFilePath = path.join(__dirname, '..', fileInfo.file_path);
-
-    if (!fs.existsSync(absoluteFilePath)) {
-      return res.status(404).json({ success: false, message: 'Requested design package file was not found on server.' });
+    // Fallback if physical files on disk are missing (e.g. sample data in dev)
+    if (filesAddedCount === 0) {
+      const sampleZipPath = path.join(__dirname, '..', 'public', 'uploads', 'designs', 'sample_peacock.zip');
+      if (fs.existsSync(sampleZipPath)) {
+        const sampleZip = new AdmZip(sampleZipPath);
+        sampleZip.getEntries().forEach(entry => {
+          zip.addFile(entry.entryName, entry.getData());
+        });
+      } else {
+        const formatExt = (design.formats ? design.formats.split(',')[0].trim() : 'dst').toLowerCase();
+        zip.addFile(`${cleanFileName}.${formatExt}`, Buffer.from(`[Aruvi Embroidery Machine Design File - ${cleanFileName}]`));
+      }
     }
 
-    await Design.incrementDownloadCount(designId);
-    return res.download(absoluteFilePath, fileInfo.file_name);
+    await Design.incrementDownloadCount(targetDesignId);
+
+    const zipBuffer = zip.toBuffer();
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"; filename*=UTF-8''${encodeURIComponent(zipFileName)}`);
+    res.setHeader('Content-Length', zipBuffer.length);
+    return res.send(zipBuffer);
+
   } catch (err) {
+    console.error('downloadDesignZip error:', err);
     next(err);
   }
 };
+
+exports.downloadDesignFile = exports.downloadDesignZip;
+exports.downloadDesignFormat = exports.downloadDesignZip;
+exports.downloadDesignApi = exports.downloadDesignZip;
 
 exports.getWishlist = async (req, res, next) => {
   try {

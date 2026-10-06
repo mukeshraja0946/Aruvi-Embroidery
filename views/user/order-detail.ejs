@@ -47,17 +47,11 @@
                 </td>
                 <td><strong>₹<%= item.price_at_purchase %></strong></td>
                 <td style="text-align: right;">
-                  <% if (order.status === 'completed' || order.payment_status === 'completed' || order.payment_status === 'PAID') { %>
-                    <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end;">
-                      <% 
-                        const fmtList = (item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : []);
-                        fmtList.forEach(fmt => {
-                      %>
-                        <a href="/user/download-format/<%= item.design_id || item.id %>/<%= fmt %>" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 0.75rem;">
-                          <i class="fa-solid fa-download"></i> <%= fmt %>
-                        </a>
-                      <% }); %>
-                    </div>
+                  <% if (order.status === 'completed' || order.status === 'paid' || order.payment_status === 'completed' || order.payment_status === 'PAID') { %>
+                    <% const cleanTitle = item.title || item.slug || ('AED_' + (item.design_id || item.id)); %>
+                    <a href="/user/download/<%= item.design_id || item.id %>" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
+                      <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
+                    </a>
                   <% } else { %>
                     <span style="font-size: 0.82rem; color: var(--text-muted);">Unlocks after payment</span>
                   <% } %>

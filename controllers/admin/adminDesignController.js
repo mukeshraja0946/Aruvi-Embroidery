@@ -560,11 +560,28 @@ exports.deleteFile = async (req, res, next) => {
 exports.deleteDesign = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
     await Design.delete(id);
-    req.flash('info', `Design #${id} deleted / deactivated successfully.`);
+
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: 'Design deleted successfully.'
+      });
+    }
+
+    req.flash('success', 'Design deleted successfully.');
     res.redirect('/admin/designs');
   } catch (err) {
     console.error('Design delete error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({
+        success: false,
+        message: err.message || 'Unable to delete design.'
+      });
+    }
     req.flash('error', `Unable to delete design: ${err.message}`);
     res.redirect('/admin/designs');
   }
