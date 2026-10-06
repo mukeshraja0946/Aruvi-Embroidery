@@ -353,11 +353,106 @@ class Design {
 
   static async syncDesignFormats(designId) {
     if (!db.isConnected()) return;
-    const files = await db.query('SELECT file_format, file_name, is_preview FROM design_files WHERE design_id = ?', [designId]);
-    if (!files) return;
-    const machineFiles = files.filter(f => !f.is_preview && ['DST', 'PES', 'JEF', 'EXP'].includes((f.file_format || f.file_name.split('.').pop() || '').toUpperCase()));
-    const formatsStr = [...new Set(machineFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
+    const files = await db.query('SELECT file_format, file_name, file_path, is_preview FROM design_files WHERE design_id = ? AND is_preview = 0', [designId]);
+    if (!files || files.length === 0) {
+      await db.query('UPDATE designs SET formats = "" WHERE id = ?', [designId]);
+      return;
+    }
+
+    let detected = [];
+    const zipFile = files.find(f => (f.file_format || '').toUpperCase() === 'ZIP' || (f.file_name || '').toLowerCase().endsWith('.zip'));
+    if (zipFile && zipFile.file_path) {
+      let relPath = zipFile.file_path.startsWith('/') ? zipFile.file_path.substring(1) : zipFile.file_path;
+      const fullPath = path.join(__dirname, '..', relPath);
+      if (fs.existsSync(fullPath)) {
+        try {
+          const zip = new AdmZip(fullPath);
+          const entries = zip.getEntries();
+          const machineEntries = entries.filter(e => {
+            if (e.isDirectory) return false;
+            const ext = path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase();
+            return ['DST', 'PES', 'JEF', 'EXP'].includes(ext);
+          });
+          if (machineEntries.length > 0) {
+            detected = [...new Set(machineEntries.map(e => path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase()))];
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (detected.length === 0) {
+      detected = [...new Set(files.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()))].filter(f => ['DST', 'PES', 'JEF', 'EXP'].includes(f));
+    }
+
+    const formatsStr = detected.join(', ');
     await db.query('UPDATE designs SET formats = ? WHERE id = ?', [formatsStr, designId]);
+  }
+
+  static attachZipPackage(design) {
+    if (!design) return design;
+
+    const files = design.files || [];
+    const machineFiles = files.filter(f => !f.is_preview);
+
+    if (machineFiles.length > 0) {
+      const zipFile = machineFiles.find(f => (f.file_format || '').toUpperCase() === 'ZIP' || (f.file_name || '').toLowerCase().endsWith('.zip')) || machineFiles[0];
+
+      let fileCount = machineFiles.length;
+      let detectedFormats = [];
+
+      if (zipFile && zipFile.file_path) {
+        let relPath = zipFile.file_path.startsWith('/') ? zipFile.file_path.substring(1) : zipFile.file_path;
+        const fullZipPath = path.join(__dirname, '..', relPath);
+
+        if (fs.existsSync(fullZipPath) && zipFile.file_name && zipFile.file_name.toLowerCase().endsWith('.zip')) {
+          try {
+            const zip = new AdmZip(fullZipPath);
+            const entries = zip.getEntries();
+            const machineEntries = entries.filter(e => {
+              if (e.isDirectory) return false;
+              const ext = path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase();
+              return ['DST', 'PES', 'JEF', 'EXP'].includes(ext);
+            });
+
+            if (machineEntries.length > 0) {
+              fileCount = machineEntries.length;
+              detectedFormats = [...new Set(machineEntries.map(e => path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase()))];
+            } else {
+              fileCount = entries.filter(e => !e.isDirectory).length || 1;
+            }
+          } catch (zipErr) {
+            console.warn('[ZIP INSPECT WARN]:', zipErr.message);
+          }
+        }
+      }
+
+      if (detectedFormats.length === 0) {
+        detectedFormats = [...new Set(machineFiles.map(f => (f.file_format || (f.file_name ? f.file_name.split('.').pop() : '') || '').toUpperCase()))].filter(f => ['DST', 'PES', 'JEF', 'EXP'].includes(f));
+        if (detectedFormats.length === 0 && design.formats) {
+          detectedFormats = design.formats.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        }
+      }
+
+      const rawPkgName = zipFile.file_name && zipFile.file_name.toLowerCase().endsWith('.zip')
+        ? zipFile.file_name
+        : `${design.title || design.sku || 'AED 2'}.zip`;
+
+      design.zipPackage = {
+        id: zipFile.id,
+        packageName: rawPkgName,
+        fileCount: fileCount || 1,
+        formats: detectedFormats.length > 0 ? detectedFormats : ['DST'],
+        file_path: zipFile.file_path,
+        file_size: zipFile.file_size
+      };
+
+      design.formats = detectedFormats.join(', ');
+    } else {
+      design.zipPackage = null;
+      design.formats = '';
+    }
+
+    return design;
   }
 
   static async getBySlug(slug) {
@@ -390,9 +485,8 @@ class Design {
             design.primary_image = imgFile ? imgFile.file_path : null;
           }
 
-          // Sync dynamic available formats 100% from uploaded machine files in design_files
-          const machineFiles = design.files.filter(f => !f.is_preview && ['DST', 'PES', 'JEF', 'EXP'].includes((f.file_format || f.file_name.split('.').pop() || '').toUpperCase()));
-          design.formats = [...new Set(machineFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
+          // Attach zipPackage metadata & sync formats
+          this.attachZipPackage(design);
 
           return design;
         }
@@ -403,9 +497,12 @@ class Design {
 
     const d = fallbackDesigns.find(item => item.slug === slug || item.id == slug);
     if (!d) return null;
-    const machineFiles = (d.files || []).filter(f => !f.is_preview && !['PNG', 'JPG', 'JPEG', 'WEBP', 'IMAGE'].includes((f.file_format || '').toUpperCase()));
-    d.formats = [...new Set(machineFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
+    this.attachZipPackage(d);
     return d;
+  }
+
+  static async getById(id) {
+    return this.getBySlug(id);
   }
 
   static async incrementDownloadCount(id) {

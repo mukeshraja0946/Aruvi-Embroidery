@@ -300,22 +300,26 @@
 
       <!-- Right Side Box: Included Files & Design Information matching Reference -->
       <aside class="included-files-sidebar">
-        <h4 class="sidebar-box-title">Included Files</h4>
+        <h4 class="sidebar-box-title">Included Formats</h4>
         
         <div class="download-formats-grid">
-          <% const activeFormatsList = (design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : []); %>
+          <% const activeFormatsList = (design.formats ? design.formats.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : []); %>
           <% if (activeFormatsList.length > 0) { %>
             <% activeFormatsList.forEach(fmt => { %>
               <div class="format-download-card">
                 <div class="format-title-wrap">
                   <span class="format-code"><%= fmt %></span>
-                  <i class="fa-solid fa-chevron-down" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+                  <i class="fa-solid fa-check" style="font-size: 0.75rem; color: #2E7D32;"></i>
                 </div>
-                <span class="download-link">Download</span>
+                <% if (typeof hasPurchased !== 'undefined' && hasPurchased) { %>
+                  <a href="/user/download/<%= design.id %>" download class="download-link" style="text-decoration: none; color: var(--primary); font-weight: 700;">Download ZIP</a>
+                <% } else { %>
+                  <span class="download-link" style="color: var(--text-muted);">Included in ZIP</span>
+                <% } %>
               </div>
             <% }) %>
           <% } else { %>
-            <div style="font-size: 0.82rem; color: var(--text-muted); grid-column: 1 / -1;">No machine files uploaded yet.</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); grid-column: 1 / -1;">No machine format files attached yet.</div>
           <% } %>
         </div>
 

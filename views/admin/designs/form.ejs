@@ -219,106 +219,79 @@
 
             <!-- Card 2: Design Files -->
             <div class="form-section-card">
-              <h3>Design Files</h3>
-              <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: -0.8rem 0 1.2rem;">Select machine formats and upload matching embroidery files.</p>
-
-              <!-- Available Machine Formats Checkboxes -->
-              <div style="margin-bottom: 1.2rem; background: #FAF6F0; border-radius: 12px; padding: 1.1rem; border: 1px solid var(--admin-border);">
-                <label class="form-label-custom" style="margin-bottom: 4px;">Available Machine Formats <span class="req">*</span></label>
-                <p style="font-size: 0.76rem; color: var(--admin-text-muted); margin: 0 0 10px;">Select the embroidery machine formats you want to make available for this design:</p>
-                <% 
-                  const existingFormats = (design && design.files && design.files.length > 0)
-                    ? design.files.filter(f => !f.is_preview && !['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase())).map(f => (f.file_format||'').toUpperCase())
-                    : (design && design.formats ? design.formats.split(',').map(s=>s.trim().toUpperCase()) : []);
-                %>
-                <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
-                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
-                    <input type="checkbox" name="selected_formats" value="DST" id="chkDST" <%= existingFormats.includes('DST') ? 'checked' : '' %> onchange="toggleFormatBox('DST')"> DST
-                  </label>
-                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
-                    <input type="checkbox" name="selected_formats" value="PES" id="chkPES" <%= existingFormats.includes('PES') ? 'checked' : '' %> onchange="toggleFormatBox('PES')"> PES
-                  </label>
-                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
-                    <input type="checkbox" name="selected_formats" value="JEF" id="chkJEF" <%= existingFormats.includes('JEF') ? 'checked' : '' %> onchange="toggleFormatBox('JEF')"> JEF
-                  </label>
-                  <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: #FFFFFF; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--admin-border);">
-                    <input type="checkbox" name="selected_formats" value="EXP" id="chkEXP" <%= existingFormats.includes('EXP') ? 'checked' : '' %> onchange="toggleFormatBox('EXP')"> EXP
-                  </label>
+              <!-- 1. Uploaded Machine Files Container matching Reference -->
+              <div style="background: #FFF5F5; border: 1px solid #FFCDD2; border-radius: 14px; padding: 1.25rem; margin-bottom: 1.4rem;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
+                  <i class="fa-solid fa-file-lines" style="color: #C62828; font-size: 1.1rem;"></i>
+                  <strong style="font-size: 0.88rem; font-weight: 800; color: #212529; letter-spacing: 0.5px; text-transform: uppercase;">UPLOADED MACHINE FILES</strong>
                 </div>
-              </div>
+                <p style="font-size: 0.78rem; color: #7F8C8D; margin: 0 0 1.1rem 0; font-weight: 500;">All machine files are uploaded as a single ZIP package.</p>
 
-              <!-- Format-Specific Upload Areas -->
-              <div id="formatUploadContainers" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.2rem;">
-                <% ['DST','PES','JEF','EXP'].forEach(fmt => { %>
-                  <% 
-                    const isChecked = existingFormats.includes(fmt); 
-                    const existingFmtFile = design && design.files ? design.files.find(f => !f.is_preview && (f.file_format||'').toUpperCase() === fmt) : null;
-                  %>
-                  <div id="box_<%= fmt %>" style="display: <%= isChecked ? 'block' : 'none' %>; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 0.9rem 1.1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                      <strong style="font-size: 0.85rem; color: var(--admin-text-dark);"><i class="fa-solid fa-file-code" style="color: var(--admin-primary); margin-right: 6px;"></i> <%= fmt %> File (. <%= fmt.toLowerCase() %> or .zip)</strong>
-                      <% if (existingFmtFile) { %>
-                        <span style="font-size: 0.75rem; color: #2E7D32; font-weight: 600; background: #E8F5E9; padding: 2px 8px; border-radius: 4px;"><i class="fa-solid fa-check"></i> Uploaded: <%= existingFmtFile.file_name %></span>
-                      <% } %>
-                    </div>
-                    <input type="file" name="file_<%= fmt.toLowerCase() %>" accept=".<%= fmt.toLowerCase() %>,.zip" class="form-control-custom" style="padding-top: 8px; background: #FFFFFF; height: 42px;" onchange="validateFormatFile(this, '<%= fmt %>')">
-                    <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Upload a .<%= fmt.toLowerCase() %> machine file or a ZIP containing <%= fmt %> format.</span>
-                  </div>
-                <% }) %>
-              </div>
-
-              <!-- Package Archive / Folder / Drag & Drop Upload Zone -->
-              <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 1.5rem; align-items: flex-start;">
-                <!-- Drag & Drop Box with File / ZIP / Folder Buttons -->
-                <div class="dropzone-box" id="dropzoneBox" style="border: 2px dashed var(--admin-primary); border-radius: 14px; padding: 1.2rem; text-align: center; background: #FAF6F0; transition: all 0.2s ease;">
-                  <i class="fa-solid fa-folder-open" style="font-size: 2.2rem; color: var(--admin-primary); margin-bottom: 0.4rem; display: block;"></i>
-                  <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 2px;">Drag & Drop machine files, ZIP, or Folder here</strong>
-                  <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: block; margin-bottom: 10px;">Supports .dst, .pes, .jef, .exp, .zip archives, or entire design folders</span>
-                  
-                  <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-sm" style="background: var(--admin-primary); color: #FFF; font-weight: 600; border-radius: 8px; font-size: 0.78rem; padding: 6px 12px;" onclick="document.getElementById('packageFileInput').click()">
-                      <i class="fa-solid fa-file-archive"></i> Choose Files / ZIP
-                    </button>
-                    <button type="button" class="btn btn-sm" style="background: #FFFFFF; color: var(--admin-text-dark); border: 1px solid var(--admin-border); font-weight: 600; border-radius: 8px; font-size: 0.78rem; padding: 6px 12px;" onclick="document.getElementById('folderFileInput').click()">
-                      <i class="fa-solid fa-folder-tree"></i> Choose Folder
-                    </button>
-                  </div>
-
-                  <input type="file" id="packageFileInput" name="package_file" multiple accept=".zip,.dst,.pes,.jef,.exp" style="display: none;" onchange="showSelectedFiles(this)">
-                  <input type="file" id="folderFileInput" name="folder_files" webkitdirectory directory multiple style="display: none;" onchange="showSelectedFiles(this)">
-                  <input type="file" id="machineFileInput" name="machine_files" multiple accept=".zip,.dst,.pes,.jef,.exp" style="display: none;" onchange="showSelectedFiles(this)">
-                </div>
-
-                <!-- Uploaded Machine Files List -->
-                <div style="display: flex; flex-direction: column; gap: 8px; background: #FAF6F0; border-radius: 12px; padding: 1rem; min-height: 140px;">
-                  <% 
-                    const machineFilesList = design && design.files ? design.files.filter(f => !f.is_preview && ['DST','PES','JEF','EXP'].includes((f.file_format || '').toUpperCase())) : [];
-                  %>
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--admin-text-muted); text-transform: uppercase;">UPLOADED MACHINE FILES</span>
-                    <button type="button" id="removeAllFilesBtn" onclick="confirmRemoveAllFiles('<%= design ? design.id : '' %>')" class="btn btn-sm" style="background: #C62828; color: #FFFFFF; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 6px; border: none; cursor: pointer; display: <%= (machineFilesList && machineFilesList.length > 0) ? 'inline-flex' : 'none' %>; align-items: center; gap: 4px;" title="Remove All Uploaded Files">
-                      <i class="fa-regular fa-trash-can"></i> Remove All
-                    </button>
-                  </div>
-
-                  <div id="attachedFilesContainer" style="display: flex; flex-direction: column; gap: 8px;">
-                    <% if (machineFilesList.length > 0) { %>
-                      <% machineFilesList.forEach(f => { %>
-                        <div class="file-row-item" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFFFFF; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--admin-border);">
-                          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                            <i class="fa-regular fa-file-code" style="color: var(--admin-primary); font-size: 0.95rem;"></i>
-                            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;"><%= f.file_name %></strong>
-                          </div>
-                          <div style="display: flex; gap: 8px; align-items: center;">
-                            <span style="background: #E3F2FD; color: #1565C0; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;"><%= (f.file_format || f.file_name.split('.').pop() || '').toUpperCase() %></span>
-                          </div>
+                <!-- Uploaded Single ZIP Package Row / Dropzone -->
+                <div id="zipPackageContainer">
+                  <% if (design && design.zipPackage) { %>
+                    <!-- ONE Single ZIP Package Card matching Reference -->
+                    <div id="zipPackageCard" style="display: flex; align-items: center; justify-content: space-between; background: #FFFFFF; border: 1px solid #EFE6D9; border-radius: 12px; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                      <div style="display: flex; align-items: center; gap: 14px;">
+                        <div style="width: 44px; height: 44px; background: #FADBD8; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #C62828; flex-shrink: 0;">
+                          <i class="fa-solid fa-file-zipper" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
+                          <span style="font-size: 0.62rem; font-weight: 900; line-height: 1;">ZIP</span>
                         </div>
-                      <% }) %>
-                    <% } else { %>
-                      <div id="noMachineFilesMsg" style="font-size: 0.76rem; color: var(--admin-text-muted); font-style: italic;">No machine format files attached yet. Upload a file or ZIP archive above.</div>
-                    <% } %>
-                  </div>
-                  <div id="newSelectedFiles" style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 600;"></div>
+                        <div>
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <strong style="font-size: 0.95rem; color: #1A252C; font-weight: 800;"><%= design.zipPackage.packageName %></strong>
+                            <span style="background: #FADBD8; color: #900C3F; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; text-transform: uppercase;">ZIP</span>
+                          </div>
+                          <span style="font-size: 0.78rem; color: #7F8C8D; font-weight: 500; margin-top: 2px; display: block;">
+                            Contains <%= design.zipPackage.fileCount %> <%= design.zipPackage.fileCount === 1 ? 'machine file' : 'machine files' %>
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <button type="button" onclick="showRemoveZipModal('<%= design.id %>')" class="btn" style="background: #C62828; color: #FFFFFF; font-size: 0.82rem; font-weight: 700; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s ease;">
+                          <i class="fa-regular fa-trash-can"></i> Remove
+                        </button>
+                      </div>
+                    </div>
+                  <% } else { %>
+                    <!-- Upload Dropzone when no ZIP is uploaded yet -->
+                    <div id="zipPackageDropzone" class="dropzone-box" style="border: 2px dashed #C62828; border-radius: 12px; padding: 1.5rem; text-align: center; background: #FFFFFF;">
+                      <i class="fa-solid fa-file-arrow-up" style="font-size: 2.2rem; color: #C62828; margin-bottom: 0.4rem; display: block;"></i>
+                      <strong style="display: block; font-size: 0.92rem; color: #1A252C; margin-bottom: 2px;">Upload Machine Files ZIP Package</strong>
+                      <span style="font-size: 0.78rem; color: #7F8C8D; display: block; margin-bottom: 12px;">Supports single .zip package containing machine files (.dst, .pes, .jef, .exp)</span>
+                      <button type="button" class="btn" style="background: #C62828; color: #FFFFFF; font-weight: 700; border-radius: 8px; font-size: 0.82rem; padding: 8px 18px; border: none; cursor: pointer;" onclick="document.getElementById('packageFileInput').click()">
+                        <i class="fa-solid fa-file-archive"></i> Choose ZIP Package
+                      </button>
+                      <input type="file" id="packageFileInput" name="package_file" accept=".zip" style="display: none;" onchange="handleZipPackageSelect(this)">
+                      <div id="newZipSelectedInfo" style="margin-top: 10px; font-size: 0.82rem; font-weight: 700; color: #C62828; display: none;"></div>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+
+              <!-- 2. Available Formats (Detected from ZIP) Section matching Reference -->
+              <div style="background: #FAF6F0; border: 1px solid #EFE6D9; border-radius: 14px; padding: 1.1rem;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
+                  <i class="fa-solid fa-list-ul" style="color: #5E35B1; font-size: 1rem;"></i>
+                  <strong style="font-size: 0.88rem; font-weight: 800; color: #212529;">Available Formats (Detected from ZIP)</strong>
+                </div>
+                <p style="font-size: 0.78rem; color: #7F8C8D; margin: 0 0 10px 0;">These formats are automatically detected from the uploaded ZIP file.</p>
+
+                <div id="detectedFormatsBadges" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                  <% 
+                    const activeFmtArray = (design && design.zipPackage && design.zipPackage.formats && design.zipPackage.formats.length > 0)
+                      ? design.zipPackage.formats
+                      : (design && design.formats ? design.formats.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean) : []);
+                  %>
+                  <% if (activeFmtArray.length > 0) { %>
+                    <% activeFmtArray.forEach(fmt => { %>
+                      <span class="detected-fmt-pill" style="background: #EDE7F6; color: #5E35B1; font-weight: 800; font-size: 0.78rem; padding: 4px 14px; border-radius: 6px; text-transform: uppercase;">
+                        <%= fmt %>
+                      </span>
+                    <% }) %>
+                  <% } else { %>
+                    <span id="noFormatsMsg" style="font-size: 0.78rem; color: #7F8C8D; font-style: italic;">No formats detected yet. Upload a ZIP package containing embroidery files above.</span>
+                  <% } %>
                 </div>
               </div>
             </div>
@@ -476,6 +449,30 @@
       </form>
 
     </main>
+  </div>
+</div>
+
+<!-- Remove ZIP Package Confirmation Modal -->
+<div id="removeZipModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; padding: 1.8rem; width: 100%; max-width: 440px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid var(--admin-border);">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
+      <div style="width: 42px; height: 42px; border-radius: 50%; background: #FFEBEE; color: #C62828; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
+        <i class="fa-regular fa-trash-can"></i>
+      </div>
+      <div>
+        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px 0;">Remove uploaded ZIP?</h3>
+        <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Remove machine file package</span>
+      </div>
+    </div>
+
+    <p style="font-size: 0.88rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.5rem; background: #FAF6F0; padding: 10px 14px; border-radius: 10px; border-left: 3px solid #C62828;">
+      All machine embroidery files inside this package will be removed.
+    </p>
+
+    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+      <button type="button" onclick="closeRemoveZipModal()" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.88rem;">Cancel</button>
+      <button type="button" id="confirmRemoveZipBtn" onclick="executeRemoveZipPackage()" class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; background: #C62828; color: #FFFFFF; border: none; cursor: pointer;">Remove</button>
+    </div>
   </div>
 </div>
 
@@ -779,54 +776,90 @@
   }
 
   function confirmRemoveAllFiles(designId) {
-    const confirmed = confirm("Remove all uploaded files?\n\nAll uploaded machine files for this design will be removed.");
-    if (!confirmed) return;
+    showRemoveZipModal(designId);
+  }
 
-    // Clear file inputs & staged file selection
-    const pInput = document.getElementById('packageFileInput');
-    const fInput = document.getElementById('folderFileInput');
-    const mInput = document.getElementById('machineFileInput');
-    if (pInput) pInput.value = '';
-    if (fInput) fInput.value = '';
-    if (mInput) mInput.value = '';
+  function showRemoveZipModal(designId) {
+    pendingRemoveDesignId = designId || '<%= design ? design.id : "" %>';
+    const modal = document.getElementById('removeZipModal');
+    if (modal) modal.style.display = 'flex';
+  }
 
-    const newFilesDiv = document.getElementById('newSelectedFiles');
-    if (newFilesDiv) newFilesDiv.innerHTML = '';
+  function closeRemoveZipModal() {
+    const modal = document.getElementById('removeZipModal');
+    if (modal) modal.style.display = 'none';
+  }
 
-    if (designId && designId !== 'undefined' && designId !== 'null' && designId !== '') {
-      const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
-      fetch('/admin/designs/delete-all-files/' + designId + '?format=json&_csrf=' + encodeURIComponent(csrfToken), {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-Token': csrfToken
-        }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            clearMachineFilesUI();
-          } else {
-            alert(data.message || 'Unable to remove files');
-          }
-        })
-        .catch(err => {
-          clearMachineFilesUI();
-        });
-    } else {
-      clearMachineFilesUI();
+  function executeRemoveZipPackage() {
+    if (!pendingRemoveDesignId) {
+      resetZipUploadUI();
+      closeRemoveZipModal();
+      return;
+    }
+
+    const btn = document.getElementById('confirmRemoveZipBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Removing...'; }
+
+    const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
+
+    fetch('/admin/designs/delete-all-files/' + pendingRemoveDesignId + '?format=json', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify({ _csrf: csrfToken })
+    })
+    .then(res => res.json())
+    .then(data => {
+      closeRemoveZipModal();
+      if (btn) { btn.disabled = false; btn.textContent = 'Remove'; }
+      if (data.success) {
+        resetZipUploadUI();
+      } else {
+        alert(data.message || 'Unable to remove ZIP package.');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      closeRemoveZipModal();
+      if (btn) { btn.disabled = false; btn.textContent = 'Remove'; }
+      alert('Error removing ZIP package: ' + err.message);
+    });
+  }
+
+  function resetZipUploadUI() {
+    const container = document.getElementById('zipPackageContainer');
+    if (container) {
+      container.innerHTML = `
+        <div id="zipPackageDropzone" class="dropzone-box" style="border: 2px dashed #C62828; border-radius: 12px; padding: 1.5rem; text-align: center; background: #FFFFFF;">
+          <i class="fa-solid fa-file-arrow-up" style="font-size: 2.2rem; color: #C62828; margin-bottom: 0.4rem; display: block;"></i>
+          <strong style="display: block; font-size: 0.92rem; color: #1A252C; margin-bottom: 2px;">Upload Machine Files ZIP Package</strong>
+          <span style="font-size: 0.78rem; color: #7F8C8D; display: block; margin-bottom: 12px;">Supports single .zip package containing machine files (.dst, .pes, .jef, .exp)</span>
+          <button type="button" class="btn" style="background: #C62828; color: #FFFFFF; font-weight: 700; border-radius: 8px; font-size: 0.82rem; padding: 8px 18px; border: none; cursor: pointer;" onclick="document.getElementById('packageFileInput').click()">
+            <i class="fa-solid fa-file-archive"></i> Choose ZIP Package
+          </button>
+          <input type="file" id="packageFileInput" name="package_file" accept=".zip" style="display: none;" onchange="handleZipPackageSelect(this)">
+          <div id="newZipSelectedInfo" style="margin-top: 10px; font-size: 0.82rem; font-weight: 700; color: #C62828; display: none;"></div>
+        </div>
+      `;
+    }
+    const formatsBadges = document.getElementById('detectedFormatsBadges');
+    if (formatsBadges) {
+      formatsBadges.innerHTML = `<span id="noFormatsMsg" style="font-size: 0.78rem; color: #7F8C8D; font-style: italic;">No formats detected yet. Upload a ZIP package containing embroidery files above.</span>`;
     }
   }
 
-  function clearMachineFilesUI() {
-    const container = document.getElementById('attachedFilesContainer');
-    const removeBtn = document.getElementById('removeAllFilesBtn');
-    if (container) {
-      container.innerHTML = '<div id="noMachineFilesMsg" style="font-size: 0.76rem; color: var(--admin-text-muted); font-style: italic;">No machine format files attached yet. Upload a file or ZIP archive above.</div>';
-    }
-    if (removeBtn) {
-      removeBtn.style.display = 'none';
+  function handleZipPackageSelect(input) {
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      const infoEl = document.getElementById('newZipSelectedInfo');
+      if (infoEl) {
+        infoEl.style.display = 'block';
+        infoEl.innerHTML = `<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i> Selected package: <strong>${file.name}</strong> (${(file.size / (1024*1024)).toFixed(2)} MB)`;
+      }
     }
   }
 

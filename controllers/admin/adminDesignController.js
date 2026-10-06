@@ -60,15 +60,14 @@ exports.processUploadedFilesAndArchives = processUploadedFilesAndArchives;
  * Protects against Zip Slip path traversal and enforces file size limits.
  */
 function processUploadedFilesAndArchives(reqFiles) {
-  const extractedFiles = [];
-  const supportedFormats = ['.dst', '.pes', '.jef', '.exp'];
+  const packageFiles = [];
   const targetDir = path.join(__dirname, '../../public/uploads/designs');
 
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  if (!reqFiles) return extractedFiles;
+  if (!reqFiles) return packageFiles;
 
   const allFilesList = [];
   if (Array.isArray(reqFiles)) {
@@ -86,81 +85,70 @@ function processUploadedFilesAndArchives(reqFiles) {
   for (const file of allFilesList) {
     const extName = path.extname(file.originalname).toLowerCase();
     
+    // Ignore preview image files here (handled separately)
+    if (['.png', '.jpg', '.jpeg', '.webp'].includes(extName)) {
+      continue;
+    }
+
     if (extName === '.zip') {
       try {
-        console.log(`[ZIP INSPECTION] Reading archive "${file.originalname}"...`);
+        console.log(`[ZIP PACKAGE PROCESS] Reading archive "${file.originalname}"...`);
         const zip = new AdmZip(file.path);
         const entries = zip.getEntries();
 
-        let totalExtractedSize = 0;
-        const MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100MB limit
+        const machineEntries = entries.filter(e => {
+          if (e.isDirectory) return false;
+          const eExt = path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase();
+          return ['DST', 'PES', 'JEF', 'EXP'].includes(eExt);
+        });
 
-        for (const entry of entries) {
-          if (entry.isDirectory) continue;
+        const fileCount = machineEntries.length > 0 ? machineEntries.length : (entries.filter(e => !e.isDirectory).length || 1);
+        const detectedFormats = [...new Set(machineEntries.map(e => path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase()))];
+        if (detectedFormats.length === 0) detectedFormats.push('DST');
 
-          // Security: Zip Slip / Path Traversal Protection
-          const entryName = entry.entryName;
-          const normalizedPath = path.normalize(entryName).replace(/^(\.\.[\/\\])+/, '');
-          if (normalizedPath.includes('..') || path.isAbsolute(normalizedPath)) {
-            console.warn(`[ZIP SECURITY WARN] Skipping suspicious path entry: ${entryName}`);
-            continue;
-          }
+        const uniqueZipFilename = `zip_pkg_${Date.now()}_${Math.round(Math.random() * 10000)}_${path.basename(file.originalname)}`;
+        const destPath = path.join(targetDir, uniqueZipFilename);
 
-          // Security: Skip nested archives
-          const entryExt = path.extname(entryName).toLowerCase();
-          if (['.zip', '.rar', '.7z'].includes(entryExt)) {
-            console.warn(`[ZIP WARN] Skipping nested archive entry: ${entryName}`);
-            continue;
-          }
+        fs.copyFileSync(file.path, destPath);
 
-          if (supportedFormats.includes(entryExt)) {
-            totalExtractedSize += entry.header.size;
-            if (totalExtractedSize > MAX_TOTAL_SIZE) {
-              throw new Error('ZIP content exceeds total allowed extraction size limit (100MB).');
-            }
+        packageFiles.push({
+          originalname: file.originalname,
+          filename: uniqueZipFilename,
+          path: destPath,
+          webPath: `/public/uploads/designs/${uniqueZipFilename}`,
+          size: file.size,
+          format: 'ZIP',
+          fileCount: fileCount,
+          detectedFormats: detectedFormats,
+          source: 'zip'
+        });
 
-            const cleanBasename = path.basename(entryName);
-            const fmtUpper = entryExt.replace('.', '').toUpperCase();
-            const uniqueFilename = `zip_${fmtUpper.toLowerCase()}_${Date.now()}_${Math.round(Math.random() * 10000)}_${cleanBasename}`;
-            const destPath = path.join(targetDir, uniqueFilename);
-
-            const buffer = zip.readFile(entry);
-            if (buffer && buffer.length > 0) {
-              fs.writeFileSync(destPath, buffer);
-              extractedFiles.push({
-                originalname: cleanBasename,
-                filename: uniqueFilename,
-                path: destPath,
-                webPath: `/public/uploads/designs/${uniqueFilename}`,
-                size: buffer.length,
-                format: fmtUpper,
-                source: 'zip'
-              });
-              console.log(`[ZIP EXTRACT SUCCESS] Found ${fmtUpper} file: ${cleanBasename} -> ${uniqueFilename}`);
-            }
-          }
-        }
+        console.log(`[ZIP PACKAGE SAVED] ${file.originalname} -> ${uniqueZipFilename} (${fileCount} machine files, formats: ${detectedFormats.join(', ')})`);
       } catch (zipErr) {
         console.error('[ZIP PROCESSING ERROR]:', zipErr);
         throw new Error(`Failed to process uploaded ZIP archive "${file.originalname}": ${zipErr.message}`);
       }
-    } else {
+    } else if (['.dst', '.pes', '.jef', '.exp'].includes(extName)) {
       const fmtUpper = extName.replace('.', '').toUpperCase();
-      if (['DST', 'PES', 'JEF', 'EXP'].includes(fmtUpper)) {
-        extractedFiles.push({
-          originalname: file.originalname,
-          filename: file.filename,
-          path: file.path,
-          webPath: `/public/uploads/designs/${file.filename}`,
-          size: file.size,
-          format: fmtUpper,
-          source: 'direct'
-        });
-      }
+      const uniqueFilename = `pkg_${fmtUpper.toLowerCase()}_${Date.now()}_${path.basename(file.originalname)}`;
+      const destPath = path.join(targetDir, uniqueFilename);
+      fs.copyFileSync(file.path, destPath);
+
+      packageFiles.push({
+        originalname: file.originalname,
+        filename: uniqueFilename,
+        path: destPath,
+        webPath: `/public/uploads/designs/${uniqueFilename}`,
+        size: file.size,
+        format: fmtUpper,
+        fileCount: 1,
+        detectedFormats: [fmtUpper],
+        source: 'direct'
+      });
     }
   }
 
-  return extractedFiles;
+  return packageFiles;
 }
 
 exports.getCreateForm = async (req, res, next) => {
@@ -195,7 +183,7 @@ exports.postCreate = async (req, res, next) => {
     console.log('[PUBLISH] Request received for design creation:', req.body.title);
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft, selected_formats
+      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft
     } = req.body;
 
     const isAjax = checkIsAjax(req);
@@ -208,39 +196,18 @@ exports.postCreate = async (req, res, next) => {
     }
 
     const finalActiveState = status_draft ? 0 : (is_active ? 1 : 0);
-    const selectedFormats = selected_formats ? (Array.isArray(selected_formats) ? selected_formats : [selected_formats]) : [];
     
-    // Process all uploaded files, ZIPs, and folders
-    const allAvailableMachineFiles = processUploadedFilesAndArchives(req.files);
-
-    if (finalActiveState === 1) {
-      if (selectedFormats.length === 0) {
-        const errMsg = 'Please select and upload at least one machine embroidery format (DST, PES, JEF, or EXP).';
-        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
-        req.flash('error', errMsg);
-        return res.redirect('back');
-      }
-
-      for (const fmt of selectedFormats) {
-        const matchingFiles = allAvailableMachineFiles.filter(f => f.format === fmt);
-        if (matchingFiles.length === 0) {
-          const otherFormatsFound = [...new Set(allAvailableMachineFiles.map(f => f.format))].filter(f => f !== fmt);
-          let errMsg = `No ${fmt} machine file was found inside the uploaded ZIP.`;
-          if (otherFormatsFound.length > 0) {
-            errMsg = `No ${fmt} file was found inside the ZIP. The ZIP contains ${otherFormatsFound.join(', ')}, but ${fmt} was selected.`;
-          }
-          if (isAjax) return res.status(400).json({ success: false, message: errMsg });
-          req.flash('error', errMsg);
-          return res.redirect('back');
-        }
-      }
-    }
+    // Process uploaded ZIP package
+    const packageFiles = processUploadedFilesAndArchives(req.files);
 
     const generatedSlug = slug && slug.trim() 
       ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') 
       : title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    const formattedFormatsStr = selectedFormats.join(', ');
+    let detectedFormatsStr = 'DST';
+    if (packageFiles.length > 0) {
+      detectedFormatsStr = packageFiles[0].detectedFormats ? packageFiles[0].detectedFormats.join(', ') : 'DST';
+    }
 
     const designId = await Design.create({
       title,
@@ -252,7 +219,7 @@ exports.postCreate = async (req, res, next) => {
       hoop_size: hoop_size || '5x7 inch (130x180 mm)',
       stitch_count: stitch_count ? parseInt(stitch_count) : 24800,
       dimensions: dimensions || '140mm x 180mm',
-      formats: formattedFormatsStr,
+      formats: detectedFormatsStr,
       is_featured: is_featured ? 1 : 0,
       is_trending: is_trending ? 1 : 0,
       is_active: finalActiveState,
@@ -260,14 +227,10 @@ exports.postCreate = async (req, res, next) => {
       tags: tags || null
     });
 
-    // Save machine file records ONLY for formats selected by Admin
-    for (const fmt of ['DST', 'PES', 'JEF', 'EXP']) {
-      if (selectedFormats.includes(fmt)) {
-        const matchingFiles = allAvailableMachineFiles.filter(f => f.format === fmt);
-        for (const file of matchingFiles) {
-          await Design.addFile(designId, file.originalname, file.webPath, fmt, file.size, 0);
-        }
-      }
+    // Save single ZIP package record in design_files
+    if (packageFiles.length > 0) {
+      const pkg = packageFiles[0];
+      await Design.addFile(designId, pkg.originalname, pkg.webPath, 'ZIP', pkg.size, 0);
     }
 
     // Handle uploaded preview images
@@ -361,52 +324,13 @@ exports.postEdit = async (req, res, next) => {
     }
 
     const finalActiveState = status_draft ? 0 : (is_active ? 1 : 0);
-    const selectedFormats = selected_formats ? (Array.isArray(selected_formats) ? selected_formats : [selected_formats]) : [];
 
-    // Process all uploaded files, ZIPs, and folders
-    const allAvailableMachineFiles = processUploadedFilesAndArchives(req.files);
-
-    if (finalActiveState === 1) {
-      if (selectedFormats.length === 0) {
-        const errMsg = 'Please select and upload at least one machine embroidery format (DST, PES, JEF, or EXP).';
-        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
-        req.flash('error', errMsg);
-        return res.redirect('back');
-      }
-
-      for (const fmt of selectedFormats) {
-        const newMatching = allAvailableMachineFiles.filter(f => f.format === fmt);
-        const existingMatching = existingDesign.files && existingDesign.files.find(f => !f.is_preview && (f.file_format || '').toUpperCase() === fmt.toUpperCase());
-
-        if (newMatching.length === 0 && !existingMatching) {
-          const otherFormatsFound = [...new Set(allAvailableMachineFiles.map(f => f.format))].filter(f => f !== fmt);
-          let errMsg = `No ${fmt} machine file was found inside the uploaded ZIP.`;
-          if (otherFormatsFound.length > 0) {
-            errMsg = `No ${fmt} file was found inside the ZIP. The ZIP contains ${otherFormatsFound.join(', ')}, but ${fmt} was selected.`;
-          }
-          if (isAjax) return res.status(400).json({ success: false, message: errMsg });
-          req.flash('error', errMsg);
-          return res.redirect('back');
-        }
-      }
-    }
-
-    // Remove files for unselected formats
-    if (existingDesign.files && existingDesign.files.length > 0) {
-      for (const f of existingDesign.files) {
-        const fFmt = (f.file_format || '').toUpperCase();
-        if (!f.is_preview && ['DST','PES','JEF','EXP'].includes(fFmt) && !selectedFormats.includes(fFmt)) {
-          console.log(`[EDIT REMOVE] Unchecked format ${fFmt} removed from design #${id}`);
-          await Design.deleteFile(f.id);
-        }
-      }
-    }
+    // Process uploaded ZIP package
+    const packageFiles = processUploadedFilesAndArchives(req.files);
 
     const generatedSlug = (slug && slug.trim()) 
       ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') 
       : (existingDesign.slug || title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-
-    const formattedFormatsStr = selectedFormats.join(', ');
 
     await Design.update(id, {
       title,
@@ -418,7 +342,6 @@ exports.postEdit = async (req, res, next) => {
       hoop_size: hoop_size || existingDesign.hoop_size || '5x7 inch (130x180 mm)',
       stitch_count: stitch_count ? parseInt(stitch_count) : (existingDesign.stitch_count || 24800),
       dimensions: dimensions || existingDesign.dimensions || '140mm x 180mm',
-      formats: formattedFormatsStr,
       is_featured: is_featured ? 1 : 0,
       is_trending: is_trending ? 1 : 0,
       is_active: finalActiveState,
@@ -426,14 +349,16 @@ exports.postEdit = async (req, res, next) => {
       tags: tags || null
     });
 
-    // Save machine file records ONLY for formats selected by Admin
-    for (const fmt of ['DST', 'PES', 'JEF', 'EXP']) {
-      if (selectedFormats.includes(fmt)) {
-        const newMatching = allAvailableMachineFiles.filter(f => f.format === fmt);
-        for (const file of newMatching) {
-          await Design.addFile(id, file.originalname, file.webPath, fmt, file.size, 0);
-        }
+    // Save single ZIP package record if new ZIP file uploaded
+    if (packageFiles.length > 0) {
+      const pkg = packageFiles[0];
+      const db = require('../../config/db');
+      if (db.isConnected()) {
+        await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [id]);
       }
+      await Design.addFile(id, pkg.originalname, pkg.webPath, 'ZIP', pkg.size, 0);
+      const detectedFormatsStr = pkg.detectedFormats ? pkg.detectedFormats.join(', ') : 'DST';
+      await Design.update(id, { formats: detectedFormatsStr });
     }
 
     // Handle uploaded preview images
