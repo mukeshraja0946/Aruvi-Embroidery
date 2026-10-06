@@ -565,11 +565,121 @@ class Design {
     return fallbackDesigns.filter(d => d.category_id == categoryId && d.id != currentDesignId).slice(0, limit);
   }
 
+  static normalizeSlug(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  static async generateUniqueSlug(baseTitleOrSlug, currentDesignId = null) {
+    let baseSlug = this.normalizeSlug(baseTitleOrSlug);
+    if (!baseSlug) {
+      baseSlug = currentDesignId ? `design-${currentDesignId}` : `design-${Date.now()}`;
+    }
+
+    let candidateSlug = baseSlug;
+    let counter = 1;
+
+    if (db.isConnected()) {
+      try {
+        while (counter <= 100) {
+          let sql = 'SELECT id FROM designs WHERE slug = ?';
+          let params = [candidateSlug];
+
+          if (currentDesignId) {
+            sql += ' AND id != ?';
+            params.push(parseInt(currentDesignId));
+          }
+
+          sql += ' LIMIT 1';
+
+          const existing = await db.query(sql, params);
+          if (!existing || existing.length === 0) {
+            return candidateSlug;
+          }
+
+          counter++;
+          candidateSlug = `${baseSlug}-${counter}`;
+        }
+      } catch (err) {
+        console.error('[generateUniqueSlug DB Error]:', err.message);
+      }
+    }
+
+    // Fallback in-memory check
+    counter = 1;
+    candidateSlug = baseSlug;
+    while (counter <= 100) {
+      const duplicate = fallbackDesigns.find(d => 
+        d.slug === candidateSlug && (!currentDesignId || d.id != currentDesignId)
+      );
+      if (!duplicate) {
+        return candidateSlug;
+      }
+      counter++;
+      candidateSlug = `${baseSlug}-${counter}`;
+    }
+
+    return `${baseSlug}-${Date.now()}`;
+  }
+
+  static async repairInvalidDatabaseSlugs() {
+    if (!db.isConnected()) return;
+    try {
+      // 1. Repair empty or NULL slugs
+      const invalidRows = await db.query(
+        "SELECT id, title, sku FROM designs WHERE slug IS NULL OR TRIM(slug) = ''"
+      );
+
+      if (invalidRows && invalidRows.length > 0) {
+        console.log(`[SLUG REPAIR] Found ${invalidRows.length} design(s) with empty/invalid slugs. Repairing...`);
+        for (const row of invalidRows) {
+          const baseName = row.title || row.sku || `design-${row.id}`;
+          const uniqueSlug = await this.generateUniqueSlug(baseName, row.id);
+          await db.query('UPDATE designs SET slug = ? WHERE id = ?', [uniqueSlug, row.id]);
+          console.log(`[SLUG REPAIR SUCCESS] Design #${row.id} ("${row.title}") updated with valid slug: "${uniqueSlug}"`);
+        }
+      }
+
+      // 2. Resolve duplicate non-empty slugs
+      const duplicateSlugRows = await db.query(
+        "SELECT slug, COUNT(*) as cnt FROM designs WHERE slug IS NOT NULL AND TRIM(slug) != '' GROUP BY slug HAVING cnt > 1"
+      );
+
+      if (duplicateSlugRows && duplicateSlugRows.length > 0) {
+        console.log(`[SLUG REPAIR] Found ${duplicateSlugRows.length} duplicate slug group(s). Resolving...`);
+        for (const dup of duplicateSlugRows) {
+          const matchingDesigns = await db.query(
+            "SELECT id, title, sku FROM designs WHERE slug = ? ORDER BY id ASC",
+            [dup.slug]
+          );
+          for (let i = 1; i < matchingDesigns.length; i++) {
+            const target = matchingDesigns[i];
+            const baseName = target.title || target.sku || `design-${target.id}`;
+            const newSlug = await this.generateUniqueSlug(baseName, target.id);
+            await db.query('UPDATE designs SET slug = ? WHERE id = ?', [newSlug, target.id]);
+            console.log(`[SLUG DUPLICATE RESOLVED] Design #${target.id} slug updated to "${newSlug}"`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[SLUG REPAIR ERROR]:', err.message);
+    }
+  }
+
   static async create(data) {
     const {
       title, sku, slug, price, sale_price, category_id,
       hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags
     } = data;
+
+    // Ensure slug is non-empty and unique
+    const finalSlug = slug ? slug : await this.generateUniqueSlug(title);
 
     const res = await db.query(
       `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags)
@@ -577,7 +687,7 @@ class Design {
       [
         title,
         sku || null,
-        slug,
+        finalSlug,
         price,
         sale_price || null,
         category_id || null,
@@ -601,6 +711,12 @@ class Design {
       hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags
     } = data;
 
+    // Ensure slug is valid & unique excluding current design ID
+    let finalSlug = slug;
+    if (!finalSlug || finalSlug.trim() === '') {
+      finalSlug = await this.generateUniqueSlug(title || `design-${id}`, id);
+    }
+
     await db.query(
       `UPDATE designs SET 
         title=?, sku=?, slug=?, price=?, sale_price=?, category_id=?,
@@ -609,7 +725,7 @@ class Design {
       [
         title,
         sku || null,
-        slug,
+        finalSlug,
         price,
         sale_price !== undefined && sale_price !== null && sale_price !== '' ? sale_price : null,
         category_id || null,

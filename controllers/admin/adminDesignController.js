@@ -200,9 +200,8 @@ exports.postCreate = async (req, res, next) => {
     // Process uploaded ZIP package
     const packageFiles = processUploadedFilesAndArchives(req.files);
 
-    const generatedSlug = slug && slug.trim() 
-      ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') 
-      : title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const baseSlugInput = (slug && slug.trim()) ? slug : title;
+    const finalSlug = await Design.generateUniqueSlug(baseSlugInput);
 
     let detectedFormatsStr = 'DST';
     if (packageFiles.length > 0) {
@@ -212,7 +211,7 @@ exports.postCreate = async (req, res, next) => {
     const designId = await Design.create({
       title,
       sku: sku || `ARV-FL-${Math.floor(100 + Math.random() * 900)}`,
-      slug: generatedSlug,
+      slug: finalSlug,
       price: parseFloat(price),
       sale_price: sale_price && parseFloat(sale_price) > 0 ? parseFloat(sale_price) : null,
       category_id: category_id ? parseInt(category_id) : null,
@@ -328,14 +327,13 @@ exports.postEdit = async (req, res, next) => {
     // Process uploaded ZIP package
     const packageFiles = processUploadedFilesAndArchives(req.files);
 
-    const generatedSlug = (slug && slug.trim()) 
-      ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') 
-      : (existingDesign.slug || title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    let baseSlugInput = (slug && slug.trim()) ? slug.trim() : (existingDesign.slug || title || `design-${id}`);
+    const finalSlug = await Design.generateUniqueSlug(baseSlugInput, id);
 
     await Design.update(id, {
       title,
       sku: sku || existingDesign.sku || `ARV-FL-00${id}`,
-      slug: generatedSlug,
+      slug: finalSlug,
       price: parseFloat(price),
       sale_price: sale_price !== undefined && sale_price !== null && sale_price !== '' ? parseFloat(sale_price) : null,
       category_id: category_id ? parseInt(category_id) : null,

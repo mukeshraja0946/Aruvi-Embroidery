@@ -236,10 +236,17 @@ app.use(errorHandler);
 
 // Start Server
 // 0.0.0.0 is required so Render can access the application
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log('====================================================');
   console.log(`🌸 Aruvi Embroidery Web App running on port ${PORT}`);
   console.log('📌 Tagline: "Where Threads Tell Stories"');
   console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
   console.log('====================================================');
+
+  try {
+    const Design = require('./models/Design');
+    await Design.repairInvalidDatabaseSlugs();
+  } catch (err) {
+    console.warn('[Startup Repair] Slug repair warning:', err.message);
+  }
 });
