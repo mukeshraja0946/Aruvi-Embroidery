@@ -557,6 +557,29 @@ exports.deleteFile = async (req, res, next) => {
   }
 };
 
+exports.deleteAllFiles = async (req, res, next) => {
+  try {
+    const { designId } = req.params;
+    await Design.deleteAllMachineFiles(designId);
+
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'All machine files removed successfully.' });
+    }
+
+    req.flash('success', 'All uploaded machine files removed.');
+    res.redirect('back');
+  } catch (err) {
+    console.error('Delete all files error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Error removing machine files.' });
+    }
+    next(err);
+  }
+};
+
 exports.deleteDesign = async (req, res, next) => {
   try {
     const { id } = req.params;

@@ -670,6 +670,47 @@ class Design {
     return true;
   }
 
+  static async deleteAllMachineFiles(designId) {
+    if (!designId) return false;
+    if (db.isConnected()) {
+      try {
+        const files = await db.query(
+          'SELECT * FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) NOT IN ("PNG","JPG","JPEG","WEBP")',
+          [designId]
+        ) || [];
+
+        for (const f of files) {
+          if (f.file_path) {
+            let relPath = f.file_path;
+            if (relPath.startsWith('/')) relPath = relPath.substring(1);
+            const fullPath = path.join(__dirname, '..', relPath);
+            if (fs.existsSync(fullPath)) {
+              try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical file from disk:', fullPath, e.message); }
+            }
+          }
+        }
+
+        await db.query(
+          'DELETE FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) NOT IN ("PNG","JPG","JPEG","WEBP")',
+          [designId]
+        );
+
+        await this.syncDesignFormats(designId);
+        return true;
+      } catch (err) {
+        console.error('Design.deleteAllMachineFiles DB error:', err.message);
+        throw err;
+      }
+    }
+
+    const d = fallbackDesigns.find(item => item.id == designId);
+    if (d && d.files) {
+      d.files = d.files.filter(f => f.is_preview || ['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase()));
+      d.formats = '';
+    }
+    return true;
+  }
+
   static async count() {
     const res = await db.query('SELECT COUNT(*) as total FROM designs');
     return res[0].total;

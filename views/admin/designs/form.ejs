@@ -291,25 +291,26 @@
 
                 <!-- Uploaded Machine Files List -->
                 <div style="display: flex; flex-direction: column; gap: 8px; background: #FAF6F0; border-radius: 12px; padding: 1rem; min-height: 140px;">
-                  <span style="font-size: 0.75rem; font-weight: 700; color: var(--admin-text-muted); text-transform: uppercase;">Uploaded Machine Files</span>
+                  <% 
+                    const machineFilesList = design && design.files ? design.files.filter(f => !f.is_preview && ['DST','PES','JEF','EXP'].includes((f.file_format || '').toUpperCase())) : [];
+                  %>
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--admin-text-muted); text-transform: uppercase;">UPLOADED MACHINE FILES</span>
+                    <button type="button" id="removeAllFilesBtn" onclick="confirmRemoveAllFiles('<%= design ? design.id : '' %>')" class="btn btn-sm" style="background: #C62828; color: #FFFFFF; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 6px; border: none; cursor: pointer; display: <%= (machineFilesList && machineFilesList.length > 0) ? 'inline-flex' : 'none' %>; align-items: center; gap: 4px;" title="Remove All Uploaded Files">
+                      <i class="fa-regular fa-trash-can"></i> Remove All
+                    </button>
+                  </div>
 
                   <div id="attachedFilesContainer" style="display: flex; flex-direction: column; gap: 8px;">
-                    <% 
-                      const machineFilesList = design && design.files ? design.files.filter(f => !f.is_preview && ['DST','PES','JEF','EXP'].includes((f.file_format || '').toUpperCase())) : [];
-                    %>
                     <% if (machineFilesList.length > 0) { %>
                       <% machineFilesList.forEach(f => { %>
-                        <div class="file-row-item" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFFFFF; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--admin-border);">
+                        <div class="file-row-item" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFFFFF; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--admin-border);">
                           <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                            <i class="fa-regular fa-file-code" style="color: var(--admin-primary);"></i>
-                            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;"><%= f.file_name %></strong>
-                            <span style="font-size: 0.7rem; color: var(--admin-text-muted);"><%= (f.file_format || '').toUpperCase() %></span>
+                            <i class="fa-regular fa-file-code" style="color: var(--admin-primary); font-size: 0.95rem;"></i>
+                            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;"><%= f.file_name %></strong>
                           </div>
                           <div style="display: flex; gap: 8px; align-items: center;">
-                            <span style="background: #E3F2FD; color: #1565C0; font-size: 0.68rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;"><%= (f.file_format||'').toUpperCase() %></span>
-                            <button type="button" onclick="deleteFileRecord('<%= f.id %>', this)" style="background: none; border: none; padding: 0; cursor: pointer;">
-                              <i class="fa-regular fa-trash-can" style="color: #C62828; font-size: 0.85rem;" title="Delete File"></i>
-                            </button>
+                            <span style="background: #E3F2FD; color: #1565C0; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;"><%= (f.file_format || f.file_name.split('.').pop() || '').toUpperCase() %></span>
                           </div>
                         </div>
                       <% }) %>
@@ -658,21 +659,23 @@
 
         const div = document.createElement('div');
         div.className = 'file-row-item new-file-item';
-        div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFF9F5; padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--admin-primary);';
+        div.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; background: #FFF9F5; padding: 7px 10px; border-radius: 8px; border: 1px dashed var(--admin-primary);';
         div.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
             <i class="${isImage ? 'fa-regular fa-image' : 'fa-solid fa-cloud-arrow-up'}" style="color: var(--admin-primary);"></i>
-            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">${file.name}</strong>
+            <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">${file.name}</strong>
             <span style="font-size: 0.7rem; color: var(--admin-text-muted);">${sizeMB}</span>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            ${isImage ? '<span style="background:#E8F5E9; color:#2E7D32; font-size:0.68rem; font-weight:600; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;"><i class="fa-solid fa-check"></i> Preview</span>' : '<span style="font-size: 0.68rem; color: var(--admin-primary); font-weight: 600;">Ready to upload</span>'}
-            <button type="button" onclick="removeFileRow(this)" style="background: none; border: none; padding: 0; cursor: pointer;">
-              <i class="fa-regular fa-trash-can" style="color: #C62828; font-size: 0.85rem;" title="Remove File"></i>
-            </button>
+            ${isImage ? '<span style="background:#E8F5E9; color:#2E7D32; font-size:0.68rem; font-weight:600; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:3px;"><i class="fa-solid fa-check"></i> Preview</span>' : '<span style="background: #E3F2FD; color: #1565C0; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">' + ext.toUpperCase() + '</span>'}
           </div>
         `;
+        const noMsg = document.getElementById('noMachineFilesMsg');
+        if (noMsg) noMsg.remove();
         container.appendChild(div);
+
+        const removeBtn = document.getElementById('removeAllFilesBtn');
+        if (removeBtn && !isImage) removeBtn.style.display = 'inline-flex';
       });
     }
   }
@@ -775,27 +778,56 @@
     }
   }
 
-  function deleteFileRecord(fileId, btn) {
-    const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
-    fetch('/admin/designs/delete-file/' + fileId + '?format=json&_csrf=' + encodeURIComponent(csrfToken), {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': csrfToken
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          window.location.reload();
-        } else {
-          alert(data.message || 'Unable to remove file');
+  function confirmRemoveAllFiles(designId) {
+    const confirmed = confirm("Remove all uploaded files?\n\nAll uploaded machine files for this design will be removed.");
+    if (!confirmed) return;
+
+    // Clear file inputs & staged file selection
+    const pInput = document.getElementById('packageFileInput');
+    const fInput = document.getElementById('folderFileInput');
+    const mInput = document.getElementById('machineFileInput');
+    if (pInput) pInput.value = '';
+    if (fInput) fInput.value = '';
+    if (mInput) mInput.value = '';
+
+    const newFilesDiv = document.getElementById('newSelectedFiles');
+    if (newFilesDiv) newFilesDiv.innerHTML = '';
+
+    if (designId && designId !== 'undefined' && designId !== 'null' && designId !== '') {
+      const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
+      fetch('/admin/designs/delete-all-files/' + designId + '?format=json&_csrf=' + encodeURIComponent(csrfToken), {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': csrfToken
         }
       })
-      .catch(err => {
-        window.location.reload();
-      });
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            clearMachineFilesUI();
+          } else {
+            alert(data.message || 'Unable to remove files');
+          }
+        })
+        .catch(err => {
+          clearMachineFilesUI();
+        });
+    } else {
+      clearMachineFilesUI();
+    }
+  }
+
+  function clearMachineFilesUI() {
+    const container = document.getElementById('attachedFilesContainer');
+    const removeBtn = document.getElementById('removeAllFilesBtn');
+    if (container) {
+      container.innerHTML = '<div id="noMachineFilesMsg" style="font-size: 0.76rem; color: var(--admin-text-muted); font-style: italic;">No machine format files attached yet. Upload a file or ZIP archive above.</div>';
+    }
+    if (removeBtn) {
+      removeBtn.style.display = 'none';
+    }
   }
 
   function deleteImageRecord(imageId, btn) {
