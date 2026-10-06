@@ -9,28 +9,75 @@ exports.getLogin = (req, res) => {
 };
 
 exports.postLogin = async (req, res, next) => {
+  const acceptHeader = (req.get && req.get('accept')) || req.headers.accept || '';
+  const xhrHeader = (req.get && req.get('x-requested-with')) || req.headers['x-requested-with'] || '';
+  const isAjax = req.xhr || 
+                 xhrHeader.toLowerCase() === 'xmlhttprequest' ||
+                 acceptHeader.includes('json') || 
+                 (req.body && (req.body._ajax || req.body.ajax)) || 
+                 req.query.format === 'json';
   try {
     const { email, password } = req.body;
+    if (!email || !password) {
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: 'Email and password are required.' });
+      }
+      req.flash('error', 'Email and password are required.');
+      return res.redirect('/auth/login');
+    }
+
     const user = await User.findByEmail(email);
 
     if (!user) {
+      if (isAjax) {
+        return res.status(400).json({
+          success: false,
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'No account found with this email. Please create an account.'
+        });
+      }
       req.flash('account_not_found', true);
       req.flash('account_email', email);
       return res.redirect('/auth/login');
     }
 
     if (!user.is_active) {
+      if (isAjax) {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_DEACTIVATED',
+          message: 'Your account has been deactivated. Please contact support.'
+        });
+      }
       req.flash('error', 'Your account has been deactivated. Please contact support.');
       return res.redirect('/auth/login');
     }
 
     const isValid = await User.verifyPassword(password, user.password_hash);
     if (!isValid) {
+      if (isAjax) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_PASSWORD',
+          message: 'Incorrect password. Please try again.'
+        });
+      }
       req.flash('error', 'Incorrect password. Please try again.');
       return res.redirect('/auth/login');
     }
 
     req.session.userId = user.id;
+
+    const returnTo = user.role === 'admin' ? '/admin' : (req.session.returnTo || '/user/dashboard');
+    delete req.session.returnTo;
+
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: `Welcome back, ${user.full_name}!`,
+        redirect: returnTo
+      });
+    }
 
     if (user.role === 'admin') {
       req.flash('success', 'Logged in to Admin Panel.');
@@ -38,10 +85,15 @@ exports.postLogin = async (req, res, next) => {
     }
 
     req.flash('success', `Welcome back, ${user.full_name}!`);
-    const returnTo = req.session.returnTo || '/user/dashboard';
-    delete req.session.returnTo;
     res.redirect(returnTo);
   } catch (err) {
+    console.error('postLogin error:', err);
+    if (isAjax) {
+      return res.status(500).json({
+        success: false,
+        message: err.message || 'An error occurred during authentication.'
+      });
+    }
     next(err);
   }
 };

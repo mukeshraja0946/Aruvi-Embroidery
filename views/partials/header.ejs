@@ -254,25 +254,32 @@
               headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-Token': csrfToken
               },
-              body: new URLSearchParams({ email, password, _csrf: csrfToken })
+              body: new URLSearchParams({ email, password, _csrf: csrfToken, _ajax: '1' })
             });
 
             const data = await res.json();
-            if (data.success) {
+            if (res.ok && data.success) {
               window.isUserLoggedIn = true;
               closeLoginModal();
               if (typeof window.pendingAuthAction === 'function') {
                 const cb = window.pendingAuthAction;
                 window.pendingAuthAction = null;
                 cb();
+              } else if (data.redirect) {
+                window.location.href = data.redirect;
               } else {
                 window.location.reload();
               }
             } else {
               if (errDiv) {
-                errDiv.textContent = data.message || 'Invalid email or password.';
+                if (data.code === 'ACCOUNT_NOT_FOUND') {
+                  errDiv.innerHTML = `${data.message || 'No account found with this email.'} <a href="/auth/register" style="color: #900C3F; font-weight: 700; text-decoration: underline; margin-left: 4px;">Create Account</a>`;
+                } else {
+                  errDiv.textContent = data.message || 'Invalid email or password.';
+                }
                 errDiv.style.display = 'block';
               }
               btn.disabled = false;
@@ -281,7 +288,7 @@
           } catch (err) {
             console.error('Modal login error:', err);
             if (errDiv) {
-              errDiv.textContent = 'An error occurred during authentication.';
+              errDiv.textContent = 'An error occurred during authentication. Please try again.';
               errDiv.style.display = 'block';
             }
             btn.disabled = false;
