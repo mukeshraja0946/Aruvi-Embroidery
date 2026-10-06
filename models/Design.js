@@ -2,175 +2,7 @@ const db = require('../config/db');
 const path = require('path');
 const fs = require('fs');
 
-const fallbackDesigns = [
-  {
-    id: 1,
-    title: 'Rose Floral Design',
-    sku: 'ARV-FL-001',
-    slug: 'rose-floral-design',
-    price: 399.00,
-    sale_price: 299.00,
-    discount_pct: 25,
-    category_id: 1,
-    category_name: 'Floral Designs',
-    category_slug: 'floral-designs',
-    hoop_size: '5x7 inch (130x180 mm)',
-    stitch_count: 24800,
-    dimensions: '140mm x 180mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: 1,
-    is_trending: 1,
-    is_active: 1,
-    download_count: 256,
-    tags: 'rose, floral, blouse, saree, flower',
-    total_sales: 120,
-    average_rating: 4.80,
-    reviews_count: 120,
-    primary_image: '/public/images/cat_floral.jpg',
-    images: [{ id: 1, image_url: '/public/images/cat_floral.jpg', is_primary: 1 }],
-    files: [
-      { id: 1, file_name: 'rose_design.dst', file_path: '/public/uploads/designs/sample_peacock.zip', file_format: 'DST', file_size: 2400000 },
-      { id: 2, file_name: 'rose_design.pes', file_path: '/public/uploads/designs/sample_peacock.zip', file_format: 'PES', file_size: 1800000 },
-      { id: 3, file_name: 'rose_design.jef', file_path: '/public/uploads/designs/sample_peacock.zip', file_format: 'JEF', file_size: 1600000 },
-      { id: 4, file_name: 'rose_design.exp', file_path: '/public/uploads/designs/sample_peacock.zip', file_format: 'EXP', file_size: 2100000 }
-    ]
-  },
-  {
-    id: 2,
-    title: 'Lotus Mandala',
-    sku: 'ARV-TM-002',
-    slug: 'lotus-mandala',
-    price: 449.00,
-    sale_price: 349.00,
-    discount_pct: 22,
-    category_id: 4,
-    category_name: 'Traditional Designs',
-    category_slug: 'traditional-designs',
-    hoop_size: '7x7 inch (180x180 mm)',
-    stitch_count: 31200,
-    dimensions: '170mm x 170mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: 1,
-    is_trending: 0,
-    is_active: 1,
-    download_count: 185,
-    tags: 'lotus, mandala, traditional, saree',
-    total_sales: 85,
-    average_rating: 4.90,
-    reviews_count: 85,
-    primary_image: '/public/images/cat_traditional.jpg',
-    images: [{ id: 2, image_url: '/public/images/cat_traditional.jpg', is_primary: 1 }],
-    files: [{ id: 5, file_name: 'Lotus_Mandala.zip', file_path: '/public/uploads/designs/sample_ganesha.zip', file_format: 'ZIP', file_size: 1890432 }]
-  },
-  {
-    id: 3,
-    title: 'Butterfly Floral',
-    sku: 'ARV-KD-003',
-    slug: 'butterfly-floral',
-    price: 299.00,
-    sale_price: 249.00,
-    discount_pct: 17,
-    category_id: 3,
-    category_name: 'Kids Designs',
-    category_slug: 'kids-designs',
-    hoop_size: '6x6 inch (150x150 mm)',
-    stitch_count: 19500,
-    dimensions: '145mm x 145mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: 1,
-    is_trending: 1,
-    is_active: 1,
-    download_count: 140,
-    tags: 'butterfly, kids, floral, dress',
-    total_sales: 64,
-    average_rating: 4.70,
-    reviews_count: 64,
-    primary_image: '/public/images/cat_kids.jpg',
-    images: [{ id: 3, image_url: '/public/images/cat_kids.jpg', is_primary: 1 }],
-    files: [{ id: 6, file_name: 'Butterfly_Floral.zip', file_path: '/public/uploads/designs/sample_lotus.zip', file_format: 'ZIP', file_size: 1420980 }]
-  },
-  {
-    id: 4,
-    title: 'Letter A Monogram',
-    sku: 'ARV-MG-004',
-    slug: 'letter-a-monogram',
-    price: 249.00,
-    sale_price: 199.00,
-    discount_pct: 20,
-    category_id: 2,
-    category_name: 'Monogram Designs',
-    category_slug: 'monogram-designs',
-    hoop_size: '4x4 inch (100x100 mm)',
-    stitch_count: 12400,
-    dimensions: '95mm x 95mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: 1,
-    is_trending: 0,
-    is_active: 1,
-    download_count: 195,
-    tags: 'monogram, letter, alphabet, royal',
-    total_sales: 95,
-    average_rating: 4.90,
-    reviews_count: 95,
-    primary_image: '/public/images/cat_monogram.jpg',
-    images: [{ id: 4, image_url: '/public/images/cat_monogram.jpg', is_primary: 1 }],
-    files: [{ id: 7, file_name: 'Letter_A_Monogram.zip', file_path: '/public/uploads/designs/sample_elephant.zip', file_format: 'ZIP', file_size: 1650320 }]
-  },
-  {
-    id: 5,
-    title: 'Peacock Design',
-    sku: 'ARV-TD-005',
-    slug: 'peacock-design',
-    price: 499.00,
-    sale_price: 399.00,
-    discount_pct: 20,
-    category_id: 4,
-    category_name: 'Traditional Designs',
-    category_slug: 'traditional-designs',
-    hoop_size: '8x10 inch (200x250 mm)',
-    stitch_count: 42500,
-    dimensions: '190mm x 240mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: 1,
-    is_trending: 1,
-    is_active: 1,
-    download_count: 310,
-    tags: 'peacock, bridal, traditional, neck',
-    total_sales: 142,
-    average_rating: 5.00,
-    reviews_count: 142,
-    primary_image: '/public/images/cat_traditional.jpg',
-    images: [{ id: 5, image_url: '/public/images/cat_traditional.jpg', is_primary: 1 }],
-    files: [{ id: 8, file_name: 'Peacock_Design.zip', file_path: '/public/uploads/designs/sample_floral.zip', file_format: 'ZIP', file_size: 2980450 }]
-  },
-  {
-    id: 6,
-    title: 'Border Pattern',
-    sku: 'ARV-BD-006',
-    slug: 'border-pattern',
-    price: 349.00,
-    sale_price: 299.00,
-    discount_pct: 14,
-    category_id: 5,
-    category_name: 'Border Designs',
-    category_slug: 'border-designs',
-    hoop_size: '5x8 inch (130x200 mm)',
-    stitch_count: 22100,
-    dimensions: '120mm x 195mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: 1,
-    is_trending: 0,
-    is_active: 1,
-    download_count: 178,
-    tags: 'border, cutwork, saree, dupatta',
-    total_sales: 78,
-    average_rating: 4.85,
-    reviews_count: 78,
-    primary_image: '/public/images/cat_border.jpg',
-    images: [{ id: 6, image_url: '/public/images/cat_border.jpg', is_primary: 1 }],
-    files: [{ id: 9, file_name: 'Border_Pattern.zip', file_path: '/public/uploads/designs/sample_radha.zip', file_format: 'ZIP', file_size: 2110540 }]
-  }
-];
+const fallbackDesigns = [];
 
 class Design {
   static async getAll({
@@ -1013,6 +845,38 @@ class Design {
     const idx = fallbackDesigns.findIndex(d => d.id == id);
     if (idx !== -1) {
       fallbackDesigns.splice(idx, 1);
+    }
+    return true;
+  }
+
+  static async deleteAll() {
+    if (db.isConnected()) {
+      try {
+        const designs = await db.query('SELECT id FROM designs') || [];
+        for (const d of designs) {
+          await db.query('DELETE FROM design_files WHERE design_id = ?', [d.id]);
+          await db.query('DELETE FROM design_images WHERE design_id = ?', [d.id]);
+          await db.query('DELETE FROM cart_items WHERE design_id = ?', [d.id]);
+          await db.query('DELETE FROM wishlist WHERE design_id = ?', [d.id]);
+          await db.query('DELETE FROM order_items WHERE design_id = ?', [d.id]);
+          await db.query('DELETE FROM designs WHERE id = ?', [d.id]);
+        }
+        await db.query('TRUNCATE TABLE design_files');
+        await db.query('TRUNCATE TABLE design_images');
+        await db.query('DELETE FROM designs');
+      } catch (err) {
+        console.error('Design.deleteAll DB error:', err.message);
+        throw err;
+      }
+    }
+    fallbackDesigns.length = 0;
+    return true;
+  }
+
+  static async deleteBulk(ids) {
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return true;
+    for (const id of ids) {
+      await this.delete(id);
     }
     return true;
   }

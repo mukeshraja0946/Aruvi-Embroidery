@@ -533,3 +533,50 @@ exports.deleteDesign = async (req, res, next) => {
   }
 };
 
+exports.deleteAllDesigns = async (req, res, next) => {
+  try {
+    await Design.deleteAll();
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'All designs have been permanently removed.' });
+    }
+
+    req.flash('success', 'All designs have been permanently removed.');
+    res.redirect('/admin/designs');
+  } catch (err) {
+    console.error('deleteAllDesigns error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete all designs.' });
+    }
+    next(err);
+  }
+};
+
+exports.deleteBulkDesigns = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'No designs selected for deletion.' });
+    }
+
+    await Design.deleteBulk(ids);
+
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.json({ success: true, message: `${ids.length} selected design(s) deleted successfully.` });
+    }
+
+    req.flash('success', `${ids.length} selected design(s) deleted successfully.`);
+    res.redirect('/admin/designs');
+  } catch (err) {
+    console.error('deleteBulkDesigns error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete selected designs.' });
+    }
+    next(err);
+  }
+};
+

@@ -159,9 +159,17 @@
           <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Add, edit, delete and organize your embroidery designs. All changes will be reflected on the website.</p>
         </div>
 
-        <a href="/admin/designs/create" class="btn btn-primary" style="height: 44px; padding: 0 1.4rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
-          <i class="fa-solid fa-plus"></i> Add New Design
-        </a>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <button type="button" id="deleteSelectedBtn" onclick="confirmDeleteSelectedDesigns()" class="btn" style="display: none; height: 44px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #C62828; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px;">
+            <i class="fa-regular fa-trash-can"></i> Delete Selected (<span id="selectedCountNum">0</span>)
+          </button>
+          <button type="button" onclick="confirmDeleteAllDesigns()" class="btn" style="height: 44px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #900C3F; color: #FFFFFF; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-dumpster-fire"></i> Delete All Designs
+          </button>
+          <a href="/admin/designs/create" class="btn btn-primary" style="height: 44px; padding: 0 1.4rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-plus"></i> Add New Design
+          </a>
+        </div>
       </div>
 
       <% if (flash && flash.success && flash.success.length > 0) { %>
@@ -285,7 +293,7 @@
         <table class="admin-table-styled">
           <thead>
             <tr>
-              <th style="width: 38px; text-align: center;"><input type="checkbox"></th>
+              <th style="width: 38px; text-align: center;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllDesigns(this)"></th>
               <th style="width: 60px;">#</th>
               <th>Design Preview</th>
               <th>Design Name</th>
@@ -309,7 +317,7 @@
                   else if (catName.includes('Monogram')) catClass = 'cat-tag-monogram';
                 %>
                 <tr id="designRow-<%= d.id %>">
-                  <td style="text-align: center;"><input type="checkbox"></td>
+                  <td style="text-align: center;"><input type="checkbox" class="design-checkbox" value="<%= d.id %>" onchange="updateSelectedCount()"></td>
                   <td><strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong></td>
                   <td>
                     <% if (d.primary_image) { %>
@@ -419,13 +427,26 @@
       </div>
     </div>
 
-    <p id="deleteModalMessage" style="font-size: 0.88rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.5rem; background: #FAF6F0; padding: 10px 14px; border-radius: 10px; border-left: 3px solid #C62828;">
-      Are you sure you want to permanently delete this design?
+<!-- Delete All Designs Confirmation Modal -->
+<div id="deleteAllDesignsModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; padding: 1.8rem; width: 100%; max-width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid var(--admin-border);">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
+      <div style="width: 42px; height: 42px; border-radius: 50%; background: #FFEBEE; color: #900C3F; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
+        <i class="fa-solid fa-dumpster-fire"></i>
+      </div>
+      <div>
+        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px 0;">Delete ALL Designs?</h3>
+        <span style="font-size: 0.8rem; color: #C62828; font-weight: 600;">PERMANENT ACTION — CANNOT BE UNDONE</span>
+      </div>
+    </div>
+
+    <p style="font-size: 0.88rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.5rem; background: #FFEBEE; padding: 12px 14px; border-radius: 10px; border-left: 4px solid #900C3F;">
+      <strong>Warning:</strong> Are you sure you want to permanently delete <strong>ALL designs</strong> from the store? This will completely clear all designs, images, and design files permanently.
     </p>
 
     <div style="display: flex; gap: 10px; justify-content: flex-end;">
-      <button type="button" onclick="closeDeleteModal()" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.88rem;">Cancel</button>
-      <button type="button" id="confirmDeleteBtn" onclick="executeDeleteDesign()" class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; background: #C62828; color: #FFFFFF; border: none; cursor: pointer;">Delete Design</button>
+      <button type="button" onclick="closeDeleteAllModal()" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.88rem;">Cancel</button>
+      <button type="button" id="confirmDeleteAllBtn" onclick="executeDeleteAllDesigns()" class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; background: #900C3F; color: #FFFFFF; border: none; cursor: pointer;">Yes, Delete All Designs</button>
     </div>
   </div>
 </div>
@@ -447,6 +468,113 @@
     pendingDeleteId = null;
     const modal = document.getElementById('deleteDesignModal');
     if (modal) modal.style.display = 'none';
+  }
+
+  function confirmDeleteAllDesigns() {
+    const modal = document.getElementById('deleteAllDesignsModal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeDeleteAllModal() {
+    const modal = document.getElementById('deleteAllDesignsModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function toggleSelectAllDesigns(master) {
+    const checkboxes = document.querySelectorAll('.design-checkbox');
+    checkboxes.forEach(cb => cb.checked = master.checked);
+    updateSelectedCount();
+  }
+
+  function updateSelectedCount() {
+    const checked = document.querySelectorAll('.design-checkbox:checked');
+    const count = checked.length;
+    const btn = document.getElementById('deleteSelectedBtn');
+    const numEl = document.getElementById('selectedCountNum');
+    if (numEl) numEl.textContent = count;
+    if (btn) {
+      btn.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+    const master = document.getElementById('selectAllCheckbox');
+    const all = document.querySelectorAll('.design-checkbox');
+    if (master && all.length > 0) {
+      master.checked = checked.length === all.length;
+    }
+  }
+
+  function confirmDeleteSelectedDesigns() {
+    const checked = document.querySelectorAll('.design-checkbox:checked');
+    if (checked.length === 0) return;
+    if (confirm(`Are you sure you want to permanently delete the ${checked.length} selected design(s)?`)) {
+      executeDeleteSelectedDesigns();
+    }
+  }
+
+  function executeDeleteSelectedDesigns() {
+    const checked = document.querySelectorAll('.design-checkbox:checked');
+    const ids = Array.from(checked).map(cb => cb.value);
+    if (ids.length === 0) return;
+
+    const csrfToken = '<%= csrfToken %>';
+
+    fetch('/admin/designs/delete-bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify({ ids, _csrf: csrfToken })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        showAdminToast(data.message || 'Selected designs deleted successfully.');
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        alert(data.message || 'Unable to delete selected designs.');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('Error deleting selected designs.');
+    });
+  }
+
+  function executeDeleteAllDesigns() {
+    const btn = document.getElementById('confirmDeleteAllBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Deleting All...'; }
+
+    const csrfToken = '<%= csrfToken %>';
+
+    fetch('/admin/designs/delete-all', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify({ _csrf: csrfToken })
+    })
+    .then(res => res.json())
+    .then(data => {
+      closeDeleteAllModal();
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, Delete All Designs'; }
+      if (data.success) {
+        showAdminToast(data.message || 'All designs permanently removed.');
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        alert(data.message || 'Unable to delete all designs. Please try again.');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      closeDeleteAllModal();
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, Delete All Designs'; }
+      alert('Unable to delete all designs. Please try again.');
+    });
   }
 
   function executeDeleteDesign() {

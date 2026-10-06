@@ -48,6 +48,8 @@ router.post('/admin/designs/delete-all-files/:designId', adminDesignController.d
 
 router.post('/admin/products/delete/:id', adminDesignController.deleteDesign);
 router.post('/admin/designs/delete/:id', adminDesignController.deleteDesign);
+router.post('/admin/designs/delete-all', adminDesignController.deleteAllDesigns);
+router.post('/admin/designs/delete-bulk', adminDesignController.deleteBulkDesigns);
 
 // Categories Management
 router.get('/admin/categories', adminCategoryController.getCategories);
