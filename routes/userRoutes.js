@@ -6,6 +6,9 @@ const { isAuthenticated } = require('../middleware/auth');
 router.use('/user', isAuthenticated);
 
 router.get('/user/dashboard', userController.getDashboard);
+router.get('/user/orders', (req, res) => res.redirect('/user/dashboard#order-history'));
+router.get('/user/downloads', (req, res) => res.redirect('/user/dashboard#purchased-downloads'));
+router.get('/user/profile', (req, res) => res.redirect('/user/dashboard'));
 router.post('/user/profile/update', userController.updateProfile);
 router.get('/user/orders/:id', userController.getOrderDetail);
 router.get('/user/download/:fileId', userController.downloadDesignFile);

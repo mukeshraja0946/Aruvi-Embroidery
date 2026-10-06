@@ -229,7 +229,13 @@ class Order {
                MAX(o.created_at) as purchase_date,
                MAX(o.order_number) as order_number,
                MIN(oi.id) as order_item_id,
-               (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
+               COALESCE(
+                 (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
+                 (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
+                 (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
+                 (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
+               ) as primary_image,
+               (SELECT COUNT(*) FROM design_files WHERE design_id = d.id AND is_preview = 0 AND UPPER(file_format) IN ('DST','PES','JEF','EXP')) as file_count
         FROM orders o
         JOIN order_items oi ON o.id = oi.order_id
         JOIN designs d ON oi.design_id = d.id
@@ -242,18 +248,15 @@ class Order {
     return [
       {
         design_id: 1,
-        title: 'Royal Bridal Peacock Neckline & Sleeve Set',
-        slug: 'royal-bridal-peacock-neckline-sleeve-set',
-        hoop_size: '8x12 inch (200x300 mm)',
-        formats: 'DST, PES, JEF, EXP, HUS, VIP, VP3, XXX',
+        title: 'AED 3',
+        slug: 'rose-floral-design',
+        hoop_size: '6x6 inch (150x150 mm)',
+        formats: 'DST',
         purchase_date: new Date(),
-        order_number: 'AE-20261001-9812',
+        order_number: 'AE-20261005-5194',
         order_item_id: 1,
-        primary_image: '/public/images/logo.jpg',
-        file_id: 1,
-        file_name: 'Royal_Bridal_Peacock_Set.zip',
-        file_path: '/public/uploads/designs/sample_peacock.zip',
-        file_size: 2450123
+        primary_image: '/public/images/cat_floral.jpg',
+        file_count: 1
       }
     ];
   }

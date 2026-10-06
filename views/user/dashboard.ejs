@@ -1,156 +1,892 @@
 <%- include('../partials/header') %>
 
-<div class="container section">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <div>
-      <h2>My Account Dashboard</h2>
-      <p style="color: var(--text-muted);">Welcome back, <strong><%= currentUser.full_name %></strong></p>
-    </div>
-    <div style="display: flex; gap: 10px; align-items: center;">
-      <% if (currentUser && currentUser.role === 'admin') { %>
-        <a href="/admin" class="btn btn-primary btn-sm"><i class="fa-solid fa-gauge-high"></i> Go to Admin Panel</a>
-      <% } %>
-      <a href="/auth/logout" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</a>
-    </div>
-  </div>
+<!-- Dashboard Custom Styling matching Reference UI -->
+<style>
+  :root {
+    --dash-bg: #FAF5EE;
+    --dash-card-bg: #FFFFFF;
+    --dash-border: #EFE7DD;
+    --dash-primary: #A93226;
+    --dash-primary-hover: #922B21;
+    --dash-text-dark: #2C1810;
+    --dash-text-muted: #8C7B72;
+    --dash-bg-soft: #FAF6F0;
+    --dash-green-bg: #E8F5E9;
+    --dash-green-text: #2E7D32;
+    --dash-help-bg: #FDF2F0;
+    --dash-help-border: #F8E3DF;
+  }
 
-  <div style="display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem;">
-    <!-- Profile Card Sidebar -->
-    <div>
-      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-sm); margin-bottom: 1.5rem;">
-        <h3 style="font-size: 1.1rem; margin-bottom: 1.2rem; padding-bottom: 0.5rem; border-bottom: 2px dashed var(--border-light);"><i class="fa-solid fa-user-gear"></i> Profile Information</h3>
+  body {
+    background-color: var(--dash-bg) !important;
+  }
+
+  .dashboard-wrapper {
+    position: relative;
+    padding-top: 1.5rem;
+    padding-bottom: 4rem;
+    min-height: 80vh;
+  }
+
+  /* Decorative Background Line Art */
+  .dashboard-bg-floral-left {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 280px;
+    height: 380px;
+    opacity: 0.07;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cpath fill='%232C1810' d='M150,100 Q200,50 250,100 T350,100 Q400,150 350,200 T350,300 Q300,350 250,300 T150,300 Q100,250 150,200 T150,100 Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+  }
+  .dashboard-bg-floral-right {
+    position: absolute;
+    top: 40px;
+    right: 0;
+    width: 320px;
+    height: 400px;
+    opacity: 0.06;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cpath fill='%23A93226' d='M250,50 Q300,150 400,150 T400,350 Q300,350 250,450 T100,350 Q100,150 250,50 Z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+  }
+
+  /* Header Section */
+  .dash-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .dash-main-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--dash-text-dark);
+    margin: 0 0 0.3rem 0;
+    line-height: 1.2;
+  }
+
+  .dash-sub-title {
+    font-size: 1.05rem;
+    color: var(--dash-text-muted);
+    margin: 0;
+  }
+
+  .dash-sub-title strong {
+    color: var(--dash-text-dark);
+    font-weight: 700;
+  }
+
+  .dash-signout-btn {
+    border: 1px solid #E2D7CC;
+    background: #FFFFFF;
+    color: var(--dash-text-dark);
+    border-radius: 30px;
+    padding: 10px 22px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(44, 24, 16, 0.04);
+  }
+
+  .dash-signout-btn:hover {
+    background: #FAF0EE;
+    border-color: #D4C3B5;
+    color: var(--dash-primary);
+  }
+
+  /* Main Grid Layout */
+  .dash-grid-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 2rem;
+    align-items: start;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Left Sidebar */
+  .dash-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .dash-profile-card {
+    background: var(--dash-card-bg);
+    border-radius: 20px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--dash-border);
+    box-shadow: 0 4px 20px rgba(44, 24, 16, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dash-profile-user-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .dash-avatar-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--dash-primary);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  .dash-profile-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--dash-text-dark);
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+
+  .dash-profile-email {
+    font-size: 0.85rem;
+    color: var(--dash-text-muted);
+    word-break: break-all;
+  }
+
+  .dash-nav-menu-card {
+    background: var(--dash-card-bg);
+    border-radius: 20px;
+    padding: 0.75rem;
+    border: 1px solid var(--dash-border);
+    box-shadow: 0 4px 20px rgba(44, 24, 16, 0.03);
+  }
+
+  .dash-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 18px;
+    border-radius: 14px;
+    color: var(--dash-text-dark);
+    font-weight: 500;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    margin-bottom: 4px;
+  }
+
+  .dash-nav-link:last-child {
+    margin-bottom: 0;
+  }
+
+  .dash-nav-link i {
+    font-size: 1.15rem;
+    width: 22px;
+    text-align: center;
+    color: #6D5B52;
+  }
+
+  .dash-nav-link.active {
+    background: #FAF0EE;
+    color: var(--dash-primary);
+    font-weight: 700;
+  }
+
+  .dash-nav-link.active i {
+    color: var(--dash-primary);
+  }
+
+  .dash-nav-link:hover:not(.active) {
+    background: var(--dash-bg-soft);
+    color: var(--dash-primary);
+  }
+
+  /* Help Card */
+  .dash-help-card {
+    background: var(--dash-help-bg);
+    border: 1px solid var(--dash-help-border);
+    border-radius: 20px;
+    padding: 1.5rem;
+  }
+
+  .dash-help-icon {
+    font-size: 1.25rem;
+    color: var(--dash-primary);
+    margin-bottom: 0.6rem;
+  }
+
+  .dash-help-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--dash-primary);
+    margin-bottom: 0.4rem;
+  }
+
+  .dash-help-desc {
+    font-size: 0.88rem;
+    color: #7C6B63;
+    line-height: 1.45;
+    margin-bottom: 1.2rem;
+  }
+
+  .dash-support-btn {
+    background: #FFFFFF;
+    color: var(--dash-primary);
+    border: 1px solid #F0D5D0;
+    border-radius: 30px;
+    padding: 10px 18px;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(169, 50, 38, 0.05);
+  }
+
+  .dash-support-btn:hover {
+    background: var(--dash-primary);
+    color: #FFFFFF;
+    border-color: var(--dash-primary);
+  }
+
+  /* Right Main Content Cards */
+  .dash-section-card {
+    background: var(--dash-card-bg);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid var(--dash-border);
+    box-shadow: 0 4px 20px rgba(44, 24, 16, 0.03);
+    margin-bottom: 2rem;
+  }
+
+  .dash-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 1.5rem;
+  }
+
+  .dash-header-icon-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #FAF0EE;
+    color: var(--dash-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  .dash-card-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--dash-text-dark);
+    margin: 0 0 0.25rem 0;
+    line-height: 1.2;
+  }
+
+  .dash-card-subtitle {
+    font-size: 0.9rem;
+    color: var(--dash-text-muted);
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  /* Purchased Designs Grid (3 columns desktop) */
+  .dash-purchased-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .dash-purchased-item-card {
+    background: #FFFFFF;
+    border: 1px solid var(--dash-border);
+    border-radius: 16px;
+    padding: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .dash-purchased-item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(44, 24, 16, 0.06);
+  }
+
+  .dash-item-top-flex {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 1rem;
+  }
+
+  .dash-item-preview-img {
+    width: 90px;
+    height: 90px;
+    border-radius: 12px;
+    object-fit: contain;
+    background: var(--dash-bg-soft);
+    border: 1px solid #F0E8DF;
+    padding: 6px;
+    flex-shrink: 0;
+  }
+
+  .dash-item-meta-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dash-item-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--dash-text-dark);
+    margin: 0 0 0.2rem 0;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dash-item-order-no {
+    font-size: 0.78rem;
+    color: var(--dash-text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .dash-item-spec {
+    font-size: 0.78rem;
+    color: #5C4B43;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0.3rem;
+  }
+
+  .dash-item-spec i {
+    color: var(--dash-primary);
+    font-size: 0.75rem;
+  }
+
+  /* Available Formats Container */
+  .dash-formats-box {
+    background: var(--dash-bg-soft);
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .dash-formats-label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--dash-text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .dash-fmt-badge-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .dash-fmt-badge {
+    background: var(--dash-green-bg);
+    color: var(--dash-green-text);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: monospace;
+    letter-spacing: 0.03em;
+  }
+
+  /* Single ZIP Download Button */
+  .dash-download-btn {
+    background: var(--dash-primary);
+    color: #FFFFFF !important;
+    font-weight: 700;
+    font-size: 0.92rem;
+    border-radius: 12px;
+    padding: 12px 16px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    box-shadow: 0 4px 12px rgba(169, 50, 38, 0.2);
+    border: none;
+  }
+
+  .dash-download-btn:hover {
+    background: var(--dash-primary-hover);
+    color: #FFFFFF !important;
+  }
+
+  .dash-file-count-subtitle {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--dash-text-muted);
+    margin-top: 0.45rem;
+  }
+
+  /* Order History Table */
+  .dash-table-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .dash-view-all-btn {
+    border: 1px solid #E2D7CC;
+    background: #FFFFFF;
+    color: var(--dash-text-dark);
+    border-radius: 30px;
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .dash-view-all-btn:hover {
+    background: #FAF0EE;
+    color: var(--dash-primary);
+    border-color: #D4C3B5;
+  }
+
+  .dash-orders-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .dash-orders-table th {
+    background: var(--dash-bg-soft);
+    color: var(--dash-text-dark);
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 12px 16px;
+    border-top: 1px solid var(--dash-border);
+    border-bottom: 1px solid var(--dash-border);
+  }
+
+  .dash-orders-table th:first-child {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-left: 1px solid var(--dash-border);
+  }
+  .dash-orders-table th:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-right: 1px solid var(--dash-border);
+  }
+
+  .dash-orders-table td {
+    padding: 16px;
+    font-size: 0.9rem;
+    color: var(--dash-text-dark);
+    border-bottom: 1px solid #F4ECE4;
+    vertical-align: middle;
+  }
+
+  .dash-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .dash-status-badge.success {
+    background: var(--dash-green-bg);
+    color: var(--dash-green-text);
+  }
+
+  .dash-status-badge.warning {
+    background: #FFF8E1;
+    color: #F57F17;
+  }
+
+  .dash-status-badge.danger {
+    background: #FFEBEE;
+    color: #C62828;
+  }
+
+  .dash-status-badge i {
+    font-size: 0.5rem;
+  }
+
+  .dash-details-link-btn {
+    background: var(--dash-bg-soft);
+    color: var(--dash-text-dark);
+    border: 1px solid var(--dash-border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .dash-details-link-btn:hover {
+    background: #FAF0EE;
+    color: var(--dash-primary);
+    border-color: #F0D5D0;
+  }
+
+  /* Profile Edit Modal */
+  .dash-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(44, 24, 16, 0.5);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+  }
+
+  .dash-modal-content {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    position: relative;
+  }
+
+  .dash-modal-close {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: var(--dash-bg-soft);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--dash-text-dark);
+  }
+
+  /* Responsive Media Queries */
+  @media (max-width: 1024px) {
+    .dash-grid-layout {
+      grid-template-columns: 280px 1fr;
+      gap: 1.5rem;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .dash-grid-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .dash-header-bar {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .dash-purchased-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="dashboard-wrapper">
+  <div class="dashboard-bg-floral-left"></div>
+  <div class="dashboard-bg-floral-right"></div>
+
+  <div class="container">
+    <!-- Header: Page Title + Welcome Greeting + Sign Out Button -->
+    <div class="dash-header-bar">
+      <div>
+        <h1 class="dash-main-title">My Account Dashboard</h1>
+        <p class="dash-sub-title">Welcome back, <strong><%= currentUser ? currentUser.full_name : 'Customer' %></strong> 👋</p>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <% if (currentUser && currentUser.role === 'admin') { %>
+          <a href="/admin" class="dash-signout-btn" style="background: var(--dash-primary); color: #fff; border-color: var(--dash-primary);"><i class="fa-solid fa-gauge-high"></i> Admin Panel</a>
+        <% } %>
+        <a href="/auth/logout" class="dash-signout-btn">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+        </a>
+      </div>
+    </div>
+
+    <!-- Main Grid Layout: Left Sidebar + Right Content -->
+    <div class="dash-grid-layout">
+      
+      <!-- LEFT SIDEBAR -->
+      <aside class="dash-sidebar">
+        <!-- Top Profile Card -->
+        <div class="dash-profile-card">
+          <div class="dash-profile-user-info">
+            <div class="dash-avatar-circle">
+              <i class="fa-solid fa-user"></i>
+            </div>
+            <div>
+              <div class="dash-profile-name"><%= currentUser ? (currentUser.full_name.split(' ')[0] || currentUser.full_name) : 'User' %></div>
+              <div class="dash-profile-email"><%= currentUser ? currentUser.email : '' %></div>
+            </div>
+          </div>
+          <i class="fa-solid fa-chevron-right" style="color: #C2B4A8; cursor: pointer;" onclick="document.getElementById('profileModal').style.display='flex'"></i>
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="dash-nav-menu-card">
+          <a href="/user/dashboard" class="dash-nav-link active">
+            <i class="fa-solid fa-house"></i> Dashboard
+          </a>
+          <a href="#order-history" class="dash-nav-link" onclick="document.getElementById('order-history').scrollIntoView({behavior:'smooth'})">
+            <i class="fa-solid fa-box"></i> My Orders
+          </a>
+          <a href="#purchased-downloads" class="dash-nav-link" onclick="document.getElementById('purchased-downloads').scrollIntoView({behavior:'smooth'})">
+            <i class="fa-solid fa-download"></i> Purchased Downloads
+          </a>
+          <a href="/user/wishlist" class="dash-nav-link">
+            <i class="fa-regular fa-heart"></i> Saved Wishlist
+          </a>
+          <a href="javascript:void(0)" class="dash-nav-link" onclick="document.getElementById('profileModal').style.display='flex'">
+            <i class="fa-regular fa-user"></i> Profile Information
+          </a>
+          <a href="javascript:void(0)" class="dash-nav-link" onclick="document.getElementById('profileModal').style.display='flex'">
+            <i class="fa-solid fa-lock"></i> Change Password
+          </a>
+        </nav>
+
+        <!-- Help Card -->
+        <div class="dash-help-card">
+          <i class="fa-solid fa-headphones dash-help-icon"></i>
+          <div class="dash-help-title">Need Help?</div>
+          <div class="dash-help-desc">If you have any questions, feel free to contact us.</div>
+          <a href="/contact" class="dash-support-btn">
+            <i class="fa-regular fa-envelope"></i> Contact Support
+          </a>
+        </div>
+      </aside>
+
+      <!-- RIGHT MAIN CONTENT -->
+      <main>
         
-        <form action="/user/profile/update" method="POST">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          
-          <div class="form-group">
-            <label class="form-label">Full Name</label>
-            <input type="text" name="full_name" class="form-control" value="<%= currentUser.full_name %>" required>
+        <!-- SECTION 1: PURCHASED EMBROIDERY DOWNLOADS -->
+        <div class="dash-section-card" id="purchased-downloads">
+          <div class="dash-card-header">
+            <div class="dash-header-icon-box">
+              <i class="fa-solid fa-download"></i>
+            </div>
+            <div>
+              <h2 class="dash-card-title">Purchased Embroidery Downloads</h2>
+              <p class="dash-card-subtitle">Your purchased designs are available for download. Each design is provided as a single ZIP file containing the available machine format(s).</p>
+            </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Email (Read-only)</label>
-            <input type="email" class="form-control" value="<%= currentUser.email %>" disabled style="background: #f8f9fa;">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Phone Number</label>
-            <input type="tel" name="phone" class="form-control" value="<%= currentUser.phone || '' %>">
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-block btn-sm">Update Profile</button>
-        </form>
-      </div>
-
-      <div style="background: var(--bg-soft); border-radius: var(--radius-md); padding: 1.2rem;">
-        <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-heart" style="color: var(--primary);"></i> Saved Wishlist</h4>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">You have <%= wishlistItems ? wishlistItems.length : 0 %> saved items in your wishlist.</p>
-        <a href="/user/wishlist" class="btn btn-outline btn-sm btn-block">View Wishlist</a>
-      </div>
-    </div>
-
-    <!-- Main Dashboard Area -->
-    <div>
-      <!-- Purchased Design Downloads -->
-      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.8rem; box-shadow: var(--shadow-sm); margin-bottom: 2.5rem;">
-        <h3 style="font-size: 1.3rem; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 2px dashed var(--border-light);">
-          <i class="fa-solid fa-cloud-arrow-down" style="color: var(--primary);"></i> Purchased Embroidery Downloads
-        </h3>
-
-        <% if (!purchasedDesigns || purchasedDesigns.length === 0) { %>
-          <p style="color: var(--text-muted); font-size: 0.95rem;">You have not purchased any embroidery designs yet. Purchased designs will be instantly downloadable here forever!</p>
-          <a href="/shop" class="btn btn-primary btn-sm" style="margin-top: 1rem;">Explore Designs</a>
-        <% } else { %>
-          <div class="table-responsive">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Design Title</th>
-                  <th>Hoop & Formats</th>
-                  <th>Purchase Date</th>
-                  <th style="text-align: right;">Download</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% purchasedDesigns.forEach(item => { %>
-                  <% 
-                    const cleanTitle = item.title || item.slug || ('AED_' + (item.design_id || item.id));
-                    const rawFmts = item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : ['DST'];
-                    const displayFmts = [...new Set(rawFmts)].join(' • ');
-                  %>
-                  <tr>
-                    <td>
-                      <div style="display: flex; align-items: center; gap: 10px;">
-                        <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= item.title %>" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px;">
-                        <div>
-                          <strong><a href="/design/<%= item.slug %>" style="color: var(--text-dark);"><%= item.title %></a></strong><br>
-                          <span style="font-size: 0.75rem; color: var(--text-muted);">Order #<%= item.order_number %></span>
+          <% if (!purchasedDesigns || purchasedDesigns.length === 0) { %>
+            <div style="text-align: center; padding: 2.5rem 1rem; background: var(--dash-bg-soft); border-radius: 16px; border: 1px dashed var(--dash-border);">
+              <i class="fa-solid fa-folder-open" style="font-size: 2.5rem; color: var(--dash-text-muted); opacity: 0.6; margin-bottom: 0.8rem;"></i>
+              <h4 style="font-size: 1.1rem; color: var(--dash-text-dark); margin-bottom: 0.4rem;">No Purchased Downloads Found</h4>
+              <p style="color: var(--dash-text-muted); font-size: 0.9rem; max-width: 420px; margin: 0 auto 1.2rem auto;">You have not purchased any digital embroidery designs yet. Purchased designs will be instantly downloadable here forever!</p>
+              <a href="/designs" class="btn btn-primary btn-sm" style="border-radius: 20px; padding: 8px 20px;">Explore Designs</a>
+            </div>
+          <% } else { %>
+            <div class="dash-purchased-grid">
+              <% purchasedDesigns.forEach(item => { %>
+                <% 
+                  const cleanTitle = item.title || item.slug || ('AED ' + (item.design_id || item.id));
+                  const rawFmts = item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : ['DST'];
+                  const formatsList = [...new Set(rawFmts)];
+                  const pDate = item.purchase_date ? new Date(item.purchase_date).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US');
+                  const hoopText = item.hoop_size || '5x7 inch (130x180 mm)';
+                %>
+                <div class="dash-purchased-item-card">
+                  <div>
+                    <!-- Top Flex: Image + Title/Meta -->
+                    <div class="dash-item-top-flex">
+                      <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= cleanTitle %>" class="dash-item-preview-img">
+                      <div class="dash-item-meta-info">
+                        <h3 class="dash-item-title" title="<%= cleanTitle %>"><%= cleanTitle %></h3>
+                        <div class="dash-item-order-no">Order #<%= item.order_number || 'AE-2026' %></div>
+                        <div class="dash-item-spec">
+                          <i class="fa-solid fa-up-right-and-down-left-from-center"></i> <%= hoopText %>
+                        </div>
+                        <div class="dash-item-spec">
+                          <i class="fa-regular fa-calendar"></i> Purchased on <%= pDate %>
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      <% if (item.hoop_size) { %>
-                        <span style="font-size: 0.82rem;"><%= item.hoop_size %></span><br>
-                      <% } %>
-                      <span style="font-size: 0.78rem; font-weight: 600; color: #5C504A;">Available Formats:</span><br>
-                      <span class="badge badge-info" style="font-size: 0.72rem; letter-spacing: 0.03em;"><%= displayFmts %></span>
-                    </td>
-                    <td><span style="font-size: 0.85rem;"><%= new Date(item.purchase_date).toLocaleDateString() %></span></td>
-                    <td style="text-align: right;">
-                      <a href="/user/download/<%= item.design_id || item.id %>" download class="btn btn-primary btn-sm" style="padding: 8px 14px; font-size: 0.85rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
-                        <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
-                      </a>
-                    </td>
-                  </tr>
-                <% }) %>
-              </tbody>
-            </table>
+                    </div>
+
+                    <!-- Available Formats Container -->
+                    <div class="dash-formats-box">
+                      <div class="dash-formats-label">Available Formats</div>
+                      <div class="dash-fmt-badge-wrap">
+                        <% formatsList.forEach(fmt => { %>
+                          <span class="dash-fmt-badge"><%= fmt %></span>
+                        <% }) %>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- SINGLE ZIP Download Button per Purchased Design -->
+                  <div>
+                    <a href="/user/download/<%= item.design_id || item.id %>" download class="dash-download-btn">
+                      <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
+                    </a>
+                    <div class="dash-file-count-subtitle">Contains <%= item.file_count || formatsList.length || 1 %> machine file(s)</div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- SECTION 2: ORDER HISTORY -->
+        <div class="dash-section-card" id="order-history">
+          <div class="dash-table-header-flex">
+            <div style="display: flex; align-items: flex-start; gap: 16px;">
+              <div class="dash-header-icon-box">
+                <i class="fa-solid fa-box"></i>
+              </div>
+              <div>
+                <h2 class="dash-card-title">Order History</h2>
+                <p class="dash-card-subtitle">View your past orders and their status.</p>
+              </div>
+            </div>
+
+            <a href="/user/dashboard#order-history" class="dash-view-all-btn">
+              View All Orders <i class="fa-solid fa-chevron-right"></i>
+            </a>
           </div>
-        <% } %>
-      </div>
 
-      <!-- Order History -->
-      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.8rem; box-shadow: var(--shadow-sm);">
-        <h3 style="font-size: 1.3rem; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 2px dashed var(--border-light);">
-          <i class="fa-solid fa-receipt"></i> Order History
-        </h3>
-
-        <% if (!orders || orders.length === 0) { %>
-          <p style="color: var(--text-muted);">No order history found.</p>
-        <% } else { %>
-          <div class="table-responsive">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Order #</th>
-                  <th>Date</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% orders.forEach(ord => { %>
+          <% if (!orders || orders.length === 0) { %>
+            <div style="text-align: center; padding: 2.5rem 1rem; background: var(--dash-bg-soft); border-radius: 16px; border: 1px dashed var(--dash-border);">
+              <p style="color: var(--dash-text-muted); margin: 0;">No order history found for your account.</p>
+            </div>
+          <% } else { %>
+            <div style="overflow-x: auto;">
+              <table class="dash-orders-table">
+                <thead>
                   <tr>
-                    <td><strong><%= ord.order_number %></strong></td>
-                    <td><%= new Date(ord.created_at).toLocaleDateString() %></td>
-                    <td><strong style="color: var(--primary);">₹<%= ord.final_amount %></strong></td>
-                    <td>
-                      <span class="badge badge-<%= ord.status === 'completed' ? 'success' : (ord.status === 'pending' ? 'warning' : 'danger') %>">
-                        <%= ord.status %>
-                      </span>
-                    </td>
-                    <td style="text-align: right;">
-                      <a href="/user/orders/<%= ord.id %>" class="btn btn-outline btn-sm">View</a>
-                    </td>
+                    <th>Order #</th>
+                    <th>Date</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Items</th>
+                    <th style="text-align: right;">Actions</th>
                   </tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-        <% } %>
-      </div>
+                </thead>
+                <tbody>
+                  <% orders.forEach(ord => { %>
+                    <% 
+                      const isDone = (ord.status === 'completed' || ord.status === 'paid');
+                      const ordDate = ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-US') : '';
+                      const itemCount = ord.items ? ord.items.length : 1;
+                    %>
+                    <tr>
+                      <td><strong><%= ord.order_number %></strong></td>
+                      <td><%= ordDate %></td>
+                      <td><strong style="color: var(--dash-primary);">₹<%= Number(ord.final_amount).toFixed(2) %></strong></td>
+                      <td>
+                        <span class="dash-status-badge <%= isDone ? 'success' : (ord.status === 'pending' ? 'warning' : 'danger') %>">
+                          <i class="fa-solid fa-circle"></i> <%= isDone ? 'Completed' : ord.status %>
+                        </span>
+                      </td>
+                      <td><%= itemCount %> Design<%= itemCount !== 1 ? 's' : '' %></td>
+                      <td style="text-align: right;">
+                        <a href="/user/orders/<%= ord.id %>" class="dash-details-link-btn">
+                          View Details
+                        </a>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+
+      </main>
     </div>
+  </div>
+</div>
+
+<!-- Modal for Profile Information / Update -->
+<div class="dash-modal-overlay" id="profileModal">
+  <div class="dash-modal-content">
+    <button class="dash-modal-close" onclick="document.getElementById('profileModal').style.display='none'">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <h3 style="font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--dash-text-dark); margin-bottom: 1.2rem;">
+      Profile Information
+    </h3>
+
+    <form action="/user/profile/update" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      
+      <div class="form-group" style="margin-bottom: 1.2rem;">
+        <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Full Name</label>
+        <input type="text" name="full_name" class="form-control" value="<%= currentUser ? currentUser.full_name : '' %>" required style="border-radius: 10px;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.2rem;">
+        <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Email Address (Read-only)</label>
+        <input type="email" class="form-control" value="<%= currentUser ? currentUser.email : '' %>" disabled style="background: #F4ECE4; border-radius: 10px;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Phone Number</label>
+        <input type="tel" name="phone" class="form-control" value="<%= currentUser ? currentUser.phone || '' : '' %>" placeholder="Enter phone number" style="border-radius: 10px;">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('profileModal').style.display='none'" style="border-radius: 20px;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background: var(--dash-primary); border-color: var(--dash-primary); border-radius: 20px;">Save Changes</button>
+      </div>
+    </form>
   </div>
 </div>
 
