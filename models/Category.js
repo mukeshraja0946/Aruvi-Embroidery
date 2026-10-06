@@ -14,23 +14,36 @@ const fallbackCategories = [
 class Category {
   static async getAll() {
     if (db.isConnected()) {
-      return await db.query('SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id GROUP BY c.id ORDER BY c.display_order ASC, c.name ASC');
+      try {
+        const rows = await db.query('SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id GROUP BY c.id ORDER BY c.display_order ASC, c.name ASC');
+        if (rows && Array.isArray(rows)) return rows;
+      } catch (err) {
+        console.error('Category.getAll DB error:', err.message);
+      }
     }
     return fallbackCategories.map(cat => ({ ...cat, design_count: 3 }));
   }
 
   static async getById(id) {
     if (db.isConnected()) {
-      const rows = await db.query('SELECT * FROM categories WHERE id = ? LIMIT 1', [id]);
-      return rows[0] || null;
+      try {
+        const rows = await db.query('SELECT * FROM categories WHERE id = ? LIMIT 1', [id]);
+        if (rows && rows[0]) return rows[0];
+      } catch (err) {
+        console.error('Category.getById DB error:', err.message);
+      }
     }
     return fallbackCategories.find(c => c.id == id) || null;
   }
 
   static async getBySlug(slug) {
     if (db.isConnected()) {
-      const rows = await db.query('SELECT * FROM categories WHERE slug = ? LIMIT 1', [slug]);
-      return rows[0] || null;
+      try {
+        const rows = await db.query('SELECT * FROM categories WHERE slug = ? LIMIT 1', [slug]);
+        if (rows && rows[0]) return rows[0];
+      } catch (err) {
+        console.error('Category.getBySlug DB error:', err.message);
+      }
     }
     return fallbackCategories.find(c => c.slug === slug) || null;
   }

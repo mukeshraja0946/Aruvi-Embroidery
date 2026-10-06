@@ -190,112 +190,123 @@ class Design {
     status = null
   } = {}) {
     if (db.isConnected()) {
-      let whereClause = [];
-      let params = [];
+      try {
+        let whereClause = [];
+        let params = [];
 
-      if (is_active_only) {
-        whereClause.push('d.is_active = 1');
-      } else if (status === 'active') {
-        whereClause.push('d.is_active = 1');
-      } else if (status === 'inactive' || status === 'draft') {
-        whereClause.push('d.is_active = 0');
-      } else {
-        whereClause.push('d.is_active >= 0');
-      }
-
-      if (is_featured !== null && is_featured !== undefined) {
-        whereClause.push('d.is_featured = ?');
-        params.push(is_featured ? 1 : 0);
-      }
-
-      if (is_trending !== null && is_trending !== undefined) {
-        whereClause.push('d.is_trending = ?');
-        params.push(is_trending ? 1 : 0);
-      }
-
-      if (search) {
-        whereClause.push('(d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ?)');
-        const searchPattern = `%${search}%`;
-        params.push(searchPattern, searchPattern, searchPattern, searchPattern);
-      }
-
-      if (category_id) {
-        whereClause.push('d.category_id = ?');
-        params.push(parseInt(category_id));
-      } else if (category_slug) {
-        whereClause.push('c.slug = ?');
-        params.push(category_slug);
-      }
-
-      if (format) {
-        whereClause.push('d.formats LIKE ?');
-        params.push(`%${format}%`);
-      }
-
-      if (min_price !== null && min_price !== '') {
-        whereClause.push('COALESCE(d.sale_price, d.price) >= ?');
-        params.push(parseFloat(min_price));
-      }
-
-      if (max_price !== null && max_price !== '') {
-        whereClause.push('COALESCE(d.sale_price, d.price) <= ?');
-        params.push(parseFloat(max_price));
-      }
-
-      if (min_rating !== null && min_rating !== '') {
-        whereClause.push('d.average_rating >= ?');
-        params.push(parseFloat(min_rating));
-      }
-
-      const whereSql = whereClause.length ? 'WHERE ' + whereClause.join(' AND ') : '';
-
-      let orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
-      if (sort === 'price_low') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC';
-      else if (sort === 'price_high') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC';
-      else if (sort === 'popular') orderBy = 'ORDER BY COALESCE(d.download_count, d.total_sales) DESC';
-      else if (sort === 'rating') orderBy = 'ORDER BY d.average_rating DESC';
-      else if (sort === 'oldest') orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
-
-      const offset = (page - 1) * limit;
-
-      const sql = `
-        SELECT d.*, c.name as category_name, c.slug as category_slug,
-               COALESCE(
-                 (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
-                 (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
-                 (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
-                 (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
-               ) as primary_image
-        FROM designs d
-        LEFT JOIN categories c ON d.category_id = c.id
-        ${whereSql}
-        ${orderBy}
-        LIMIT ? OFFSET ?
-      `;
-
-      const designs = await db.query(sql, [...params, parseInt(limit), parseInt(offset)]);
-      const countSql = `SELECT COUNT(*) as total FROM designs d LEFT JOIN categories c ON d.category_id = c.id ${whereSql}`;
-      const countRes = await db.query(countSql, params);
-
-      // Post-process designs to derive formats 100% dynamically from design_files table
-      for (const d of designs) {
-        const mFiles = await db.query(
-          'SELECT file_format, file_name FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) IN ("DST","PES","JEF","EXP")',
-          [d.id]
-        );
-        if (mFiles && mFiles.length > 0) {
-          d.formats = [...new Set(mFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
+        if (is_active_only) {
+          whereClause.push('d.is_active = 1');
+        } else if (status === 'active') {
+          whereClause.push('d.is_active = 1');
+        } else if (status === 'inactive' || status === 'draft') {
+          whereClause.push('d.is_active = 0');
         } else {
-          d.formats = '';
+          whereClause.push('d.is_active >= 0');
         }
-      }
 
-      return {
-        designs,
-        total: countRes[0].total,
-        page: parseInt(page),
-        totalPages: Math.ceil((countRes[0].total || 1) / limit)
-      };
+        if (is_featured !== null && is_featured !== undefined) {
+          whereClause.push('d.is_featured = ?');
+          params.push(is_featured ? 1 : 0);
+        }
+
+        if (is_trending !== null && is_trending !== undefined) {
+          whereClause.push('d.is_trending = ?');
+          params.push(is_trending ? 1 : 0);
+        }
+
+        if (search) {
+          whereClause.push('(d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ?)');
+          const searchPattern = `%${search}%`;
+          params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+        }
+
+        if (category_id) {
+          whereClause.push('d.category_id = ?');
+          params.push(parseInt(category_id));
+        } else if (category_slug) {
+          whereClause.push('c.slug = ?');
+          params.push(category_slug);
+        }
+
+        if (format) {
+          whereClause.push('d.formats LIKE ?');
+          params.push(`%${format}%`);
+        }
+
+        if (min_price !== null && min_price !== '') {
+          whereClause.push('COALESCE(d.sale_price, d.price) >= ?');
+          params.push(parseFloat(min_price));
+        }
+
+        if (max_price !== null && max_price !== '') {
+          whereClause.push('COALESCE(d.sale_price, d.price) <= ?');
+          params.push(parseFloat(max_price));
+        }
+
+        if (min_rating !== null && min_rating !== '') {
+          whereClause.push('d.average_rating >= ?');
+          params.push(parseFloat(min_rating));
+        }
+
+        const whereSql = whereClause.length ? 'WHERE ' + whereClause.join(' AND ') : '';
+
+        let orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
+        if (sort === 'price_low') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC';
+        else if (sort === 'price_high') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC';
+        else if (sort === 'popular') orderBy = 'ORDER BY COALESCE(d.download_count, d.total_sales) DESC';
+        else if (sort === 'rating') orderBy = 'ORDER BY d.average_rating DESC';
+        else if (sort === 'oldest') orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
+
+        const offset = (page - 1) * limit;
+
+        const sql = `
+          SELECT d.*, c.name as category_name, c.slug as category_slug,
+                 COALESCE(
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
+                 ) as primary_image
+          FROM designs d
+          LEFT JOIN categories c ON d.category_id = c.id
+          ${whereSql}
+          ${orderBy}
+          LIMIT ? OFFSET ?
+        `;
+
+        const designs = await db.query(sql, [...params, parseInt(limit), parseInt(offset)]);
+        const countSql = `SELECT COUNT(*) as total FROM designs d LEFT JOIN categories c ON d.category_id = c.id ${whereSql}`;
+        const countRes = await db.query(countSql, params);
+
+        if (designs && Array.isArray(designs)) {
+          // Post-process designs to derive formats 100% dynamically from design_files table
+          for (const d of designs) {
+            try {
+              const mFiles = await db.query(
+                'SELECT file_format, file_name FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) IN ("DST","PES","JEF","EXP")',
+                [d.id]
+              );
+              if (mFiles && mFiles.length > 0) {
+                d.formats = [...new Set(mFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
+              } else {
+                d.formats = '';
+              }
+            } catch (fErr) {
+              d.formats = d.formats || '';
+            }
+          }
+
+          const totalNum = (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : designs.length;
+          return {
+            designs,
+            total: totalNum,
+            page: parseInt(page),
+            totalPages: Math.ceil((totalNum || 1) / limit)
+          };
+        }
+      } catch (err) {
+        console.error('Design.getAll DB error:', err.message);
+      }
     }
 
     // Fallback in-memory
@@ -417,31 +428,44 @@ class Design {
     return res.designs;
   }
 
+  static async getFeatured(limit = 6) {
+    const res = await this.getAll({ is_active_only: true, is_featured: true, limit });
+    return (res && Array.isArray(res.designs)) ? res.designs : [];
+  }
+
   static async getTrending(limit = 6) {
     const res = await this.getAll({ is_active_only: true, is_trending: true, limit });
-    return res.designs;
+    return (res && Array.isArray(res.designs)) ? res.designs : [];
   }
 
   static async getNewArrivals(limit = 6) {
     const res = await this.getAll({ is_active_only: true, sort: 'newest', limit });
-    return res.designs;
+    return (res && Array.isArray(res.designs)) ? res.designs : [];
   }
 
   static async getRelated(categoryId, currentDesignId, limit = 4) {
-    const sql = `
-      SELECT d.*, c.name as category_name,
-             COALESCE(
-               (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
-               (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
-               (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
-               (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
-             ) as primary_image
-      FROM designs d
-      LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.category_id = ? AND d.id != ? AND d.is_active = 1
-      ORDER BY d.created_at DESC LIMIT ?
-    `;
-    return await db.query(sql, [categoryId, currentDesignId, parseInt(limit)]);
+    if (db.isConnected()) {
+      try {
+        const sql = `
+          SELECT d.*, c.name as category_name,
+                 COALESCE(
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
+                 ) as primary_image
+          FROM designs d
+          LEFT JOIN categories c ON d.category_id = c.id
+          WHERE d.category_id = ? AND d.id != ? AND d.is_active = 1
+          ORDER BY d.created_at DESC LIMIT ?
+        `;
+        const rows = await db.query(sql, [categoryId, currentDesignId, parseInt(limit)]);
+        if (rows && Array.isArray(rows)) return rows;
+      } catch (err) {
+        console.error('Design.getRelated DB error:', err.message);
+      }
+    }
+    return fallbackDesigns.filter(d => d.category_id == categoryId && d.id != currentDesignId).slice(0, limit);
   }
 
   static async create(data) {

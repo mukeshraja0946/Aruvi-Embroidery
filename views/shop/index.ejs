@@ -341,7 +341,7 @@
                 <!-- Star Rating Row matching Reference -->
                 <div class="card-rating-row">
                   <i class="fa-solid fa-star star-yellow"></i>
-                  <span class="rating-num"><%= (design.rating || 4.9).toFixed(1) %></span>
+                  <span class="rating-num"><%= Number(design.rating || design.average_rating || 4.9).toFixed(1) %></span>
                   <span class="rating-count">(<%= design.reviews_count || (design.id * 17 % 80 + 40) %>)</span>
                 </div>
 
