@@ -164,7 +164,7 @@
             <i class="fa-regular fa-trash-can"></i> Delete Selected (<span id="selectedCountNum">0</span>)
           </button>
           <button type="button" onclick="confirmDeleteAllDesigns()" class="btn" style="height: 44px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #900C3F; color: #FFFFFF; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-dumpster-fire"></i> Delete All Designs
+            <i class="fa-regular fa-trash-can"></i> Delete All Designs
           </button>
           <a href="/admin/designs/create" class="btn btn-primary" style="height: 44px; padding: 0 1.4rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-plus"></i> Add New Design
@@ -414,7 +414,7 @@
   </div>
 </div>
 
-<!-- Delete Design Confirmation Modal -->
+<!-- Delete Single Design Confirmation Modal -->
 <div id="deleteDesignModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;">
   <div style="background: #FFFFFF; border-radius: 16px; padding: 1.8rem; width: 100%; max-width: 440px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid var(--admin-border);">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
@@ -427,12 +427,23 @@
       </div>
     </div>
 
+    <p id="deleteModalMessage" style="font-size: 0.88rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.5rem; background: #FAF6F0; padding: 10px 14px; border-radius: 10px; border-left: 3px solid #C62828;">
+      Are you sure you want to permanently delete this design?
+    </p>
+
+    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+      <button type="button" onclick="closeDeleteModal()" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.88rem;">Cancel</button>
+      <button type="button" id="confirmDeleteBtn" onclick="executeDeleteDesign()" class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; background: #C62828; color: #FFFFFF; border: none; cursor: pointer;">Delete Design</button>
+    </div>
+  </div>
+</div>
+
 <!-- Delete All Designs Confirmation Modal -->
 <div id="deleteAllDesignsModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;">
   <div style="background: #FFFFFF; border-radius: 16px; padding: 1.8rem; width: 100%; max-width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid var(--admin-border);">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
       <div style="width: 42px; height: 42px; border-radius: 50%; background: #FFEBEE; color: #900C3F; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
-        <i class="fa-solid fa-dumpster-fire"></i>
+        <i class="fa-solid fa-trash-can"></i>
       </div>
       <div>
         <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px 0;">Delete ALL Designs?</h3>
