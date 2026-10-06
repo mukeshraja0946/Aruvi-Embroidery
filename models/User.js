@@ -91,13 +91,19 @@ class User {
 
   static async getAll({ page = 1, limit = 20 } = {}) {
     if (db.isConnected()) {
-      const offset = (page - 1) * limit;
-      const rows = await db.query(
-        'SELECT id, full_name, email, phone, role, is_active, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?',
-        [parseInt(limit), parseInt(offset)]
-      );
-      const countRes = await db.query('SELECT COUNT(*) as total FROM users');
-      return { users: rows, total: countRes[0].total };
+      try {
+        const offset = (page - 1) * limit;
+        const rows = await db.query(
+          'SELECT id, full_name, email, phone, role, is_active, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?',
+          [parseInt(limit), parseInt(offset)]
+        );
+        const countRes = await db.query('SELECT COUNT(*) as total FROM users');
+        if (rows && Array.isArray(rows)) {
+          return { users: rows, total: (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : rows.length };
+        }
+      } catch (err) {
+        console.error('User.getAll DB error:', err.message);
+      }
     }
     return { users: fallbackUsers, total: fallbackUsers.length };
   }
@@ -117,8 +123,12 @@ class User {
 
   static async count() {
     if (db.isConnected()) {
-      const res = await db.query('SELECT COUNT(*) as total FROM users');
-      return res[0].total;
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM users');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (err) {
+        console.error('User.count DB error:', err.message);
+      }
     }
     return fallbackUsers.length;
   }

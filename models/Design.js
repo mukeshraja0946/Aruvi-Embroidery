@@ -712,32 +712,31 @@ class Design {
   }
 
   static async count() {
-    const res = await db.query('SELECT COUNT(*) as total FROM designs');
-    return res[0].total;
-  }
-
-  static async countActive() {
-    const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active = 1');
-    return res[0].total;
-  }
-
-  static async countInactive() {
-    const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active = 0');
-    return res[0].total;
+    if (db.isConnected()) {
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM designs');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (e) {}
+    }
+    return fallbackDesigns.length;
   }
 
   static async countActive() {
     if (db.isConnected()) {
-      const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active = 1');
-      return res[0].total;
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active = 1');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (e) {}
     }
     return fallbackDesigns.filter(d => d.is_active === 1).length;
   }
 
   static async countInactive() {
     if (db.isConnected()) {
-      const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active = 0');
-      return res[0].total;
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active = 0');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (e) {}
     }
     return fallbackDesigns.filter(d => d.is_active === 0).length;
   }

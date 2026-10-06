@@ -307,17 +307,23 @@ class Order {
 
   static async getStats() {
     if (db.isConnected()) {
-      const totalSalesRes = await db.query("SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status = 'completed'");
-      const totalOrdersRes = await db.query("SELECT COUNT(*) as total FROM orders");
-      const pendingOrdersRes = await db.query("SELECT COUNT(*) as total FROM orders WHERE status = 'pending'");
-      const recentOrders = await db.query("SELECT o.*, COALESCE(u.full_name, o.guest_name) as customer_name FROM orders o LEFT JOIN users u ON o.user_id = u.id ORDER BY o.created_at DESC LIMIT 5");
+      try {
+        const totalSalesRes = await db.query("SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status = 'completed'");
+        const totalOrdersRes = await db.query("SELECT COUNT(*) as total FROM orders");
+        const pendingOrdersRes = await db.query("SELECT COUNT(*) as total FROM orders WHERE status = 'pending'");
+        const recentOrders = await db.query("SELECT o.*, COALESCE(u.full_name, o.guest_name) as customer_name FROM orders o LEFT JOIN users u ON o.user_id = u.id ORDER BY o.created_at DESC LIMIT 5");
 
-      return {
-        totalSales: totalSalesRes[0].total,
-        totalOrders: totalOrdersRes[0].total,
-        pendingOrders: pendingOrdersRes[0].total,
-        recentOrders
-      };
+        if (totalSalesRes && totalOrdersRes && pendingOrdersRes && recentOrders) {
+          return {
+            totalSales: (totalSalesRes[0] && totalSalesRes[0].total !== undefined) ? totalSalesRes[0].total : 0,
+            totalOrders: (totalOrdersRes[0] && totalOrdersRes[0].total !== undefined) ? totalOrdersRes[0].total : 0,
+            pendingOrders: (pendingOrdersRes[0] && pendingOrdersRes[0].total !== undefined) ? pendingOrdersRes[0].total : 0,
+            recentOrders
+          };
+        }
+      } catch (err) {
+        console.error('Order.getStats DB error:', err.message);
+      }
     }
 
     return {

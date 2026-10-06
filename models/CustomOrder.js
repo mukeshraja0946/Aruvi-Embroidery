@@ -43,10 +43,16 @@ class CustomOrder {
 
   static async getAll({ page = 1, limit = 20 } = {}) {
     if (db.isConnected()) {
-      const offset = (page - 1) * limit;
-      const requests = await db.query('SELECT * FROM custom_orders ORDER BY created_at DESC LIMIT ? OFFSET ?', [parseInt(limit), parseInt(offset)]);
-      const countRes = await db.query('SELECT COUNT(*) as total FROM custom_orders');
-      return { requests, total: countRes[0].total };
+      try {
+        const offset = (page - 1) * limit;
+        const requests = await db.query('SELECT * FROM custom_orders ORDER BY created_at DESC LIMIT ? OFFSET ?', [parseInt(limit), parseInt(offset)]);
+        const countRes = await db.query('SELECT COUNT(*) as total FROM custom_orders');
+        if (requests && Array.isArray(requests)) {
+          return { requests, total: (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : requests.length };
+        }
+      } catch (err) {
+        console.error('CustomOrder.getAll DB error:', err.message);
+      }
     }
     return { requests: fallbackCustomOrders, total: fallbackCustomOrders.length };
   }
@@ -54,7 +60,7 @@ class CustomOrder {
   static async getById(id) {
     if (db.isConnected()) {
       const rows = await db.query('SELECT * FROM custom_orders WHERE id = ? LIMIT 1', [id]);
-      return rows[0] || null;
+      return (rows && rows[0]) ? rows[0] : null;
     }
     return fallbackCustomOrders.find(r => r.id == id) || null;
   }
@@ -74,8 +80,12 @@ class CustomOrder {
 
   static async count() {
     if (db.isConnected()) {
-      const res = await db.query('SELECT COUNT(*) as total FROM custom_orders');
-      return res[0].total;
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM custom_orders');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (err) {
+        console.error('CustomOrder.count DB error:', err.message);
+      }
     }
     return fallbackCustomOrders.length;
   }
