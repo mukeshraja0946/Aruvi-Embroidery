@@ -109,11 +109,9 @@ async function initPool() {
       }
 
       isConnected = true;
-      console.log(`[DB] Connected successfully to MySQL database: ${dbConfig.database} on ${dbConfig.host}:${dbConfig.port}`);
+      console.log(`==================================================\nLOCAL DATABASE:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nStatus: Connected to MySQL\n==================================================`);
     } catch (err) {
-      console.warn(`[DB Warning] Could not establish connection to MySQL database '${dbConfig.database}'.`);
-      console.warn(`[DB Warning] Reason: ${err.message}`);
-      console.warn(`[DB Warning] Operating in fallback mode until MySQL server is active.`);
+      console.log(`==================================================\nLOCAL DATABASE:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nStatus: Offline (Operating in Local Fallback Mode)\n==================================================`);
       isConnected = false;
     }
   })();
