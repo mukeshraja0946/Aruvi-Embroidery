@@ -45,7 +45,7 @@ class Order {
     couponCode = null,
     razorpayOrderId = null,
     cashfreeOrderId = null,
-    paymentGateway = 'cashfree'
+    paymentGateway = 'razorpay'
   }) {
     const orderNumber = 'AE-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000);
 
@@ -332,6 +332,16 @@ class Order {
       pendingOrders: 2,
       recentOrders: fallbackOrders
     };
+  }
+
+  static async delete(id) {
+    if (db.isConnected()) {
+      await db.query('DELETE FROM orders WHERE id = ?', [id]);
+      return true;
+    }
+    const idx = fallbackOrders.findIndex(o => o.id == id);
+    if (idx !== -1) fallbackOrders.splice(idx, 1);
+    return true;
   }
 }
 

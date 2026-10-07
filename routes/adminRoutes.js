@@ -61,22 +61,26 @@ router.post('/admin/categories/delete/:id', adminCategoryController.deleteCatego
 router.get('/admin/orders', adminOrderController.getOrders);
 router.get('/admin/orders/:id', adminOrderController.getOrderDetail);
 router.post('/admin/orders/status/:id', adminOrderController.updateOrderStatus);
+router.post('/admin/orders/delete/:id', adminOrderController.deleteOrder);
 
 // Custom Orders Requests
 router.get('/admin/custom-orders', adminCustomOrderController.getCustomOrders);
 router.post('/admin/custom-orders/status/:id', adminCustomOrderController.updateStatus);
+router.post('/admin/custom-orders/delete/:id', adminCustomOrderController.deleteCustomOrder);
 
 // Customers Directory
 router.get('/admin/customers', adminCustomerController.getCustomers);
+router.post('/admin/customers/delete/:id', adminCustomerController.deleteCustomer);
 
 // Coupons
 router.get('/admin/coupons', adminCouponController.getCoupons);
 router.post('/admin/coupons/create', adminCouponController.postCreate);
 router.post('/admin/coupons/delete/:id', adminCouponController.deleteCoupon);
 
-// Contact Messages
+// Contact Messages / Enquiries
 router.get('/admin/messages', adminMessageController.getMessages);
 router.post('/admin/messages/status/:id', adminMessageController.updateStatus);
+router.post('/admin/messages/delete/:id', adminMessageController.deleteMessage);
 
 // Banners Management
 router.get('/admin/banners', adminBannerController.getBanners);
@@ -87,12 +91,14 @@ router.post('/admin/banners/delete/:id', adminBannerController.deleteBanner);
 router.get('/admin/homepage', adminSettingController.getHomepageEditor);
 router.post('/admin/homepage', upload.single('hero_image'), adminSettingController.postHomepageEditor);
 
-// Site Settings & Branding Logo Management
+// Site Settings, SMTP Test & Branding Logo Management
 router.get('/admin/settings', adminSettingController.getSettings);
 router.post('/admin/settings', upload.fields([
   { name: 'logo_image', maxCount: 1 },
   { name: 'mobile_logo_image', maxCount: 1 },
   { name: 'favicon_image', maxCount: 1 }
 ]), adminSettingController.postSettings);
+
+router.all('/admin/api/test-smtp', adminSettingController.testSmtp);
 
 module.exports = router;

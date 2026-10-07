@@ -67,9 +67,21 @@ exports.deleteCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
     await Category.delete(id);
-    req.flash('info', 'Category deleted.');
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Category deleted successfully.' });
+    }
+
+    req.flash('success', 'Category deleted successfully.');
     res.redirect('/admin/categories');
   } catch (err) {
-    next(err);
+    console.error('Delete category error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete category. Please try again.' });
+    }
+    req.flash('error', `Unable to delete category: ${err.message}`);
+    res.redirect('/admin/categories');
   }
 };

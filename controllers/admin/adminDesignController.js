@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const Design = require('../../models/Design');
 const Category = require('../../models/Category');
+const emailService = require('../../services/emailService');
 
 exports.getDesigns = async (req, res, next) => {
   try {
@@ -250,6 +251,16 @@ exports.postCreate = async (req, res, next) => {
 
     await Design.syncDesignFormats(designId);
 
+    // Send New Design Notification Email
+    emailService.sendNewDesignEmail({
+      id: designId,
+      title,
+      slug: finalSlug,
+      formats: detectedFormatsStr,
+      price: parseFloat(price),
+      sale_price: sale_price ? parseFloat(sale_price) : null
+    }).catch(e => console.error('New design email error:', e.message));
+
     const statusMsg = finalActiveState === 1 ? 'published' : 'saved as draft';
     console.log(`[PUBLISH SUCCESS] Design #${designId} "${title}" ${statusMsg} successfully.`);
 
@@ -376,6 +387,13 @@ exports.postEdit = async (req, res, next) => {
     }
 
     await Design.syncDesignFormats(id);
+
+    // Send Design Update Notification Email
+    emailService.sendDesignUpdateEmail({
+      id,
+      title,
+      slug: finalSlug || existingDesign.slug
+    }).catch(e => console.error('Design update email error:', e.message));
 
     const statusMsg = finalActiveState === 1 ? 'published' : 'saved as draft';
     console.log(`[PUBLISH SUCCESS] Design #${id} "${title}" updated and ${statusMsg} successfully.`);

@@ -121,16 +121,18 @@ class User {
     return true;
   }
 
-  static async count() {
+  static async delete(id) {
     if (db.isConnected()) {
-      try {
-        const res = await db.query('SELECT COUNT(*) as total FROM users');
-        if (res && res[0] && res[0].total !== undefined) return res[0].total;
-      } catch (err) {
-        console.error('User.count DB error:', err.message);
+      const user = await this.findById(id);
+      if (user && user.role === 'admin') {
+        throw new Error('Admin accounts cannot be deleted.');
       }
+      await db.query('DELETE FROM users WHERE id = ? AND role != "admin"', [id]);
+      return true;
     }
-    return fallbackUsers.length;
+    const idx = fallbackUsers.findIndex(u => u.id == id && u.role !== 'admin');
+    if (idx !== -1) fallbackUsers.splice(idx, 1);
+    return true;
   }
 }
 

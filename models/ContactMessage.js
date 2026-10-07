@@ -38,6 +38,16 @@ class ContactMessage {
     if (msg) msg.status = status;
     return true;
   }
+
+  static async delete(id) {
+    if (db.isConnected()) {
+      await db.query('DELETE FROM contact_messages WHERE id = ?', [id]);
+      return true;
+    }
+    const idx = fallbackMessages.findIndex(m => m.id == id);
+    if (idx !== -1) fallbackMessages.splice(idx, 1);
+    return true;
+  }
 }
 
 module.exports = ContactMessage;

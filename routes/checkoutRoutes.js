@@ -14,13 +14,6 @@ router.post('/checkout/verify-payment', checkoutController.verifyPayment);
 router.post('/api/payment/webhook', checkoutController.handleRazorpayWebhook);
 router.post('/checkout/webhook', checkoutController.handleRazorpayWebhook);
 
-// Official Cashfree Gateway API Routes
-router.post('/api/payment/cashfree/create-order', checkoutController.createCashfreeOrder);
-router.post('/checkout/cashfree/create-order', checkoutController.createCashfreeOrder);
-router.post('/api/payment/cashfree/verify', checkoutController.verifyCashfreePayment);
-router.get('/checkout/cashfree-return', checkoutController.handleCashfreeReturn);
-router.post('/api/payment/cashfree/webhook', checkoutController.handleCashfreeWebhook);
-
 router.get('/checkout/success/:orderNumber', checkoutController.getOrderSuccess);
 router.get('/order-success/:orderId', checkoutController.getOrderSuccess);
 

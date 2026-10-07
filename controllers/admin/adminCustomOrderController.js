@@ -29,3 +29,26 @@ exports.updateStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.deleteCustomOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await CustomOrder.delete(id);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Custom order deleted successfully.' });
+    }
+
+    req.flash('success', 'Custom order deleted successfully.');
+    res.redirect('/admin/custom-orders');
+  } catch (err) {
+    console.error('Delete custom order error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete custom order. Please try again.' });
+    }
+    req.flash('error', `Unable to delete custom order: ${err.message}`);
+    res.redirect('/admin/custom-orders');
+  }
+};

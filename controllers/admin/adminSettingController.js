@@ -1,4 +1,14 @@
 const Setting = require('../../models/Setting');
+const emailService = require('../../services/emailService');
+
+exports.testSmtp = async (req, res, next) => {
+  try {
+    const result = await emailService.testSmtpConnection();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: `SMTP test error: ${err.message}` });
+  }
+};
 
 exports.getSettings = async (req, res, next) => {
   try {

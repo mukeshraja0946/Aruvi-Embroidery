@@ -28,3 +28,26 @@ exports.updateStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.deleteMessage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await ContactMessage.delete(id);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Enquiry deleted successfully.' });
+    }
+
+    req.flash('success', 'Enquiry deleted successfully.');
+    res.redirect('/admin/messages');
+  } catch (err) {
+    console.error('Delete enquiry error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete enquiry. Please try again.' });
+    }
+    req.flash('error', `Unable to delete enquiry: ${err.message}`);
+    res.redirect('/admin/messages');
+  }
+};

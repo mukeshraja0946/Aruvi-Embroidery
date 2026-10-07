@@ -50,3 +50,26 @@ exports.updateOrderStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.deleteOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await Order.delete(id);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Order deleted successfully.' });
+    }
+
+    req.flash('success', 'Order deleted successfully.');
+    res.redirect('/admin/orders');
+  } catch (err) {
+    console.error('Delete order error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete order. Please try again.' });
+    }
+    req.flash('error', `Unable to delete order: ${err.message}`);
+    res.redirect('/admin/orders');
+  }
+};

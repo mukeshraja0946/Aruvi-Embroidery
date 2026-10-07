@@ -55,9 +55,21 @@ exports.deleteBanner = async (req, res, next) => {
       const idx = fallbackBanners.findIndex(b => b.id == id);
       if (idx !== -1) fallbackBanners.splice(idx, 1);
     }
-    req.flash('info', 'Banner removed.');
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Banner deleted successfully.' });
+    }
+
+    req.flash('success', 'Banner deleted successfully.');
     res.redirect('/admin/banners');
   } catch (err) {
-    next(err);
+    console.error('Delete banner error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to delete banner. Please try again.' });
+    }
+    req.flash('error', `Unable to delete banner: ${err.message}`);
+    res.redirect('/admin/banners');
   }
 };

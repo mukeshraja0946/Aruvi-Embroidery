@@ -78,16 +78,14 @@ class CustomOrder {
     return true;
   }
 
-  static async count() {
+  static async delete(id) {
     if (db.isConnected()) {
-      try {
-        const res = await db.query('SELECT COUNT(*) as total FROM custom_orders');
-        if (res && res[0] && res[0].total !== undefined) return res[0].total;
-      } catch (err) {
-        console.error('CustomOrder.count DB error:', err.message);
-      }
+      await db.query('DELETE FROM custom_orders WHERE id = ?', [id]);
+      return true;
     }
-    return fallbackCustomOrders.length;
+    const idx = fallbackCustomOrders.findIndex(r => r.id == id);
+    if (idx !== -1) fallbackCustomOrders.splice(idx, 1);
+    return true;
   }
 }
 
