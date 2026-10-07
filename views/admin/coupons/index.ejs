@@ -1,98 +1,221 @@
-<%- include('../../partials/header') %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coupons & Promo Codes - ARUVI Admin</title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+</head>
+<body class="admin-body">
 
-<div class="admin-layout">
-  <aside class="admin-sidebar">
-    <div style="padding: 0 1.8rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem;">
-      <h3 style="color: white; font-size: 1.1rem;"><i class="fa-solid fa-crown" style="color: var(--primary);"></i> Admin Studio</h3>
+<div class="admin-wrapper">
+  <!-- Top Header matching Master Admin UI -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <!-- Global Search -->
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search designs, orders, customers...">
     </div>
-    <ul class="admin-menu">
-      <li><a href="/admin"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
-      <li><a href="/admin/designs"><i class="fa-solid fa-palette"></i> Manage Designs</a></li>
-      <li><a href="/admin/categories"><i class="fa-solid fa-list-check"></i> Categories</a></li>
-      <li><a href="/admin/orders"><i class="fa-solid fa-cart-flatbed"></i> Orders</a></li>
-      <li><a href="/admin/customers"><i class="fa-solid fa-users"></i> Customers</a></li>
-      <li><a href="/admin/coupons" class="active"><i class="fa-solid fa-ticket"></i> Coupons</a></li>
-      <li><a href="/admin/messages"><i class="fa-solid fa-comments"></i> Contact Messages</a></li>
-      <li><a href="/admin/settings"><i class="fa-solid fa-gears"></i> Site Settings</a></li>
-    </ul>
-  </aside>
 
-  <main class="admin-content">
-    <div class="admin-header">
-      <div>
-        <h2 style="font-size: 1.8rem;">Coupons & Promo Codes</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Create percentage or flat discounts for checkout</p>
+    <!-- Right User Header Icons -->
+    <div class="admin-header-right">
+      <a href="#" class="admin-icon-btn" title="Notifications">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge-count">3</span>
+      </a>
+
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--admin-text-muted); margin-left: 4px;"></i>
       </div>
     </div>
+  </header>
 
-    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 2.5rem;">
-      <div class="table-responsive">
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Discount</th>
-              <th>Min Spend</th>
-              <th>Times Used</th>
-              <th>Status</th>
-              <th style="text-align: right;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% coupons.forEach(coup => { %>
+  <!-- Admin Main Layout with Sidebar -->
+  <div class="admin-main-container">
+    <!-- Left Sidebar matching Master Admin UI -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=pending"><span><i class="fa-regular fa-clock"></i> Pending Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CONTENT Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CONTENT</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+
+      <!-- Breadcrumbs & Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.8rem;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+            <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; 
+            <span style="color: var(--admin-primary); font-weight: 600;">Coupons</span>
+          </div>
+          <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Coupons & Promo Codes</h1>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Create and manage promotional discount codes for customer checkout.</p>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 340px; gap: 1.8rem;">
+        
+        <!-- Coupons Table -->
+        <div class="admin-card-box" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
+          <table class="admin-table-styled">
+            <thead>
               <tr>
-                <td><strong><code><%= coup.code %></code></strong></td>
-                <td>
-                  <strong><%= coup.discount_type === 'percentage' ? coup.discount_value + '%' : '₹' + coup.discount_value %> OFF</strong>
-                </td>
-                <td>₹<%= coup.min_purchase %></td>
-                <td><%= coup.times_used || 0 %></td>
-                <td><span class="badge badge-<%= coup.is_active ? 'success' : 'danger' %>"><%= coup.is_active ? 'Active' : 'Expired' %></span></td>
-                <td style="text-align: right;">
-                  <form action="/admin/coupons/delete/<%= coup.id %>" method="POST">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button type="submit" class="btn btn-outline btn-sm" style="color: var(--error); border-color: var(--border-light);"><i class="fa-solid fa-trash"></i></button>
-                  </form>
-                </td>
+                <th>Code</th>
+                <th>Discount</th>
+                <th>Min Spend</th>
+                <th>Times Used</th>
+                <th>Status</th>
+                <th style="text-align: right;">Action</th>
               </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              <% if (coupons && coupons.length > 0) { %>
+                <% coupons.forEach(coup => { %>
+                  <tr>
+                    <td>
+                      <span style="background: #FAF6F0; border: 1px dashed var(--admin-primary); color: var(--admin-primary); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.88rem; letter-spacing: 0.5px;">
+                        <%= coup.code %>
+                      </span>
+                    </td>
+                    <td>
+                      <strong style="color: var(--admin-text-dark); font-size: 0.92rem;">
+                        <%= coup.discount_type === 'percentage' ? coup.discount_value + '%' : '₹' + coup.discount_value %> OFF
+                      </strong>
+                    </td>
+                    <td>₹<%= coup.min_purchase || 0 %></td>
+                    <td><strong style="color: var(--admin-text-dark);"><%= coup.times_used || 0 %></strong></td>
+                    <td>
+                      <span style="background: <%= coup.is_active ? '#E8F5E9' : '#FFEBEE' %>; color: <%= coup.is_active ? '#2E7D32' : '#C62828' %>; padding: 3px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 600;">
+                        <%= coup.is_active ? 'Active' : 'Expired' %>
+                      </span>
+                    </td>
+                    <td style="text-align: right;">
+                      <form action="/admin/coupons/delete/<%= coup.id %>" method="POST" style="display: inline;">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="action-icon-btn" style="color: #C62828; border: none; background: transparent; cursor: pointer;" title="Delete Coupon" onclick="return confirm('Delete this coupon code?')">
+                          <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">No coupons created yet.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
 
-      <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; box-shadow: var(--shadow-sm);">
-        <h3 style="font-size: 1.15rem; margin-bottom: 1.2rem; border-bottom: 2px dashed var(--border-light); padding-bottom: 0.5rem;">Add Coupon</h3>
-        <form action="/admin/coupons/create" method="POST">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <!-- Add Coupon Form Card -->
+        <div class="admin-card-box" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1.1rem; color: var(--admin-text-dark); margin-bottom: 1.2rem; border-bottom: 1px solid var(--admin-border); padding-bottom: 0.6rem; font-family: var(--font-heading); font-weight: 700;">Add Coupon</h3>
           
-          <div class="form-group">
-            <label class="form-label">Coupon Code *</label>
-            <input type="text" name="code" class="form-control" placeholder="e.g. FESTIVE25" required style="text-transform: uppercase;">
-          </div>
+          <form action="/admin/coupons/create" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 0.4rem;">Coupon Code *</label>
+              <input type="text" name="code" placeholder="e.g. FESTIVE25" required style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem; text-transform: uppercase;">
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">Discount Type *</label>
-            <select name="discount_type" class="form-control">
-              <option value="percentage">Percentage (%)</option>
-              <option value="fixed">Fixed Amount (₹)</option>
-            </select>
-          </div>
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 0.4rem;">Discount Type *</label>
+              <select name="discount_type" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem; background: #FFFFFF;">
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed">Fixed Amount (₹)</option>
+              </select>
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">Discount Value *</label>
-            <input type="number" step="0.01" name="discount_value" class="form-control" placeholder="e.g. 15 or 100" required>
-          </div>
+            <div style="margin-bottom: 1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 0.4rem;">Discount Value *</label>
+              <input type="number" step="0.01" name="discount_value" placeholder="e.g. 15 or 100" required style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem;">
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">Min Purchase (₹)</label>
-            <input type="number" step="0.01" name="min_purchase" class="form-control" placeholder="299.00">
-          </div>
+            <div style="margin-bottom: 1.2rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 0.4rem;">Min Purchase (₹)</label>
+              <input type="number" step="0.01" name="min_purchase" placeholder="299.00" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem;">
+            </div>
 
-          <button type="submit" class="btn btn-primary btn-block">Create Coupon</button>
-        </form>
+            <button type="submit" class="btn btn-primary" style="width: 100%; height: 44px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;">Create Coupon</button>
+          </form>
+        </div>
+
       </div>
-    </div>
-  </main>
+
+    </main>
+  </div>
 </div>
 
-<%- include('../../partials/footer') %>
+</body>
+</html>
+
