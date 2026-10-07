@@ -26,25 +26,15 @@
     const subVal = typeof currentSub !== 'undefined' ? currentSub : '';
     const sortVal = typeof currentSort !== 'undefined' ? currentSort : 'latest';
   %>
-  <div class="filter-bar-container">
-    <div class="filter-pills-scroll-row">
-      <span class="filter-label">Filter:</span>
-      <a href="/category/<%= category.slug %>" class="filter-pill-btn <%= !subVal ? 'active' : '' %>">All</a>
-      <a href="/category/<%= category.slug %>?sub=rose" class="filter-pill-btn <%= subVal === 'rose' ? 'active' : '' %>">Rose</a>
-      <a href="/category/<%= category.slug %>?sub=lotus" class="filter-pill-btn <%= subVal === 'lotus' ? 'active' : '' %>">Lotus</a>
-      <a href="/category/<%= category.slug %>?sub=leaves" class="filter-pill-btn <%= subVal === 'leaves' ? 'active' : '' %>">Leaves</a>
-      <a href="/category/<%= category.slug %>?sub=small" class="filter-pill-btn <%= subVal === 'small' ? 'active' : '' %>">Small Flowers</a>
-      <a href="/category/<%= category.slug %>?sub=big" class="filter-pill-btn <%= subVal === 'big' ? 'active' : '' %>">Big Flowers</a>
-    </div>
-
+  <div class="filter-bar-container" style="justify-content: flex-end;">
     <div class="sort-select-box">
       <span class="sort-label">Sort by:</span>
       <select class="form-control sort-select-input" onchange="location = this.value;">
-        <option value="/category/<%= category.slug %>?sort=latest<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'latest' ? 'selected' : '' %>>Latest</option>
-        <option value="/category/<%= category.slug %>?sort=price_low<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
-        <option value="/category/<%= category.slug %>?sort=price_high<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
-        <option value="/category/<%= category.slug %>?sort=popular<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'popular' ? 'selected' : '' %>>Most Popular</option>
-        <option value="/category/<%= category.slug %>?sort=rating<%= subVal ? '&sub=' + subVal : '' %>" <%= sortVal === 'rating' ? 'selected' : '' %>>Highest Rated</option>
+        <option value="/category/<%= category.slug %>?sort=latest" <%= sortVal === 'latest' ? 'selected' : '' %>>Latest</option>
+        <option value="/category/<%= category.slug %>?sort=price_low" <%= sortVal === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
+        <option value="/category/<%= category.slug %>?sort=price_high" <%= sortVal === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
+        <option value="/category/<%= category.slug %>?sort=popular" <%= sortVal === 'popular' ? 'selected' : '' %>>Most Popular</option>
+        <option value="/category/<%= category.slug %>?sort=rating" <%= sortVal === 'rating' ? 'selected' : '' %>>Highest Rated</option>
       </select>
     </div>
   </div>
