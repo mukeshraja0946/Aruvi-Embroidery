@@ -3,8 +3,41 @@ const path = require('path');
 const fs = require('fs');
 const AdmZip = require('adm-zip');
 
+const availablePreviewImages = [
+  '/public/uploads/previews/design_file-1791042254214-185248588.png',
+  '/public/uploads/previews/design_file-1791042328059-900556097.png',
+  '/public/uploads/previews/design_file-1791043703946-812496920.png',
+  '/public/uploads/previews/design_file-1791044351993-377176697.png',
+  '/public/uploads/previews/design_file-1791044401396-730712576.png',
+  '/public/uploads/previews/design_file-1791044451199-587612069.png',
+  '/public/uploads/previews/design_file-1791044497412-293209124.png',
+  '/public/uploads/previews/design_file-1791044530255-613750965.png',
+  '/public/uploads/previews/design_file-1791044568469-573511633.png',
+  '/public/uploads/previews/design_file-1791212506592-922941743.png'
+];
+
+const categoryMetaMap = {
+  1: { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs' },
+  2: { id: 2, name: 'Blouse Designs', slug: 'blouse-designs' },
+  3: { id: 3, name: 'Saree Designs', slug: 'saree-designs' },
+  4: { id: 4, name: 'Shirt Designs', slug: 'shirt-designs' },
+  5: { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs' },
+  6: { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs' }
+};
+
 const fallbackDesigns = Array.from({ length: 34 }, (_, idx) => {
   const num = idx + 1;
+  // AED 1 to AED 10 -> category_id 2 (Blouse Designs, matching production site)
+  let catId = 2;
+  if (num > 10 && num <= 15) catId = 1;
+  else if (num > 15 && num <= 20) catId = 3;
+  else if (num > 20 && num <= 25) catId = 4;
+  else if (num > 25 && num <= 30) catId = 5;
+  else if (num > 30) catId = 6;
+
+  const catMeta = categoryMetaMap[catId];
+  const imgUrl = availablePreviewImages[(num - 1) % availablePreviewImages.length];
+
   return {
     id: num,
     title: `AED ${num}`,
@@ -13,9 +46,9 @@ const fallbackDesigns = Array.from({ length: 34 }, (_, idx) => {
     price: 399.00,
     sale_price: 299.00,
     discount_pct: 25,
-    category_id: 6,
-    category_name: 'Blouse Designs',
-    category_slug: 'blouse-designs',
+    category_id: catMeta.id,
+    category_name: catMeta.name,
+    category_slug: catMeta.slug,
     hoop_size: '5x7 inch (130x180 mm)',
     stitch_count: 24800,
     dimensions: '140mm x 180mm',
@@ -24,8 +57,8 @@ const fallbackDesigns = Array.from({ length: 34 }, (_, idx) => {
     is_trending: num <= 10 ? 1 : 0,
     is_active: 1,
     download_count: 256,
-    primary_image: '/public/images/logo.jpg',
-    images: [{ id: num, image_url: '/public/images/logo.jpg', is_primary: 1 }],
+    primary_image: imgUrl,
+    images: [{ id: num, image_url: imgUrl, is_primary: 1 }],
     files: [{
       id: num,
       file_name: `AED ${num}.zip`,
