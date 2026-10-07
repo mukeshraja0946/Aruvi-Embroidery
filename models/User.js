@@ -121,6 +121,18 @@ class User {
     return true;
   }
 
+  static async count() {
+    if (db.isConnected()) {
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM users');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (err) {
+        console.error('User.count DB error:', err.message);
+      }
+    }
+    return fallbackUsers.length;
+  }
+
   static async delete(id) {
     if (db.isConnected()) {
       const user = await this.findById(id);

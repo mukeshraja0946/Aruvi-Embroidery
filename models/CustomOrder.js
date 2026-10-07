@@ -78,6 +78,18 @@ class CustomOrder {
     return true;
   }
 
+  static async count() {
+    if (db.isConnected()) {
+      try {
+        const res = await db.query('SELECT COUNT(*) as total FROM custom_orders');
+        if (res && res[0] && res[0].total !== undefined) return res[0].total;
+      } catch (err) {
+        console.error('CustomOrder.count DB error:', err.message);
+      }
+    }
+    return fallbackCustomOrders.length;
+  }
+
   static async delete(id) {
     if (db.isConnected()) {
       await db.query('DELETE FROM custom_orders WHERE id = ?', [id]);
