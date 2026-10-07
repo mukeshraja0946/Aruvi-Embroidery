@@ -25,16 +25,9 @@ const categoryMetaMap = {
   6: { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs' }
 };
 
-const fallbackDesigns = Array.from({ length: 34 }, (_, idx) => {
+const fallbackDesigns = Array.from({ length: 5 }, (_, idx) => {
   const num = idx + 1;
-  // AED 1 to AED 10 -> category_id 2 (Blouse Designs, matching production site)
-  let catId = 2;
-  if (num > 10 && num <= 15) catId = 1;
-  else if (num > 15 && num <= 20) catId = 3;
-  else if (num > 20 && num <= 25) catId = 4;
-  else if (num > 25 && num <= 30) catId = 5;
-  else if (num > 30) catId = 6;
-
+  const catId = 2; // Blouse Designs (5 designs: AED 1, AED 2, AED 3, AED 4, AED 5 matching production)
   const catMeta = categoryMetaMap[catId];
   const imgUrl = availablePreviewImages[(num - 1) % availablePreviewImages.length];
 
