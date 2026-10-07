@@ -53,6 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
+        // Localhost Payment Gateway Bypass: redirect directly to success page
+        if (data.isLocalTest && data.redirectUrl) {
+          payBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Payment Successful! Redirecting...';
+          window.location.href = data.redirectUrl;
+          return;
+        }
+
         // Step 2: Launch Official Razorpay Standard Checkout Popup
         const options = {
           key: data.key,

@@ -78,7 +78,7 @@ exports.getCheckout = async (req, res, next) => {
 
 exports.createRazorpayOrder = async (req, res, next) => {
   try {
-    // Requirement 4: Require Login
+    // Require Login
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -87,8 +87,19 @@ exports.createRazorpayOrder = async (req, res, next) => {
       });
     }
 
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production';
+    const isLocalTest = !isProduction || process.env.PAYMENT_MODE === 'local_test';
+
     const userId = req.user.id;
-    const { full_name, email, phone, design_id } = req.body;
+    const { full_name, email, phone, design_id, payment_mode } = req.body;
+
+    // Production security guard — reject any local test payment attempt on production
+    if (isProduction && (payment_mode === 'local_test' || req.body.is_local_test)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Local test payment bypass is strictly prohibited in production environment.'
+      });
+    }
 
     let cartItems = [];
     if (design_id) {
@@ -115,7 +126,7 @@ exports.createRazorpayOrder = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Your cart is empty. Please select a design.' });
     }
 
-    // Requirement 1 & 7: Fetch actual prices from DB server-side
+    // Server-side price verification
     let dbOriginalTotal = 0;
     let dbSubtotal = 0;
     const verifiedItems = [];
@@ -155,6 +166,49 @@ exports.createRazorpayOrder = async (req, res, next) => {
     const finalTotal = Math.max(0, dbSubtotal - couponDiscount);
     const amountInPaise = Math.round(finalTotal * 100);
 
+    // ==================================================
+    // LOCALHOST PAYMENT GATEWAY BYPASS
+    // ==================================================
+    if (isLocalTest) {
+      const testPaymentId = 'pay_local_test_' + Date.now();
+      const testRazorpayOrderId = 'order_local_test_' + Date.now();
+
+      const { orderId, orderNumber } = await Order.createOrder({
+        userId,
+        guestEmail: email || req.user.email,
+        guestName: full_name || req.user.full_name,
+        guestPhone: phone || req.user.phone,
+        items: verifiedItems,
+        totalAmount: dbOriginalTotal,
+        discountAmount: totalDiscount,
+        finalAmount: finalTotal,
+        couponCode: appliedCoupon ? appliedCoupon.code : null,
+        razorpayOrderId: testRazorpayOrderId
+      });
+
+      // Grant customer ownership & mark order as COMPLETED
+      await Order.updateStatus(orderId, 'completed', testPaymentId);
+
+      // Clear Cart & Session Coupon
+      await Cart.clearCart(userId, req.session.cartSessionId);
+      delete req.session.appliedCoupon;
+
+      const refreshedOrder = await Order.getById(orderId);
+      sendOrderConfirmationEmail(refreshedOrder).catch(err => console.error('Email send notice:', err.message));
+
+      return res.json({
+        success: true,
+        isLocalTest: true,
+        orderId,
+        orderNumber: refreshedOrder ? refreshedOrder.order_number : orderNumber,
+        redirectUrl: `/checkout/success/${refreshedOrder ? refreshedOrder.order_number : orderNumber}`,
+        finalTotal
+      });
+    }
+
+    // ==================================================
+    // PRODUCTION REAL RAZORPAY PAYMENT GATEWAY FLOW
+    // ==================================================
     let razorpayOrderId = null;
 
     if (razorpayInstance && isRealRazorpayKey) {
@@ -193,6 +247,7 @@ exports.createRazorpayOrder = async (req, res, next) => {
 
     res.json({
       success: true,
+      isLocalTest: false,
       orderId,
       orderNumber,
       razorpayOrderId,

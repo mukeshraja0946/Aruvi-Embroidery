@@ -1,8 +1,41 @@
 const db = require('../config/db');
 const path = require('path');
 const fs = require('fs');
+const AdmZip = require('adm-zip');
 
-const fallbackDesigns = [];
+const fallbackDesigns = Array.from({ length: 34 }, (_, idx) => {
+  const num = idx + 1;
+  return {
+    id: num,
+    title: `AED ${num}`,
+    sku: `AED ${num}`,
+    slug: `aed-${num}`,
+    price: 399.00,
+    sale_price: 299.00,
+    discount_pct: 25,
+    category_id: 6,
+    category_name: 'Blouse Designs',
+    category_slug: 'blouse-designs',
+    hoop_size: '5x7 inch (130x180 mm)',
+    stitch_count: 24800,
+    dimensions: '140mm x 180mm',
+    formats: 'DST, PES, JEF, EXP',
+    is_featured: num <= 6 ? 1 : 0,
+    is_trending: num <= 10 ? 1 : 0,
+    is_active: 1,
+    download_count: 256,
+    primary_image: '/public/images/logo.jpg',
+    images: [{ id: num, image_url: '/public/images/logo.jpg', is_primary: 1 }],
+    files: [{
+      id: num,
+      file_name: `AED ${num}.zip`,
+      file_path: '/public/uploads/designs/sample_peacock.zip',
+      file_format: 'ZIP',
+      file_size: 2450123,
+      is_preview: 0
+    }]
+  };
+});
 
 class Design {
   static async getAll({
