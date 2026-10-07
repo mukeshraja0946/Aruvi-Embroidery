@@ -101,9 +101,9 @@ app.locals.siteSettings = {
   shop_name: 'ARUVI EMBROIDERY STUDIO',
   tagline: 'Where Threads Tell Stories',
 
-  logo_url: '/public/images/logo.jpg',
-  mobile_logo_url: '/public/images/logo.jpg',
-  favicon_url: '/public/images/logo.jpg',
+  logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
+  mobile_logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
+  favicon_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
 
   contact_email:
     process.env.CONTACT_EMAIL || 'aruviembroidery@gmail.com',

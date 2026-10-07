@@ -3,9 +3,9 @@ const db = require('../config/db');
 const fallbackSettings = {
   shop_name: 'ARUVI EMBROIDERY STUDIO',
   tagline: 'Where Threads Tell Stories',
-  logo_url: '/public/images/logo.jpg',
-  mobile_logo_url: '/public/images/logo.jpg',
-  favicon_url: '/public/images/logo.jpg',
+  logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
+  mobile_logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
+  favicon_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
   contact_email: 'aruviembroidery@gmail.com',
   contact_phone: '+91 98765 43210',
   address: 'Erode, Tamil Nadu, 638001, India',

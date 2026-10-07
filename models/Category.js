@@ -1,14 +1,12 @@
 const db = require('../config/db');
 
 const fallbackCategories = [
-  { id: 1, name: 'Floral Designs', slug: 'floral-designs', description: '500+ Designs', image_url: '/public/images/cat_floral.jpg', display_order: 1 },
-  { id: 2, name: 'Monogram Designs', slug: 'monogram-designs', description: '300+ Designs', image_url: '/public/images/cat_monogram.jpg', display_order: 2 },
-  { id: 3, name: 'Kids Designs', slug: 'kids-designs', description: '250+ Designs', image_url: '/public/images/cat_kids.jpg', display_order: 3 },
-  { id: 4, name: 'Traditional Designs', slug: 'traditional-designs', description: '400+ Designs', image_url: '/public/images/cat_traditional.jpg', display_order: 4 },
-  { id: 5, name: 'Border Designs', slug: 'border-designs', description: '350+ Designs', image_url: '/public/images/cat_border.jpg', display_order: 5 },
-  { id: 6, name: 'Blouse Designs', slug: 'blouse-designs', description: '300+ Designs', image_url: '/public/images/cat_blouse.jpg', display_order: 6 },
-  { id: 7, name: 'Animals & Birds', slug: 'animals-birds', description: '200+ Designs', image_url: '/public/images/cat_traditional.jpg', display_order: 7 },
-  { id: 8, name: 'Festival Designs', slug: 'festival-designs', description: '250+ Designs', image_url: '/public/images/cat_floral.jpg', display_order: 8 }
+  { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs', description: '400+ Designs', image_url: '/public/uploads/previews/image-1791089267899-390574949.jpg', display_order: 1 },
+  { id: 2, name: 'Blouse Designs', slug: 'blouse-designs', description: '300+ Designs', image_url: '/public/uploads/previews/image-1791088871799-582220830.jpg', display_order: 2 },
+  { id: 3, name: 'Saree Designs', slug: 'saree-designs', description: '350+ Designs', image_url: '/public/uploads/previews/image-1791089421630-413060859.jpg', display_order: 3 },
+  { id: 4, name: 'Shirt Designs', slug: 'shirt-designs', description: '250+ Designs', image_url: '/public/uploads/previews/image-1791088403082-410874073.webp', display_order: 4 },
+  { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs', description: '300+ Designs', image_url: '/public/uploads/previews/image-1791088812151-821668197.avif', display_order: 5 },
+  { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs', description: '500+ Designs', image_url: '/public/uploads/previews/image-1791088493088-537921429.webp', display_order: 6 }
 ];
 
 class Category {
