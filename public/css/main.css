@@ -1087,12 +1087,13 @@ textarea.form-control {
 /* Controls Top Bar */
 .filter-bar-container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
   gap: 14px;
   width: 100%;
   box-sizing: border-box;
-  min-height: 96px;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.8rem;
 }
 
 .filter-pills-scroll-row {
@@ -1194,23 +1195,21 @@ textarea.form-control {
 }
 
 .category-header-box {
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.5rem;
   width: 100%;
   box-sizing: border-box;
 }
 
 .category-count-badge-wrap {
-  min-height: 22px;
   display: flex;
   align-items: center;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
 }
 
 .results-container {
   width: 100%;
   max-width: 100%;
-  min-height: 380px;
-  margin-top: 16px;
+  margin-top: 0;
   box-sizing: border-box;
 }
 

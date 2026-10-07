@@ -1,22 +1,22 @@
 <%- include('../partials/header') %>
 
-<div class="container section category-detail-container">
+<div class="container category-detail-container" style="margin-top: 1.2rem; margin-bottom: 2.5rem;">
   <!-- Breadcrumb -->
-  <div class="category-breadcrumb-bar">
+  <div class="category-breadcrumb-bar" style="margin-bottom: 0.5rem;">
     <a href="/" style="color: var(--text-muted);">Home</a> &gt; <a href="/categories" style="color: var(--text-muted);">Categories</a> &gt; <span style="color: var(--text-dark); font-weight: 600;"><%= category.name %></span>
   </div>
 
   <!-- Category Header -->
-  <div class="section-heading-box category-header-box">
-    <h1 class="category-main-title">
+  <div class="section-heading-box category-header-box" style="margin-bottom: 0.5rem;">
+    <h1 class="category-main-title" style="margin-bottom: 0.2rem;">
       <%= category.name %>
     </h1>
-    <div class="category-count-badge-wrap">
+    <div class="category-count-badge-wrap" style="margin-bottom: 0.2rem;">
       <span class="category-count-badge">
         Showing <%= designs.length %> of <%= total %> <%= total === 1 ? 'Design' : 'Designs' %>
       </span>
     </div>
-    <p class="category-desc">
+    <p class="category-desc" style="margin-bottom: 0.2rem;">
       <%= category.description || 'Explore our exclusive collection of premium machine embroidery design files.' %>
     </p>
   </div>
