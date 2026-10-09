@@ -552,7 +552,7 @@
                 <button type="button" onclick="clearComposer()" class="btn" style="height: 42px; padding: 0 1rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: transparent; color: var(--admin-text-muted); border: none;">
                   Clear
                 </button>
-                <button type="button" onclick="confirmAndSendCampaign()" class="btn btn-primary" style="height: 42px; padding: 0 1.5rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: var(--admin-primary); color: #FFFFFF; border: none; box-shadow: 0 2px 6px rgba(184,64,42,0.2);">
+                <button type="button" id="sendCampaignBtn" onclick="confirmAndSendCampaign()" class="btn btn-primary" style="height: 42px; padding: 0 1.5rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: var(--admin-primary); color: #FFFFFF; border: none; box-shadow: 0 2px 6px rgba(184,64,42,0.2);">
                   <i class="fa-solid fa-paper-plane"></i> Send Campaign Now
                 </button>
               </div>
@@ -819,6 +819,7 @@
   }
 
   async function executeSendTestEmail() {
+    const testBtn = event ? (event.target || event.currentTarget) : null;
     const testEmail = document.getElementById('testEmailInput').value.trim();
     const subject = document.getElementById('campaignSubject').value.trim();
     const bodyHtml = document.getElementById('richEditor').innerHTML;
@@ -827,6 +828,13 @@
     if (!testEmail) {
       alert('Please enter a test email address.');
       return;
+    }
+
+    let origText = '';
+    if (testBtn) {
+      origText = testBtn.innerHTML;
+      testBtn.disabled = true;
+      testBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending Test...';
     }
 
     try {
@@ -844,10 +852,15 @@
         alert(data.message);
         closeModal('testModal');
       } else {
-        alert('Test Email Failed: ' + data.message);
+        alert('Test Email Failed:\n' + (data.message || 'SMTP Authentication Error'));
       }
     } catch (err) {
       alert('Error sending test email: ' + err.message);
+    } finally {
+      if (testBtn) {
+        testBtn.disabled = false;
+        testBtn.innerHTML = origText;
+      }
     }
   }
 
@@ -885,6 +898,7 @@
   }
 
   async function confirmAndSendCampaign() {
+    const sendBtn = document.getElementById('sendCampaignBtn');
     const subject = document.getElementById('campaignSubject').value.trim();
     const bodyHtml = document.getElementById('richEditor').innerHTML;
     const csrfToken = document.getElementById('csrfToken').value;
@@ -914,6 +928,14 @@
       return;
     }
 
+    // Disable button to prevent duplicate submissions
+    let origBtnHtml = '';
+    if (sendBtn) {
+      origBtnHtml = sendBtn.innerHTML;
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching Campaign...';
+    }
+
     try {
       const res = await fetch('/admin/api/email-campaigns/send', {
         method: 'POST',
@@ -931,13 +953,18 @@
 
       const data = await res.json();
       if (data.success) {
-        alert(data.message);
+        alert(`Campaign Sending Results:\n\nTotal Recipients: ${data.total}\nAccepted by SMTP: ${data.successCount}\nFailed Sends: ${data.failedCount}\n\nStatus: ${data.status}`);
         window.location.reload();
       } else {
-        alert('Campaign Dispatch Error: ' + data.message);
+        alert('Campaign Dispatch Error:\n' + (data.message || 'SMTP Authentication / Server Error'));
       }
     } catch (err) {
       alert('Network / Server Error dispatching campaign: ' + err.message);
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = origBtnHtml;
+      }
     }
   }
 

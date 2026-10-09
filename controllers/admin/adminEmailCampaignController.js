@@ -21,10 +21,10 @@ class AdminEmailCampaignController {
     try {
       const page = parseInt(req.query.page || 1);
       const { campaigns, total } = await EmailCampaign.getAll({ page, limit: 20 });
-      const { users } = await User.getAll({ limit: 1000 });
+      const rawCustomersList = await User.getAllCustomers();
 
       // Filter eligible customers (non-admin, valid email)
-      const rawCustomers = users ? users.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
+      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
 
       // Attach unsubscribe status dynamically
       const customers = [];
@@ -80,8 +80,8 @@ class AdminEmailCampaignController {
    */
   static async getRecipients(req, res) {
     try {
-      const { users } = await User.getAll({ limit: 1000 });
-      const rawCustomers = users ? users.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
+      const rawCustomersList = await User.getAllCustomers();
+      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
 
       const customers = [];
       for (const c of rawCustomers) {
@@ -189,8 +189,8 @@ class AdminEmailCampaignController {
       }
 
       // Fetch all registered customers
-      const { users } = await User.getAll({ limit: 1000 });
-      const rawCustomers = users ? users.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
+      const rawCustomersList = await User.getAllCustomers();
+      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
 
       let candidateList = [];
 

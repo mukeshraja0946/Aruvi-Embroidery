@@ -89,6 +89,20 @@ class User {
     return false;
   }
 
+  static async getAllCustomers() {
+    if (db.isConnected()) {
+      try {
+        const rows = await db.query(
+          "SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE role != 'admin' OR role IS NULL ORDER BY id DESC"
+        );
+        if (rows && Array.isArray(rows)) return rows;
+      } catch (err) {
+        console.error('User.getAllCustomers DB error:', err.message);
+      }
+    }
+    return fallbackUsers.filter(u => u.role !== 'admin');
+  }
+
   static async getAll({ page = 1, limit = 20 } = {}) {
     if (db.isConnected()) {
       try {

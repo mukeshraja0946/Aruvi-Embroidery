@@ -1,22 +1,27 @@
 const nodemailer = require('nodemailer');
 
 function getTransporter() {
-  const host = process.env.SMTP_HOST || 'smtp.mailtrap.io';
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587');
-  const user = process.env.SMTP_USER;
+  const user = process.env.SMTP_USER || 'aruviembroidery@gmail.com';
   const pass = process.env.SMTP_PASS;
 
-  if (!user || user === 'your_smtp_user' || user === 'your_smtp_username') {
+  if (!user || !pass || pass === 'YOUR_GMAIL_APP_PASSWORD' || pass === 'your_smtp_password' || user === 'your_smtp_user') {
     return null; // SMTP credentials not set
   }
+
+  const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
 
   return nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure: isSecure,
     auth: {
       user,
       pass
+    },
+    tls: {
+      rejectUnauthorized: false
     }
   });
 }
@@ -25,36 +30,41 @@ function getTransporter() {
  * 1. Test SMTP Connection
  */
 async function testSmtpConnection() {
-  const host = process.env.SMTP_HOST;
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587');
-  const user = process.env.SMTP_USER;
+  const user = process.env.SMTP_USER || 'aruviembroidery@gmail.com';
   const pass = process.env.SMTP_PASS;
 
-  if (!user || user === 'your_smtp_user') {
+  if (!user || !pass || pass === 'YOUR_GMAIL_APP_PASSWORD' || pass === 'your_smtp_password' || user === 'your_smtp_user') {
     return {
       success: false,
-      message: 'SMTP credentials (SMTP_USER/SMTP_PASS) are not configured in backend environment.'
+      message: 'Gmail App Password (SMTP_PASS) is not configured in backend environment (.env file).'
     };
   }
+
+  const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
 
   const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
-    auth: { user, pass }
+    secure: isSecure,
+    auth: { user, pass },
+    tls: {
+      rejectUnauthorized: false
+    }
   });
 
   try {
     await transporter.verify();
     return {
       success: true,
-      message: `SMTP connection and authentication successful! (Server: ${host}:${port})`
+      message: `Gmail SMTP connection and authentication successful! (Server: ${host}:${port}, User: ${user})`
     };
   } catch (err) {
     console.error('[SMTP Test Error]:', err.message);
     return {
       success: false,
-      message: `SMTP Connection/Auth Failed: ${err.message}`
+      message: `Gmail SMTP Authentication Failed: ${err.message}`
     };
   }
 }
@@ -243,8 +253,9 @@ async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl
     const fromHeader = `"${fromName}" <${fromEmail}>`;
 
     if (!transporter) {
-      console.log(`[Email Simulation Notice] Campaign email simulated to ${to}. Subject: "${subject}".`);
-      return { success: true, simulated: true };
+      const errMsg = 'Gmail SMTP credentials (SMTP_PASS) not configured in backend environment. Please set a 16-character Google App Password in .env file.';
+      console.error(`❌ [SMTP Config Error] ${errMsg}`);
+      return { success: false, error: errMsg };
     }
 
     const cleanName = toName || 'Valued Customer';
