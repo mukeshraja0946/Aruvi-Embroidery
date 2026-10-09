@@ -291,12 +291,8 @@ async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl
                 <!-- Footer -->
                 <tr>
                   <td align="center" style="background-color:#FAF6F0; padding: 20px 28px; border-top:1px solid #E8E0D5; font-size:0.78rem; color:#776A62;">
-                    <p style="margin:0 0 8px 0; font-weight:bold;">ARUVI EMBROIDERY STUDIO</p>
-                    <p style="margin:0 0 10px 0;">Erode, Tamil Nadu, 638001, India | <a href="mailto:aruviembroidery@gmail.com" style="color:#B8402A; text-decoration:none;">aruviembroidery@gmail.com</a></p>
-                    <p style="margin:0; color:#998B82;">
-                      You received this email because you registered on Aruvi Embroidery. 
-                      <a href="${finalUnsubUrl}" style="color:#B8402A; text-decoration:underline;">Unsubscribe from marketing emails</a>
-                    </p>
+                    <p style="margin:0 0 6px 0; font-weight:bold;">Aruvi Embroidery Design</p>
+                    <p style="margin:0;"><a href="mailto:aruviembroidery@gmail.com" style="color:#B8402A; text-decoration:none;">aruviembroidery@gmail.com</a></p>
                   </td>
                 </tr>
               </table>
