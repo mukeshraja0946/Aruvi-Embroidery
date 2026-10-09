@@ -15,13 +15,22 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const AdmZip = require('adm-zip');
+
 sampleFiles.forEach(file => {
   const filePath = path.join(uploadDir, file);
-  if (!fs.existsSync(filePath)) {
-    // Write a small dummy file simulating a ZIP package containing DST, PES, JEF files
-    const dummyContent = Buffer.from(`PK\x03\x04 Aruvi Embroidery Digital Design Package - ${file}\nDST, PES, JEF, EXP formats included.`);
-    fs.writeFileSync(filePath, dummyContent);
-    console.log(`Created sample design file: ${file}`);
+  // Create or overwrite sample files to ensure valid ZIP structure
+  try {
+    const zip = new AdmZip();
+    const baseName = file.replace('.zip', '');
+    zip.addFile(`${baseName}.dst`, Buffer.from(`ARUVI EMBROIDERY DST MACHINE FILE DATA - ${file}`));
+    zip.addFile(`${baseName}.pes`, Buffer.from(`ARUVI EMBROIDERY PES MACHINE FILE DATA - ${file}`));
+    zip.addFile(`${baseName}.jef`, Buffer.from(`ARUVI EMBROIDERY JEF MACHINE FILE DATA - ${file}`));
+    zip.addFile(`${baseName}.exp`, Buffer.from(`ARUVI EMBROIDERY EXP MACHINE FILE DATA - ${file}`));
+    zip.writeZip(filePath);
+    console.log(`Created valid binary ZIP package: ${file}`);
+  } catch (e) {
+    console.error(`Error creating sample zip ${file}:`, e.message);
   }
 });
 

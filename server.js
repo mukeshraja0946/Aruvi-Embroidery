@@ -67,6 +67,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Static Files
+const customUploadsDir = process.env.UPLOADS_DIR || process.env.PERSISTENT_UPLOADS_DIR;
+if (customUploadsDir && fs.existsSync(customUploadsDir)) {
+  app.use('/public/uploads', express.static(customUploadsDir));
+}
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // Session Management
