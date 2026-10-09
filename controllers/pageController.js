@@ -17,8 +17,49 @@ exports.getContact = (req, res) => {
 
 exports.postContact = async (req, res, next) => {
   try {
-    const { name, email, message } = req.body;
-    await ContactMessage.create({ name, email, subject: 'Customer Inquiry', message });
+    const { name, email, subject, phone, message, website_url_hp } = req.body;
+
+    // Honeypot bot protection check
+    if (website_url_hp && website_url_hp.trim() !== '') {
+      console.warn('[Spam Submission Prevented] Honeypot filled on /contact form');
+      req.flash('success', 'Thank you! Your message has been sent. We will get back to you within 24 hours.');
+      return res.redirect('/contact');
+    }
+
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanSubject = (subject || 'General Inquiry').trim();
+    const cleanMessage = (message || '').trim();
+
+    if (!cleanName || !cleanEmail || !cleanMessage) {
+      req.flash('error', 'Please fill in all required fields (Name, Email, and Message).');
+      return res.redirect('/contact');
+    }
+
+    if (!cleanEmail.includes('@') || cleanEmail.length < 5) {
+      req.flash('error', 'Please enter a valid email address.');
+      return res.redirect('/contact');
+    }
+
+    if (cleanMessage.length < 5) {
+      req.flash('error', 'Message must be at least 5 characters long.');
+      return res.redirect('/contact');
+    }
+
+    // Check for duplicate submission within 30s
+    const duplicate = await ContactMessage.findRecentDuplicate(cleanEmail, cleanMessage);
+    if (duplicate) {
+      req.flash('success', 'Thank you! Your message has already been received.');
+      return res.redirect('/contact');
+    }
+
+    await ContactMessage.create({
+      name: cleanName,
+      email: cleanEmail,
+      subject: cleanSubject,
+      message: cleanMessage,
+      source: 'customer_form'
+    });
 
     req.flash('success', 'Thank you! Your message has been sent. We will get back to you within 24 hours.');
     res.redirect('/contact');

@@ -43,6 +43,10 @@
 
       <form action="/contact" method="POST">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <!-- Anti-spam Honeypot field (hidden from real users) -->
+        <div style="display: none !important; opacity: 0; position: absolute; left: -9999px;">
+          <input type="text" name="website_url_hp" tabindex="-1" autocomplete="off">
+        </div>
 
         <div class="form-grid-2" style="margin-bottom: 1.2rem;">
           <div class="form-group-field">

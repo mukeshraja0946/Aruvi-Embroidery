@@ -123,13 +123,19 @@
     <main class="admin-content-body">
 
       <!-- Breadcrumbs & Header -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.8rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.8rem; flex-wrap: wrap; gap: 1rem;">
         <div>
           <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
             <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; <span style="color: var(--admin-primary); font-weight: 600;">Enquiries</span>
           </div>
           <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Enquiries</h1>
           <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Inquiries submitted via the Contact Us page.</p>
+        </div>
+
+        <div>
+          <button type="button" onclick="openCreateModal()" class="btn btn-primary" style="height: 42px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: var(--admin-primary); color: #FFF; border: none; padding: 0 1.2rem;">
+            <i class="fa-solid fa-plus"></i> Add Manual Enquiry
+          </button>
         </div>
       </div>
 
@@ -279,8 +285,12 @@
               <% }) %>
             <% } else { %>
               <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
-                  No customer enquiries found.
+                <td colspan="8" style="text-align: center; padding: 3.5rem 1.5rem;">
+                  <div style="width: 56px; height: 56px; border-radius: 50%; background: #FAF6F0; color: var(--admin-text-muted); display: inline-flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 0.8rem; border: 1px solid var(--admin-border); margin: 0 auto 0.8rem;">
+                    <i class="fa-regular fa-envelope-open"></i>
+                  </div>
+                  <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">No enquiries yet</h3>
+                  <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin: 0;">Customer enquiries submitted through your website will appear here.</p>
                 </td>
               </tr>
             <% } %>
@@ -352,8 +362,101 @@
   </div>
 </div>
 
+<!-- Modal 3: Manual Enquiry Creation by Admin -->
+<div id="createEnquiryModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+  <div style="background: #FFFFFF; border-radius: 18px; max-width: 520px; width: 90%; padding: 2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.15); border: 1px solid var(--admin-border);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 1px solid var(--admin-border);">
+      <h3 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">
+        <i class="fa-solid fa-plus" style="color: var(--admin-primary);"></i> Add Manual Enquiry Record
+      </h3>
+      <i class="fa-solid fa-xmark" onclick="closeCreateModal()" style="cursor: pointer; font-size: 1.1rem; color: var(--admin-text-muted);"></i>
+    </div>
+
+    <form id="createEnquiryForm" onsubmit="executeCreateEnquiry(event)">
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">Customer Name <span style="color:#C62828;">*</span></label>
+        <input type="text" id="createName" required placeholder="e.g. Priya Lakshmi" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem;">
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">Customer Email <span style="color:#C62828;">*</span></label>
+        <input type="email" id="createEmail" required placeholder="customer@example.com" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem;">
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">Subject <span style="color:#C62828;">*</span></label>
+        <input type="text" id="createSubject" required value="General Inquiry" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.88rem;">
+      </div>
+
+      <div style="margin-bottom: 1.2rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">Message Content <span style="color:#C62828;">*</span></label>
+        <textarea id="createMessage" rows="4" required placeholder="Enter enquiry message details..." style="width: 100%; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0.8rem; font-size: 0.88rem; font-family: inherit;"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button type="button" onclick="closeCreateModal()" class="btn btn-outline" style="height: 40px; border-radius: 8px; font-weight: 600; background: #FFF;">Cancel</button>
+        <button type="submit" id="createSubmitBtn" class="btn btn-primary" style="height: 40px; border-radius: 8px; font-weight: 600; padding: 0 1.4rem; background: var(--admin-primary); color: #FFF; border: none;">
+          Save Enquiry
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   let pendingDeleteEnquiryId = null;
+
+  function openCreateModal() {
+    document.getElementById('createEnquiryModal').style.display = 'flex';
+  }
+
+  function closeCreateModal() {
+    document.getElementById('createEnquiryModal').style.display = 'none';
+  }
+
+  async function executeCreateEnquiry(e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('createSubmitBtn');
+    const name = document.getElementById('createName').value.trim();
+    const email = document.getElementById('createEmail').value.trim();
+    const subject = document.getElementById('createSubject').value.trim();
+    const message = document.getElementById('createMessage').value.trim();
+
+    if (!name || !email || !message) {
+      alert('Please fill in Name, Email, and Message.');
+      return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    const csrfToken = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+
+    try {
+      const res = await fetch('/admin/messages/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ name, email, subject, message, _csrf: csrfToken })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        closeCreateModal();
+        showAdminToast(data.message || 'Manual Enquiry created successfully.');
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        alert(data.message || 'Failed to save enquiry.');
+      }
+    } catch (err) {
+      alert('Error creating enquiry: ' + err.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Enquiry'; }
+    }
+  }
 
   function openEnquiryModal(m) {
     document.getElementById('enqName').innerText = m.name || '';

@@ -4,7 +4,10 @@ const AdminStatsService = require('../../services/adminStatsService');
 exports.getMessages = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { messages, total } = await ContactMessage.getAll({ page, limit: 15 });
+    const status = req.query.status || null;
+    const search = req.query.search || null;
+
+    const { messages, total } = await ContactMessage.getAll({ page, limit: 15, status, search });
     const stats = await AdminStatsService.getMessageStats();
 
     res.render('admin/messages/index', {
@@ -13,9 +16,59 @@ exports.getMessages = async (req, res, next) => {
       total,
       stats,
       currentPage: page,
-      totalPages: Math.ceil(total / 15)
+      totalPages: Math.ceil(total / 15),
+      query: req.query
     });
   } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Manually Create Enquiry by Admin
+ */
+exports.createEnquiry = async (req, res, next) => {
+  try {
+    const { name, email, subject, message, status } = req.body;
+
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanSubject = (subject || 'Admin Inquiry Record').trim();
+    const cleanMessage = (message || '').trim();
+
+    if (!cleanName || !cleanEmail || !cleanMessage) {
+      return res.status(400).json({ success: false, message: 'Customer Name, Email, and Message are required.' });
+    }
+
+    if (!cleanEmail.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid customer email address.' });
+    }
+
+    const enquiryId = await ContactMessage.create({
+      name: cleanName,
+      email: cleanEmail,
+      subject: cleanSubject,
+      message: cleanMessage,
+      status: status || 'new',
+      source: 'admin_created'
+    });
+
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: 'Manual Enquiry record created successfully.',
+        enquiryId
+      });
+    }
+
+    req.flash('success', 'Manual Enquiry created successfully.');
+    res.redirect('/admin/messages');
+  } catch (err) {
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
     next(err);
   }
 };

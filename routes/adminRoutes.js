@@ -93,6 +93,7 @@ router.post('/admin/coupons/delete/:id', adminCouponController.deleteCoupon);
 
 // Contact Messages / Enquiries
 router.get('/admin/messages', adminMessageController.getMessages);
+router.post('/admin/messages/create', adminMessageController.createEnquiry);
 router.post('/admin/messages/status/:id', adminMessageController.updateStatus);
 router.post('/admin/messages/delete/:id', adminMessageController.deleteMessage);
 
