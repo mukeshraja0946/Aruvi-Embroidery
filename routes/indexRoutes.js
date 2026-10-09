@@ -16,6 +16,8 @@ router.get('/faq', pageController.getFAQ);
 router.get('/privacy', pageController.getPrivacy);
 router.get('/terms', pageController.getTerms);
 router.get('/refund', pageController.getRefund);
+router.get('/unsubscribe', pageController.getUnsubscribe);
+router.post('/unsubscribe', pageController.postUnsubscribe);
 router.get('/sitemap.xml', pageController.getSitemap);
 
 module.exports = router;

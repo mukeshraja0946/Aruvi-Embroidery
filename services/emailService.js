@@ -232,9 +232,94 @@ async function sendPurchaseConfirmationEmail(order) {
   }
 }
 
+/**
+ * 5. Send Custom Campaign Email to Individual Recipient
+ */
+async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl }) {
+  try {
+    const transporter = getTransporter();
+    const fromName = process.env.EMAIL_FROM_NAME || 'Aruvi Embroidery';
+    const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || 'aruviembroidery@gmail.com';
+    const fromHeader = `"${fromName}" <${fromEmail}>`;
+
+    if (!transporter) {
+      console.log(`[Email Simulation Notice] Campaign email simulated to ${to}. Subject: "${subject}".`);
+      return { success: true, simulated: true };
+    }
+
+    const cleanName = toName || 'Valued Customer';
+    const finalUnsubUrl = unsubscribeUrl || 'https://aruviembroidery.com/unsubscribe';
+
+    // Wrap body content with professional branding & unsubscribe footer
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${subject}</title>
+      </head>
+      <body style="margin:0; padding:0; background-color:#F7F3EC; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; color:#231815;">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#F7F3EC; padding: 20px 0;">
+          <tr>
+            <td align="center">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; background-color:#FFFFFF; border-radius:12px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.06); border:1px solid #E8E0D5;">
+                <!-- Header -->
+                <tr>
+                  <td align="center" style="background-color:#231815; padding: 25px 20px;">
+                    <h1 style="color:#FFFFFF; font-size:1.6rem; margin:0; font-family:Georgia, serif; letter-spacing:1px;">Aruvi Embroidery</h1>
+                    <p style="color:#E5C396; font-size:0.85rem; margin:4px 0 0 0; font-style:italic;">Where Threads Tell Stories</p>
+                  </td>
+                </tr>
+                <!-- Body Content -->
+                <tr>
+                  <td style="padding: 30px 28px; line-height:1.6; font-size:0.95rem; color:#231815;">
+                    ${htmlBody}
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td align="center" style="background-color:#FAF6F0; padding: 20px 28px; border-top:1px solid #E8E0D5; font-size:0.78rem; color:#776A62;">
+                    <p style="margin:0 0 8px 0; font-weight:bold;">ARUVI EMBROIDERY STUDIO</p>
+                    <p style="margin:0 0 10px 0;">Erode, Tamil Nadu, 638001, India | <a href="mailto:aruviembroidery@gmail.com" style="color:#B8402A; text-decoration:none;">aruviembroidery@gmail.com</a></p>
+                    <p style="margin:0; color:#998B82;">
+                      You received this email because you registered on Aruvi Embroidery. 
+                      <a href="${finalUnsubUrl}" style="color:#B8402A; text-decoration:underline;">Unsubscribe from marketing emails</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const plainText = htmlBody.replace(/<[^>]+>/g, '').trim();
+
+    const mailOptions = {
+      from: fromHeader,
+      to: to,
+      subject: subject,
+      text: plainText,
+      html: fullHtml
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ [Campaign Email Sent] To: ${to} | Subject: "${subject}"`);
+    return { success: true };
+  } catch (err) {
+    console.error(`❌ [Campaign Email Error] To: ${to} | Error: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   testSmtpConnection,
   sendNewDesignEmail,
   sendDesignUpdateEmail,
-  sendPurchaseConfirmationEmail
+  sendPurchaseConfirmationEmail,
+  sendCampaignEmail
 };
+

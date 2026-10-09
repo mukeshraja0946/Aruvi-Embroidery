@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Campaigns - ARUVI Admin</title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .campaign-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .campaign-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .campaign-stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    .campaign-stat-val {
+      font-family: var(--font-heading);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--admin-text-dark);
+      line-height: 1.1;
+    }
+    .campaign-stat-lbl {
+      font-size: 0.82rem;
+      color: var(--admin-text-muted);
+      margin-top: 2px;
+    }
+
+    /* Tabs Styling */
+    .campaign-tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 2px solid var(--admin-border);
+      margin-bottom: 1.8rem;
+    }
+    .campaign-tab-btn {
+      padding: 0.75rem 1.4rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--admin-text-muted);
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: -2px;
+      transition: all 0.2s ease;
+    }
+    .campaign-tab-btn.active {
+      color: var(--admin-primary);
+      border-bottom-color: var(--admin-primary);
+    }
+
+    /* Card Panels */
+    .campaign-card-panel {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 16px;
+      padding: 1.8rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    }
+
+    /* Form Inputs & Rich Toolbar */
+    .campaign-field-group {
+      margin-bottom: 1.4rem;
+    }
+    .campaign-label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--admin-text-dark);
+      margin-bottom: 0.4rem;
+    }
+    .campaign-input {
+      width: 100%;
+      padding: 0.85rem 1.1rem;
+      border: 1px solid var(--admin-border);
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      box-sizing: border-box;
+      background: #FAF8F5;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .campaign-input:focus {
+      outline: none;
+      border-color: var(--admin-primary);
+      background: #FFFFFF;
+    }
+
+    .rich-toolbar {
+      display: flex;
+      gap: 6px;
+      padding: 8px 12px;
+      background: #F4EFEA;
+      border: 1px solid var(--admin-border);
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      flex-wrap: wrap;
+    }
+    .rich-tool-btn {
+      padding: 6px 12px;
+      background: #FFFFFF;
+      border: 1px solid #D8CFB9;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--admin-text-dark);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .rich-tool-btn:hover {
+      background: var(--admin-primary-light);
+      color: var(--admin-primary);
+      border-color: var(--admin-primary);
+    }
+
+    .rich-editor-area {
+      min-height: 220px;
+      padding: 1rem 1.2rem;
+      border: 1px solid var(--admin-border);
+      border-radius: 0 0 10px 10px;
+      background: #FFFFFF;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      outline: none;
+      overflow-y: auto;
+    }
+
+    /* Recipient Table */
+    .recipient-table-wrapper {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid var(--admin-border);
+      border-radius: 10px;
+      margin-top: 0.8rem;
+    }
+    .recipient-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .recipient-table th, .recipient-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--admin-border);
+    }
+    .recipient-table th {
+      background: #F4EFEA;
+      font-weight: 600;
+      color: var(--admin-text-dark);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    /* Status Badges */
+    .badge-status {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-status-completed { background: #E8F5E9; color: #2E7D32; }
+    .badge-status-sending { background: #E3F2FD; color: #1565C0; }
+    .badge-status-draft { background: #FFF8E1; color: #F57F17; }
+    .badge-status-partially { background: #FFF3E0; color: #E65100; }
+    .badge-status-failed { background: #FFEBEE; color: #C62828; }
+
+    /* Modal Overlay */
+    .campaign-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    .campaign-modal.show {
+      display: flex;
+    }
+    .campaign-modal-content {
+      background: #FFFFFF;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+      padding: 2rem;
+      position: relative;
+    }
+    .modal-close-btn {
+      position: absolute;
+      top: 1.2rem;
+      right: 1.2rem;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid #DDD;
+      background: #FFF;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <!-- Global Search -->
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search email campaigns, customers...">
+    </div>
+
+    <!-- Right User Header Icons -->
+    <div class="admin-header-right">
+      <a href="#" class="admin-icon-btn" title="Notifications">
+        <i class="fa-regular fa-bell"></i>
+        <span class="badge-count">3</span>
+      </a>
+
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+        <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--admin-text-muted); margin-left: 4px;"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Main Layout with Sidebar -->
+  <div class="admin-main-container">
+    <!-- Left Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=pending"><span><i class="fa-regular fa-clock"></i> Pending Orders</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/email-campaigns" class="active"><span><i class="fa-solid fa-paper-plane"></i> Email Campaigns 📧</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CONTENT Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CONTENT</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+      <!-- Breadcrumbs & Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.8rem; gap: 1rem; flex-wrap: wrap;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+            <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; <span style="color: var(--admin-primary); font-weight: 600;">Email Campaigns</span>
+          </div>
+          <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">
+            Email Campaigns 📧
+          </h1>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">
+            Compose, preview, and dispatch email campaigns directly to your registered customers with automated history tracking.
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button type="button" onclick="openTestModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-color: var(--admin-primary); color: var(--admin-primary);">
+            <i class="fa-solid fa-vial"></i> Send Test Email
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Summary Cards -->
+      <div class="campaign-stat-grid">
+        <div class="campaign-stat-card">
+          <div class="campaign-stat-icon" style="background: #E3F2FD; color: #1565C0;">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <div>
+            <div class="campaign-stat-val"><%= stats.totalCampaigns %></div>
+            <div class="campaign-stat-lbl">Total Campaigns</div>
+          </div>
+        </div>
+
+        <div class="campaign-stat-card">
+          <div class="campaign-stat-icon" style="background: #FAF6F0; color: #B8402A;">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div>
+            <div class="campaign-stat-val"><%= stats.totalSent %></div>
+            <div class="campaign-stat-lbl">Total Recipients Reached</div>
+          </div>
+        </div>
+
+        <div class="campaign-stat-card">
+          <div class="campaign-stat-icon" style="background: #E8F5E9; color: #2E7D32;">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <div class="campaign-stat-val"><%= stats.deliveryRate %>%</div>
+            <div class="campaign-stat-lbl">Delivery Success Rate</div>
+          </div>
+        </div>
+
+        <div class="campaign-stat-card">
+          <div class="campaign-stat-icon" style="background: #FFEBEE; color: #C62828;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <div class="campaign-stat-val"><%= stats.totalFailed %></div>
+            <div class="campaign-stat-lbl">Failed Deliveries</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="campaign-tabs">
+        <button type="button" class="campaign-tab-btn active" onclick="switchTab('composer', this)">
+          <i class="fa-solid fa-pen-to-square"></i> Campaign Composer
+        </button>
+        <button type="button" class="campaign-tab-btn" onclick="switchTab('history', this)">
+          <i class="fa-solid fa-clock-rotate-left"></i> Campaign History (<%= campaigns.length %>)
+        </button>
+      </div>
+
+      <!-- TAB 1: COMPOSER -->
+      <div id="tabComposer" class="tab-content-panel">
+        <div class="campaign-card-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--admin-border);">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.35rem; margin: 0 0 4px 0; color: var(--admin-text-dark);">
+                Compose Email Campaign
+              </h3>
+              <span style="font-size: 0.85rem; color: var(--admin-text-muted);">
+                Sender Email: <strong>aruviembroidery@gmail.com</strong> (Aruvi Embroidery)
+              </span>
+            </div>
+            <span style="background: #FAF6F0; border: 1px solid #E8E0D5; color: var(--admin-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+              <i class="fa-solid fa-shield-halved"></i> Secure Gmail SMTP
+            </span>
+          </div>
+
+          <form id="campaignForm">
+            <input type="hidden" id="csrfToken" name="_csrf" value="<%= csrfToken %>">
+
+            <!-- Subject Input -->
+            <div class="campaign-field-group">
+              <label class="campaign-label" for="campaignSubject">
+                Email Subject <span style="color: #C62828;">*</span>
+              </label>
+              <input type="text" id="campaignSubject" class="campaign-input" placeholder="e.g. New Embroidery Designs Available!" value="New Embroidery Designs Available!">
+            </div>
+
+            <!-- Email Body Rich Text Editor -->
+            <div class="campaign-field-group">
+              <label class="campaign-label">
+                Email Message Content <span style="color: #C62828;">*</span>
+              </label>
+
+              <!-- Rich Formatting Toolbar -->
+              <div class="rich-toolbar">
+                <button type="button" class="rich-tool-btn" onclick="formatEditor('bold')" title="Bold"><i class="fa-solid fa-bold"></i></button>
+                <button type="button" class="rich-tool-btn" onclick="formatEditor('italic')" title="Italic"><i class="fa-solid fa-italic"></i></button>
+                <button type="button" class="rich-tool-btn" onclick="formatEditor('underline')" title="Underline"><i class="fa-solid fa-underline"></i></button>
+                <button type="button" class="rich-tool-btn" onclick="formatEditor('insertUnorderedList')" title="Bullet List"><i class="fa-solid fa-list-ul"></i></button>
+                <button type="button" class="rich-tool-btn" onclick="insertCtaButton()" title="Insert Button CTA"><i class="fa-solid fa-rectangle-ad"></i> Insert CTA Button</button>
+                <button type="button" class="rich-tool-btn" onclick="insertDefaultTemplate()" title="Load Default Template"><i class="fa-solid fa-rotate-left"></i> Default Template</button>
+              </div>
+
+              <!-- Editable Div -->
+              <div id="richEditor" class="rich-editor-area" contenteditable="true">
+                <p>Hello Customer,</p>
+                <p>We’re happy to inform you that new embroidery designs have been added to Aruvi Embroidery!</p>
+                <p>Visit our website to explore the latest designs and download your favorite machine embroidery files after purchase.</p>
+                <p style="margin: 20px 0;">
+                  <a href="https://aruviembroidery.com/" style="display: inline-block; background: #B8402A; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Explore New Designs</a>
+                </p>
+                <p>Thank you for supporting Aruvi Embroidery.</p>
+                <p>Best regards,<br><strong>Team Aruvi Embroidery</strong></p>
+              </div>
+            </div>
+
+            <!-- Recipient Selector -->
+            <div class="campaign-field-group" style="margin-top: 2rem;">
+              <label class="campaign-label">Select Recipients</label>
+
+              <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 1rem;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.92rem; cursor: pointer; font-weight: 500;">
+                  <input type="radio" name="recipientTarget" value="all" checked onclick="toggleRecipientMode('all')">
+                  <span>All Registered Customers (<strong id="allCustomerCount"><%= customers.length %></strong>)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.92rem; cursor: pointer; font-weight: 500;">
+                  <input type="radio" name="recipientTarget" value="selected" onclick="toggleRecipientMode('selected')">
+                  <span>Select Specific Customers</span>
+                </label>
+              </div>
+
+              <!-- Customer Table Selection Container -->
+              <div id="customerSelectContainer" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                  <input type="text" id="customerSearchInput" onkeyup="filterCustomerTable()" placeholder="Search customer by name or email..." class="campaign-input" style="max-width: 320px; padding: 0.5rem 0.9rem; font-size: 0.85rem;">
+                  <span style="font-size: 0.85rem; font-weight: 600; color: var(--admin-primary);">
+                    Selected: <span id="selectedCountBadge">0</span> / <%= customers.length %> Customers
+                  </span>
+                </div>
+
+                <div class="recipient-table-wrapper">
+                  <table class="recipient-table" id="customerTable">
+                    <thead>
+                      <tr>
+                        <th style="width: 40px; text-align: center;">
+                          <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                        </th>
+                        <th>Customer Name</th>
+                        <th>Email Address</th>
+                        <th>Opt-Out Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% if (customers && customers.length > 0) { %>
+                        <% customers.forEach(c => { %>
+                          <tr>
+                            <td style="text-align: center;">
+                              <input type="checkbox" class="customer-checkbox" value="<%= c.email %>" <%= c.is_unsubscribed ? 'disabled' : '' %> onchange="updateSelectedCount()">
+                            </td>
+                            <td><strong><%= c.full_name %></strong></td>
+                            <td><%= c.email %></td>
+                            <td>
+                              <% if (c.is_unsubscribed) { %>
+                                <span class="badge-status badge-status-failed">Unsubscribed</span>
+                              <% } else { %>
+                                <span class="badge-status badge-status-completed">Active Subscribed</span>
+                              <% } %>
+                            </td>
+                          </tr>
+                        <% }) %>
+                      <% } else { %>
+                        <tr>
+                          <td colspan="4" style="text-align: center; color: var(--admin-text-muted); padding: 1.5rem;">
+                            No registered customers found.
+                          </td>
+                        </tr>
+                      <% } %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--admin-border); flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="openPreviewModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-color: var(--admin-primary); color: var(--admin-primary);">
+                  <i class="fa-regular fa-eye"></i> Preview Email
+                </button>
+                <button type="button" onclick="saveDraft()" class="btn" style="height: 42px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #F4EFEA; color: var(--admin-text-dark); border: 1px solid var(--admin-border);">
+                  <i class="fa-regular fa-floppy-disk"></i> Save Draft
+                </button>
+              </div>
+
+              <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="clearComposer()" class="btn" style="height: 42px; padding: 0 1rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: transparent; color: var(--admin-text-muted); border: none;">
+                  Clear
+                </button>
+                <button type="button" onclick="confirmAndSendCampaign()" class="btn btn-primary" style="height: 42px; padding: 0 1.5rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: var(--admin-primary); color: #FFFFFF; border: none; box-shadow: 0 2px 6px rgba(184,64,42,0.2);">
+                  <i class="fa-solid fa-paper-plane"></i> Send Campaign Now
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- TAB 2: CAMPAIGN HISTORY -->
+      <div id="tabHistory" class="tab-content-panel" style="display: none;">
+        <div class="campaign-card-panel" style="padding: 0; overflow: hidden;">
+          <div style="padding: 1.4rem 1.8rem; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-family: var(--font-heading); font-size: 1.3rem; margin: 0; color: var(--admin-text-dark);">
+              Campaign History & Tracking Logs
+            </h3>
+            <span style="font-size: 0.85rem; color: var(--admin-text-muted);">
+              Showing <%= campaigns.length %> campaigns
+            </span>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="recipient-table" style="margin: 0;">
+              <thead>
+                <tr>
+                  <th style="padding: 12px 18px;">Campaign Subject</th>
+                  <th>Date & Time</th>
+                  <th>Recipients</th>
+                  <th>Success</th>
+                  <th>Failed</th>
+                  <th>Status</th>
+                  <th style="text-align: right; padding-right: 18px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (campaigns && campaigns.length > 0) { %>
+                  <% campaigns.forEach(c => { %>
+                    <tr>
+                      <td style="padding: 14px 18px;">
+                        <strong><%= c.subject %></strong>
+                        <div style="font-size: 0.75rem; color: var(--admin-text-muted);">ID: #CMP-00<%= c.id %></div>
+                      </td>
+                      <td><%= new Date(c.created_at || c.sent_at || Date.now()).toLocaleString() %></td>
+                      <td><strong><%= c.total_recipients || 0 %></strong></td>
+                      <td><span style="color: #2E7D32; font-weight: 700;"><%= c.success_count || 0 %></span></td>
+                      <td><span style="color: #C62828; font-weight: 700;"><%= c.failed_count || 0 %></span></td>
+                      <td>
+                        <% if (c.status === 'Completed') { %>
+                          <span class="badge-status badge-status-completed">Completed</span>
+                        <% } else if (c.status === 'Partially Failed') { %>
+                          <span class="badge-status badge-status-partially">Partially Failed</span>
+                        <% } else if (c.status === 'Failed') { %>
+                          <span class="badge-status badge-status-failed">Failed</span>
+                        <% } else if (c.status === 'Sending') { %>
+                          <span class="badge-status badge-status-sending">Sending</span>
+                        <% } else { %>
+                          <span class="badge-status badge-status-draft">Draft</span>
+                        <% } %>
+                      </td>
+                      <td style="text-align: right; padding-right: 18px;">
+                        <button type="button" onclick="viewCampaignDetails('<%= c.id %>')" class="action-icon-btn" title="View Logs">
+                          <i class="fa-regular fa-eye"></i>
+                        </button>
+                        <% if (c.failed_count > 0) { %>
+                          <button type="button" onclick="retryFailedCampaign('<%= c.id %>')" class="action-icon-btn" title="Retry Failed" style="color: #C62828; border-color: #FFCDD2; background: #FFF0F0;">
+                            <i class="fa-solid fa-rotate"></i>
+                          </button>
+                        <% } %>
+                        <button type="button" onclick="deleteCampaign('<%= c.id %>')" class="action-icon-btn" title="Delete" style="color: #C62828;">
+                          <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                <% } else { %>
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: var(--admin-text-muted); padding: 2.5rem;">
+                      No email campaigns dispatched yet. Use the composer above to create your first campaign.
+                    </td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- MODAL 1: Gmail Live Preview Modal -->
+<div id="previewModal" class="campaign-modal">
+  <div class="campaign-modal-content" style="max-width: 650px; padding: 0; overflow: hidden;">
+    <button type="button" class="modal-close-btn" onclick="closeModal('previewModal')">&times;</button>
+    <div style="background: #202124; color: #FFFFFF; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 10px;">
+      <i class="fa-solid fa-envelope" style="color: #EA4335; font-size: 1.2rem;"></i>
+      <span style="font-weight: 600; font-size: 0.95rem;">Gmail Inbox Preview</span>
+    </div>
+
+    <div style="padding: 1.5rem; background: #F6F8FC;">
+      <div style="background: #FFFFFF; border-radius: 8px; padding: 1.2rem; border: 1px solid #E0E0E0; margin-bottom: 1rem;">
+        <div style="font-size: 1.15rem; font-weight: 700; color: #202124; margin-bottom: 0.6rem;" id="previewSubjectText">
+          Subject Text Here
+        </div>
+        <div style="font-size: 0.85rem; color: #5F6368; display: flex; align-items: center; gap: 6px;">
+          <strong>Aruvi Embroidery</strong> &lt;aruviembroidery@gmail.com&gt;
+        </div>
+      </div>
+
+      <!-- Rendered Email Body Box -->
+      <div style="background: #FFFFFF; border-radius: 8px; border: 1px solid #E0E0E0; overflow: hidden;" id="previewBodyBox">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL 2: Send Test Email Modal -->
+<div id="testModal" class="campaign-modal">
+  <div class="campaign-modal-content" style="max-width: 480px;">
+    <button type="button" class="modal-close-btn" onclick="closeModal('testModal')">&times;</button>
+    <h3 style="font-family: var(--font-heading); margin-top: 0; font-size: 1.3rem;">Send Test Email</h3>
+    <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-bottom: 1.2rem;">
+      Send a sample test copy of your email campaign to verify rendering before launching.
+    </p>
+
+    <div class="campaign-field-group">
+      <label class="campaign-label">Recipient Test Email</label>
+      <input type="email" id="testEmailInput" class="campaign-input" value="aruviembroidery@gmail.com" placeholder="e.g. yourname@gmail.com">
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem;">
+      <button type="button" onclick="closeModal('testModal')" class="btn" style="height: 40px; padding: 0 1rem; border-radius: 8px; background: #FAF6F0; border: 1px solid #DDD;">Cancel</button>
+      <button type="button" onclick="executeSendTestEmail()" class="btn btn-primary" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; background: var(--admin-primary); color: #FFF; border: none;">
+        Send Test Now
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL 3: Campaign Logs & Retry Modal -->
+<div id="logsModal" class="campaign-modal">
+  <div class="campaign-modal-content" style="max-width: 720px;">
+    <button type="button" class="modal-close-btn" onclick="closeModal('logsModal')">&times;</button>
+    <h3 style="font-family: var(--font-heading); margin-top: 0; font-size: 1.4rem;" id="logModalTitle">Campaign Delivery Details</h3>
+    <div style="font-size: 0.85rem; color: var(--admin-text-muted); margin-bottom: 1rem;" id="logModalSub"></div>
+
+    <div class="recipient-table-wrapper" style="max-height: 340px;">
+      <table class="recipient-table">
+        <thead>
+          <tr>
+            <th>Recipient Email</th>
+            <th>Name</th>
+            <th>Delivery Status</th>
+            <th>Error Details</th>
+          </tr>
+        </thead>
+        <tbody id="logsTableBody">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;" id="logModalFooter">
+      <button type="button" onclick="closeModal('logsModal')" class="btn" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; background: #FAF6F0; border: 1px solid #DDD;">Close</button>
+      <div id="retryActionBtnContainer"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchTab(tabName, btn) {
+    document.querySelectorAll('.campaign-tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    document.getElementById('tabComposer').style.display = tabName === 'composer' ? 'block' : 'none';
+    document.getElementById('tabHistory').style.display = tabName === 'history' ? 'block' : 'none';
+  }
+
+  function formatEditor(cmd, val = null) {
+    document.execCommand(cmd, false, val);
+  }
+
+  function insertCtaButton() {
+    const url = prompt('Enter website link for CTA button:', 'https://aruviembroidery.com/');
+    if (url) {
+      const btnHtml = `<p style="margin: 20px 0;"><a href="${url}" style="display: inline-block; background: #B8402A; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Explore New Designs</a></p>`;
+      document.execCommand('insertHTML', false, btnHtml);
+    }
+  }
+
+  function insertDefaultTemplate() {
+    document.getElementById('campaignSubject').value = 'New Embroidery Designs Available!';
+    document.getElementById('richEditor').innerHTML = `
+      <p>Hello Customer,</p>
+      <p>We’re happy to inform you that new embroidery designs have been added to Aruvi Embroidery!</p>
+      <p>Visit our website to explore the latest designs and download your favorite machine embroidery files after purchase.</p>
+      <p style="margin: 20px 0;">
+        <a href="https://aruviembroidery.com/" style="display: inline-block; background: #B8402A; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Explore New Designs</a>
+      </p>
+      <p>Thank you for supporting Aruvi Embroidery.</p>
+      <p>Best regards,<br><strong>Team Aruvi Embroidery</strong></p>
+    `;
+  }
+
+  function toggleRecipientMode(mode) {
+    const container = document.getElementById('customerSelectContainer');
+    container.style.display = mode === 'selected' ? 'block' : 'none';
+  }
+
+  function toggleSelectAll(masterCb) {
+    document.querySelectorAll('.customer-checkbox').forEach(cb => {
+      if (!cb.disabled) cb.checked = masterCb.checked;
+    });
+    updateSelectedCount();
+  }
+
+  function updateSelectedCount() {
+    const checked = document.querySelectorAll('.customer-checkbox:checked').length;
+    document.getElementById('selectedCountBadge').innerText = checked;
+  }
+
+  function filterCustomerTable() {
+    const q = document.getElementById('customerSearchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#customerTable tbody tr');
+    rows.forEach(tr => {
+      const text = tr.innerText.toLowerCase();
+      tr.style.display = text.includes(q) ? '' : 'none';
+    });
+  }
+
+  function openModal(id) {
+    document.getElementById(id).classList.add('show');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+  }
+
+  function openPreviewModal() {
+    const subject = document.getElementById('campaignSubject').value.trim() || 'New Embroidery Designs Available!';
+    const htmlBody = document.getElementById('richEditor').innerHTML;
+
+    document.getElementById('previewSubjectText').innerText = subject;
+    document.getElementById('previewBodyBox').innerHTML = `
+      <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+        <div style="background: #231815; color: #FFF; padding: 20px; text-align: center;">
+          <h1 style="margin: 0; font-size: 1.5rem; color:#FFF;">Aruvi Embroidery</h1>
+          <p style="margin: 5px 0 0; font-size: 0.85rem; color: #E5C396; font-style: italic;">Where Threads Tell Stories</p>
+        </div>
+        <div style="padding: 24px;">
+          ${htmlBody}
+        </div>
+        <div style="background:#FAF6F0; padding:15px; text-align:center; font-size:0.78rem; color:#776A62; border-top:1px solid #E8E0D5;">
+          Aruvi Embroidery Studio | Erode, Tamil Nadu | <a href="#" style="color:#B8402A;">Unsubscribe</a>
+        </div>
+      </div>
+    `;
+
+    openModal('previewModal');
+  }
+
+  function openTestModal() {
+    openModal('testModal');
+  }
+
+  async function executeSendTestEmail() {
+    const testEmail = document.getElementById('testEmailInput').value.trim();
+    const subject = document.getElementById('campaignSubject').value.trim();
+    const bodyHtml = document.getElementById('richEditor').innerHTML;
+    const csrfToken = document.getElementById('csrfToken').value;
+
+    if (!testEmail) {
+      alert('Please enter a test email address.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/admin/api/email-campaigns/send-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ test_email: testEmail, subject, body_html: bodyHtml })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        closeModal('testModal');
+      } else {
+        alert('Test Email Failed: ' + data.message);
+      }
+    } catch (err) {
+      alert('Error sending test email: ' + err.message);
+    }
+  }
+
+  async function saveDraft() {
+    const subject = document.getElementById('campaignSubject').value.trim();
+    const bodyHtml = document.getElementById('richEditor').innerHTML;
+    const csrfToken = document.getElementById('csrfToken').value;
+
+    try {
+      const res = await fetch('/admin/api/email-campaigns/save-draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ subject, body_html: bodyHtml })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+      } else {
+        alert('Error: ' + data.message);
+      }
+    } catch (err) {
+      alert('Error saving draft: ' + err.message);
+    }
+  }
+
+  function clearComposer() {
+    if (confirm('Clear composer fields?')) {
+      document.getElementById('campaignSubject').value = '';
+      document.getElementById('richEditor').innerHTML = '<p><br></p>';
+    }
+  }
+
+  async function confirmAndSendCampaign() {
+    const subject = document.getElementById('campaignSubject').value.trim();
+    const bodyHtml = document.getElementById('richEditor').innerHTML;
+    const csrfToken = document.getElementById('csrfToken').value;
+    const targetMode = document.querySelector('input[name="recipientTarget"]:checked').value;
+
+    if (!subject) {
+      alert('Please enter an Email Subject.');
+      return;
+    }
+
+    let selectedEmails = [];
+    let recipientCountStr = '';
+
+    if (targetMode === 'selected') {
+      const checkedBoxes = document.querySelectorAll('.customer-checkbox:checked');
+      if (checkedBoxes.length === 0) {
+        alert('Please select at least one recipient customer from the table.');
+        return;
+      }
+      selectedEmails = Array.from(checkedBoxes).map(cb => cb.value);
+      recipientCountStr = `${selectedEmails.length} selected customers`;
+    } else {
+      recipientCountStr = `all eligible registered customers`;
+    }
+
+    if (!confirm(`Are you sure you want to send this email campaign to ${recipientCountStr}?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/admin/api/email-campaigns/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({
+          subject,
+          body_html: bodyHtml,
+          target: targetMode,
+          selected_emails: selectedEmails
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert('Campaign Dispatch Error: ' + data.message);
+      }
+    } catch (err) {
+      alert('Network / Server Error dispatching campaign: ' + err.message);
+    }
+  }
+
+  async function viewCampaignDetails(id) {
+    try {
+      const res = await fetch(`/admin/api/email-campaigns/details/${id}`);
+      const data = await res.json();
+
+      if (!data.success || !data.campaign) {
+        alert('Failed to load campaign details.');
+        return;
+      }
+
+      const c = data.campaign;
+      document.getElementById('logModalTitle').innerText = c.subject;
+      document.getElementById('logModalSub').innerText = `Campaign ID: #CMP-00${c.id} | Total: ${c.total_recipients} | Success: ${c.success_count} | Failed: ${c.failed_count}`;
+
+      const tbody = document.getElementById('logsTableBody');
+      tbody.innerHTML = '';
+
+      if (c.logs && c.logs.length > 0) {
+        c.logs.forEach(l => {
+          const tr = document.createElement('tr');
+          const statusBadge = l.status === 'Sent'
+            ? '<span class="badge-status badge-status-completed">Sent</span>'
+            : '<span class="badge-status badge-status-failed">Failed</span>';
+
+          tr.innerHTML = `
+            <td><strong>${l.recipient_email}</strong></td>
+            <td>${l.recipient_name || 'Customer'}</td>
+            <td>${statusBadge}</td>
+            <td style="color:#C62828; font-size:0.8rem;">${l.error_message || 'None'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#666;">No recipient logs found.</td></tr>';
+      }
+
+      const retryBtnContainer = document.getElementById('retryActionBtnContainer');
+      if (c.failed_count > 0) {
+        retryBtnContainer.innerHTML = `<button type="button" onclick="retryFailedCampaign('${c.id}')" class="btn btn-primary" style="height:38px; padding:0 1rem; border-radius:8px; background:#C62828; color:#FFF; border:none; font-size:0.85rem;"><i class="fa-solid fa-rotate"></i> Retry Failed (${c.failed_count})</button>`;
+      } else {
+        retryBtnContainer.innerHTML = '';
+      }
+
+      openModal('logsModal');
+    } catch (err) {
+      alert('Error fetching campaign details: ' + err.message);
+    }
+  }
+
+  async function retryFailedCampaign(id) {
+    const csrfToken = document.getElementById('csrfToken').value;
+    if (!confirm('Retry sending campaign emails to failed recipients?')) return;
+
+    try {
+      const res = await fetch('/admin/api/email-campaigns/retry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ campaignId: id })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert('Retry Error: ' + data.message);
+      }
+    } catch (err) {
+      alert('Error retrying campaign: ' + err.message);
+    }
+  }
+
+  async function deleteCampaign(id) {
+    const csrfToken = document.getElementById('csrfToken').value;
+    if (!confirm('Are you sure you want to delete this email campaign record?')) return;
+
+    try {
+      const res = await fetch(`/admin/api/email-campaigns/delete/${id}`, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': csrfToken
+        }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert('Delete Error: ' + data.message);
+      }
+    } catch (err) {
+      alert('Error deleting campaign: ' + err.message);
+    }
+  }
+</script>
+
+</body>
+</html>

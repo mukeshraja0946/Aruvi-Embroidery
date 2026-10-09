@@ -14,6 +14,7 @@ const adminCouponController = require('../controllers/admin/adminCouponControlle
 const adminMessageController = require('../controllers/admin/adminMessageController');
 const adminBannerController = require('../controllers/admin/adminBannerController');
 const adminSettingController = require('../controllers/admin/adminSettingController');
+const adminEmailCampaignController = require('../controllers/admin/adminEmailCampaignController');
 
 // 1. Unprotected Admin Login Routes
 router.get('/admin/login', adminAuthController.getLogin);
@@ -113,5 +114,15 @@ router.post('/admin/settings', upload.fields([
 ]), adminSettingController.postSettings);
 
 router.all('/admin/api/test-smtp', adminSettingController.testSmtp);
+
+// Email Campaigns Management
+router.get('/admin/email-campaigns', adminEmailCampaignController.getCampaignsPage);
+router.get('/admin/api/email-campaigns/recipients', adminEmailCampaignController.getRecipients);
+router.post('/admin/api/email-campaigns/save-draft', adminEmailCampaignController.saveDraft);
+router.post('/admin/api/email-campaigns/send-test', adminEmailCampaignController.sendTestEmail);
+router.post('/admin/api/email-campaigns/send', adminEmailCampaignController.sendCampaign);
+router.post('/admin/api/email-campaigns/retry', adminEmailCampaignController.retryFailed);
+router.get('/admin/api/email-campaigns/details/:id', adminEmailCampaignController.getCampaignDetails);
+router.post('/admin/api/email-campaigns/delete/:id', adminEmailCampaignController.deleteCampaign);
 
 module.exports = router;

@@ -112,3 +112,31 @@ exports.getSitemap = async (req, res, next) => {
     next(err);
   }
 };
+
+const EmailCampaign = require('../models/EmailCampaign');
+
+exports.getUnsubscribe = (req, res) => {
+  const email = (req.query.email || '').trim();
+  res.render('pages/unsubscribe', {
+    title: 'Unsubscribe - ARUVI EMBROIDERY STUDIO',
+    email,
+    unsubscribed: false
+  });
+};
+
+exports.postUnsubscribe = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (email && email.trim()) {
+      await EmailCampaign.unsubscribe(email.trim());
+    }
+    res.render('pages/unsubscribe', {
+      title: 'Unsubscribed - ARUVI EMBROIDERY STUDIO',
+      email: email ? email.trim() : '',
+      unsubscribed: true
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

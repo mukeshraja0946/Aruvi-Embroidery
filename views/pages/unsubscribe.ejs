@@ -1,0 +1,33 @@
+<%- include('../partials/header') %>
+
+<div class="container" style="margin-top: 3rem; margin-bottom: 5rem; max-width: 600px;">
+  <div style="background: #FFFFFF; border: 1px solid var(--border-color, #E8E0D5); border-radius: 16px; padding: 2.5rem; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
+    <% if (typeof unsubscribed !== 'undefined' && unsubscribed) { %>
+      <div style="width: 70px; height: 70px; background: #E8F5E9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; color: #2E7D32; font-size: 2rem;">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h1 style="font-family: var(--font-heading); font-size: 1.8rem; margin-bottom: 0.8rem; color: #231815;">You are Unsubscribed</h1>
+      <p style="color: #666; font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem;">
+        <strong><%= email %></strong> has been removed from promotional and marketing email campaigns. You will no longer receive marketing updates from Aruvi Embroidery.
+      </p>
+      <a href="/" class="btn btn-primary" style="padding: 0.8rem 2rem; border-radius: 25px; text-decoration: none;">Return to Home</a>
+    <% } else { %>
+      <div style="width: 70px; height: 70px; background: #FFF0F0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; color: #C62828; font-size: 2rem;">
+        <i class="fa-solid fa-envelope-open-text"></i>
+      </div>
+      <h1 style="font-family: var(--font-heading); font-size: 1.8rem; margin-bottom: 0.8rem; color: #231815;">Unsubscribe from Promotional Emails</h1>
+      <p style="color: #666; font-size: 0.95rem; line-height: 1.6; margin-bottom: 2rem;">
+        Enter your email address below to unsubscribe from marketing announcements, promotional offers, and new design releases.
+      </p>
+      <form action="/unsubscribe" method="POST" style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="email" name="email" value="<%= email %>" placeholder="Enter your email address" required style="width: 100%; padding: 0.85rem 1.2rem; border: 1px solid #D1C7BD; border-radius: 12px; font-size: 0.95rem; box-sizing: border-radius;">
+        <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2rem; border-radius: 12px; font-weight: 600; font-size: 1rem; border: none; background: #C62828; color: white; cursor: pointer;">
+          Confirm Unsubscribe
+        </button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>
