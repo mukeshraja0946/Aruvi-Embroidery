@@ -128,9 +128,9 @@ app.locals.siteSettings = {
     process.env.INSTAGRAM_URL ||
     'https://instagram.com/aruviembroidery',
 
-  linkedin_url:
-    process.env.LINKEDIN_URL ||
-    'https://linkedin.com/company/aruviembroidery',
+  pinterest_url:
+    process.env.PINTEREST_URL ||
+    'https://pinterest.com/aruviembroidery',
 
   youtube_url:
     process.env.YOUTUBE_URL ||
@@ -148,40 +148,6 @@ app.locals.siteSettings = {
 
   upiMerchantName:
     process.env.UPI_NAME || 'ARUVI EMBROIDERY STUDIO',
-
-  // Bank Details
-  bank_name:
-    process.env.BANK_NAME || '',
-
-  bankName:
-    process.env.BANK_NAME || '',
-
-  account_number:
-    process.env.BANK_ACCOUNT_NUMBER || '',
-
-  accountNumber:
-    process.env.BANK_ACCOUNT_NUMBER || '',
-
-  ifsc_code:
-    process.env.BANK_IFSC || '',
-
-  ifscCode:
-    process.env.BANK_IFSC || '',
-
-  account_holder:
-    process.env.BANK_ACCOUNT_HOLDER ||
-    'ARUVI EMBROIDERY STUDIO',
-
-  accountHolder:
-    process.env.BANK_ACCOUNT_HOLDER ||
-    'ARUVI EMBROIDERY STUDIO',
-
-  accountHolderName:
-    process.env.BANK_ACCOUNT_HOLDER ||
-    'ARUVI EMBROIDERY STUDIO',
-
-  pinterest_url:
-    process.env.PINTEREST_URL || '',
 
   twitter_url:
     process.env.TWITTER_URL || ''

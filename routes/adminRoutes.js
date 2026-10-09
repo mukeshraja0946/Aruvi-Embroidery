@@ -25,6 +25,15 @@ router.use('/admin', isAdmin);
 
 // Dashboard
 router.get('/admin', adminDashboardController.getDashboard);
+router.get('/api/admin/dashboard/stats', async (req, res) => {
+  try {
+    const AdminStatsService = require('../services/adminStatsService');
+    const stats = await AdminStatsService.getDashboardStats();
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Products / Designs Management (supports both /admin/products and /admin/designs)
 router.get('/admin/products', adminDesignController.getDesigns);
@@ -45,6 +54,10 @@ router.post('/admin/designs/delete-image/:imageId', adminDesignController.delete
 router.post('/admin/designs/set-primary-image/:imageId', adminDesignController.setPrimaryImage);
 router.post('/admin/designs/delete-file/:fileId', adminDesignController.deleteFile);
 router.post('/admin/designs/delete-all-files/:designId', adminDesignController.deleteAllFiles);
+
+router.get('/admin/designs/import-template', adminDesignController.downloadImportTemplate);
+router.post('/admin/designs/import-preview', upload.any(), adminDesignController.postImportPreview);
+router.post('/admin/designs/import-commit', adminDesignController.postImportCommit);
 
 router.post('/admin/products/delete/:id', adminDesignController.deleteDesign);
 router.post('/admin/designs/delete/:id', adminDesignController.deleteDesign);

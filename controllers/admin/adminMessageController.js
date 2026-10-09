@@ -1,14 +1,17 @@
 const ContactMessage = require('../../models/ContactMessage');
+const AdminStatsService = require('../../services/adminStatsService');
 
 exports.getMessages = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const { messages, total } = await ContactMessage.getAll({ page, limit: 15 });
+    const stats = await AdminStatsService.getMessageStats();
 
     res.render('admin/messages/index', {
       title: 'Contact Messages - Admin',
       messages,
       total,
+      stats,
       currentPage: page,
       totalPages: Math.ceil(total / 15)
     });

@@ -3,10 +3,6 @@
 <div class="container">
   <!-- Hero Section matching Reference Screenshot 1 & 2 -->
   <section class="hero-card-container">
-    <!-- Prev / Next Slider Arrows -->
-    <button class="hero-slider-arrow prev" title="Previous Slide"><i class="fa-solid fa-chevron-left"></i></button>
-    <button class="hero-slider-arrow next" title="Next Slide"><i class="fa-solid fa-chevron-right"></i></button>
-
     <div class="hero-grid">
       <div class="hero-content">
         <div class="eyebrow-tag">
@@ -61,13 +57,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Carousel Indicator Dots -->
-    <div class="hero-carousel-dots">
-      <span class="dot active"></span>
-      <span class="dot"></span>
-      <span class="dot"></span>
-    </div>
   </section>
 
   <!-- Popular Categories Section (6 in a single row) -->
@@ -120,6 +109,11 @@
     <div class="grid-6">
       <% if (featuredDesigns && featuredDesigns.length > 0) { %>
         <% featuredDesigns.forEach(design => { %>
+          <%
+            const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
+            const origPrice = parseFloat(design.price || 0);
+            const hasDisc = curPrice < origPrice;
+          %>
           <div class="product-card-exact">
             <button class="heart-top-btn wishlist-btn" data-id="<%= design.id %>" title="Wishlist"><i class="fa-regular fa-heart"></i></button>
             <div class="product-exact-img" style="background: #FAF6F0; position: relative;">
@@ -137,9 +131,9 @@
             <div class="product-exact-content">
               <h4><a href="/design/<%= design.slug %>" style="color: inherit; text-decoration: none;"><%= design.title %></a></h4>
               <div class="price-row">
-                <span class="current-price">₹<%= design.sale_price !== null && design.sale_price !== undefined ? design.sale_price : design.price %></span>
-                <% if (design.sale_price && design.price > design.sale_price) { %>
-                  <span class="old-price">₹<%= design.price %></span>
+                <span class="current-price">₹<%= curPrice %></span>
+                <% if (hasDisc) { %>
+                  <span class="old-price">₹<%= origPrice %></span>
                 <% } %>
                 <button class="heart-bottom-btn wishlist-btn" data-id="<%= design.id %>"><i class="fa-regular fa-heart"></i></button>
               </div>

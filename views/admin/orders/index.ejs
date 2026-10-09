@@ -145,8 +145,12 @@
           <div class="card-info-content">
             <div class="stat-title">Total Orders</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= orders ? orders.length : 124 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 12%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.totalOrders !== undefined) ? stats.totalOrders : (orders ? orders.length : 0) %></span>
+              <% if (typeof stats !== 'undefined' && stats.ordersTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.ordersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.ordersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.ordersTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -157,8 +161,12 @@
           <div class="card-info-content">
             <div class="stat-title">Pending Orders</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">5</span>
-              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-up"></i> 2 new</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.pendingOrders !== undefined) ? stats.pendingOrders : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.pendingTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.pendingTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.pendingTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.pendingTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">needs processing</span>
           </div>
@@ -169,8 +177,12 @@
           <div class="card-info-content">
             <div class="stat-title">Completed Orders</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">112</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 94%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.completedOrders !== undefined) ? stats.completedOrders : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.completedTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.completedTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.completedTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.completedTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">fulfillment rate</span>
           </div>
@@ -181,8 +193,12 @@
           <div class="card-info-content">
             <div class="stat-title">Total Revenue</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">₹48,750</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 18%</span>
+              <span class="stat-num">₹<%= (typeof stats !== 'undefined' && stats.totalRevenue !== undefined) ? parseFloat(stats.totalRevenue).toLocaleString('en-IN') : '0' %></span>
+              <% if (typeof stats !== 'undefined' && stats.revenueTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.revenueTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.revenueTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.revenueTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>

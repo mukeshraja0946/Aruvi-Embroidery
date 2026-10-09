@@ -34,16 +34,12 @@ exports.postSettings = async (req, res, next) => {
     const currency_symbol = b.currency_symbol;
     const facebook_url = b.facebook_url;
     const instagram_url = b.instagram_url;
-    const linkedin_url = b.linkedin_url;
+    const pinterest_url = b.pinterest_url;
     const youtube_url = b.youtube_url;
 
-    // All 6 UPI & Bank fields with fallback alias mapping
+    // All UPI fields with fallback alias mapping
     const upi_id = (b.upi_id !== undefined ? b.upi_id : (b.upiId !== undefined ? b.upiId : b.upi_vpa)) || '';
     const upi_name = (b.upi_name !== undefined ? b.upi_name : (b.upiName !== undefined ? b.upiName : (b.upiMerchantName !== undefined ? b.upiMerchantName : b.merchant_name))) || '';
-    const bank_name = (b.bank_name !== undefined ? b.bank_name : b.bankName) || '';
-    const account_number = (b.account_number !== undefined ? b.account_number : (b.accountNumber !== undefined ? b.accountNumber : b.bank_account_no)) || '';
-    const ifsc_code = (b.ifsc_code !== undefined ? b.ifsc_code : (b.ifscCode !== undefined ? b.ifscCode : b.ifsc)) || '';
-    const account_holder = (b.account_holder !== undefined ? b.account_holder : (b.accountHolder !== undefined ? b.accountHolder : (b.accountHolderName !== undefined ? b.accountHolderName : b.account_holder_name))) || '';
 
     const remove_logo = b.remove_logo;
     const remove_mobile_logo = b.remove_mobile_logo;
@@ -52,10 +48,10 @@ exports.postSettings = async (req, res, next) => {
     const mobile_logo_url = b.mobile_logo_url;
     const favicon_url = b.favicon_url;
 
-    // Validation
-    const cleanUpiId = upi_id.trim();
-    if (cleanUpiId && !cleanUpiId.includes('@')) {
-      const errMessage = 'Invalid UPI ID format. UPI ID must be a valid VPA (e.g. username@upi or number@paytm).';
+    // Validation for Pinterest URL
+    const cleanPinterest = (pinterest_url || '').trim();
+    if (cleanPinterest && !/^https?:\/\//i.test(cleanPinterest)) {
+      const errMessage = 'Invalid Pinterest URL format. URL must start with http:// or https:// (e.g. https://pinterest.com/aruviembroidery).';
       if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
         return res.status(400).json({ success: false, message: errMessage });
       }
@@ -63,9 +59,10 @@ exports.postSettings = async (req, res, next) => {
       return res.redirect('/admin/settings');
     }
 
-    const cleanIfsc = ifsc_code.trim();
-    if (cleanIfsc && cleanIfsc.length !== 11) {
-      const errMessage = 'Invalid IFSC Code format. IFSC code must be 11 characters (e.g. SBIN0001234).';
+    // Validation for UPI ID
+    const cleanUpiId = upi_id.trim();
+    if (cleanUpiId && !cleanUpiId.includes('@')) {
+      const errMessage = 'Invalid UPI ID format. UPI ID must be a valid VPA (e.g. username@upi or number@paytm).';
       if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
         return res.status(400).json({ success: false, message: errMessage });
       }
@@ -82,14 +79,10 @@ exports.postSettings = async (req, res, next) => {
       currency_symbol,
       facebook_url,
       instagram_url,
-      linkedin_url,
+      pinterest_url: cleanPinterest,
       youtube_url,
       upi_id: cleanUpiId,
-      upi_name: upi_name.trim(),
-      bank_name: bank_name.trim(),
-      account_number: account_number.trim(),
-      ifsc_code: cleanIfsc.toUpperCase(),
-      account_holder: account_holder.trim()
+      upi_name: upi_name.trim()
     };
 
     if (logo_url) updates.logo_url = logo_url;
@@ -112,9 +105,7 @@ exports.postSettings = async (req, res, next) => {
       }
     }
 
-    // Secure logging of masked values (Section 22 requirement)
-    const maskedAcct = updates.account_number ? ('*'.repeat(Math.max(0, updates.account_number.length - 4)) + updates.account_number.slice(-4)) : 'N/A';
-    console.log(`[Admin Settings Update] UPI ID: ${updates.upi_id}, Merchant: ${updates.upi_name}, Bank: ${updates.bank_name}, Acct: ${maskedAcct}`);
+    console.log(`[Admin Settings Update] UPI ID: ${updates.upi_id}, Merchant: ${updates.upi_name}, Pinterest: ${updates.pinterest_url}`);
 
     await Setting.updateAll(updates);
     const refreshedSettings = await Setting.getAll();
@@ -125,7 +116,7 @@ exports.postSettings = async (req, res, next) => {
       };
     }
 
-    const successMessage = 'Payment settings and store branding updated successfully! All changes are synchronized across database and checkout.';
+    const successMessage = 'Payment settings and store branding updated successfully! All changes are synchronized across database and website.';
 
     if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
       return res.json({

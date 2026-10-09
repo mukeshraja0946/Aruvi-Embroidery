@@ -566,19 +566,23 @@ class Design {
   static async create(data) {
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags
+      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
+      average_rating, reviews_count
     } = data;
 
     // Ensure slug is non-empty and unique
     const finalSlug = slug ? slug : await this.generateUniqueSlug(title);
+
+    const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : 4.80;
+    const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : 0;
 
     let insertedId = null;
 
     if (db.isConnected()) {
       try {
         const res = await db.query(
-          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             title,
             sku || null,
@@ -594,7 +598,9 @@ class Design {
             is_trending ? 1 : 0,
             is_active ? 1 : 0,
             download_count ? parseInt(download_count) : 0,
-            tags || null
+            tags || null,
+            avgRatingVal,
+            revCountVal
           ]
         );
         if (res && res.insertId) insertedId = res.insertId;
@@ -627,6 +633,8 @@ class Design {
       is_active: is_active ? 1 : 0,
       download_count: download_count ? parseInt(download_count) : 0,
       tags: tags || null,
+      average_rating: avgRatingVal,
+      reviews_count: revCountVal,
       primary_image: '/public/images/logo.jpg',
       images: [],
       files: []
@@ -645,7 +653,8 @@ class Design {
   static async update(id, data) {
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags
+      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
+      average_rating, reviews_count
     } = data;
 
     // Ensure slug is valid & unique excluding current design ID
@@ -654,31 +663,47 @@ class Design {
       finalSlug = await this.generateUniqueSlug(title || `design-${id}`, id);
     }
 
+    const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : undefined;
+    const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : undefined;
+
     if (db.isConnected()) {
       try {
+        let updateFields = [
+          'title=?', 'sku=?', 'slug=?', 'price=?', 'sale_price=?', 'category_id=?',
+          'hoop_size=?', 'stitch_count=?', 'dimensions=?', 'formats=?', 'is_featured=?', 'is_trending=?', 'is_active=?', 'download_count=?', 'tags=?'
+        ];
+        let updateParams = [
+          title,
+          sku || null,
+          finalSlug,
+          price,
+          sale_price !== undefined && sale_price !== null && sale_price !== '' ? sale_price : null,
+          category_id || null,
+          hoop_size || '5x7 inch (130x180 mm)',
+          stitch_count || 24800,
+          dimensions || '140mm x 180mm',
+          formats || '',
+          is_featured ? 1 : 0,
+          is_trending ? 1 : 0,
+          is_active ? 1 : 0,
+          download_count ? parseInt(download_count) : 0,
+          tags || null
+        ];
+
+        if (avgRatingVal !== undefined) {
+          updateFields.push('average_rating=?');
+          updateParams.push(avgRatingVal);
+        }
+        if (revCountVal !== undefined) {
+          updateFields.push('reviews_count=?');
+          updateParams.push(revCountVal);
+        }
+
+        updateParams.push(id);
+
         await db.query(
-          `UPDATE designs SET 
-            title=?, sku=?, slug=?, price=?, sale_price=?, category_id=?,
-            hoop_size=?, stitch_count=?, dimensions=?, formats=?, is_featured=?, is_trending=?, is_active=?, download_count=?, tags=?
-           WHERE id=?`,
-          [
-            title,
-            sku || null,
-            finalSlug,
-            price,
-            sale_price !== undefined && sale_price !== null && sale_price !== '' ? sale_price : null,
-            category_id || null,
-            hoop_size || '5x7 inch (130x180 mm)',
-            stitch_count || 24800,
-            dimensions || '140mm x 180mm',
-            formats || '',
-            is_featured ? 1 : 0,
-            is_trending ? 1 : 0,
-            is_active ? 1 : 0,
-            download_count ? parseInt(download_count) : 0,
-            tags || null,
-            id
-          ]
+          `UPDATE designs SET ${updateFields.join(', ')} WHERE id=?`,
+          updateParams
         );
       } catch (err) {
         console.error('[Design.update DB Error]:', err.message);
@@ -703,6 +728,8 @@ class Design {
       if (is_active !== undefined) target.is_active = is_active ? 1 : 0;
       if (download_count !== undefined) target.download_count = parseInt(download_count);
       if (tags !== undefined) target.tags = tags;
+      if (avgRatingVal !== undefined) target.average_rating = avgRatingVal;
+      if (revCountVal !== undefined) target.reviews_count = revCountVal;
     }
     return true;
   }

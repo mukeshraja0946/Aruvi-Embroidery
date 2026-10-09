@@ -139,8 +139,10 @@
           <div class="card-info-content">
             <div class="stat-title">Total Orders</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= stats.totalOrders || 124 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 12%</span>
+              <span class="stat-num"><%= stats.totalOrders %></span>
+              <span class="stat-trend" style="color: <%= stats.ordersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                <i class="fa-solid fa-arrow-<%= stats.ordersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.ordersTrend.text %>
+              </span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -152,8 +154,10 @@
           <div class="card-info-content">
             <div class="stat-title">Total Sales</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">₹<%= stats.totalSales ? parseFloat(stats.totalSales).toLocaleString('en-IN') : '48,750' %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 18%</span>
+              <span class="stat-num">₹<%= parseFloat(stats.totalSales || 0).toLocaleString('en-IN') %></span>
+              <span class="stat-trend" style="color: <%= stats.salesTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                <i class="fa-solid fa-arrow-<%= stats.salesTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.salesTrend.text %>
+              </span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -165,8 +169,10 @@
           <div class="card-info-content">
             <div class="stat-title">Total Customers</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= totalCustomers || 312 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 10%</span>
+              <span class="stat-num"><%= stats.totalCustomers %></span>
+              <span class="stat-trend" style="color: <%= stats.customersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                <i class="fa-solid fa-arrow-<%= stats.customersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.customersTrend.text %>
+              </span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -178,8 +184,10 @@
           <div class="card-info-content">
             <div class="stat-title">Total Designs</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= totalDesigns || 520 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 8%</span>
+              <span class="stat-num"><%= stats.totalDesigns %></span>
+              <span class="stat-trend" style="color: <%= stats.designsTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                <i class="fa-solid fa-arrow-<%= stats.designsTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.designsTrend.text %>
+              </span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -192,11 +200,7 @@
         <div class="admin-card-box">
           <div class="card-header-flex">
             <h3>Sales Overview</h3>
-            <select style="background: #F4EFEA; border: 1px solid var(--admin-border); border-radius: 8px; padding: 4px 10px; font-size: 0.8rem; color: var(--admin-text-dark); cursor: pointer;">
-              <option>Last 6 Months</option>
-              <option>Last 3 Months</option>
-              <option>This Year</option>
-            </select>
+            <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Last 6 Months</span>
           </div>
           <div style="height: 220px; position: relative;">
             <canvas id="salesOverviewChart"></canvas>
@@ -215,7 +219,7 @@
               <canvas id="ordersStatusChart"></canvas>
               <!-- Center Text -->
               <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
-                <div style="font-size: 1.4rem; font-family: var(--font-heading); font-weight: 700; color: var(--admin-text-dark); line-height: 1;">124</div>
+                <div style="font-size: 1.4rem; font-family: var(--font-heading); font-weight: 700; color: var(--admin-text-dark); line-height: 1;"><%= stats.ordersByStatus.total %></div>
                 <div style="font-size: 0.68rem; color: var(--admin-text-muted);">Orders</div>
               </div>
             </div>
@@ -227,7 +231,7 @@
                   <span style="width: 10px; height: 10px; border-radius: 50%; background: #FFC107;"></span>
                   <span>Pending</span>
                 </div>
-                <strong>5 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(4%)</span></strong>
+                <strong><%= stats.ordersByStatus.pending %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.pending / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
               </div>
 
               <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -235,7 +239,7 @@
                   <span style="width: 10px; height: 10px; border-radius: 50%; background: #2196F3;"></span>
                   <span>Processing</span>
                 </div>
-                <strong>18 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(15%)</span></strong>
+                <strong><%= stats.ordersByStatus.processing %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.processing / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
               </div>
 
               <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -243,7 +247,7 @@
                   <span style="width: 10px; height: 10px; border-radius: 50%; background: #4CAF50;"></span>
                   <span>Completed</span>
                 </div>
-                <strong>92 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(74%)</span></strong>
+                <strong><%= stats.ordersByStatus.completed %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.completed / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
               </div>
 
               <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -251,7 +255,7 @@
                   <span style="width: 10px; height: 10px; border-radius: 50%; background: #F44336;"></span>
                   <span>Cancelled</span>
                 </div>
-                <strong>9 <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(7%)</span></strong>
+                <strong><%= stats.ordersByStatus.cancelled %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.cancelled / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
               </div>
             </div>
           </div>
@@ -280,71 +284,33 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><strong>#1001</strong></td>
-                <td>Priya S.</td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <img src="/public/images/hero_embroidery.jpg" alt="Floral Border" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
-                    <span style="font-size: 0.8rem;">Floral Border</span>
-                  </div>
-                </td>
-                <td><strong>₹499</strong></td>
-                <td><span style="background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Completed</span></td>
-                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">01 Oct 2026</td>
-              </tr>
-              <tr>
-                <td><strong>#1002</strong></td>
-                <td>Karthik M.</td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <img src="/public/images/cat_monogram.jpg" alt="Peacock Design" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
-                    <span style="font-size: 0.8rem;">Peacock Design</span>
-                  </div>
-                </td>
-                <td><strong>₹299</strong></td>
-                <td><span style="background: #E3F2FD; color: #1565C0; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Processing</span></td>
-                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">30 Sep 2026</td>
-              </tr>
-              <tr>
-                <td><strong>#1003</strong></td>
-                <td>Divya R.</td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <img src="/public/images/cat_floral.jpg" alt="Blouse Design" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
-                    <span style="font-size: 0.8rem;">Blouse Design</span>
-                  </div>
-                </td>
-                <td><strong>₹699</strong></td>
-                <td><span style="background: #FFF8E1; color: #F57F17; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Pending</span></td>
-                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">29 Sep 2026</td>
-              </tr>
-              <tr>
-                <td><strong>#1004</strong></td>
-                <td>Sathish K.</td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <img src="/public/images/cat_monogram.jpg" alt="Monogram A" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
-                    <span style="font-size: 0.8rem;">Monogram A</span>
-                  </div>
-                </td>
-                <td><strong>₹399</strong></td>
-                <td><span style="background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Completed</span></td>
-                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">28 Sep 2026</td>
-              </tr>
-              <tr>
-                <td><strong>#1005</strong></td>
-                <td>Meena L.</td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <img src="/public/images/cat_kids.jpg" alt="Kids Teddy" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
-                    <span style="font-size: 0.8rem;">Kids Teddy</span>
-                  </div>
-                </td>
-                <td><strong>₹349</strong></td>
-                <td><span style="background: #E3F2FD; color: #1565C0; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;">Processing</span></td>
-                <td style="color: var(--admin-text-muted); font-size: 0.78rem;">27 Sep 2026</td>
-              </tr>
+              <% if (stats.recentOrders && stats.recentOrders.length > 0) { %>
+                <% stats.recentOrders.forEach(ord => { %>
+                  <tr>
+                    <td><strong><%= ord.order_number || ('#' + ord.id) %></strong></td>
+                    <td><%= ord.customer_name || 'Guest Customer' %></td>
+                    <td>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <img src="<%= ord.item_image || '/public/images/hero_embroidery.jpg' %>" alt="<%= ord.item_title || 'Design' %>" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                        <span style="font-size: 0.8rem;"><%= ord.item_title || 'Embroidery Design' %></span>
+                      </div>
+                    </td>
+                    <td><strong>₹<%= ord.final_amount || 0 %></strong></td>
+                    <td>
+                      <span style="background: <%= ord.status === 'completed' || ord.status === 'paid' ? '#E8F5E9' : (ord.status === 'pending' ? '#FFF8E1' : '#FFEBEE') %>; color: <%= ord.status === 'completed' || ord.status === 'paid' ? '#2E7D32' : (ord.status === 'pending' ? '#F57F17' : '#C62828') %>; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; text-transform: capitalize;">
+                        <%= ord.status %>
+                      </span>
+                    </td>
+                    <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
+                      <%= ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 1.8rem; color: var(--admin-text-muted);">No orders recorded yet.</td>
+                </tr>
+              <% } %>
             </tbody>
           </table>
         </div>
@@ -357,50 +323,20 @@
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
-              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F6E5E0; color: var(--admin-primary); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">1</span>
-              <img src="/public/images/hero_embroidery.jpg" alt="Floral Border Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Floral Border Design</strong>
-                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">86 sales</span>
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
-              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">2</span>
-              <img src="/public/images/cat_monogram.jpg" alt="Peacock Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Peacock Design</strong>
-                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">72 sales</span>
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
-              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">3</span>
-              <img src="/public/images/cat_floral.jpg" alt="Blouse Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Blouse Design</strong>
-                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">58 sales</span>
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
-              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">4</span>
-              <img src="/public/images/cat_monogram.jpg" alt="Monogram A" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Monogram A</strong>
-                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">45 sales</span>
-              </div>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
-              <span style="width: 22px; height: 22px; border-radius: 50%; background: #F4EFEA; color: var(--admin-text-dark); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">5</span>
-              <img src="/public/images/cat_kids.jpg" alt="Kids Teddy Design" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
-              <div style="flex: 1;">
-                <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);">Kids Teddy Design</strong>
-                <span style="font-size: 0.72rem; color: var(--admin-text-muted);">38 sales</span>
-              </div>
-            </div>
+            <% if (stats.topSellingDesigns && stats.topSellingDesigns.length > 0) { %>
+              <% stats.topSellingDesigns.forEach((des, idx) => { %>
+                <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+                  <span style="width: 22px; height: 22px; border-radius: 50%; background: <%= idx === 0 ? '#F6E5E0' : '#F4EFEA' %>; color: <%= idx === 0 ? 'var(--admin-primary)' : 'var(--admin-text-dark)' %>; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;"><%= idx + 1 %></span>
+                  <img src="<%= des.image_url || '/public/images/hero_embroidery.jpg' %>" alt="<%= des.title %>" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
+                  <div style="flex: 1;">
+                    <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);"><%= des.title %></strong>
+                    <span style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= des.sales_count || 0 %> sales</span>
+                  </div>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div style="padding: 1.5rem; text-align: center; color: var(--admin-text-muted);">No design sales recorded yet.</div>
+            <% } %>
           </div>
         </div>
 
@@ -459,7 +395,7 @@
   </div>
 </div>
 
-<!-- Chart initialization script matching reference -->
+<!-- Dynamic Chart initialization script -->
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     // 1. Sales Overview Area Chart
@@ -468,13 +404,16 @@
     gradient.addColorStop(0, 'rgba(184, 64, 42, 0.35)');
     gradient.addColorStop(1, 'rgba(184, 64, 42, 0.01)');
 
+    const monthLabels = <%- JSON.stringify(stats.monthLabels || ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']) %>;
+    const monthlySalesData = <%- JSON.stringify(stats.monthlySales || [0, 0, 0, 0, 0, 0]) %>;
+
     new Chart(ctxSales, {
       type: 'line',
       data: {
-        labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+        labels: monthLabels,
         datasets: [{
           label: 'Sales (₹)',
-          data: [6000, 14000, 20000, 18000, 29000, 35000],
+          data: monthlySalesData,
           borderColor: '#B8402A',
           borderWidth: 2.5,
           backgroundColor: gradient,
@@ -493,7 +432,7 @@
           y: {
             ticks: {
               callback: function(val) {
-                return val === 0 ? '0' : (val / 1000) + 'K';
+                return val === 0 ? '0' : (val >= 1000 ? (val / 1000).toFixed(0) + 'K' : val);
               }
             }
           }
@@ -503,12 +442,19 @@
 
     // 2. Orders by Status Donut Chart
     const ctxStatus = document.getElementById('ordersStatusChart').getContext('2d');
+    const statusData = [
+      <%= stats.ordersByStatus.pending || 0 %>,
+      <%= stats.ordersByStatus.processing || 0 %>,
+      <%= stats.ordersByStatus.completed || 0 %>,
+      <%= stats.ordersByStatus.cancelled || 0 %>
+    ];
+
     new Chart(ctxStatus, {
       type: 'doughnut',
       data: {
         labels: ['Pending', 'Processing', 'Completed', 'Cancelled'],
         datasets: [{
-          data: [5, 18, 92, 9],
+          data: statusData,
           backgroundColor: ['#FFC107', '#2196F3', '#4CAF50', '#F44336'],
           borderWidth: 0,
           cutout: '76%'

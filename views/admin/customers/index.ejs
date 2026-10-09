@@ -142,8 +142,12 @@
           <div class="card-info-content">
             <div class="stat-title">Total Customers</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= customers ? customers.length : 312 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 10%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.totalCustomers !== undefined) ? stats.totalCustomers : (customers ? customers.length : 0) %></span>
+              <% if (typeof stats !== 'undefined' && stats.customersTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.customersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.customersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.customersTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -154,8 +158,12 @@
           <div class="card-info-content">
             <div class="stat-title">Active Customers</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">298</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 95%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.activeCustomers !== undefined) ? stats.activeCustomers : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.activeTrend) { %>
+                <span class="stat-trend">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.activeTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">active accounts</span>
           </div>
@@ -166,8 +174,12 @@
           <div class="card-info-content">
             <div class="stat-title">New Customers</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">24</span>
-              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-up"></i> 24 this mo</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.newCustomers !== undefined) ? stats.newCustomers : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.newTrend) { %>
+                <span class="stat-trend" style="color: var(--admin-primary);">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.newTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">new signups</span>
           </div>
@@ -178,8 +190,12 @@
           <div class="card-info-content">
             <div class="stat-title">Repeat Customers</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">186</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 62%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.repeatCustomers !== undefined) ? stats.repeatCustomers : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.repeatTrend) { %>
+                <span class="stat-trend">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.repeatTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">repeat buyers</span>
           </div>

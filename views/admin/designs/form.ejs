@@ -351,21 +351,21 @@
               <h3>Pricing & Availability</h3>
 
               <!-- 3-Col: Original Price, Discount Price, Discount % -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.2rem;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.0rem; margin-bottom: 1.2rem;">
                 <div>
-                  <label class="form-label-custom">Original Price (₹) <span class="req">*</span></label>
-                  <input type="number" step="0.01" name="price" id="originalPrice" class="form-control-custom" value="<%= design ? design.price : '399' %>" required oninput="calcDiscount()">
+                  <label class="form-label-custom">Original Price / MRP (₹) <span class="req">*</span></label>
+                  <input type="number" step="0.01" min="0" name="price" id="originalPrice" class="form-control-custom" value="<%= design ? design.price : '120' %>" required oninput="calcDiscount()">
                 </div>
 
                 <div>
-                  <label class="form-label-custom">Discount Price (₹) <span class="req">*</span></label>
-                  <input type="number" step="0.01" name="sale_price" id="discountPrice" class="form-control-custom" value="<%= design ? (design.sale_price !== null && design.sale_price !== undefined ? design.sale_price : '299') : '299' %>" oninput="calcDiscount()">
+                  <label class="form-label-custom">Final Selling Price (₹) <span class="req">*</span></label>
+                  <input type="number" step="0.01" min="0" name="sale_price" id="discountPrice" class="form-control-custom" value="<%= design ? (design.sale_price !== null && design.sale_price !== undefined ? design.sale_price : design.price) : '45' %>" oninput="calcDiscount()">
                 </div>
 
                 <div>
                   <label class="form-label-custom">Discount (%)</label>
                   <div style="position: relative;">
-                    <input type="text" id="discountPercent" class="form-control-custom" value="25%" readonly style="background: #FAF6F0;">
+                    <input type="text" id="discountPercent" class="form-control-custom" value="<%= (!design) ? '62.5%' : '' %>" readonly style="background: #FAF6F0;">
                     <i class="fa-solid fa-arrows-rotate" onclick="calcDiscount()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: var(--admin-text-muted); cursor: pointer;" title="Recalculate"></i>
                   </div>
                 </div>
@@ -392,7 +392,26 @@
               </div>
             </div>
 
-            <!-- Card 3: Additional Options -->
+            <!-- Card 3: Ratings & Reviews Control (Requirement 5) -->
+            <div class="form-section-card">
+              <h3>Ratings & Review Metadata</h3>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
+                <div>
+                  <label class="form-label-custom">Displayed Rating (0.0 – 5.0)</label>
+                  <input type="number" step="0.1" min="0" max="5" name="average_rating" class="form-control-custom" value="<%= design ? (design.average_rating !== undefined ? design.average_rating : 4.8) : 4.8 %>" placeholder="e.g. 4.8">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Controls customer page star rating score.</span>
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Review Count (Number of Reviews)</label>
+                  <input type="number" min="0" name="reviews_count" class="form-control-custom" value="<%= design ? (design.reviews_count !== undefined ? design.reviews_count : 0) : 0 %>" placeholder="e.g. 120">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Controls review count display. Set 0 if no reviews exist.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 4: Additional Options -->
             <div class="form-section-card">
               <h3>Additional Options</h3>
 
@@ -708,13 +727,26 @@
   function calcDiscount() {
     const orig = parseFloat(document.getElementById('originalPrice').value) || 0;
     const disc = parseFloat(document.getElementById('discountPrice').value) || 0;
-    if (orig > 0 && disc > 0 && orig > disc) {
-      const pct = Math.round(((orig - disc) / orig) * 100);
-      document.getElementById('discountPercent').value = pct + '%';
+    if (orig > 0 && disc >= 0) {
+      if (disc > orig) {
+        document.getElementById('discountPercent').value = 'Invalid (Selling > MRP)';
+        return;
+      }
+      const pct = ((orig - disc) / orig) * 100;
+      if (pct === 0) {
+        document.getElementById('discountPercent').value = '0%';
+      } else {
+        const formatted = (pct % 1 === 0) ? (pct + '%') : (pct.toFixed(1) + '%');
+        document.getElementById('discountPercent').value = formatted;
+      }
     } else {
       document.getElementById('discountPercent').value = '0%';
     }
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    calcDiscount();
+  });
 
   function initTags() {
     const raw = document.getElementById('tagsHiddenInput').value || '';

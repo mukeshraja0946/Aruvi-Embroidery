@@ -93,7 +93,8 @@
             <div class="mini-card-body">
               <h4><a href="/design/<%= design.slug %>"><%= design.title %></a></h4>
               <div class="mini-bottom-row">
-                <span class="mini-price">₹<%= design.sale_price || design.price %></span>
+                <% const catCurP = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price); %>
+                <span class="mini-price">₹<%= catCurP %></span>
                 <form class="ajax-add-to-cart" style="display: inline;">
                   <input type="hidden" name="design_id" value="<%= design.id %>">
                   <button type="submit" class="mini-cart-btn"><i class="fa-solid fa-cart-shopping"></i></button>

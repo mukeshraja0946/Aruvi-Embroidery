@@ -43,27 +43,40 @@
       <h1 class="detail-product-title"><%= design.title %></h1>
       
       <!-- Rating Stars -->
-      <div class="detail-rating-row">
-        <div class="stars-gold">
-          <i class="fa-solid fa-star"></i>
-          <i class="fa-solid fa-star"></i>
-          <i class="fa-solid fa-star"></i>
-          <i class="fa-solid fa-star"></i>
-          <i class="fa-solid fa-star-half-stroke"></i>
+      <%
+        const detailRating = parseFloat(design.average_rating || design.rating || 0);
+        const detailReviews = parseInt(design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0);
+      %>
+      <% if (detailReviews > 0 || detailRating > 0) { %>
+        <div class="detail-rating-row">
+          <div class="stars-gold">
+            <% const fullStars = Math.floor(detailRating); %>
+            <% const hasHalf = (detailRating - fullStars) >= 0.3; %>
+            <% for (let i = 0; i < fullStars; i++) { %><i class="fa-solid fa-star"></i><% } %>
+            <% if (hasHalf) { %><i class="fa-solid fa-star-half-stroke"></i><% } %>
+            <% for (let i = (fullStars + (hasHalf ? 1 : 0)); i < 5; i++) { %><i class="fa-regular fa-star"></i><% } %>
+          </div>
+          <span class="rating-number"><%= detailRating.toFixed(1) %></span>
+          <span class="reviews-count">(<%= detailReviews %> <%= detailReviews === 1 ? 'review' : 'reviews' %>)</span>
         </div>
-        <span class="rating-number">4.9</span>
-        <span class="reviews-count">(120 reviews)</span>
-      </div>
+      <% } else { %>
+        <div class="detail-rating-row" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.8rem;">
+          <i class="fa-regular fa-star"></i> <span>No reviews yet</span>
+        </div>
+      <% } %>
 
       <!-- Price Row -->
+      <%
+        const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
+        const origPrice = parseFloat(design.price || 0);
+        const hasDisc = curPrice < origPrice;
+        const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
+      %>
       <div class="detail-price-row">
-        <span class="detail-current-price">₹<%= design.sale_price || design.price %></span>
-        <% if (design.sale_price && design.price > design.sale_price) { %>
-          <span class="detail-old-price">₹<%= design.price %></span>
-          <span class="detail-discount-tag"><%= Math.round(((design.price - design.sale_price) / design.price) * 100) %>% OFF</span>
-        <% } else { %>
-          <span class="detail-old-price">₹399</span>
-          <span class="detail-discount-tag">25% OFF</span>
+        <span class="detail-current-price">₹<%= curPrice %></span>
+        <% if (hasDisc) { %>
+          <span class="detail-old-price">₹<%= origPrice %></span>
+          <span class="detail-discount-tag"><%= discPct %>% OFF</span>
         <% } %>
       </div>
 

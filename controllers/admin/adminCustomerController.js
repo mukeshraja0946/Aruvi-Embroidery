@@ -1,14 +1,17 @@
 const User = require('../../models/User');
+const AdminStatsService = require('../../services/adminStatsService');
 
 exports.getCustomers = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const { users: customers, total } = await User.getAll({ page, limit: 15 });
+    const stats = await AdminStatsService.getCustomerStats();
 
     res.render('admin/customers/index', {
       title: 'Customer Directory - Admin',
       customers,
       total,
+      stats,
       currentPage: page,
       totalPages: Math.ceil(total / 15)
     });

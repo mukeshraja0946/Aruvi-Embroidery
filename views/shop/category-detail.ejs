@@ -88,21 +88,34 @@
             <% } %>
 
             <!-- Rating Row -->
-            <div style="font-size: 0.78rem; color: #F5A623; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 4px;">
-              <i class="fa-solid fa-star"></i>
-              <span style="font-weight: 700; color: var(--text-dark);"><%= design.average_rating || 4.9 %></span>
-              <span style="color: var(--text-muted);">(<%= design.reviews_count || 95 %>)</span>
-            </div>
+            <%
+              const catRatingScore = parseFloat(design.average_rating || design.rating || 0);
+              const catNumReviews = parseInt(design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0);
+            %>
+            <% if (catNumReviews > 0 || catRatingScore > 0) { %>
+              <div style="font-size: 0.78rem; color: #F5A623; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 4px;">
+                <i class="fa-solid fa-star"></i>
+                <span style="font-weight: 700; color: var(--text-dark);"><%= catRatingScore.toFixed(1) %></span>
+                <span style="color: var(--text-muted);">(<%= catNumReviews %>)</span>
+              </div>
+            <% } else { %>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                <span>No reviews yet</span>
+              </div>
+            <% } %>
 
             <!-- Price Row -->
+            <%
+              const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
+              const origPrice = parseFloat(design.price || 0);
+              const hasDisc = curPrice < origPrice;
+              const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
+            %>
             <div class="card-price-row">
-              <span class="current-price">₹<%= Math.round(design.sale_price || design.price) %></span>
-              <% if (design.sale_price && design.price > design.sale_price) { %>
-                <span class="old-price">₹<%= Math.round(design.price) %></span>
-                <span class="discount-badge"><%= Math.round(((design.price - design.sale_price) / design.price) * 100) %>% OFF</span>
-              <% } else if (design.discount_pct) { %>
-                <span class="old-price">₹<%= Math.round(design.price * 1.25) %></span>
-                <span class="discount-badge"><%= design.discount_pct %>% OFF</span>
+              <span class="current-price">₹<%= curPrice %></span>
+              <% if (hasDisc) { %>
+                <span class="old-price">₹<%= origPrice %></span>
+                <span class="discount-badge"><%= discPct %>% OFF</span>
               <% } %>
             </div>
 

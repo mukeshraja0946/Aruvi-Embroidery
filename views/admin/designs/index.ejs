@@ -166,6 +166,9 @@
           <button type="button" onclick="confirmDeleteAllDesigns()" class="btn" style="height: 44px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #900C3F; color: #FFFFFF; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
             <i class="fa-regular fa-trash-can"></i> Delete All Designs
           </button>
+          <button type="button" onclick="openBulkImportModal()" class="btn btn-outline" style="height: 44px; padding: 0 1.2rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-color: var(--admin-primary); color: var(--admin-primary);">
+            <i class="fa-solid fa-file-import"></i> Bulk Import
+          </button>
           <a href="/admin/designs/create" class="btn btn-primary" style="height: 44px; padding: 0 1.4rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-plus"></i> Add New Design
           </a>
@@ -197,8 +200,12 @@
           <div class="card-info-content">
             <div class="stat-title">Total Designs</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= typeof total !== 'undefined' ? total : 520 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 8%</span>
+              <span class="stat-num"><%= typeof total !== 'undefined' ? total : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.designsTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.designsTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.designsTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.designsTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -210,8 +217,12 @@
           <div class="card-info-content">
             <div class="stat-title">Active Designs</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= typeof activeCount !== 'undefined' ? activeCount : 498 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 10%</span>
+              <span class="stat-num"><%= typeof activeCount !== 'undefined' ? activeCount : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.activeTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.activeTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.activeTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.activeTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -223,8 +234,12 @@
           <div class="card-info-content">
             <div class="stat-title">Inactive Designs</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= typeof inactiveCount !== 'undefined' ? inactiveCount : 22 %></span>
-              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-down"></i> 5%</span>
+              <span class="stat-num"><%= typeof inactiveCount !== 'undefined' ? inactiveCount : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.inactiveTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.inactiveTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.inactiveTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.inactiveTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -236,8 +251,12 @@
           <div class="card-info-content">
             <div class="stat-title">Categories</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= typeof categoryCount !== 'undefined' ? categoryCount : 8 %></span>
-              <span class="stat-trend" style="color: var(--admin-text-muted);">0%</span>
+              <span class="stat-num"><%= typeof categoryCount !== 'undefined' ? categoryCount : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.categoriesTrend) { %>
+                <span class="stat-trend" style="color: <%= stats.categoriesTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <i class="fa-solid fa-arrow-<%= stats.categoriesTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.categoriesTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -668,6 +687,275 @@
     .catch(err => {
       console.error(err);
       checkbox.checked = !checkbox.checked;
+    });
+  }
+</script>
+
+<!-- Bulk Import Modal matching Requirements 6 & 7 -->
+<div id="bulkImportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.3);">
+    <!-- Modal Header -->
+    <div style="padding: 1.2rem 1.6rem; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; background: #FAF6F0;">
+      <div>
+        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+          <i class="fa-solid fa-file-import" style="color: var(--admin-primary);"></i> Bulk Import Embroidery Designs
+        </h3>
+        <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Import multiple designs from spreadsheet & upload product asset packages (.xlsx, .csv, .docx, .json, .zip, .png)</span>
+      </div>
+      <button type="button" onclick="closeBulkImportModal()" style="background: none; border: none; font-size: 1.4rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding: 1.6rem; overflow-y: auto; flex: 1;">
+      
+      <!-- Step 1: Upload Files State -->
+      <div id="importStep1">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; background: #E3F2FD; border: 1px solid #BBDEFB; padding: 0.9rem 1.2rem; border-radius: 12px; color: #0D47A1;">
+          <div style="font-size: 0.82rem; font-weight: 600;">
+            <i class="fa-solid fa-download"></i> Need an import template? Download pre-formatted spreadsheet.
+          </div>
+          <a href="/admin/designs/import-template" class="btn btn-outline btn-sm" style="background: #FFF; color: #0D47A1; border-color: #0D47A1; font-size: 0.78rem; border-radius: 8px; text-decoration: none; font-weight: 700;">
+            <i class="fa-solid fa-file-excel"></i> Download Excel Template (.xlsx)
+          </a>
+        </div>
+
+        <form id="bulkImportForm" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.2rem;">
+            <!-- Spreadsheet File Upload Card -->
+            <div style="border: 2px dashed var(--admin-primary); border-radius: 12px; padding: 1.5rem; text-align: center; background: #FAF0E8;">
+              <i class="fa-solid fa-file-csv" style="font-size: 2.2rem; color: var(--admin-primary); margin-bottom: 0.5rem;"></i>
+              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 4px;">1. Select Data Spreadsheet *</strong>
+              <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted); margin-bottom: 1rem;">Supports .XLSX, .XLS, .CSV, .DOCX, .JSON</span>
+              <input type="file" id="importSpreadsheetInput" name="import_file" accept=".xlsx,.xls,.csv,.docx,.json" required style="font-size: 0.8rem; width: 100%;">
+            </div>
+
+            <!-- Product Assets Upload Card -->
+            <div style="border: 2px dashed #4CAF50; border-radius: 12px; padding: 1.5rem; text-align: center; background: #E8F5E9;">
+              <i class="fa-solid fa-folder-open" style="font-size: 2.2rem; color: #2E7D32; margin-bottom: 0.5rem;"></i>
+              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 4px;">2. Select Product Assets (Optional)</strong>
+              <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted); margin-bottom: 1rem;">Upload preview images (.png, .jpg) & machine ZIP files (.zip)</span>
+              <input type="file" id="importAssetsInput" name="asset_files" accept=".zip,.png,.jpg,.jpeg,.webp" multiple style="font-size: 0.8rem; width: 100%;">
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Step 2: Preview & Validation Table State -->
+      <div id="importStep2" style="display: none;">
+        <div id="importValidationSummary" style="margin-bottom: 1.2rem; padding: 0.9rem 1.2rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600; display: flex; gap: 1.5rem; align-items: center;"></div>
+
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 10px;">
+          <table class="admin-table" style="font-size: 0.8rem; margin: 0;">
+            <thead>
+              <tr style="background: #FAF6F0; position: sticky; top: 0; z-index: 10;">
+                <th style="width: 50px;">Row</th>
+                <th style="width: 90px;">Status</th>
+                <th>Design Name</th>
+                <th>SKU</th>
+                <th>Category</th>
+                <th>MRP</th>
+                <th>Selling Price</th>
+                <th>Assets Matched</th>
+                <th>Validation Details</th>
+              </tr>
+            </thead>
+            <tbody id="importPreviewTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <label style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="skipErrorsCheckbox" checked> Skip invalid rows with errors automatically
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer -->
+    <div style="padding: 1rem 1.6rem; border-top: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; background: #FAF6F0;">
+      <button type="button" onclick="closeBulkImportModal()" class="btn btn-outline" style="border-radius: 8px; font-size: 0.85rem; background: #FFF;">Cancel</button>
+
+      <div style="display: flex; gap: 10px;">
+        <button type="button" id="startPreviewBtn" onclick="submitImportPreview()" class="btn btn-primary" style="border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.4rem;">
+          <i class="fa-solid fa-magnifying-glass"></i> Parse & Preview Rows
+        </button>
+
+        <button type="button" id="commitImportBtn" onclick="submitImportCommit()" class="btn btn-primary" style="display: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.6rem; background: #2E7D32; border-color: #2E7D32;">
+          <i class="fa-solid fa-circle-check"></i> Confirm & Import Designs
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentImportBatchId = null;
+
+  function openBulkImportModal() {
+    document.getElementById('importStep1').style.display = 'block';
+    document.getElementById('importStep2').style.display = 'none';
+    document.getElementById('startPreviewBtn').style.display = 'inline-flex';
+    document.getElementById('commitImportBtn').style.display = 'none';
+    document.getElementById('bulkImportModal').style.display = 'flex';
+  }
+
+  function closeBulkImportModal() {
+    document.getElementById('bulkImportModal').style.display = 'none';
+  }
+
+  function submitImportPreview() {
+    const fileInput = document.getElementById('importSpreadsheetInput');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Please select a spreadsheet file (.xlsx, .csv, .docx, .json) to import.');
+      return;
+    }
+
+    const btn = document.getElementById('startPreviewBtn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing File...';
+
+    const formData = new FormData(document.getElementById('bulkImportForm'));
+
+    fetch('/admin/designs/import-preview', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': '<%= csrfToken %>'
+      },
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+
+      if (data.success) {
+        currentImportBatchId = data.batchId;
+        renderImportPreview(data);
+      } else {
+        alert(data.message || 'Error processing import file.');
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      console.error(err);
+      alert('Import error: ' + err.message);
+    });
+  }
+
+  function renderImportPreview(data) {
+    document.getElementById('importStep1').style.display = 'none';
+    document.getElementById('importStep2').style.display = 'block';
+    document.getElementById('startPreviewBtn').style.display = 'none';
+    document.getElementById('commitImportBtn').style.display = 'inline-flex';
+
+    const summaryEl = document.getElementById('importValidationSummary');
+    summaryEl.style.background = data.errorCount > 0 ? '#FFF3E0' : '#E8F5E9';
+    summaryEl.style.color = data.errorCount > 0 ? '#E65100' : '#2E7D32';
+    summaryEl.innerHTML = `
+      <span>Total Rows: <strong>${data.totalRows}</strong></span>
+      <span>Valid: <strong style="color:#2E7D32">${data.validCount}</strong></span>
+      <span>Warnings: <strong style="color:#F57C00">${data.warningCount}</strong></span>
+      <span>Errors: <strong style="color:#C62828">${data.errorCount}</strong></span>
+    `;
+
+    const tbody = document.getElementById('importPreviewTableBody');
+    tbody.innerHTML = '';
+
+    data.rows.forEach(row => {
+      const tr = document.createElement('tr');
+      if (row.rowStatus === 'error') tr.style.background = '#FFEBEE';
+      else if (row.rowStatus === 'warning') tr.style.background = '#FFFDE7';
+
+      let statusBadge = '<span style="background:#E8F5E9; color:#2E7D32; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.72rem;">VALID</span>';
+      if (row.rowStatus === 'error') {
+        statusBadge = '<span style="background:#FFEBEE; color:#C62828; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.72rem;">ERROR</span>';
+      } else if (row.rowStatus === 'warning') {
+        statusBadge = '<span style="background:#FFF3E0; color:#E65100; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.72rem;">WARNING</span>';
+      }
+
+      let assetStr = '';
+      if (row.previewImage) assetStr += '<span style="color:#2E7D32;" title="Image attached"><i class="fa-solid fa-image"></i> Img</span> ';
+      if (row.zipPackage) assetStr += '<span style="color:#1565C0;" title="ZIP attached"><i class="fa-solid fa-file-zipper"></i> ZIP</span>';
+      if (!assetStr) assetStr = '<span style="color:#999; font-style:italic;">None</span>';
+
+      let detailsStr = '';
+      if (row.errors && row.errors.length > 0) {
+        detailsStr += `<div style="color:#C62828; font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> ${row.errors.join(' ')}</div>`;
+      }
+      if (row.warnings && row.warnings.length > 0) {
+        detailsStr += `<div style="color:#E65100;"><i class="fa-solid fa-circle-info"></i> ${row.warnings.join(' ')}</div>`;
+      }
+      if (!detailsStr) detailsStr = '<span style="color:#2E7D32;">Ready to import</span>';
+
+      tr.innerHTML = `
+        <td style="font-weight:700;">${row.rowIndex}</td>
+        <td>${statusBadge}</td>
+        <td><strong>${row.title}</strong></td>
+        <td><code>${row.sku}</code></td>
+        <td>${row.category_name || 'Blouse'}</td>
+        <td>₹${row.price}</td>
+        <td>₹${row.sale_price}</td>
+        <td>${assetStr}</td>
+        <td>${detailsStr}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function submitImportCommit() {
+    if (!currentImportBatchId) {
+      alert('Invalid batch token. Please re-upload your file.');
+      return;
+    }
+
+    const btn = document.getElementById('commitImportBtn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing Designs...';
+
+    const skipErrors = document.getElementById('skipErrorsCheckbox').checked;
+
+    fetch('/admin/designs/import-commit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': '<%= csrfToken %>'
+      },
+      body: JSON.stringify({
+        _csrf: '<%= csrfToken %>',
+        batchId: currentImportBatchId,
+        skipErrors
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+
+      if (data.success) {
+        closeBulkImportModal();
+        if (typeof showToast === 'function') showToast(data.message || 'Designs imported successfully!');
+        else alert(data.message || 'Designs imported successfully!');
+        setTimeout(() => { window.location.reload(); }, 1200);
+      } else {
+        alert(data.message || 'Error completing bulk import.');
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      console.error(err);
+      alert('Import commit error: ' + err.message);
     });
   }
 </script>

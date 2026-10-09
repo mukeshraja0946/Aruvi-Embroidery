@@ -140,8 +140,12 @@
           <div class="card-info-content">
             <div class="stat-title">Total Enquiries</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">42</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 6 new</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.totalMessages !== undefined) ? stats.totalMessages : (messages ? messages.length : 0) %></span>
+              <% if (typeof stats !== 'undefined' && stats.messagesTrend) { %>
+                <span class="stat-trend">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.messagesTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
           </div>
@@ -152,8 +156,12 @@
           <div class="card-info-content">
             <div class="stat-title">New</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">5</span>
-              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-up"></i> 5 unread</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.newMessages !== undefined) ? stats.newMessages : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.newTrend) { %>
+                <span class="stat-trend" style="color: var(--admin-primary);">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.newTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">unread messages</span>
           </div>
@@ -164,8 +172,12 @@
           <div class="card-info-content">
             <div class="stat-title">In Progress</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">12</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 12 active</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.inProgressMessages !== undefined) ? stats.inProgressMessages : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.inProgressTrend) { %>
+                <span class="stat-trend">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.inProgressTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">in review</span>
           </div>
@@ -176,8 +188,12 @@
           <div class="card-info-content">
             <div class="stat-title">Resolved</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">25</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 100%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.resolvedMessages !== undefined) ? stats.resolvedMessages : 0 %></span>
+              <% if (typeof stats !== 'undefined' && stats.resolvedTrend) { %>
+                <span class="stat-trend">
+                  <i class="fa-solid fa-arrow-up"></i> <%= stats.resolvedTrend.text %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">replied inquiries</span>
           </div>

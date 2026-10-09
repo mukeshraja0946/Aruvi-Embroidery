@@ -31,7 +31,7 @@
             <h3 class="card-title"><a href="/design/<%= design.slug %>"><%= design.title %></a></h3>
             <div class="card-footer">
               <div class="price-box">
-                <span class="current-price">₹<%= design.sale_price || design.price %></span>
+                <span class="current-price">₹<%= (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price) %></span>
               </div>
               <form class="ajax-add-to-cart">
                 <input type="hidden" name="design_id" value="<%= design.id %>">

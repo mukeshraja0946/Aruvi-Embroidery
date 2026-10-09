@@ -1,18 +1,21 @@
 const Order = require('../../models/Order');
+const AdminStatsService = require('../../services/adminStatsService');
 
 exports.getOrders = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const statusFilter = req.query.status || null;
     const { orders, total } = await Order.getAll({ page, limit: 15, status: statusFilter });
+    const stats = await AdminStatsService.getOrderStats();
 
     res.render('admin/orders/index', {
       title: 'Manage Orders - Admin',
       orders,
       total,
+      stats,
       currentPage: page,
       totalPages: Math.ceil(total / 15),
-      statusFilter
+      currentStatus: statusFilter
     });
   } catch (err) {
     next(err);

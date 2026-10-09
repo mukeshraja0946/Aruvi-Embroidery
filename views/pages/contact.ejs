@@ -134,8 +134,8 @@
           <a href="https://instagram.com" target="_blank" class="btn btn-outline btn-sm" style="flex: 1; border-radius: var(--radius-full); justify-content: center; font-size: 0.82rem;">
             <i class="fa-brands fa-instagram" style="color: #E1306C;"></i> Instagram <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.68rem; margin-left: 2px;"></i>
           </a>
-          <a href="https://linkedin.com" target="_blank" class="btn btn-outline btn-sm" style="flex: 1; border-radius: var(--radius-full); justify-content: center; font-size: 0.82rem;">
-            <i class="fa-brands fa-linkedin" style="color: #0077B5;"></i> LinkedIn <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.68rem; margin-left: 2px;"></i>
+          <a href="<%= (typeof siteSettings !== 'undefined' && siteSettings.pinterest_url) ? siteSettings.pinterest_url : 'https://pinterest.com/aruviembroidery' %>" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="flex: 1; border-radius: var(--radius-full); justify-content: center; font-size: 0.82rem;">
+            <i class="fa-brands fa-pinterest" style="color: #E60023;"></i> Pinterest <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.68rem; margin-left: 2px;"></i>
           </a>
         </div>
       </div>

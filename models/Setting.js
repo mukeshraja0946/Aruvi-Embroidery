@@ -13,23 +13,13 @@ const fallbackSettings = {
   announcement_bar: 'Premium Machine Embroidery Designs — DST, PES, JEF, EXP & More | Instant Download',
   facebook_url: 'https://facebook.com/aruviembroidery',
   instagram_url: 'https://instagram.com/aruviembroidery',
-  linkedin_url: 'https://linkedin.com/company/aruviembroidery',
+  pinterest_url: 'https://pinterest.com/aruviembroidery',
   youtube_url: 'https://youtube.com/aruviembroidery',
   upi_id: 'aruviembroidery@upi',
   upiId: 'aruviembroidery@upi',
   upi_name: 'ARUVI EMBROIDERY STUDIO',
   upiName: 'ARUVI EMBROIDERY STUDIO',
   upiMerchantName: 'ARUVI EMBROIDERY STUDIO',
-  bank_name: 'State Bank of India',
-  bankName: 'State Bank of India',
-  account_number: '39849201928',
-  accountNumber: '39849201928',
-  ifsc_code: 'SBIN0001234',
-  ifscCode: 'SBIN0001234',
-  account_holder: 'ARUVI EMBROIDERY STUDIO',
-  accountHolder: 'ARUVI EMBROIDERY STUDIO',
-  accountHolderName: 'ARUVI EMBROIDERY STUDIO',
-  pinterest_url: '',
   twitter_url: ''
 };
 
@@ -49,25 +39,6 @@ class Setting {
       fallbackSettings['upi_name'] = String(value);
       fallbackSettings['upiName'] = String(value);
       fallbackSettings['upiMerchantName'] = String(value);
-    }
-
-    if (key === 'bank_name') fallbackSettings['bankName'] = String(value);
-    if (key === 'bankName') fallbackSettings['bank_name'] = String(value);
-
-    if (key === 'account_number') fallbackSettings['accountNumber'] = String(value);
-    if (key === 'accountNumber') fallbackSettings['account_number'] = String(value);
-
-    if (key === 'ifsc_code') fallbackSettings['ifscCode'] = String(value);
-    if (key === 'ifscCode') fallbackSettings['ifsc_code'] = String(value);
-
-    if (key === 'account_holder') {
-      fallbackSettings['accountHolder'] = String(value);
-      fallbackSettings['accountHolderName'] = String(value);
-    }
-    if (key === 'accountHolder' || key === 'accountHolderName') {
-      fallbackSettings['account_holder'] = String(value);
-      fallbackSettings['accountHolder'] = String(value);
-      fallbackSettings['accountHolderName'] = String(value);
     }
   }
 
@@ -113,18 +84,6 @@ class Setting {
           }
           if (key === 'upi_name') {
             await db.query('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['upiMerchantName', strVal, strVal]);
-          }
-          if (key === 'bank_name') {
-            await db.query('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['bankName', strVal, strVal]);
-          }
-          if (key === 'account_number') {
-            await db.query('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['accountNumber', strVal, strVal]);
-          }
-          if (key === 'ifsc_code') {
-            await db.query('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['ifscCode', strVal, strVal]);
-          }
-          if (key === 'account_holder') {
-            await db.query('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['accountHolderName', strVal, strVal]);
           }
         }
       }
