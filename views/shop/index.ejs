@@ -169,7 +169,10 @@
           <div class="accordion-content">
             <div class="sort-radio-list">
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="newest" <%= !sort || sort === 'newest' ? 'checked' : '' %> onchange="this.form.submit()"> Latest
+                <input type="radio" name="sort" value="newest" <%= !sort || sort === 'newest' || sort === 'latest' ? 'checked' : '' %> onchange="this.form.submit()"> Latest
+              </label>
+              <label class="sort-radio-item">
+                <input type="radio" name="sort" value="oldest" <%= sort === 'oldest' ? 'checked' : '' %> onchange="this.form.submit()"> Oldest
               </label>
               <label class="sort-radio-item">
                 <input type="radio" name="sort" value="price_low" <%= sort === 'price_low' ? 'checked' : '' %> onchange="this.form.submit()"> Price: Low to High
@@ -228,7 +231,8 @@
           <div class="sort-wrapper">
             <span class="sort-label">Sort by:</span>
             <select name="sort" class="sort-select" onchange="location = '/designs?sort=' + this.value + '&category=<%= selectedCategory ? selectedCategory.slug : '' %>';">
-              <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Latest</option>
+              <option value="newest" <%= !sort || sort === 'newest' || sort === 'latest' ? 'selected' : '' %>>Latest</option>
+              <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest</option>
               <option value="price_low" <%= sort === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
               <option value="price_high" <%= sort === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
               <option value="popular" <%= sort === 'popular' ? 'selected' : '' %>>Most Popular</option>

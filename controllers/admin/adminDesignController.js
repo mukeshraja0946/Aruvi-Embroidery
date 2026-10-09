@@ -297,15 +297,7 @@ exports.postCreate = async (req, res, next) => {
 
     await Design.syncDesignFormats(designId);
 
-    // Send New Design Notification Email
-    emailService.sendNewDesignEmail({
-      id: designId,
-      title,
-      slug: finalSlug,
-      formats: detectedFormatsStr,
-      price: mrp,
-      sale_price: sellingPrice
-    }).catch(e => console.error('New design email error:', e.message));
+    // Note: Automatic campaign emails on design creation disabled per requirement
 
     const statusMsg = finalActiveState === 1 ? 'published' : 'saved as draft';
     console.log(`[PUBLISH SUCCESS] Design #${designId} "${title}" ${statusMsg} successfully.`);
@@ -479,12 +471,7 @@ exports.postEdit = async (req, res, next) => {
 
     await Design.syncDesignFormats(id);
 
-    // Send Design Update Notification Email
-    emailService.sendDesignUpdateEmail({
-      id,
-      title,
-      slug: finalSlug || existingDesign.slug
-    }).catch(e => console.error('Design update email error:', e.message));
+    // Note: Automatic campaign emails on design update disabled per requirement
 
     const statusMsg = finalActiveState === 1 ? 'published' : 'saved as draft';
     console.log(`[PUBLISH SUCCESS] Design #${id} "${title}" updated and ${statusMsg} successfully.`);

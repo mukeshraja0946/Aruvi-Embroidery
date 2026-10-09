@@ -30,7 +30,8 @@
     <div class="sort-select-box">
       <span class="sort-label">Sort by:</span>
       <select class="form-control sort-select-input" onchange="location = this.value;">
-        <option value="/category/<%= category.slug %>?sort=latest" <%= sortVal === 'latest' ? 'selected' : '' %>>Latest</option>
+        <option value="/category/<%= category.slug %>?sort=latest" <%= !sortVal || sortVal === 'latest' || sortVal === 'newest' ? 'selected' : '' %>>Latest</option>
+        <option value="/category/<%= category.slug %>?sort=oldest" <%= sortVal === 'oldest' ? 'selected' : '' %>>Oldest</option>
         <option value="/category/<%= category.slug %>?sort=price_low" <%= sortVal === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
         <option value="/category/<%= category.slug %>?sort=price_high" <%= sortVal === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
         <option value="/category/<%= category.slug %>?sort=popular" <%= sortVal === 'popular' ? 'selected' : '' %>>Most Popular</option>

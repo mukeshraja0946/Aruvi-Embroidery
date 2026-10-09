@@ -142,11 +142,12 @@ class Design {
         const whereSql = whereClause.length ? 'WHERE ' + whereClause.join(' AND ') : '';
 
         let orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
-        if (sort === 'price_low') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC';
-        else if (sort === 'price_high') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC';
-        else if (sort === 'popular') orderBy = 'ORDER BY COALESCE(d.download_count, d.total_sales) DESC';
-        else if (sort === 'rating') orderBy = 'ORDER BY d.average_rating DESC';
+        if (sort === 'price_low' || sort === 'price_asc') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
+        else if (sort === 'price_high' || sort === 'price_desc') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
+        else if (sort === 'popular' || sort === 'most_popular') orderBy = 'ORDER BY COALESCE(d.download_count, d.reviews_count) DESC, d.id DESC';
+        else if (sort === 'rating') orderBy = 'ORDER BY d.average_rating DESC, d.id DESC';
         else if (sort === 'oldest') orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
+        else if (sort === 'latest' || sort === 'newest') orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
 
         const offset = (page - 1) * limit;
 
@@ -228,6 +229,19 @@ class Design {
       } else {
         d.formats = '';
       }
+    }
+
+    // Apply sorting in fallback mode
+    if (sort === 'price_low' || sort === 'price_asc') {
+      filtered.sort((a, b) => (parseFloat(a.sale_price ?? a.price ?? 0) - parseFloat(b.sale_price ?? b.price ?? 0)));
+    } else if (sort === 'price_high' || sort === 'price_desc') {
+      filtered.sort((a, b) => (parseFloat(b.sale_price ?? b.price ?? 0) - parseFloat(a.sale_price ?? a.price ?? 0)));
+    } else if (sort === 'popular' || sort === 'most_popular') {
+      filtered.sort((a, b) => ((b.download_count || b.reviews_count || 0) - (a.download_count || a.reviews_count || 0)));
+    } else if (sort === 'oldest') {
+      filtered.sort((a, b) => (new Date(a.created_at || 0) - new Date(b.created_at || 0)) || (a.id - b.id));
+    } else if (sort === 'latest' || sort === 'newest') {
+      filtered.sort((a, b) => (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || (b.id - a.id));
     }
 
     const total = filtered.length;

@@ -23,8 +23,8 @@ class AdminEmailCampaignController {
       const { campaigns, total } = await EmailCampaign.getAll({ page, limit: 20 });
       const rawCustomersList = await User.getAllCustomers();
 
-      // Filter eligible customers (non-admin, valid email)
-      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
+      const senderEmail = (process.env.SMTP_USER || process.env.EMAIL_FROM || 'aruviembroidery@gmail.com').toLowerCase().trim();
+      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@') && u.email.toLowerCase().trim() !== senderEmail) : [];
 
       // Attach unsubscribe status dynamically
       const customers = [];
@@ -80,8 +80,9 @@ class AdminEmailCampaignController {
    */
   static async getRecipients(req, res) {
     try {
+      const senderEmail = (process.env.SMTP_USER || process.env.EMAIL_FROM || 'aruviembroidery@gmail.com').toLowerCase().trim();
       const rawCustomersList = await User.getAllCustomers();
-      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
+      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@') && u.email.toLowerCase().trim() !== senderEmail) : [];
 
       const customers = [];
       for (const c of rawCustomers) {
@@ -188,9 +189,9 @@ class AdminEmailCampaignController {
         return res.status(400).json({ success: false, message: 'Email Content Message is required.' });
       }
 
-      // Fetch all registered customers
+      const senderEmail = (process.env.SMTP_USER || process.env.EMAIL_FROM || 'aruviembroidery@gmail.com').toLowerCase().trim();
       const rawCustomersList = await User.getAllCustomers();
-      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@')) : [];
+      const rawCustomers = rawCustomersList ? rawCustomersList.filter(u => u.role !== 'admin' && u.email && u.email.includes('@') && u.email.toLowerCase().trim() !== senderEmail) : [];
 
       let candidateList = [];
 
