@@ -377,6 +377,9 @@ class AdminEmailCampaignController {
   /**
    * 8. Delete Campaign
    */
+  /**
+   * 8. Delete Campaign
+   */
   static async deleteCampaign(req, res) {
     try {
       const { id } = req.params;
@@ -384,6 +387,89 @@ class AdminEmailCampaignController {
       res.json({ success: true, message: 'Campaign record deleted successfully.' });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * 9. Save Gmail App Password & Test Connection
+   */
+  static async saveSmtpConfig(req, res) {
+    const fs = require('fs');
+    const path = require('path');
+    try {
+      const { smtp_user, smtp_pass, smtp_host, smtp_port } = req.body;
+      const cleanUser = (smtp_user && smtp_user.trim()) ? smtp_user.trim() : (process.env.SMTP_USER || 'aruviembroidery@gmail.com');
+      const cleanPass = (smtp_pass && smtp_pass.trim()) ? smtp_pass.trim() : '';
+
+      if (!cleanPass) {
+        return res.status(400).json({ success: false, message: 'Google App Password (16 characters) is required.' });
+      }
+
+      // Update .env file safely
+      const envPath = path.join(__dirname, '../../.env');
+      let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+
+      const updateEnvVar = (key, val) => {
+        const reg = new RegExp(`^${key}=.*$`, 'm');
+        if (reg.test(envContent)) {
+          envContent = envContent.replace(reg, `${key}=${val}`);
+        } else {
+          envContent += `\n${key}=${val}`;
+        }
+      };
+
+      const finalHost = smtp_host || 'smtp.gmail.com';
+      const finalPort = String(smtp_port || '587');
+
+      updateEnvVar('SMTP_HOST', finalHost);
+      updateEnvVar('SMTP_PORT', finalPort);
+      updateEnvVar('SMTP_SECURE', 'false');
+      updateEnvVar('SMTP_USER', cleanUser);
+      updateEnvVar('SMTP_PASS', cleanPass);
+      updateEnvVar('EMAIL_FROM_NAME', 'Aruvi Embroidery');
+      updateEnvVar('EMAIL_FROM', cleanUser);
+
+      fs.writeFileSync(envPath, envContent, 'utf8');
+
+      // Reload process.env memory variables
+      process.env.SMTP_HOST = finalHost;
+      process.env.SMTP_PORT = finalPort;
+      process.env.SMTP_SECURE = 'false';
+      process.env.SMTP_USER = cleanUser;
+      process.env.SMTP_PASS = cleanPass;
+      process.env.EMAIL_FROM_NAME = 'Aruvi Embroidery';
+      process.env.EMAIL_FROM = cleanUser;
+
+      // Test connection with Gmail SMTP
+      const testRes = await emailService.testSmtpConnection();
+
+      if (testRes.success) {
+        return res.json({
+          success: true,
+          message: 'Gmail App Password configured and SMTP authentication successful!',
+          testResult: testRes
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `App Password saved, but SMTP Authentication Failed: ${testRes.message}`,
+          testResult: testRes
+        });
+      }
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Failed to update SMTP config: ' + err.message });
+    }
+  }
+
+  /**
+   * 10. Test SMTP Connection Only
+   */
+  static async testSmtpConnectionApi(req, res) {
+    try {
+      const testRes = await emailService.testSmtpConnection();
+      res.json(testRes);
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'SMTP Test Error: ' + err.message });
     }
   }
 }

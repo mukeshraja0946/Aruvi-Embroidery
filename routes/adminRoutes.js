@@ -124,5 +124,7 @@ router.post('/admin/api/email-campaigns/send', adminEmailCampaignController.send
 router.post('/admin/api/email-campaigns/retry', adminEmailCampaignController.retryFailed);
 router.get('/admin/api/email-campaigns/details/:id', adminEmailCampaignController.getCampaignDetails);
 router.post('/admin/api/email-campaigns/delete/:id', adminEmailCampaignController.deleteCampaign);
+router.post('/admin/api/email-campaigns/save-smtp', adminEmailCampaignController.saveSmtpConfig);
+router.get('/admin/api/email-campaigns/test-smtp', adminEmailCampaignController.testSmtpConnectionApi);
 
 module.exports = router;
