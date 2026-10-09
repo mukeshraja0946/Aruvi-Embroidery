@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 const session = require('express-session');
 const flash = require('connect-flash');
@@ -30,7 +31,7 @@ app.use(
 const allowedOrigins = [
   process.env.APP_URL,
   process.env.SITE_URL,
-  'https://aruvimembroidery.com',
+  'https://aruviembroidery.com',
   'http://localhost:3000'
 ].filter(Boolean);
 
@@ -70,8 +71,10 @@ app.use(cookieParser());
 const customUploadsDir = process.env.UPLOADS_DIR || process.env.PERSISTENT_UPLOADS_DIR;
 if (customUploadsDir && fs.existsSync(customUploadsDir)) {
   app.use('/public/uploads', express.static(customUploadsDir));
+  app.use('/uploads', express.static(customUploadsDir));
 }
 app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Session Management
 app.use(

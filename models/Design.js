@@ -154,9 +154,9 @@ class Design {
         const sql = `
           SELECT d.*, c.name as category_name, c.slug as category_slug,
                  COALESCE(
-                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
                    (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
-                   (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
                    (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
                  ) as primary_image
           FROM designs d
@@ -173,6 +173,7 @@ class Design {
         if (designs && Array.isArray(designs)) {
           // Post-process designs to derive formats 100% dynamically from design_files table
           for (const d of designs) {
+            this.normalizePrimaryImage(d);
             try {
               const mFiles = await db.query(
                 'SELECT file_format, file_name FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) IN ("DST","PES","JEF","EXP")',
@@ -181,7 +182,7 @@ class Design {
               if (mFiles && mFiles.length > 0) {
                 d.formats = [...new Set(mFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
               } else {
-                d.formats = '';
+                d.formats = d.formats || '';
               }
             } catch (fErr) {
               d.formats = d.formats || '';
@@ -467,9 +468,9 @@ class Design {
         const sql = `
           SELECT d.*, c.name as category_name,
                  COALESCE(
-                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
                    (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
-                   (SELECT file_path FROM design_files WHERE design_id = d.id AND file_format IN ('PNG','JPG','JPEG','WEBP') ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
                    (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
                  ) as primary_image
           FROM designs d
@@ -484,6 +485,25 @@ class Design {
       }
     }
     return fallbackDesigns.filter(d => d.category_id == categoryId && d.id != currentDesignId).slice(0, limit);
+  }
+
+  static normalizePrimaryImage(d) {
+    if (!d) return d;
+    let img = d.primary_image ? String(d.primary_image).trim() : '';
+    const ext = img ? img.split('.').pop().toLowerCase() : '';
+    const nonImgExts = ['zip', 'dst', 'pes', 'jef', 'exp', 'hus', 'vip', 'vp3', 'xxx'];
+
+    if (!img || nonImgExts.includes(ext)) {
+      const idx = Math.abs((parseInt(d.id) || 1) - 1) % availablePreviewImages.length;
+      img = availablePreviewImages[idx];
+    }
+
+    if (img && !img.startsWith('/') && !img.startsWith('http')) {
+      img = '/' + img;
+    }
+
+    d.primary_image = img;
+    return d;
   }
 
   static normalizeSlug(str) {

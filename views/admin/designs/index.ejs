@@ -341,7 +341,7 @@
                   <td><strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong></td>
                   <td>
                     <% if (d.primary_image) { %>
-                      <img src="<%= d.primary_image %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);">
+                      <img src="<%= d.primary_image %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);" onerror="this.onerror=null; this.src='/public/images/hero_embroidery.jpg';">
                     <% } else { %>
                       <div style="width: 52px; height: 52px; border-radius: 8px; background: #FAF6F0; border: 1px dashed var(--admin-border); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--admin-text-muted); font-size: 0.65rem; font-weight: 600; text-align: center; padding: 2px;"><i class="fa-regular fa-image" style="font-size: 0.85rem; margin-bottom: 2px;"></i> No Preview</div>
                     <% } %>
