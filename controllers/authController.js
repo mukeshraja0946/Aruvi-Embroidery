@@ -260,7 +260,8 @@ exports.postGoogleVerify = async (req, res) => {
  */
 exports.getGoogleAuth = (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const siteUrl = process.env.SITE_URL || process.env.APP_URL || 'http://localhost:3000';
+  const rawSiteUrl = process.env.SITE_URL || process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const siteUrl = rawSiteUrl.replace(/\/+$/, '');
   const redirectUri = `${siteUrl}/auth/google/callback`;
 
   if (!clientId || clientId === 'sample-google-client-id') {
@@ -281,9 +282,120 @@ exports.getGoogleCallback = async (req, res, next) => {
       return res.redirect('/auth/login');
     }
 
-    req.flash('info', 'Google OAuth authorization code received. Completing sign in...');
-    res.redirect('/auth/login');
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const rawSiteUrl = process.env.SITE_URL || process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const siteUrl = rawSiteUrl.replace(/\/+$/, '');
+    const redirectUri = `${siteUrl}/auth/google/callback`;
+
+    if (!clientId || !clientSecret) {
+      req.flash('error', 'Google OAuth credentials missing on server.');
+      return res.redirect('/auth/login');
+    }
+
+    // Exchange authorization code for tokens
+    const querystring = require('querystring');
+    const https = require('https');
+    const postData = querystring.stringify({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code'
+    });
+
+    const tokenRes = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'oauth2.googleapis.com',
+        path: '/token',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const reqObj = https.request(options, (gRes) => {
+        let raw = '';
+        gRes.on('data', chunk => raw += chunk);
+        gRes.on('end', () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      });
+
+      reqObj.on('error', reject);
+      reqObj.write(postData);
+      reqObj.end();
+    });
+
+    if (!tokenRes || !tokenRes.id_token) {
+      console.error('[Google Callback Token Error]:', tokenRes);
+      req.flash('error', 'Failed to retrieve Google authentication token.');
+      return res.redirect('/auth/login');
+    }
+
+    // Process ID Token verification & user login
+    const tokenInfo = await new Promise((resolve, reject) => {
+      https.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokenRes.id_token)}`, (gRes) => {
+        let raw = '';
+        gRes.on('data', chunk => raw += chunk);
+        gRes.on('end', () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }).on('error', reject);
+    });
+
+    if (!tokenInfo || tokenInfo.error || !tokenInfo.email || (tokenInfo.email_verified !== 'true' && tokenInfo.email_verified !== true)) {
+      req.flash('error', 'Google authentication failed. Unverified or invalid Google account.');
+      return res.redirect('/auth/login');
+    }
+
+    const email = tokenInfo.email.toLowerCase().trim();
+    const fullName = tokenInfo.name || tokenInfo.given_name || 'Valued Customer';
+
+    let user = await User.findByEmail(email);
+
+    if (user) {
+      if (!user.is_active) {
+        req.flash('error', 'Your account has been deactivated. Please contact support.');
+        return res.redirect('/auth/login');
+      }
+
+      req.session.userId = user.id;
+
+      const needsProfile = !user.phone || String(user.phone).trim() === '' || !user.address || String(user.address).trim() === '';
+      const targetRedirect = needsProfile ? '/user/complete-profile' : (req.session.returnTo || '/user/dashboard');
+      delete req.session.returnTo;
+
+      req.flash('success', `Welcome back, ${user.full_name}!`);
+      return res.redirect(targetRedirect);
+    }
+
+    // Create New Customer
+    const randomPassword = 'GAuth_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+    const newUserId = await User.create({
+      full_name: fullName,
+      email: email,
+      password: randomPassword,
+      phone: null,
+      role: 'customer'
+    });
+
+    req.session.userId = newUserId;
+    req.flash('success', 'Welcome to Aruvi Embroidery! Account created successfully via Google.');
+    res.redirect('/user/complete-profile');
+
   } catch (err) {
-    next(err);
+    console.error('[Google Callback Exception]:', err);
+    req.flash('error', 'An error occurred during Google Sign-In.');
+    res.redirect('/auth/login');
   }
 };
