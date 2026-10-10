@@ -13,11 +13,10 @@
       <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4;">Sign in to discover beautiful embroidery designs and access your purchases.</p>
     </div>
 
-    <% if (flash && flash.error && flash.error.length > 0) { %>
-      <div class="alert alert-error" style="margin-bottom: 1rem; border-radius: 10px; font-size: 0.85rem;">
-        <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
-      </div>
-    <% } %>
+    <div id="loginErrorAlert" class="alert alert-error" style="display: <%= (flash && flash.error && flash.error.length > 0) ? 'flex' : 'none' %>; margin-bottom: 1rem; border-radius: 10px; font-size: 0.85rem; align-items: center; gap: 8px;">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      <span id="loginErrorMessage"><%= (flash && flash.error && flash.error.length > 0) ? flash.error[0] : '' %></span>
+    </div>
 
     <form action="/auth/login" method="POST">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -107,6 +106,19 @@
 <% } %>
 
 <script>
+  const configuredGoogleClientId = "<%= process.env.GOOGLE_CLIENT_ID || '' %>";
+
+  function showLoginError(msg) {
+    const alertBox = document.getElementById('loginErrorAlert');
+    const msgSpan = document.getElementById('loginErrorMessage');
+    if (alertBox && msgSpan) {
+      msgSpan.textContent = msg;
+      alertBox.style.display = 'flex';
+    } else {
+      alert(msg);
+    }
+  }
+
   document.getElementById('togglePasswordBtn').addEventListener('click', function() {
     const pwdInput = document.getElementById('customerPassword');
     if (pwdInput.type === 'password') {
@@ -121,6 +133,11 @@
   });
 
   function triggerGoogleSignIn() {
+    if (!configuredGoogleClientId || configuredGoogleClientId === 'sample-google-client-id') {
+      showLoginError('Google Sign-In is not currently configured with a valid Google Client ID. Please sign in with your email address.');
+      return;
+    }
+
     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
       google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
@@ -148,12 +165,12 @@
       if (data.success) {
         window.location.href = data.redirect || '/user/dashboard';
       } else {
-        alert(data.message || 'Google Sign-In failed. Please try again.');
+        showLoginError(data.message || 'Google Sign-In failed. Please try again.');
       }
     })
     .catch(err => {
       console.error('Google Sign-In Exception:', err);
-      alert('Unable to authenticate with Google right now. Please sign in with email.');
+      showLoginError('Unable to authenticate with Google right now. Please sign in with email.');
     });
   }
 </script>

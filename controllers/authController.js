@@ -188,8 +188,22 @@ exports.postGoogleVerify = async (req, res) => {
       }).on('error', reject);
     });
 
-    if (!tokenInfo || !tokenInfo.email || (tokenInfo.email_verified !== 'true' && tokenInfo.email_verified !== true)) {
-      return res.status(400).json({ success: false, message: 'Google authentication failed. Unverified email.' });
+    if (!tokenInfo || tokenInfo.error || !tokenInfo.email || (tokenInfo.email_verified !== 'true' && tokenInfo.email_verified !== true)) {
+      return res.status(400).json({ success: false, message: 'Google authentication failed. Unverified or invalid Google account.' });
+    }
+
+    // Validate expiration
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (tokenInfo.exp && Number(tokenInfo.exp) < nowSec) {
+      return res.status(400).json({ success: false, message: 'Google authentication token has expired. Please try signing in again.' });
+    }
+
+    // Validate Audience if GOOGLE_CLIENT_ID is configured
+    const configuredClientId = process.env.GOOGLE_CLIENT_ID;
+    if (configuredClientId && configuredClientId !== 'sample-google-client-id') {
+      if (tokenInfo.aud !== configuredClientId && tokenInfo.azp !== configuredClientId) {
+        return res.status(400).json({ success: false, message: 'Google authentication client ID mismatch.' });
+      }
     }
 
     const email = tokenInfo.email.toLowerCase().trim();
@@ -250,7 +264,7 @@ exports.getGoogleAuth = (req, res) => {
   const redirectUri = `${siteUrl}/auth/google/callback`;
 
   if (!clientId || clientId === 'sample-google-client-id') {
-    req.flash('error', 'Google Sign-In is configured for ID token verification. Please use the "Continue with Google" button on the login screen.');
+    req.flash('error', 'Google Sign-In is not currently configured with a valid Google Client ID. Please sign in with your email address.');
     return res.redirect('/auth/login');
   }
 
@@ -267,7 +281,7 @@ exports.getGoogleCallback = async (req, res, next) => {
       return res.redirect('/auth/login');
     }
 
-    req.flash('info', 'Google OAuth authorization code received. Please use Google Sign-In prompt.');
+    req.flash('info', 'Google OAuth authorization code received. Completing sign in...');
     res.redirect('/auth/login');
   } catch (err) {
     next(err);
