@@ -256,17 +256,11 @@ exports.postGoogleVerify = async (req, res) => {
 };
 
 function getCanonicalRedirectUri(req) {
-  let siteUrl = (process.env.SITE_URL || process.env.APP_URL || '').trim().replace(/\/+$/, '');
-  if (!siteUrl) {
-    const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
-    let host = req.get('host') || 'aruviembroidery.com';
-    host = host.replace(/^www\./, '');
-    siteUrl = `${proto}://${host}`;
+  const host = (req && req.get ? (req.get('host') || '') : '').toLowerCase();
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    return 'http://localhost:3000/auth/google/callback';
   }
-  if (siteUrl.includes('aruviembroidery.com') && siteUrl.startsWith('http:')) {
-    siteUrl = siteUrl.replace('http:', 'https:');
-  }
-  return `${siteUrl}/auth/google/callback`;
+  return 'https://aruviembroidery.com/auth/google/callback';
 }
 
 /**
