@@ -1,18 +1,18 @@
 <%- include('../partials/header') %>
 
-<div class="container" style="margin-top: 3rem; margin-bottom: 5rem;">
-  <div style="max-width: 500px; margin: 0 auto; background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 18px; padding: 2.5rem 2.2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
+<div class="container" style="margin-top: 1.8rem; margin-bottom: 2.2rem;">
+  <div style="max-width: 500px; margin: 0 auto; background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 18px; padding: 2rem 2.2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.04);">
     
-    <div style="text-align: center; margin-bottom: 2rem;">
-      <div style="width: 52px; height: 52px; border-radius: 50%; background: #231815; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; margin: 0 auto 0.6rem;">
+    <div style="text-align: center; margin-bottom: 1.2rem;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: #231815; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: var(--font-heading); font-size: 1.6rem; font-weight: 700; margin: 0 auto 0.5rem;">
         A
       </div>
-      <h2 style="font-family: var(--font-heading); font-size: 2rem; color: var(--text-dark); margin-bottom: 0.3rem;">Create Your Account</h2>
-      <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">Join ARUVI Embroidery to save designs, wishlist, and manage downloads</p>
+      <h2 style="font-family: var(--font-heading); font-size: 1.8rem; color: var(--text-dark); margin-bottom: 0.3rem;">Create Your Account</h2>
+      <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.4;">Join ARUVI Embroidery to save designs, wishlist, and manage downloads</p>
     </div>
 
     <% if (flash && flash.error && flash.error.length > 0) { %>
-      <div class="alert alert-error" style="margin-bottom: 1.5rem; border-radius: 10px; font-size: 0.85rem;">
+      <div class="alert alert-error" style="margin-bottom: 1rem; border-radius: 10px; font-size: 0.85rem;">
         <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
       </div>
     <% } %>
@@ -20,52 +20,52 @@
     <form action="/auth/register" method="POST">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-      <div class="form-group" style="margin-bottom: 1.2rem;">
-        <label class="form-label">Full Name <span style="color: var(--primary);">*</span></label>
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Full Name <span style="color: var(--primary);">*</span></label>
         <div style="position: relative;">
           <i class="fa-regular fa-user" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="text" name="full_name" class="form-control" placeholder="e.g. Priya Lakshmi" required style="padding-left: 2.6rem;">
+          <input type="text" name="full_name" class="form-control" placeholder="e.g. Priya Lakshmi" required style="padding-left: 2.6rem; height: 44px;">
         </div>
       </div>
 
-      <div class="form-group" style="margin-bottom: 1.2rem;">
-        <label class="form-label">Email Address <span style="color: var(--primary);">*</span></label>
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Email Address <span style="color: var(--primary);">*</span></label>
         <div style="position: relative;">
           <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="email" name="email" class="form-control" placeholder="name@example.com" required style="padding-left: 2.6rem;">
+          <input type="email" name="email" class="form-control" placeholder="name@example.com" required style="padding-left: 2.6rem; height: 44px;">
         </div>
       </div>
 
-      <div class="form-group" style="margin-bottom: 1.2rem;">
-        <label class="form-label">Phone Number (Optional)</label>
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Phone Number (Optional)</label>
         <div style="position: relative;">
           <i class="fa-solid fa-phone" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="tel" name="phone" class="form-control" placeholder="+91 98765 43210" style="padding-left: 2.6rem;">
+          <input type="tel" name="phone" class="form-control" placeholder="+91 98765 43210" style="padding-left: 2.6rem; height: 44px;">
         </div>
       </div>
 
-      <div class="form-group" style="margin-bottom: 1.2rem;">
-        <label class="form-label">Password <span style="color: var(--primary);">*</span></label>
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Password <span style="color: var(--primary);">*</span></label>
         <div style="position: relative;">
           <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="password" name="password" class="form-control" placeholder="At least 6 characters" required style="padding-left: 2.6rem;">
+          <input type="password" name="password" class="form-control" placeholder="At least 6 characters" required style="padding-left: 2.6rem; height: 44px;">
         </div>
       </div>
 
-      <div class="form-group" style="margin-bottom: 1.5rem;">
-        <label class="form-label">Confirm Password <span style="color: var(--primary);">*</span></label>
+      <div class="form-group" style="margin-bottom: 1.1rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Confirm Password <span style="color: var(--primary);">*</span></label>
         <div style="position: relative;">
           <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="password" name="confirm_password" class="form-control" placeholder="Re-enter password" required style="padding-left: 2.6rem;">
+          <input type="password" name="confirm_password" class="form-control" placeholder="Re-enter password" required style="padding-left: 2.6rem; height: 44px;">
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block btn-lg" style="height: 48px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="height: 46px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
         <i class="fa-solid fa-user-plus"></i> Register Account
       </button>
     </form>
 
-    <div style="text-align: center; margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--border-light); font-size: 0.88rem; color: var(--text-muted);">
+    <div style="text-align: center; margin-top: 1.2rem; padding-top: 0.9rem; border-top: 1px solid var(--border-light); font-size: 0.88rem; color: var(--text-muted);">
       Already registered? <a href="/auth/login" style="font-weight: 600; color: var(--primary);">Sign in here</a>
     </div>
   </div>
