@@ -3,17 +3,21 @@
 <div class="container" style="margin-top: 1.8rem; margin-bottom: 2.2rem;">
   <div style="max-width: 520px; margin: 0 auto; background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 20px; padding: 2rem 2.2rem; box-shadow: 0 12px 35px rgba(0,0,0,0.05);">
     
-    <div style="text-align: center; margin-bottom: 1.2rem;">
-      <div style="width: 56px; height: 56px; background: #FAF6F0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.8rem; color: var(--primary); font-size: 1.5rem; border: 1px solid #E8E0D5;">
-        <i class="fa-solid fa-user-pen"></i>
-      </div>
+    <div style="text-align: center; margin-bottom: 1.4rem;">
+      <% if (user && user.profile_picture) { %>
+        <img src="<%= user.profile_picture %>" alt="<%= user.full_name %>" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin: 0 auto 0.8rem; border: 2px solid var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+      <% } else { %>
+        <div style="width: 56px; height: 56px; background: #FAF6F0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.8rem; color: var(--primary); font-size: 1.5rem; border: 1px solid #E8E0D5;">
+          <i class="fa-solid fa-user-check"></i>
+        </div>
+      <% } %>
       
-      <h2 style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0.3rem;">
-        Complete Your Profile
+      <h2 style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 0.4rem;">
+        Welcome to Aruvi Embroidery
       </h2>
       
-      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4; margin: 0;">
-        Please provide your mobile number and address to access your downloads and complete future orders seamlessly.
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4; margin: 0; max-width: 440px; margin: 0 auto;">
+        Please confirm your details to access your account, download purchased designs, and complete future orders.
       </p>
     </div>
 
@@ -30,15 +34,15 @@
         <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Full Name <span style="color: var(--primary);">*</span></label>
         <div style="position: relative;">
           <i class="fa-regular fa-user" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="text" name="full_name" class="form-control" value="<%= user ? user.full_name : '' %>" required style="padding-left: 2.6rem; height: 44px;">
+          <input type="text" name="full_name" class="form-control" value="<%= user ? user.full_name : '' %>" placeholder="Enter your full name" required style="padding-left: 2.6rem; height: 44px;">
         </div>
       </div>
 
       <div class="form-group" style="margin-bottom: 0.9rem;">
-        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Email Address</label>
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Verified Email Address</label>
         <div style="position: relative;">
           <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="email" value="<%= user ? user.email : '' %>" disabled class="form-control" style="padding-left: 2.6rem; background: #F7F3EC; color: #776A62; height: 44px;">
+          <input type="email" value="<%= user ? user.email : '' %>" disabled class="form-control" style="padding-left: 2.6rem; background: #F7F3EC; color: #776A62; height: 44px; font-weight: 500;">
         </div>
       </div>
 
@@ -56,7 +60,7 @@
       </div>
 
       <button type="submit" class="btn btn-primary btn-block btn-lg" style="height: 46px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0.8rem;">
-        <i class="fa-solid fa-floppy-disk"></i> Save & Continue
+        <i class="fa-solid fa-circle-check"></i> Confirm Details & Continue
       </button>
 
       <div style="text-align: center;">

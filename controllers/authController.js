@@ -209,6 +209,10 @@ exports.postGoogleVerify = async (req, res) => {
     const email = tokenInfo.email.toLowerCase().trim();
     const fullName = tokenInfo.name || tokenInfo.given_name || 'Valued Customer';
 
+    if (tokenInfo.picture) {
+      req.session.googlePicture = tokenInfo.picture;
+    }
+
     // 2. Find or Create Customer Account
     let user = await User.findByEmail(email);
 
@@ -365,6 +369,10 @@ exports.getGoogleCallback = async (req, res, next) => {
 
     const email = tokenInfo.email.toLowerCase().trim();
     const fullName = tokenInfo.name || tokenInfo.given_name || 'Valued Customer';
+
+    if (tokenInfo.picture) {
+      req.session.googlePicture = tokenInfo.picture;
+    }
 
     let user = await User.findByEmail(email);
 

@@ -17,6 +17,9 @@ async function attachUserAndCart(req, res, next) {
     if (req.session && req.session.userId) {
       const user = await User.findById(req.session.userId);
       if (user && user.is_active) {
+        if (req.session && req.session.googlePicture) {
+          user.profile_picture = req.session.googlePicture;
+        }
         req.user = user;
         res.locals.currentUser = user;
       } else {
