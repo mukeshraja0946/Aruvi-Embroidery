@@ -280,7 +280,7 @@ exports.getGoogleAuth = (req, res) => {
     return res.redirect('/auth/login');
   }
 
-  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20email&access_type=online`;
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20email&access_type=online&prompt=select_account`;
   res.redirect(googleAuthUrl);
 };
 
