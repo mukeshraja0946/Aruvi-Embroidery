@@ -46,8 +46,16 @@ class User {
 
   static async findById(id) {
     if (db.isConnected()) {
-      const rows = await db.query('SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE id = ? LIMIT 1', [id]);
-      return rows[0] || null;
+      try {
+        const rows = await db.query('SELECT * FROM users WHERE id = ? LIMIT 1', [id]);
+        if (rows && rows[0]) {
+          const { password_hash, ...userWithoutPass } = rows[0];
+          return userWithoutPass;
+        }
+      } catch (e) {
+        const rows = await db.query('SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE id = ? LIMIT 1', [id]);
+        return rows[0] || null;
+      }
     }
     const u = fallbackUsers.find(user => user.id == id);
     if (!u) return null;
@@ -122,15 +130,24 @@ class User {
     return { users: fallbackUsers, total: fallbackUsers.length };
   }
 
-  static async updateProfile(id, { full_name, phone }) {
+  static async updateProfile(id, { full_name, phone, address }) {
     if (db.isConnected()) {
-      await db.query('UPDATE users SET full_name = ?, phone = ? WHERE id = ?', [full_name, phone, id]);
+      try {
+        await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL').catch(() => {});
+        await db.query('UPDATE users SET full_name = ?, phone = ? WHERE id = ?', [full_name, phone, id]);
+        if (address !== undefined) {
+          await db.query('UPDATE users SET address = ? WHERE id = ?', [address, id]).catch(() => {});
+        }
+      } catch (e) {
+        console.error('User.updateProfile error:', e.message);
+      }
       return true;
     }
     const u = fallbackUsers.find(user => user.id == id);
     if (u) {
-      u.full_name = full_name;
-      u.phone = phone;
+      if (full_name !== undefined) u.full_name = full_name;
+      if (phone !== undefined) u.phone = phone;
+      if (address !== undefined) u.address = address;
     }
     return true;
   }

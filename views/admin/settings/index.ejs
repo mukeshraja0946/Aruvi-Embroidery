@@ -244,14 +244,14 @@
             </div>
 
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Contact Phone *</label>
-              <input type="text" name="contact_phone" class="form-control" value="<%= settings.contact_phone || '+91 98765 43210' %>" required>
+              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Contact Phone</label>
+              <input type="text" name="contact_phone" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.contact_phone !== undefined) ? settings.contact_phone : '' %>" placeholder="e.g. +91 98765 43210">
             </div>
           </div>
 
           <div style="margin-bottom: 1.2rem;">
             <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Studio Location Address</label>
-            <textarea name="address" rows="3" class="form-control"><%= settings.address || 'Erode, Tamil Nadu, 638001, India' %></textarea>
+            <textarea name="address" rows="3" class="form-control" placeholder="e.g. Erode, Tamil Nadu, 638001, India"><%= (typeof settings !== 'undefined' && settings.address !== undefined) ? settings.address : '' %></textarea>
           </div>
         </div>
 

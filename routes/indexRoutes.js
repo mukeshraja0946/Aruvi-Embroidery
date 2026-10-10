@@ -13,6 +13,7 @@ router.get('/custom-order', pageController.getCustomOrder);
 router.post('/custom-order', upload.single('reference_image'), pageController.postCustomOrder);
 
 router.get('/faq', pageController.getFAQ);
+router.get('/blog', pageController.getBlog);
 router.get('/privacy', pageController.getPrivacy);
 router.get('/terms', pageController.getTerms);
 router.get('/refund', pageController.getRefund);

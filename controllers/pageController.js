@@ -105,6 +105,12 @@ exports.getFAQ = (req, res) => {
   });
 };
 
+exports.getBlog = (req, res) => {
+  res.render('pages/blog', {
+    title: 'Blog & Embroidery Guides - ARUVI EMBROIDERY STUDIO'
+  });
+};
+
 exports.getPrivacy = (req, res) => {
   res.render('pages/privacy', {
     title: 'Privacy Policy - ARUVI EMBROIDERY STUDIO'
@@ -132,7 +138,7 @@ exports.getSitemap = async (req, res, next) => {
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
 
-    const staticPages = ['', '/designs', '/categories', '/custom-order', '/about', '/contact', '/faq', '/privacy', '/terms', '/refund'];
+    const staticPages = ['', '/designs', '/categories', '/custom-order', '/about', '/contact', '/faq', '/blog', '/privacy', '/terms', '/refund'];
     staticPages.forEach(p => {
       xml += `  <url><loc>${siteUrl}${p}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
     });

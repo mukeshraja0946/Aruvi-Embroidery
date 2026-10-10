@@ -3,8 +3,4 @@ node_modules/
 .env.local
 *.log
 scratch/
-public/uploads/previews/*
-!public/uploads/previews/.gitkeep
-public/uploads/designs/*
-!public/uploads/designs/.gitkeep
 

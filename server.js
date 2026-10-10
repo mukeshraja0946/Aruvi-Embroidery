@@ -76,6 +76,33 @@ if (customUploadsDir && fs.existsSync(customUploadsDir)) {
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
+// Smart image fallback handler (Prevents broken image 404s after deployments)
+const serveImageWithFallback = (req, res, next) => {
+  const reqPath = req.path;
+  const ext = path.extname(reqPath).toLowerCase();
+  if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg'].includes(ext)) {
+    const primaryPath = path.join(__dirname, 'public/uploads/previews', reqPath);
+    const customDir = process.env.UPLOADS_DIR || process.env.PERSISTENT_UPLOADS_DIR;
+    const persistentPath = customDir ? path.join(customDir, 'previews', reqPath) : null;
+
+    if (fs.existsSync(primaryPath)) {
+      return res.sendFile(primaryPath);
+    }
+    if (persistentPath && fs.existsSync(persistentPath)) {
+      return res.sendFile(persistentPath);
+    }
+
+    const defaultFallback = path.join(__dirname, 'public/images/hero_embroidery.jpg');
+    if (fs.existsSync(defaultFallback)) {
+      return res.sendFile(defaultFallback);
+    }
+  }
+  next();
+};
+
+app.use('/public/uploads/previews', serveImageWithFallback);
+app.use('/uploads/previews', serveImageWithFallback);
+
 // Session Management
 app.use(
   session({
@@ -115,12 +142,9 @@ app.locals.siteSettings = {
   contact_email:
     process.env.CONTACT_EMAIL || 'aruviembroidery@gmail.com',
 
-  contact_phone:
-    process.env.CONTACT_PHONE || '+91 98765 43210',
+  contact_phone: process.env.CONTACT_PHONE || '',
 
-  address:
-    process.env.SHOP_ADDRESS ||
-    'Erode, Tamil Nadu, 638001, India',
+  address: process.env.SHOP_ADDRESS || '',
 
   currency_symbol: '₹',
 

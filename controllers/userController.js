@@ -26,9 +26,42 @@ exports.getDashboard = async (req, res, next) => {
 
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { full_name, phone } = req.body;
-    await User.updateProfile(req.user.id, { full_name, phone });
+    const { full_name, phone, address } = req.body;
+    await User.updateProfile(req.user.id, { full_name, phone, address });
     req.flash('success', 'Profile updated successfully.');
+    res.redirect('/user/dashboard');
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getCompleteProfile = async (req, res) => {
+  res.render('user/complete-profile', {
+    title: 'Complete Your Profile - Aruvi Embroidery',
+    user: req.user
+  });
+};
+
+exports.postCompleteProfile = async (req, res, next) => {
+  try {
+    const { full_name, phone, address } = req.body;
+
+    const cleanName = (full_name || (req.user ? req.user.full_name : '') || 'Customer').trim();
+    const cleanPhone = (phone || '').trim();
+    const cleanAddress = (address || '').trim();
+
+    if (!cleanPhone || cleanPhone.length < 7) {
+      req.flash('error', 'Please enter a valid mobile number.');
+      return res.redirect('/user/complete-profile');
+    }
+
+    await User.updateProfile(req.user.id, {
+      full_name: cleanName,
+      phone: cleanPhone,
+      address: cleanAddress
+    });
+
+    req.flash('success', 'Profile completed successfully! Welcome to Aruvi Embroidery.');
     res.redirect('/user/dashboard');
   } catch (err) {
     next(err);

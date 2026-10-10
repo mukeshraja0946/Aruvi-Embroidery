@@ -66,11 +66,21 @@
         <!-- Col 4: Contact & Machine Formats -->
         <div class="footer-col">
           <h4>Contact & Formats</h4>
-          <p style="margin-bottom: 0.8rem;"><i class="fa-solid fa-location-dot" style="color: var(--primary);"></i> <%= settings.address || 'Chennai, Tamil Nadu, India' %></p>
-          <p style="margin-bottom: 0.8rem;"><i class="fa-solid fa-envelope" style="color: var(--primary);"></i> <%= settings.contact_email || 'contact@aruviembroidery.com' %></p>
-          <p style="margin-bottom: 1.2rem;"><i class="fa-solid fa-phone" style="color: var(--primary);"></i> <%= settings.contact_phone || '+91 98765 43210' %></p>
+          <% const addrVal = (settings && settings.address) ? String(settings.address).trim() : ''; %>
+          <% const phoneVal = (settings && settings.contact_phone) ? String(settings.contact_phone).trim() : ''; %>
+          <% const emailVal = (settings && settings.contact_email) ? String(settings.contact_email).trim() : 'aruviembroidery@gmail.com'; %>
+
+          <% if (addrVal) { %>
+            <p style="margin-bottom: 0.8rem;"><i class="fa-solid fa-location-dot" style="color: var(--primary);"></i> <%= addrVal %></p>
+          <% } %>
+
+          <p style="margin-bottom: 0.8rem;"><i class="fa-solid fa-envelope" style="color: var(--primary);"></i> <%= emailVal %></p>
+
+          <% if (phoneVal) { %>
+            <p style="margin-bottom: 0.8rem;"><i class="fa-solid fa-phone" style="color: var(--primary);"></i> <%= phoneVal %></p>
+          <% } %>
           
-          <h5 style="color: white; font-size: 0.85rem; margin-bottom: 0.5rem;">Supported Machine Formats:</h5>
+          <h5 style="color: white; font-size: 0.85rem; margin-top: 1.2rem; margin-bottom: 0.5rem;">Supported Machine Formats:</h5>
           <p style="font-size: 0.8rem; color: #D3B9C0;">
             DST &bull; PES &bull; JEF &bull; EXP &bull; HUS &bull; VIP &bull; VP3 &bull; XXX
           </p>

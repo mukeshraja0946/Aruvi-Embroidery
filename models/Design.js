@@ -4,16 +4,16 @@ const fs = require('fs');
 const AdmZip = require('adm-zip');
 
 const availablePreviewImages = [
+  '/public/images/hero_embroidery.jpg',
+  '/public/images/cat_blouse.jpg',
+  '/public/images/cat_floral.jpg',
+  '/public/images/cat_traditional.jpg',
+  '/public/images/cat_border.jpg',
+  '/public/images/cat_monogram.jpg',
   '/public/uploads/previews/design_file-1791042254214-185248588.png',
   '/public/uploads/previews/design_file-1791042328059-900556097.png',
   '/public/uploads/previews/design_file-1791043703946-812496920.png',
-  '/public/uploads/previews/design_file-1791044351993-377176697.png',
-  '/public/uploads/previews/design_file-1791044401396-730712576.png',
-  '/public/uploads/previews/design_file-1791044451199-587612069.png',
-  '/public/uploads/previews/design_file-1791044497412-293209124.png',
-  '/public/uploads/previews/design_file-1791044530255-613750965.png',
-  '/public/uploads/previews/design_file-1791044568469-573511633.png',
-  '/public/uploads/previews/design_file-1791212506592-922941743.png'
+  '/public/uploads/previews/design_file-1791044351993-377176697.png'
 ];
 
 const categoryMetaMap = {

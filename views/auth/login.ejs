@@ -9,8 +9,8 @@
       <% } else { %>
         <img src="/public/images/logo.jpg" alt="ARUVI EMBROIDERY STUDIO" style="max-height: 54px; width: auto; margin: 0 auto 0.8rem; object-fit: contain;">
       <% } %>
-      <h2 style="font-family: var(--font-heading); font-size: 2rem; color: var(--text-dark); margin-bottom: 0.3rem;">Customer Login</h2>
-      <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">Sign in to access your purchased design files and order history</p>
+      <h2 style="font-family: var(--font-heading); font-size: 1.85rem; color: var(--text-dark); margin-bottom: 0.4rem;">Welcome to Aruvi Embroidery</h2>
+      <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">Sign in to discover beautiful embroidery designs and access your purchases.</p>
     </div>
 
     <% if (flash && flash.error && flash.error.length > 0) { %>
@@ -18,6 +18,32 @@
         <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
       </div>
     <% } %>
+
+    <!-- Prominent Continue with Google Button -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <div id="g_id_onload"
+         data-client_id="<%= process.env.GOOGLE_CLIENT_ID || 'sample-google-client-id' %>"
+         data-callback="handleGoogleCredentialResponse"
+         data-auto_select="false">
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <button type="button" id="customGoogleBtn" onclick="triggerGoogleSignIn()" class="btn btn-block" style="background: #FFFFFF; color: #3c4043; border: 1px solid #dadce0; border-radius: 10px; height: 48px; font-size: 0.94rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; width: 100%; transition: all 0.2s ease;">
+        <svg width="20" height="20" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+    </div>
+
+    <div style="display: flex; align-items: center; margin: 1.4rem 0; text-align: center;">
+      <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
+      <span style="padding: 0 12px; font-size: 0.78rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase;">OR SIGN IN WITH EMAIL</span>
+      <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
+    </div>
 
     <form action="/auth/login" method="POST">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -93,6 +119,43 @@
       this.classList.add('fa-eye');
     }
   });
+
+  function triggerGoogleSignIn() {
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          window.location.href = '/auth/google';
+        }
+      });
+    } else {
+      window.location.href = '/auth/google';
+    }
+  }
+
+  function handleGoogleCredentialResponse(response) {
+    if (!response || !response.credential) return;
+
+    fetch('/auth/google/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>'
+      },
+      body: JSON.stringify({ credential: response.credential })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        window.location.href = data.redirect || '/user/dashboard';
+      } else {
+        alert(data.message || 'Google Sign-In failed. Please try again.');
+      }
+    })
+    .catch(err => {
+      console.error('Google Sign-In Exception:', err);
+      alert('Unable to authenticate with Google right now. Please sign in with email.');
+    });
+  }
 </script>
 
 <%- include('../partials/footer') %>

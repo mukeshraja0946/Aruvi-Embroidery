@@ -18,9 +18,9 @@
 
   <%
     var _currentUser = (typeof currentUser !== 'undefined') ? currentUser : null;
-    var _currentPath = (typeof currentPath !== 'undefined') ? currentPath : '';
+    var _currentPath = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : ((typeof _currentPath !== 'undefined') ? _currentPath : '');
     var _cartCount = (typeof cartCount !== 'undefined') ? cartCount : 0;
-    var _flash = (typeof flash !== 'undefined') ? flash : {};
+    var _flash = (typeof flash !== 'undefined' && flash && Object.keys(flash).length > 0) ? flash : ((typeof _flash !== 'undefined') ? _flash : {});
   %>
 
   <!-- Main Stylesheet -->
@@ -299,21 +299,23 @@
     });
   </script>
 
-  <!-- Flash Messages -->
-  <div class="container" style="margin-top: 1rem;">
-    <% if (_flash.success && _flash.success.length > 0) { %>
-      <div class="alert alert-success">
-        <i class="fa-solid fa-circle-check"></i> <%= _flash.success[0] %>
-      </div>
-    <% } %>
-    <% if (_flash.error && _flash.error.length > 0) { %>
-      <div class="alert alert-error">
-        <i class="fa-solid fa-circle-exclamation"></i> <%= _flash.error[0] %>
-      </div>
-    <% } %>
-    <% if (_flash.info && _flash.info.length > 0) { %>
-      <div class="alert alert-info">
-        <i class="fa-solid fa-circle-info"></i> <%= _flash.info[0] %>
-      </div>
-    <% } %>
-  </div>
+  <!-- Flash Messages (Excluding /admin/login to prevent duplicate banners) -->
+  <% if (_currentPath !== '/admin/login') { %>
+    <div class="container" style="margin-top: 1rem;">
+      <% if (_flash.success && _flash.success.length > 0) { %>
+        <div class="alert alert-success">
+          <i class="fa-solid fa-circle-check"></i> <%= _flash.success[0] %>
+        </div>
+      <% } %>
+      <% if (_flash.error && _flash.error.length > 0) { %>
+        <div class="alert alert-error">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= _flash.error[0] %>
+        </div>
+      <% } %>
+      <% if (_flash.info && _flash.info.length > 0) { %>
+        <div class="alert alert-info">
+          <i class="fa-solid fa-circle-info"></i> <%= _flash.info[0] %>
+        </div>
+      <% } %>
+    </div>
+  <% } %>

@@ -158,3 +158,118 @@ exports.logout = (req, res) => {
     res.redirect('/auth/login');
   });
 };
+
+/**
+ * Google Sign-In backend identity verification (Customer Only)
+ * Verifies ID token with Google tokeninfo API, finds/creates customer account, and establishes customer session.
+ */
+exports.postGoogleVerify = async (req, res) => {
+  try {
+    const { credential, id_token } = req.body || {};
+    const token = credential || id_token;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Google authentication credential missing.' });
+    }
+
+    // 1. Verify token server-side with Google tokeninfo API
+    const https = require('https');
+    const tokenInfo = await new Promise((resolve, reject) => {
+      https.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`, (gRes) => {
+        let raw = '';
+        gRes.on('data', chunk => raw += chunk);
+        gRes.on('end', () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }).on('error', reject);
+    });
+
+    if (!tokenInfo || !tokenInfo.email || (tokenInfo.email_verified !== 'true' && tokenInfo.email_verified !== true)) {
+      return res.status(400).json({ success: false, message: 'Google authentication failed. Unverified email.' });
+    }
+
+    const email = tokenInfo.email.toLowerCase().trim();
+    const fullName = tokenInfo.name || tokenInfo.given_name || 'Valued Customer';
+
+    // 2. Find or Create Customer Account
+    let user = await User.findByEmail(email);
+
+    if (user) {
+      if (!user.is_active) {
+        return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+      }
+
+      // Establish customer session (Never grant admin privileges via Google Sign-In)
+      req.session.userId = user.id;
+
+      const needsProfile = !user.phone || String(user.phone).trim() === '' || !user.address || String(user.address).trim() === '';
+      const targetRedirect = needsProfile ? '/user/complete-profile' : (req.session.returnTo || '/user/dashboard');
+      delete req.session.returnTo;
+
+      return res.json({
+        success: true,
+        message: `Welcome back, ${user.full_name}!`,
+        redirect: targetRedirect
+      });
+    }
+
+    // 3. Register New Customer linked to Google Email
+    const randomPassword = 'GAuth_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+    const newUserId = await User.create({
+      full_name: fullName,
+      email: email,
+      password: randomPassword,
+      phone: null,
+      role: 'customer'
+    });
+
+    req.session.userId = newUserId;
+
+    return res.json({
+      success: true,
+      message: 'Welcome to Aruvi Embroidery! Account created successfully via Google.',
+      redirect: '/user/complete-profile'
+    });
+
+  } catch (err) {
+    console.error('[Google Verify Error]:', err.message);
+    return res.status(500).json({ success: false, message: 'Google Sign-In Error: ' + err.message });
+  }
+};
+
+/**
+ * OAuth Redirect Fallback Handler
+ */
+exports.getGoogleAuth = (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const siteUrl = process.env.SITE_URL || process.env.APP_URL || 'http://localhost:3000';
+  const redirectUri = `${siteUrl}/auth/google/callback`;
+
+  if (!clientId || clientId === 'sample-google-client-id') {
+    req.flash('error', 'Google Sign-In is configured for ID token verification. Please use the "Continue with Google" button on the login screen.');
+    return res.redirect('/auth/login');
+  }
+
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20email&access_type=online`;
+  res.redirect(googleAuthUrl);
+};
+
+exports.getGoogleCallback = async (req, res, next) => {
+  try {
+    const { code, error } = req.query;
+
+    if (error || !code) {
+      req.flash('error', 'Google Sign-In was cancelled or failed.');
+      return res.redirect('/auth/login');
+    }
+
+    req.flash('info', 'Google OAuth authorization code received. Please use Google Sign-In prompt.');
+    res.redirect('/auth/login');
+  } catch (err) {
+    next(err);
+  }
+};
