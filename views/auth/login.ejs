@@ -52,7 +52,7 @@
       <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
     </div>
 
-    <!-- Prominent Continue with Google Button -->
+    <!-- Official Google Identity Services (GIS) ID-Token Authentication -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <div id="g_id_onload"
          data-client_id="<%= process.env.GOOGLE_CLIENT_ID || 'sample-google-client-id' %>"
@@ -60,8 +60,19 @@
          data-auto_select="false">
     </div>
 
-    <div style="margin-bottom: 0.8rem;">
-      <button type="button" id="customGoogleBtn" onclick="triggerGoogleSignIn()" class="btn btn-block" style="background: #FFFFFF; color: #3c4043; border: 1px solid #dadce0; border-radius: 10px; height: 46px; font-size: 0.94rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; width: 100%; transition: all 0.2s ease;">
+    <div style="margin-bottom: 0.8rem; min-height: 46px; display: flex; justify-content: center; align-items: center;">
+      <div id="gsiButtonWrapper" style="width: 100%;">
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="outline"
+             data-text="continue_with"
+             data-size="large"
+             data-logo_alignment="left"
+             data-width="400">
+        </div>
+      </div>
+      <button type="button" id="customGoogleBtn" onclick="triggerGoogleSignIn()" class="btn btn-block" style="display: none; background: #FFFFFF; color: #3c4043; border: 1px solid #dadce0; border-radius: 10px; height: 46px; font-size: 0.94rem; font-weight: 600; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; width: 100%; transition: all 0.2s ease;">
         <svg width="20" height="20" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -132,6 +143,7 @@
     }
   });
 
+  // Fallback trigger if GSI element isn't auto-rendered
   function triggerGoogleSignIn() {
     if (!configuredGoogleClientId || configuredGoogleClientId === 'sample-google-client-id') {
       showLoginError('Google Sign-In is not currently configured with a valid Google Client ID. Please sign in with your email address.');
@@ -139,13 +151,9 @@
     }
 
     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-      google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          window.location.href = '/auth/google';
-        }
-      });
+      google.accounts.id.prompt();
     } else {
-      window.location.href = '/auth/google';
+      showLoginError('Google Sign-In library is loading or blocked by browser extensions. Please try refreshing the page.');
     }
   }
 
@@ -173,6 +181,15 @@
       showLoginError('Unable to authenticate with Google right now. Please sign in with email.');
     });
   }
+
+  // Fallback button visibility handler
+  window.addEventListener('load', function() {
+    if (!configuredGoogleClientId || configuredGoogleClientId === 'sample-google-client-id') {
+      document.getElementById('gsiButtonWrapper').style.display = 'none';
+      const customBtn = document.getElementById('customGoogleBtn');
+      if (customBtn) customBtn.style.display = 'flex';
+    }
+  });
 </script>
 
 <%- include('../partials/footer') %>
