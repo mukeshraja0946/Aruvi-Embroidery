@@ -154,13 +154,35 @@ function processUploadedFilesAndArchives(reqFiles) {
   return packageFiles;
 }
 
+exports.getNextSku = async (req, res, next) => {
+  try {
+    const categoryId = req.query.category_id;
+    const currentId = req.query.current_id || null;
+    if (!categoryId) {
+      return res.status(400).json({ success: false, message: 'Category ID is required' });
+    }
+    const nextSku = await Design.getNextSkuForCategory(categoryId, currentId);
+    return res.json({ success: true, sku: nextSku });
+  } catch (err) {
+    console.error('[getNextSku error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getCreateForm = async (req, res, next) => {
   try {
     const categories = await Category.getAll();
+    const suggestedReviewCount = Math.floor(Math.random() * 150);
+    let defaultSku = 'AED-GEN-01';
+    if (categories && categories.length > 0) {
+      defaultSku = await Design.getNextSkuForCategory(categories[0].id);
+    }
     res.render('admin/designs/form', {
       title: 'Add New Embroidery Design - Admin',
       design: null,
-      categories
+      categories,
+      suggestedReviewCount,
+      defaultSku
     });
   } catch (err) {
     next(err);
@@ -223,6 +245,20 @@ exports.postCreate = async (req, res, next) => {
       return res.redirect('back');
     }
 
+    // SKU Auto-generation & Uniqueness Validation
+    let finalSku = (sku && sku.trim()) ? sku.trim() : null;
+    if (finalSku) {
+      const isDuplicate = await Design.isSkuExists(finalSku);
+      if (isDuplicate) {
+        const errMsg = `Design Code / SKU "${finalSku}" is already in use by another product. Please enter a unique SKU.`;
+        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
+        req.flash('error', errMsg);
+        return res.redirect('back');
+      }
+    } else {
+      finalSku = await Design.getNextSkuForCategory(category_id);
+    }
+
     // Rating & review count validation
     let parsedRating = average_rating !== undefined && average_rating !== '' ? parseFloat(average_rating) : 4.80;
     if (isNaN(parsedRating) || parsedRating < 0 || parsedRating > 5) {
@@ -233,8 +269,8 @@ exports.postCreate = async (req, res, next) => {
     }
 
     let parsedReviews = reviews_count !== undefined && reviews_count !== '' ? parseInt(reviews_count) : 0;
-    if (isNaN(parsedReviews) || parsedReviews < 0) {
-      const errMsg = 'Review count must be a non-negative integer.';
+    if (isNaN(parsedReviews) || parsedReviews < 0 || parsedReviews > 149) {
+      const errMsg = 'Review count must be an integer between 0 and 149.';
       if (isAjax) return res.status(400).json({ success: false, message: errMsg });
       req.flash('error', errMsg);
       return res.redirect('back');
@@ -255,7 +291,7 @@ exports.postCreate = async (req, res, next) => {
 
     const designId = await Design.create({
       title,
-      sku: sku || `ARV-FL-${Math.floor(100 + Math.random() * 900)}`,
+      sku: finalSku,
       slug: finalSlug,
       price: mrp,
       sale_price: sellingPrice,
@@ -388,6 +424,26 @@ exports.postEdit = async (req, res, next) => {
       return res.redirect('back');
     }
 
+    const existingDesign = await Design.getById(id);
+    if (!existingDesign) {
+      const errMsg = 'Design record not found.';
+      if (isAjax) return res.status(404).json({ success: false, message: errMsg });
+      req.flash('error', errMsg);
+      return res.redirect('/admin/designs');
+    }
+
+    // SKU Uniqueness Validation
+    let finalSku = (sku && sku.trim()) ? sku.trim() : existingDesign.sku;
+    if (finalSku) {
+      const isDuplicate = await Design.isSkuExists(finalSku, id);
+      if (isDuplicate) {
+        const errMsg = `Design Code / SKU "${finalSku}" is already in use by another product. Please enter a unique SKU.`;
+        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
+        req.flash('error', errMsg);
+        return res.redirect('back');
+      }
+    }
+
     // Rating & review count validation
     let parsedRating = average_rating !== undefined && average_rating !== '' ? parseFloat(average_rating) : undefined;
     if (parsedRating !== undefined && (isNaN(parsedRating) || parsedRating < 0 || parsedRating > 5)) {
@@ -398,19 +454,11 @@ exports.postEdit = async (req, res, next) => {
     }
 
     let parsedReviews = reviews_count !== undefined && reviews_count !== '' ? parseInt(reviews_count) : undefined;
-    if (parsedReviews !== undefined && (isNaN(parsedReviews) || parsedReviews < 0)) {
-      const errMsg = 'Review count must be a non-negative integer.';
+    if (parsedReviews !== undefined && (isNaN(parsedReviews) || parsedReviews < 0 || parsedReviews > 149)) {
+      const errMsg = 'Review count must be an integer between 0 and 149.';
       if (isAjax) return res.status(400).json({ success: false, message: errMsg });
       req.flash('error', errMsg);
       return res.redirect('back');
-    }
-
-    const existingDesign = await Design.getById(id);
-    if (!existingDesign) {
-      const errMsg = 'Design record not found.';
-      if (isAjax) return res.status(404).json({ success: false, message: errMsg });
-      req.flash('error', errMsg);
-      return res.redirect('/admin/designs');
     }
 
     const finalActiveState = status_draft ? 0 : (is_active ? 1 : 0);
@@ -423,7 +471,7 @@ exports.postEdit = async (req, res, next) => {
 
     await Design.update(id, {
       title,
-      sku: sku || existingDesign.sku || `ARV-FL-00${id}`,
+      sku: finalSku,
       slug: finalSlug,
       price: mrp,
       sale_price: sellingPrice,

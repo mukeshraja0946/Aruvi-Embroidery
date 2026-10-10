@@ -39,6 +39,7 @@ router.get('/api/admin/dashboard/stats', async (req, res) => {
 // Products / Designs Management (supports both /admin/products and /admin/designs)
 router.get('/admin/products', adminDesignController.getDesigns);
 router.get('/admin/designs', adminDesignController.getDesigns);
+router.get('/admin/designs/next-sku', adminDesignController.getNextSku);
 
 router.get('/admin/products/create', adminDesignController.getCreateForm);
 router.get('/admin/designs/create', adminDesignController.getCreateForm);

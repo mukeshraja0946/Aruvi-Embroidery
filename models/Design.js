@@ -506,6 +506,132 @@ class Design {
     return d;
   }
 
+  static getCategoryAbbreviation(categoryNameOrSlug) {
+    if (!categoryNameOrSlug) return 'GEN';
+    const norm = String(categoryNameOrSlug).toLowerCase().trim();
+    if (norm.includes('blouse')) return 'BLO';
+    if (norm.includes('saree')) return 'SAR';
+    if (norm.includes('t-shirt') || norm.includes('tshirt')) return 'TSH';
+    if (norm.includes('shirt logo') || norm.includes('logo')) return 'SLG';
+    if (norm.includes('shirt')) return 'SHI';
+    if (norm.includes('animal') || norm.includes('bird')) return 'ANI';
+    if (norm.includes('custom')) return 'CUS';
+    if (norm.includes('kid') || norm.includes('child')) return 'KID';
+    if (norm.includes('tradition')) return 'TRD';
+    if (norm.includes('border')) return 'BOR';
+    if (norm.includes('flora') || norm.includes('flower')) return 'FLO';
+    if (norm.includes('monogram')) return 'MON';
+    if (norm.includes('margazhi')) return 'MAR';
+
+    const cleaned = norm.replace(/[^a-z0-9]/g, '').toUpperCase();
+    if (cleaned.length >= 3) {
+      return cleaned.substring(0, 3);
+    }
+    return (cleaned + 'XXX').substring(0, 3);
+  }
+
+  static async isSkuExists(sku, excludeDesignId = null) {
+    if (!sku || typeof sku !== 'string') return false;
+    const cleanSku = sku.trim();
+    if (db.isConnected()) {
+      try {
+        let sql = 'SELECT id FROM designs WHERE LOWER(sku) = LOWER(?)';
+        let params = [cleanSku];
+        if (excludeDesignId) {
+          sql += ' AND id != ?';
+          params.push(parseInt(excludeDesignId));
+        }
+        sql += ' LIMIT 1';
+        const rows = await db.query(sql, params);
+        if (rows && rows.length > 0) return true;
+      } catch (err) {
+        console.error('[isSkuExists DB Error]:', err.message);
+      }
+    }
+    const found = fallbackDesigns.find(d => 
+      d.sku && d.sku.trim().toLowerCase() === cleanSku.toLowerCase() &&
+      (!excludeDesignId || d.id != excludeDesignId)
+    );
+    return Boolean(found);
+  }
+
+  static async getNextSkuForCategory(categoryId, currentDesignId = null) {
+    let catName = '';
+    if (categoryId) {
+      const Category = require('./Category');
+      const cat = await Category.getById(categoryId);
+      if (cat) {
+        catName = cat.name || cat.slug || '';
+      }
+    }
+    const abbr = this.getCategoryAbbreviation(catName);
+    const prefix = `AED-${abbr}-`;
+
+    let matchingSkus = [];
+    let designCountInCategory = 0;
+
+    if (db.isConnected()) {
+      try {
+        let sql = 'SELECT sku FROM designs WHERE category_id = ?';
+        let params = [parseInt(categoryId)];
+        if (currentDesignId) {
+          sql += ' AND id != ?';
+          params.push(parseInt(currentDesignId));
+        }
+        const rows = await db.query(sql, params);
+        if (rows && Array.isArray(rows)) {
+          designCountInCategory = rows.length;
+          matchingSkus = rows.map(r => r.sku).filter(Boolean);
+        }
+      } catch (err) {
+        console.error('[getNextSkuForCategory DB Error]:', err.message);
+      }
+    } else {
+      const filtered = fallbackDesigns.filter(d => 
+        d.category_id == categoryId && (!currentDesignId || d.id != currentDesignId)
+      );
+      designCountInCategory = filtered.length;
+      matchingSkus = filtered.map(d => d.sku).filter(Boolean);
+    }
+
+    if (designCountInCategory === 0) {
+      let num = 1;
+      let candidate = `${prefix}${String(num).padStart(2, '0')}`;
+      while (await this.isSkuExists(candidate, currentDesignId)) {
+        num++;
+        candidate = `${prefix}${String(num).padStart(2, '0')}`;
+      }
+      return candidate;
+    }
+
+    let extractedNumbers = [];
+    const prefixRegex = new RegExp(`^AED-${abbr}-(\\d+)$`, 'i');
+    const genericRegex = /(\d+)$/;
+
+    for (const s of matchingSkus) {
+      const matchPrefix = s.match(prefixRegex);
+      if (matchPrefix && matchPrefix[1]) {
+        extractedNumbers.push(parseInt(matchPrefix[1], 10));
+      } else {
+        const matchGen = s.match(genericRegex);
+        if (matchGen && matchGen[1]) {
+          extractedNumbers.push(parseInt(matchGen[1], 10));
+        }
+      }
+    }
+
+    let maxNum = extractedNumbers.length > 0 ? Math.max(...extractedNumbers) : designCountInCategory;
+    let nextSeq = maxNum + 1;
+    let candidateSku = `${prefix}${String(nextSeq).padStart(2, '0')}`;
+
+    while (await this.isSkuExists(candidateSku, currentDesignId)) {
+      nextSeq++;
+      candidateSku = `${prefix}${String(nextSeq).padStart(2, '0')}`;
+    }
+
+    return candidateSku;
+  }
+
   static normalizeSlug(str) {
     if (!str || typeof str !== 'string') return '';
     return str

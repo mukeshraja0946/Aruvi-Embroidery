@@ -199,14 +199,20 @@
 
                 <div>
                   <label class="form-label-custom">Design Code / SKU <span class="req">*</span></label>
-                  <input type="text" name="sku" class="form-control-custom" value="<%= design ? (design.sku || 'ARV-FL-00' + (design ? design.id : '')) : 'ARV-FL-' + Math.floor(100 + Math.random() * 900) %>" required placeholder="e.g. ARV-FL-001">
+                  <div style="position: relative;">
+                    <input type="text" name="sku" id="skuInput" class="form-control-custom" value="<%= design ? (design.sku || '') : (typeof defaultSku !== 'undefined' ? defaultSku : '') %>" required placeholder="e.g. AED-BLO-01">
+                    <button type="button" onclick="autoGenerateSku()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #F4EFEA; border: 1px solid var(--admin-border); border-radius: 6px; padding: 4px 10px; color: var(--admin-primary); cursor: pointer; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;" title="Auto-generate suggested SKU">
+                      <i class="fa-solid fa-wand-magic-sparkles"></i> Auto
+                    </button>
+                  </div>
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Auto-generated based on selected category. You can edit manually.</span>
                 </div>
               </div>
 
               <!-- Category -->
               <div>
                 <label class="form-label-custom">Category <span class="req">*</span></label>
-                <select name="category_id" class="form-control-custom" required>
+                <select name="category_id" id="categorySelect" class="form-control-custom" required onchange="autoGenerateSku()">
                   <option value="">Select Category</option>
                   <% categories.forEach(cat => { %>
                     <option value="<%= cat.id %>" <%= (design && design.category_id == cat.id) ? 'selected' : '' %>>
@@ -404,9 +410,9 @@
                 </div>
 
                 <div>
-                  <label class="form-label-custom">Review Count (Number of Reviews)</label>
-                  <input type="number" min="0" name="reviews_count" class="form-control-custom" value="<%= design ? (design.reviews_count !== undefined ? design.reviews_count : 0) : 0 %>" placeholder="e.g. 120">
-                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Controls review count display. Set 0 if no reviews exist.</span>
+                  <label class="form-label-custom">Review Count (0 – 149)</label>
+                  <input type="number" min="0" max="149" name="reviews_count" class="form-control-custom" value="<%= design ? (design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0) : (typeof suggestedReviewCount !== 'undefined' ? suggestedReviewCount : Math.floor(Math.random() * 150)) %>" placeholder="e.g. 85" required>
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Controls displayed review count (0 to 149). Suggested on product creation.</span>
                 </div>
               </div>
             </div>
@@ -518,11 +524,37 @@
     }
   }
 
+  function autoGenerateSku() {
+    const catSelect = document.getElementById('categorySelect');
+    const skuInput = document.getElementById('skuInput');
+    if (!catSelect || !skuInput) return;
+
+    const catId = catSelect.value;
+    if (!catId) return;
+
+    const currentDesignId = '<%= design ? design.id : "" %>';
+    fetch(`/admin/designs/next-sku?category_id=${catId}&current_id=${currentDesignId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.sku) {
+          skuInput.value = data.sku;
+        }
+      })
+      .catch(err => {
+        console.warn('[autoGenerateSku Error]:', err);
+      });
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     calcDiscount();
     initTags();
     initDragAndDrop();
     initFormSubmit();
+    <% if (!design) { %>
+      if (document.getElementById('categorySelect') && document.getElementById('categorySelect').value && !document.getElementById('skuInput').value) {
+        autoGenerateSku();
+      }
+    <% } %>
   });
 
   function initDragAndDrop() {
