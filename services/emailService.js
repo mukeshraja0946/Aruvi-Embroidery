@@ -1,13 +1,30 @@
 const nodemailer = require('nodemailer');
 
+/**
+ * Helper to get the canonical sender identity.
+ * Gmail SMTP requires the From address to match the authenticated user account (aruviembroidery@gmail.com).
+ * Mismatched From headers cause SPF/DKIM/DMARC alignment failure and SPAM routing.
+ */
+function getSenderEmail() {
+  return (process.env.SMTP_USER || 'aruviembroidery@gmail.com').toLowerCase().trim();
+}
+
+function getSenderName() {
+  return (process.env.EMAIL_FROM_NAME || 'Aruvi Embroidery').trim();
+}
+
+function getSenderHeader() {
+  return `"${getSenderName()}" <${getSenderEmail()}>`;
+}
+
 function getTransporter() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587');
-  const user = process.env.SMTP_USER || 'aruviembroidery@gmail.com';
+  const user = getSenderEmail();
   const pass = process.env.SMTP_PASS;
 
   if (!user || !pass || pass === 'YOUR_GMAIL_APP_PASSWORD' || pass === 'your_smtp_password' || user === 'your_smtp_user') {
-    return null; // SMTP credentials not set
+    return null; // SMTP credentials not configured
   }
 
   const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
@@ -16,12 +33,10 @@ function getTransporter() {
     host,
     port,
     secure: isSecure,
+    requireTLS: !isSecure, // Enforce STARTTLS for port 587
     auth: {
       user,
       pass
-    },
-    tls: {
-      rejectUnauthorized: false
     }
   });
 }
@@ -32,7 +47,7 @@ function getTransporter() {
 async function testSmtpConnection() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587');
-  const user = process.env.SMTP_USER || 'aruviembroidery@gmail.com';
+  const user = getSenderEmail();
   const pass = process.env.SMTP_PASS;
 
   if (!user || !pass || pass === 'YOUR_GMAIL_APP_PASSWORD' || pass === 'your_smtp_password' || user === 'your_smtp_user') {
@@ -48,10 +63,8 @@ async function testSmtpConnection() {
     host,
     port,
     secure: isSecure,
-    auth: { user, pass },
-    tls: {
-      rejectUnauthorized: false
-    }
+    requireTLS: !isSecure,
+    auth: { user, pass }
   });
 
   try {
@@ -75,9 +88,9 @@ async function testSmtpConnection() {
 async function sendNewDesignEmail(design, recipientEmail = null) {
   try {
     const transporter = getTransporter();
-    const from = process.env.EMAIL_FROM || '"Aruvi Embroidery" <noreply@aruviembroidery.com>';
+    const from = getSenderHeader();
     const appUrl = process.env.APP_URL || process.env.SITE_URL || 'http://localhost:3000';
-    const recipient = recipientEmail || process.env.SMTP_USER || 'customer@aruviembroidery.com';
+    const recipient = recipientEmail || getSenderEmail();
 
     const title = design.title || 'New Embroidery Design';
     const formats = design.formats || 'DST';
@@ -91,9 +104,10 @@ async function sendNewDesignEmail(design, recipientEmail = null) {
 
     const mailOptions = {
       from,
+      replyTo: from,
       to: recipient,
       subject: `New Embroidery Design Added – Aruvi Embroidery`,
-      text: `Hello,\n\nA new embroidery design has been added to Aruvi Embroidery.\n\nDesign:\n${title}\n\nAvailable formats:\n${formats}\n\nPrice:\n₹${price}\n\nYou can view the new design on our website.\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
+      text: `Hello,\n\nA new embroidery design has been added to Aruvi Embroidery.\n\nDesign:\n${title}\n\nAvailable formats:\n${formats}\n\nPrice:\n₹${price}\n\nYou can view the new design on our website:\n${designUrl}\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
           <div style="background: #231815; color: #FFF; padding: 20px; text-align: center;">
@@ -130,9 +144,9 @@ async function sendNewDesignEmail(design, recipientEmail = null) {
 async function sendDesignUpdateEmail(design, recipientEmail = null) {
   try {
     const transporter = getTransporter();
-    const from = process.env.EMAIL_FROM || '"Aruvi Embroidery" <noreply@aruviembroidery.com>';
+    const from = getSenderHeader();
     const appUrl = process.env.APP_URL || process.env.SITE_URL || 'http://localhost:3000';
-    const recipient = recipientEmail || process.env.SMTP_USER || 'customer@aruviembroidery.com';
+    const recipient = recipientEmail || getSenderEmail();
 
     const title = design.title || 'AED 01';
     const designUrl = `${appUrl}/design/${design.slug || design.id}`;
@@ -144,9 +158,10 @@ async function sendDesignUpdateEmail(design, recipientEmail = null) {
 
     const mailOptions = {
       from,
+      replyTo: from,
       to: recipient,
       subject: `Design Updated – ${title}`,
-      text: `Hello,\n\nThe embroidery design ${title} has been updated on Aruvi Embroidery.\n\nPlease visit our website to view the latest information.\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
+      text: `Hello,\n\nThe embroidery design ${title} has been updated on Aruvi Embroidery.\n\nPlease visit our website to view the latest information:\n${designUrl}\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
           <div style="background: #231815; color: #FFF; padding: 20px; text-align: center;">
@@ -174,13 +189,13 @@ async function sendDesignUpdateEmail(design, recipientEmail = null) {
 }
 
 /**
- * 4. Send Successful Purchase Email
+ * 4. Send Successful Purchase Email (Transactional Email)
  * MUST ONLY be called AFTER server-side Razorpay signature verification and successful order completion.
  */
 async function sendPurchaseConfirmationEmail(order) {
   try {
     const transporter = getTransporter();
-    const from = process.env.EMAIL_FROM || '"Aruvi Embroidery" <noreply@aruviembroidery.com>';
+    const from = getSenderHeader();
     const appUrl = process.env.APP_URL || process.env.SITE_URL || 'http://localhost:3000';
 
     const customerName = order.guest_name || order.user_name || 'Customer';
@@ -202,9 +217,10 @@ async function sendPurchaseConfirmationEmail(order) {
 
     const mailOptions = {
       from,
+      replyTo: from,
       to: customerEmail,
-      subject: `Purchase Successful – ${designName} | Aruvi Embroidery`,
-      text: `Hello ${customerName},\n\nThank you for your purchase from Aruvi Embroidery.\n\nYou have successfully purchased:\n${designName}\n\nYour payment has been successfully received.\n\nYour purchased design is now available for download from your account.\n\nDownload:\n${downloadUrl}\n\nOrder ID:\n${orderId}\n\nAmount:\n₹${amount}\n\nPayment Status:\nPaid\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
+      subject: `Order Confirmation #${orderId} – Aruvi Embroidery`,
+      text: `Hello ${customerName},\n\nThank you for your purchase from Aruvi Embroidery.\n\nYou have successfully purchased:\n${designName}\n\nYour payment has been successfully received.\n\nYour purchased design is now available for download from your account.\n\nDownload Link:\n${downloadUrl}\n\nOrder ID: ${orderId}\nAmount: ₹${amount}\nPayment Status: Paid\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
           <div style="background: #231815; color: #FFF; padding: 20px; text-align: center;">
@@ -243,14 +259,14 @@ async function sendPurchaseConfirmationEmail(order) {
 }
 
 /**
- * 5. Send Custom Campaign Email to Individual Recipient
+ * 5. Send Promotional Campaign Email to Individual Recipient
+ * Includes RFC 2369 / RFC 8058 compliant List-Unsubscribe headers & visible unsubscribe link.
  */
 async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl }) {
   try {
     const transporter = getTransporter();
-    const fromName = process.env.EMAIL_FROM_NAME || 'Aruvi Embroidery';
-    const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || 'aruviembroidery@gmail.com';
-    const fromHeader = `"${fromName}" <${fromEmail}>`;
+    const fromHeader = getSenderHeader();
+    const appUrl = process.env.APP_URL || process.env.SITE_URL || 'http://localhost:3000';
 
     if (!transporter) {
       const errMsg = 'Gmail SMTP credentials (SMTP_PASS) not configured in backend environment. Please set a 16-character Google App Password in .env file.';
@@ -259,9 +275,9 @@ async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl
     }
 
     const cleanName = toName || 'Valued Customer';
-    const finalUnsubUrl = unsubscribeUrl || 'https://aruviembroidery.com/unsubscribe';
+    const finalUnsubUrl = unsubscribeUrl || `${appUrl}/unsubscribe?email=${encodeURIComponent(to)}`;
 
-    // Wrap body content with professional branding & unsubscribe footer
+    // Wrap body content with professional branding & RFC-compliant unsubscribe footer
     const fullHtml = `
       <!DOCTYPE html>
       <html>
@@ -291,8 +307,12 @@ async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl
                 <!-- Footer -->
                 <tr>
                   <td align="center" style="background-color:#FAF6F0; padding: 20px 28px; border-top:1px solid #E8E0D5; font-size:0.78rem; color:#776A62;">
-                    <p style="margin:0 0 6px 0; font-weight:bold;">Aruvi Embroidery Design</p>
-                    <p style="margin:0;"><a href="mailto:aruviembroidery@gmail.com" style="color:#B8402A; text-decoration:none;">aruviembroidery@gmail.com</a></p>
+                    <p style="margin:0 0 6px 0; font-weight:bold;">Aruvi Embroidery Studio</p>
+                    <p style="margin:0 0 8px 0;"><a href="mailto:aruviembroidery@gmail.com" style="color:#B8402A; text-decoration:none;">aruviembroidery@gmail.com</a></p>
+                    <p style="margin:8px 0 0 0; font-size:0.75rem; color:#998C82;">
+                      You are receiving this email because you opted in to marketing announcements from Aruvi Embroidery.<br>
+                      <a href="${finalUnsubUrl}" style="color:#776A62; text-decoration:underline;">Unsubscribe from promotional emails</a>
+                    </p>
                   </td>
                 </tr>
               </table>
@@ -303,14 +323,21 @@ async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl
       </html>
     `;
 
-    const plainText = htmlBody.replace(/<[^>]+>/g, '').trim();
+    // Strip HTML for clean plain text fallback
+    let plainText = htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    plainText += `\n\n---\nUnsubscribe from promotional emails: ${finalUnsubUrl}`;
 
     const mailOptions = {
       from: fromHeader,
+      replyTo: fromHeader,
       to: to,
       subject: subject,
       text: plainText,
-      html: fullHtml
+      html: fullHtml,
+      headers: {
+        'List-Unsubscribe': `<${finalUnsubUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+      }
     };
 
     await transporter.sendMail(mailOptions);
@@ -323,10 +350,14 @@ async function sendCampaignEmail({ to, toName, subject, htmlBody, unsubscribeUrl
 }
 
 module.exports = {
+  getSenderEmail,
+  getSenderName,
+  getSenderHeader,
   testSmtpConnection,
   sendNewDesignEmail,
   sendDesignUpdateEmail,
   sendPurchaseConfirmationEmail,
   sendCampaignEmail
 };
+
 

@@ -41,7 +41,8 @@ SMTP_HOST=smtp.mailtrap.io
 SMTP_PORT=2525
 SMTP_USER=your_smtp_user
 SMTP_PASS=your_smtp_password
-EMAIL_FROM="Aruvi Embroidery <noreply@aruviembroidery.com>"
+EMAIL_FROM_NAME="Aruvi Embroidery"
+EMAIL_FROM=aruviembroidery@gmail.com
 
 # ------------------------------------------------------------------
 # 6. STORE CONTACT INFORMATION
