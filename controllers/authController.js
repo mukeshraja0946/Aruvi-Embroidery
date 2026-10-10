@@ -255,17 +255,27 @@ exports.postGoogleVerify = async (req, res) => {
   }
 };
 
+function getCanonicalRedirectUri(req) {
+  let siteUrl = (process.env.SITE_URL || process.env.APP_URL || '').trim().replace(/\/+$/, '');
+  if (!siteUrl) {
+    const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    let host = req.get('host') || 'aruviembroidery.com';
+    host = host.replace(/^www\./, '');
+    siteUrl = `${proto}://${host}`;
+  }
+  if (siteUrl.includes('aruviembroidery.com') && siteUrl.startsWith('http:')) {
+    siteUrl = siteUrl.replace('http:', 'https:');
+  }
+  return `${siteUrl}/auth/google/callback`;
+}
+
 /**
  * OAuth Redirect Fallback Handler
  */
 exports.getGoogleAuth = (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const rawSiteUrl = process.env.SITE_URL || process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-  let siteUrl = rawSiteUrl.replace(/\/+$/, '');
-  if (siteUrl.includes('aruviembroidery.com') && siteUrl.startsWith('http:')) {
-    siteUrl = siteUrl.replace('http:', 'https:');
-  }
-  const redirectUri = `${siteUrl}/auth/google/callback`;
+  const redirectUri = getCanonicalRedirectUri(req);
+  console.log('[Google Auth] Initiating OAuth request with Redirect URI:', redirectUri);
 
   if (!clientId || clientId === 'sample-google-client-id') {
     req.flash('error', 'Google Sign-In is not currently configured with a valid Google Client ID. Please sign in with your email address.');
@@ -287,12 +297,7 @@ exports.getGoogleCallback = async (req, res, next) => {
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const rawSiteUrl = process.env.SITE_URL || process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    let siteUrl = rawSiteUrl.replace(/\/+$/, '');
-    if (siteUrl.includes('aruviembroidery.com') && siteUrl.startsWith('http:')) {
-      siteUrl = siteUrl.replace('http:', 'https:');
-    }
-    const redirectUri = `${siteUrl}/auth/google/callback`;
+    const redirectUri = getCanonicalRedirectUri(req);
 
     if (!clientId || !clientSecret) {
       req.flash('error', 'Google OAuth credentials missing on server.');
