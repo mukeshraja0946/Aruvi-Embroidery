@@ -261,7 +261,10 @@ exports.postGoogleVerify = async (req, res) => {
 exports.getGoogleAuth = (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const rawSiteUrl = process.env.SITE_URL || process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-  const siteUrl = rawSiteUrl.replace(/\/+$/, '');
+  let siteUrl = rawSiteUrl.replace(/\/+$/, '');
+  if (siteUrl.includes('aruviembroidery.com') && siteUrl.startsWith('http:')) {
+    siteUrl = siteUrl.replace('http:', 'https:');
+  }
   const redirectUri = `${siteUrl}/auth/google/callback`;
 
   if (!clientId || clientId === 'sample-google-client-id') {
@@ -285,7 +288,10 @@ exports.getGoogleCallback = async (req, res, next) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     const rawSiteUrl = process.env.SITE_URL || process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const siteUrl = rawSiteUrl.replace(/\/+$/, '');
+    let siteUrl = rawSiteUrl.replace(/\/+$/, '');
+    if (siteUrl.includes('aruviembroidery.com') && siteUrl.startsWith('http:')) {
+      siteUrl = siteUrl.replace('http:', 'https:');
+    }
     const redirectUri = `${siteUrl}/auth/google/callback`;
 
     if (!clientId || !clientSecret) {
