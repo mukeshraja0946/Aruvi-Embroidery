@@ -1389,16 +1389,33 @@ textarea.form-control {
 
 .card-image-box {
   width: 100%;
-  height: 180px;
+  height: 230px;
   overflow: hidden;
-  background-color: var(--bg-soft);
+  background-color: #FAF6F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.card-image-box a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .card-image-box img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain !important;
+  object-position: center;
   transition: transform 0.4s ease;
+  display: block;
 }
 
 .listing-product-card:hover .card-image-box img {
@@ -3420,14 +3437,29 @@ textarea.form-control {
 }
 .product-exact-img {
   width: 100%;
-  height: 150px;
+  height: 180px;
   overflow: hidden;
-  background: var(--bg-soft);
+  background: #FAF6F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  box-sizing: border-box;
+}
+.product-exact-img a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 .product-exact-img img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain !important;
+  object-position: center;
   transition: transform 0.4s ease;
 }
 .product-card-exact:hover .product-exact-img img {
@@ -4922,8 +4954,18 @@ textarea.form-control {
   }
 
   .product-exact-img {
-    height: 115px !important;
+    height: 140px !important;
     width: 100% !important;
+    background: #FAF6F0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px !important;
+    box-sizing: border-box !important;
+  }
+
+  .product-exact-img img {
+    object-fit: contain !important;
   }
 
   .product-exact-content {
@@ -5692,18 +5734,34 @@ textarea.form-control {
   }
 
   .card-image-box {
-    height: 140px !important;
+    height: 180px !important;
     width: 100% !important;
     background-color: #FAF6F0 !important;
     overflow: hidden !important;
     position: relative !important;
     border-radius: 16px 16px 0 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 6px !important;
+    box-sizing: border-box !important;
+  }
+
+  .card-image-box a {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   .card-image-box img {
     width: 100% !important;
     height: 100% !important;
-    object-fit: cover !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
     display: block !important;
   }
 
