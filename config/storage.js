@@ -52,7 +52,7 @@ try {
  * Resolves a web path (e.g. /public/uploads/previews/image-1.png or /uploads/designs/file.zip)
  * to an existing physical file on disk. Checks persistent storage first, then default repo path.
  */
-function resolveFilePath(filePath) {
+function resolveFilePath(filePath, returnTargetIfMissing = false) {
   if (!filePath || typeof filePath !== 'string') return null;
 
   // If already an existing absolute path on disk
