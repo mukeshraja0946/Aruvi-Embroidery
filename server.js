@@ -67,41 +67,35 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Static Files
-const customUploadsDir = process.env.UPLOADS_DIR || process.env.PERSISTENT_UPLOADS_DIR;
-if (customUploadsDir && fs.existsSync(customUploadsDir)) {
-  app.use('/public/uploads', express.static(customUploadsDir));
-  app.use('/uploads', express.static(customUploadsDir));
+// Persistent Storage & Static Files
+const storage = require('./config/storage');
+storage.initStorage();
+
+app.use('/public/uploads', express.static(storage.getUploadsDir()));
+app.use('/uploads', express.static(storage.getUploadsDir()));
+
+// Fallback to default uploads directory if custom persistent directory is configured
+if (path.resolve(storage.getUploadsDir()) !== path.resolve(storage.defaultUploadsDir)) {
+  app.use('/public/uploads', express.static(storage.defaultUploadsDir));
+  app.use('/uploads', express.static(storage.defaultUploadsDir));
 }
+
 app.use('/public', express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// Smart image fallback handler (Prevents broken image 404s after deployments)
-const serveImageWithFallback = (req, res, next) => {
-  const reqPath = req.path;
-  const ext = path.extname(reqPath).toLowerCase();
+// Safe preview resolver (locates previews across persistent and fallback storage)
+const serveUploadedPreview = (req, res, next) => {
+  const ext = path.extname(req.path).toLowerCase();
   if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg'].includes(ext)) {
-    const primaryPath = path.join(__dirname, 'public/uploads/previews', reqPath);
-    const customDir = process.env.UPLOADS_DIR || process.env.PERSISTENT_UPLOADS_DIR;
-    const persistentPath = customDir ? path.join(customDir, 'previews', reqPath) : null;
-
-    if (fs.existsSync(primaryPath)) {
-      return res.sendFile(primaryPath);
-    }
-    if (persistentPath && fs.existsSync(persistentPath)) {
-      return res.sendFile(persistentPath);
-    }
-
-    const defaultFallback = path.join(__dirname, 'public/images/hero_embroidery.jpg');
-    if (fs.existsSync(defaultFallback)) {
-      return res.sendFile(defaultFallback);
+    const resolved = storage.resolveFilePath(path.join('previews', req.path));
+    if (resolved && fs.existsSync(resolved)) {
+      return res.sendFile(resolved);
     }
   }
   next();
 };
 
-app.use('/public/uploads/previews', serveImageWithFallback);
-app.use('/uploads/previews', serveImageWithFallback);
+app.use('/public/uploads/previews', serveUploadedPreview);
+app.use('/uploads/previews', serveUploadedPreview);
 
 // Session Management
 app.use(

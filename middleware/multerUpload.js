@@ -2,22 +2,18 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directories exist
-const previewsDir = path.join(__dirname, '../public/uploads/previews');
-const designsDir = path.join(__dirname, '../public/uploads/designs');
-
-if (!fs.existsSync(previewsDir)) fs.mkdirSync(previewsDir, { recursive: true });
-if (!fs.existsSync(designsDir)) fs.mkdirSync(designsDir, { recursive: true });
+const { getPreviewsDir, getDesignsDir } = require('../config/storage');
 
 const imageExts = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.ico', '.jfif', '.avif', '.bmp', '.gif', '.tiff'];
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (imageExts.includes(ext) || file.fieldname === 'image' || (file.mimetype && file.mimetype.startsWith('image/'))) {
-      cb(null, previewsDir);
+    const isImageField = ['image', 'preview_images', 'logo_image', 'mobile_logo_image', 'favicon_image', 'hero_image'].includes(file.fieldname);
+    if (imageExts.includes(ext) || isImageField || (file.mimetype && file.mimetype.startsWith('image/'))) {
+      cb(null, getPreviewsDir());
     } else {
-      cb(null, designsDir);
+      cb(null, getDesignsDir());
     }
   },
   filename: function (req, file, cb) {

@@ -2,6 +2,7 @@ const db = require('../config/db');
 const path = require('path');
 const fs = require('fs');
 const AdmZip = require('adm-zip');
+const storage = require('../config/storage');
 
 const availablePreviewImages = [
   '/public/images/hero_embroidery.jpg',
@@ -921,44 +922,6 @@ class Design {
     return true;
   }
 
-  static async delete(id) {
-    if (!id) return false;
-    if (db.isConnected()) {
-      try {
-        const files = await db.query('SELECT * FROM design_files WHERE design_id = ?', [id]) || [];
-        for (const f of files) {
-          if (f.file_path) {
-            let relPath = f.file_path.startsWith('/') ? f.file_path.substring(1) : f.file_path;
-            const fullPath = path.join(__dirname, '..', relPath);
-            if (fs.existsSync(fullPath)) {
-              try { fs.unlinkSync(fullPath); } catch (e) {}
-            }
-          }
-        }
-        await db.query('DELETE FROM design_files WHERE design_id = ?', [id]);
-        await db.query('DELETE FROM design_images WHERE design_id = ?', [id]);
-        await db.query('DELETE FROM cart_items WHERE design_id = ?', [id]);
-        await db.query('DELETE FROM wishlist WHERE design_id = ?', [id]);
-
-        const orderItemsRes = await db.query('SELECT COUNT(*) as cnt FROM order_items WHERE design_id = ?', [id]);
-        const hasPurchases = orderItemsRes && orderItemsRes[0] && orderItemsRes[0].cnt > 0;
-        if (hasPurchases) {
-          await db.query('UPDATE designs SET is_active = -1 WHERE id = ?', [id]);
-        } else {
-          await db.query('DELETE FROM designs WHERE id = ?', [id]);
-        }
-      } catch (err) {
-        console.error('Design.delete DB error:', err.message);
-      }
-    }
-
-    const idx = fallbackDesigns.findIndex(d => d.id == id);
-    if (idx !== -1) {
-      fallbackDesigns.splice(idx, 1);
-    }
-    return true;
-  }
-
   static async addImage(designId, imageUrl, isPrimary = 0, displayOrder = 0) {
     if (db.isConnected()) {
       try {
@@ -1130,10 +1093,9 @@ class Design {
 
         for (const f of files) {
           if (f.file_path) {
-            let relPath = f.file_path;
-            if (relPath.startsWith('/')) relPath = relPath.substring(1);
-            const fullPath = path.join(__dirname, '..', relPath);
-            if (fs.existsSync(fullPath)) {
+            const fullPath = storage.resolveFilePath(f.file_path);
+            if (fullPath && fs.existsSync(fullPath)) {
+              if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
               try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical file from disk:', fullPath, e.message); }
             }
           }
@@ -1198,10 +1160,9 @@ class Design {
         const files = await db.query('SELECT * FROM design_files WHERE design_id = ?', [id]) || [];
         for (const f of files) {
           if (f.file_path) {
-            let relPath = f.file_path;
-            if (relPath.startsWith('/')) relPath = relPath.substring(1);
-            const fullPath = path.join(__dirname, '..', relPath);
-            if (fs.existsSync(fullPath)) {
+            const fullPath = storage.resolveFilePath(f.file_path);
+            if (fullPath && fs.existsSync(fullPath)) {
+              if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
               try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical file:', fullPath, e.message); }
             }
           }
@@ -1211,10 +1172,9 @@ class Design {
         const images = await db.query('SELECT * FROM design_images WHERE design_id = ?', [id]) || [];
         for (const img of images) {
           if (img.image_url) {
-            let relPath = img.image_url;
-            if (relPath.startsWith('/')) relPath = relPath.substring(1);
-            const fullPath = path.join(__dirname, '..', relPath);
-            if (fs.existsSync(fullPath)) {
+            const fullPath = storage.resolveFilePath(img.image_url);
+            if (fullPath && fs.existsSync(fullPath)) {
+              if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
               try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical image:', fullPath, e.message); }
             }
           }
@@ -1254,6 +1214,9 @@ class Design {
   }
 
   static async deleteAll() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Mass deletion of all designs is blocked in production environment.');
+    }
     if (db.isConnected()) {
       try {
         const designs = await db.query('SELECT id FROM designs') || [];

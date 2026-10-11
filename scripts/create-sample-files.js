@@ -10,6 +10,11 @@ const sampleFiles = [
   'sample_radha.zip'
 ];
 
+if (process.env.NODE_ENV === 'production') {
+  console.error('❌ Cannot run create-sample-files in production environment. Uploads must be preserved.');
+  process.exit(1);
+}
+
 const uploadDir = path.join(__dirname, '../public/uploads/designs');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });

@@ -13,6 +13,11 @@ async function initDatabase() {
   const password = process.env.DB_PASSWORD || '';
   const dbName = process.env.DB_NAME || 'aruvi_embroidery';
 
+  if (process.env.NODE_ENV === 'production' && process.env.FORCE_PRODUCTION_SEED !== 'true') {
+    console.error('❌ Refusing to run seed.sql in production environment! To protect existing production product records, database re-seeding is blocked in production.');
+    return;
+  }
+
   try {
     // 1. Connect without selecting database to create it
     const connection = await mysql.createConnection({

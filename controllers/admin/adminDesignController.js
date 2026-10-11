@@ -3,6 +3,7 @@ const fs = require('fs');
 const Design = require('../../models/Design');
 const Category = require('../../models/Category');
 const emailService = require('../../services/emailService');
+const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists } = require('../../config/storage');
 
 const AdminStatsService = require('../../services/adminStatsService');
 
@@ -64,11 +65,7 @@ exports.processUploadedFilesAndArchives = processUploadedFilesAndArchives;
  */
 function processUploadedFilesAndArchives(reqFiles) {
   const packageFiles = [];
-  const targetDir = path.join(__dirname, '../../public/uploads/designs');
-
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
+  const targetDir = getDesignsDir();
 
   if (!reqFiles) return packageFiles;
 
@@ -492,13 +489,15 @@ exports.postEdit = async (req, res, next) => {
     // Save single ZIP package record if new ZIP file uploaded
     if (packageFiles.length > 0) {
       const pkg = packageFiles[0];
-      const db = require('../../config/db');
-      if (db.isConnected()) {
-        await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [id]);
+      if (fs.existsSync(pkg.path)) {
+        const db = require('../../config/db');
+        if (db.isConnected()) {
+          await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [id]);
+        }
+        await Design.addFile(id, pkg.originalname, pkg.webPath, 'ZIP', pkg.size, 0);
+        const detectedFormatsStr = pkg.detectedFormats ? pkg.detectedFormats.join(', ') : 'DST';
+        await Design.update(id, { formats: detectedFormatsStr });
       }
-      await Design.addFile(id, pkg.originalname, pkg.webPath, 'ZIP', pkg.size, 0);
-      const detectedFormatsStr = pkg.detectedFormats ? pkg.detectedFormats.join(', ') : 'DST';
-      await Design.update(id, { formats: detectedFormatsStr });
     }
 
     // Handle uploaded preview images
@@ -678,6 +677,14 @@ exports.deleteDesign = async (req, res, next) => {
 };
 
 exports.deleteAllDesigns = async (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(403).json({ success: false, message: 'Mass deletion of designs is disabled in production.' });
+    }
+    req.flash('error', 'Mass deletion of designs is disabled in production.');
+    return res.redirect('/admin/designs');
+  }
   try {
     await Design.deleteAll();
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
@@ -860,11 +867,9 @@ exports.postImportPreview = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No valid data rows found in the uploaded file. Please use the downloadable template.' });
     }
 
-    // 3. Move uploaded assets to public uploads directory for storage
-    const targetDirPreviews = path.join(__dirname, '../../public/uploads/previews');
-    const targetDirDesigns = path.join(__dirname, '../../public/uploads/designs');
-    if (!fs.existsSync(targetDirPreviews)) fs.mkdirSync(targetDirPreviews, { recursive: true });
-    if (!fs.existsSync(targetDirDesigns)) fs.mkdirSync(targetDirDesigns, { recursive: true });
+    // 3. Move uploaded assets to persistent uploads directory for storage
+    const targetDirPreviews = getPreviewsDir();
+    const targetDirDesigns = getDesignsDir();
 
     const assetMap = new Map(); // filename lowercase -> asset metadata
 

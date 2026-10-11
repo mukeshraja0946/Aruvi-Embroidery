@@ -5,6 +5,7 @@ const Design = require('../models/Design');
 const db = require('../config/db');
 const path = require('path');
 const fs = require('fs');
+const { resolveFilePath } = require('../config/storage');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -197,38 +198,58 @@ exports.downloadDesignZip = async (req, res, next) => {
       return !['PNG', 'JPG', 'JPEG', 'WEBP', 'IMAGE'].includes(ext);
     });
 
-    // 5. Generate ZIP package using AdmZip
-    const zip = new AdmZip();
-    let filesAddedCount = 0;
-
     const rawTitle = design.title || design.slug || `AED_${targetDesignId}`;
     const cleanFileName = rawTitle.replace(/[/\\?%*:|"<>]/g, '').trim();
     const zipFileName = `${cleanFileName}.zip`;
 
-    for (const file of machineFiles) {
-      let relPath = file.file_path || '';
-      if (relPath.startsWith('/')) relPath = relPath.substring(1);
-      const fullPath = path.join(__dirname, '..', relPath);
-
-      if (fs.existsSync(fullPath)) {
-        const outName = file.file_name || path.basename(fullPath);
-        zip.addLocalFile(fullPath, '', outName);
-        filesAddedCount++;
+    // Fast-path: If admin uploaded a single ZIP package, serve the authentic archive directly
+    if (machineFiles.length === 1 && machineFiles[0].file_path) {
+      const singlePath = resolveFilePath(machineFiles[0].file_path);
+      if (singlePath && fs.existsSync(singlePath) && path.extname(singlePath).toLowerCase() === '.zip') {
+        await Design.incrementDownloadCount(targetDesignId);
+        return res.download(singlePath, zipFileName);
       }
     }
 
-    // Fallback if physical files on disk are missing (e.g. sample data in dev)
-    if (filesAddedCount === 0) {
-      const sampleZipPath = path.join(__dirname, '..', 'public', 'uploads', 'designs', 'sample_peacock.zip');
-      if (fs.existsSync(sampleZipPath)) {
-        const sampleZip = new AdmZip(sampleZipPath);
-        sampleZip.getEntries().forEach(entry => {
-          zip.addFile(entry.entryName, entry.getData());
-        });
-      } else {
-        const formatExt = (design.formats ? design.formats.split(',')[0].trim() : 'dst').toLowerCase();
-        zip.addFile(`${cleanFileName}.${formatExt}`, Buffer.from(`[Aruvi Embroidery Machine Design File - ${cleanFileName}]`));
+    // 5. Generate or bundle ZIP package using AdmZip
+    const zip = new AdmZip();
+    let filesAddedCount = 0;
+
+    for (const file of machineFiles) {
+      if (!file.file_path) continue;
+      const fullPath = resolveFilePath(file.file_path);
+
+      if (fullPath && fs.existsSync(fullPath)) {
+        if (path.extname(fullPath).toLowerCase() === '.zip') {
+          try {
+            const arch = new AdmZip(fullPath);
+            arch.getEntries().forEach(entry => {
+              if (!entry.isDirectory) {
+                zip.addFile(entry.entryName, entry.getData());
+              }
+            });
+            filesAddedCount++;
+          } catch (e) {
+            const outName = file.file_name || path.basename(fullPath);
+            zip.addLocalFile(fullPath, '', outName);
+            filesAddedCount++;
+          }
+        } else {
+          const outName = file.file_name || path.basename(fullPath);
+          zip.addLocalFile(fullPath, '', outName);
+          filesAddedCount++;
+        }
       }
+    }
+
+    // Never serve fake placeholder ZIPs (sample_peacock.zip) to customers
+    if (filesAddedCount === 0) {
+      console.error(`[DOWNLOAD ERROR] No persistent machine files found on disk for design #${targetDesignId} ("${rawTitle}"). DB records:`, machineFiles);
+      if (isApi) {
+        return res.status(404).json({ success: false, message: 'The design files are currently unavailable. Please contact support.' });
+      }
+      req.flash('error', 'The design files are currently unavailable. Please contact support.');
+      return res.redirect('/user/dashboard');
     }
 
     await Design.incrementDownloadCount(targetDesignId);

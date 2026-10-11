@@ -60,38 +60,28 @@ async function initPool() {
       const connection = await pool.getConnection();
       connection.release();
 
-      // 3. Auto-initialize tables & seed data if empty or out of sync
+      // 3. Auto-initialize tables if empty (NEVER run seed.sql in production)
       try {
+        const isProduction = process.env.NODE_ENV === 'production';
         const [tables] = await pool.query("SHOW TABLES LIKE 'designs'");
         if (!tables || tables.length === 0) {
-          console.log(`[DB] Database '${dbConfig.database}' is empty. Running automatic schema & seed initialization...`);
+          console.log(`[DB] Database '${dbConfig.database}' missing tables. Running schema initialization...`);
           const schemaPath = path.join(__dirname, '../schema.sql');
-          const seedPath = path.join(__dirname, '../seed.sql');
           if (fs.existsSync(schemaPath)) {
             const schemaSql = fs.readFileSync(schemaPath, 'utf8');
             await pool.query(schemaSql);
+            console.log(`[DB] Schema tables initialized successfully.`);
           }
-          if (fs.existsSync(seedPath)) {
-            const seedSql = fs.readFileSync(seedPath, 'utf8');
-            await pool.query(seedSql);
-          }
-          console.log(`[DB] Schema & Seed initialization completed successfully.`);
-        } else {
-          // Check design count and auto-sync seed dataset if needed
-          try {
-            const [dCount] = await pool.query("SELECT COUNT(*) as total FROM designs");
-            if (!dCount || dCount[0].total === 0) {
-              console.log(`[DB Sync] Designs table empty in '${dbConfig.database}'. Running seed.sql sync...`);
-              const seedPath = path.join(__dirname, '../seed.sql');
-              if (fs.existsSync(seedPath)) {
-                const seedSql = fs.readFileSync(seedPath, 'utf8');
-                await pool.query(seedSql);
-                console.log(`[DB Sync] Seed data synchronized successfully.`);
-              }
+          // Seed data is ONLY for explicit local dev with AUTO_SEED=true, NEVER production
+          if (!isProduction && process.env.AUTO_SEED === 'true') {
+            const seedPath = path.join(__dirname, '../seed.sql');
+            if (fs.existsSync(seedPath)) {
+              const seedSql = fs.readFileSync(seedPath, 'utf8');
+              await pool.query(seedSql);
+              console.log(`[DB Dev] Seed data initialized.`);
             }
-          } catch (syncErr) {
-            console.warn(`[DB Sync Warning]: ${syncErr.message}`);
           }
+        }
 
           // Auto-migrate orders table columns for Cashfree if missing
           try {
@@ -103,7 +93,6 @@ async function initPool() {
           } catch (colErr) {
             // Ignore if orders table check fails
           }
-        }
       } catch (initErr) {
         console.warn(`[DB Init Warning]: ${initErr.message}`);
       }
