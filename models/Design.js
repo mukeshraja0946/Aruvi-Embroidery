@@ -1214,23 +1214,12 @@ class Design {
   }
 
   static async deleteAll() {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Mass deletion of all designs is blocked in production environment.');
-    }
     if (db.isConnected()) {
       try {
-        const designs = await db.query('SELECT id FROM designs') || [];
+        const designs = await db.query('SELECT id FROM designs WHERE is_active != -1') || [];
         for (const d of designs) {
-          await db.query('DELETE FROM design_files WHERE design_id = ?', [d.id]);
-          await db.query('DELETE FROM design_images WHERE design_id = ?', [d.id]);
-          await db.query('DELETE FROM cart_items WHERE design_id = ?', [d.id]);
-          await db.query('DELETE FROM wishlist WHERE design_id = ?', [d.id]);
-          await db.query('DELETE FROM order_items WHERE design_id = ?', [d.id]);
-          await db.query('DELETE FROM designs WHERE id = ?', [d.id]);
+          await this.delete(d.id);
         }
-        await db.query('TRUNCATE TABLE design_files');
-        await db.query('TRUNCATE TABLE design_images');
-        await db.query('DELETE FROM designs');
       } catch (err) {
         console.error('Design.deleteAll DB error:', err.message);
         throw err;

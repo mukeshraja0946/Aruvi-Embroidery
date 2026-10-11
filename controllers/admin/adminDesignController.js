@@ -677,14 +677,6 @@ exports.deleteDesign = async (req, res, next) => {
 };
 
 exports.deleteAllDesigns = async (req, res, next) => {
-  if (process.env.NODE_ENV === 'production') {
-    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
-    if (isAjax) {
-      return res.status(403).json({ success: false, message: 'Mass deletion of designs is disabled in production.' });
-    }
-    req.flash('error', 'Mass deletion of designs is disabled in production.');
-    return res.redirect('/admin/designs');
-  }
   try {
     await Design.deleteAll();
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
