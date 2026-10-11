@@ -21,26 +21,52 @@
     </p>
   </div>
 
-  <!-- Filter Chips Bar & Sorting -->
+  <!-- Filter & Controls Toolbar matching Reference UI -->
   <% 
     const subVal = typeof currentSub !== 'undefined' ? currentSub : '';
     const sortVal = typeof currentSort !== 'undefined' ? currentSort : 'latest';
+    const catPageNum = typeof currentPage !== 'undefined' ? (parseInt(currentPage) || 1) : 1;
+    const catPageLimit = 16;
+    const catTotalCount = typeof total !== 'undefined' ? parseInt(total) : designs.length;
+    const catFromNum = designs.length > 0 ? ((catPageNum - 1) * catPageLimit + 1) : 0;
+    const catToNum = designs.length > 0 ? Math.min((catPageNum - 1) * catPageLimit + designs.length, catTotalCount) : 0;
+    const catTotalDisplay = catTotalCount >= 10 ? (catTotalCount + '+') : (catTotalCount || designs.length);
   %>
-  <div class="filter-bar-container" style="justify-content: flex-end;">
-    <%- include('../partials/sort-dropdown', {
-      id: 'cat_sort_dd',
-      label: 'Sort by:',
-      actionType: 'url',
-      currentSort: sortVal,
-      options: [
-        { value: 'latest', label: 'Latest', iconType: 'latest' },
-        { value: 'oldest', label: 'Oldest', iconType: 'oldest' },
-        { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
-        { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
-        { value: 'popular', label: 'Most Popular', iconType: 'popular' },
-        { value: 'rating', label: 'Highest Rated', iconType: 'rating' }
-      ]
-    }) %>
+  <div class="shop-controls-bar" style="margin-bottom: 1.5rem;">
+    <!-- 1. Filters Button (Navigates to designs page with this category filtered) -->
+    <a href="/designs?category=<%= category.slug %>" class="mobile-filter-toggle-btn" aria-label="Filters">
+      <i class="fa-solid fa-sliders"></i> <span>Filters</span>
+    </a>
+
+    <!-- 2. Vertical Divider -->
+    <div class="toolbar-divider"></div>
+
+    <!-- 3. Exact Two-Line Results Count -->
+    <div class="results-count-twoline">
+      <span class="rc-line1">Showing</span>
+      <span class="rc-line2"><strong><%= catFromNum %>–<%= catToNum %></strong> of <strong><%= catTotalDisplay %></strong> designs</span>
+    </div>
+
+    <!-- 4. Vertical Divider -->
+    <div class="toolbar-divider"></div>
+    
+    <!-- 5. Sort By label and dropdown -->
+    <div class="controls-right">
+      <%- include('../partials/sort-dropdown', {
+        id: 'cat_sort_dd',
+        label: 'Sort by:',
+        actionType: 'url',
+        currentSort: sortVal,
+        options: [
+          { value: 'latest', label: 'Latest', iconType: 'latest' },
+          { value: 'oldest', label: 'Oldest', iconType: 'oldest' },
+          { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
+          { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
+          { value: 'popular', label: 'Most Popular', iconType: 'popular' },
+          { value: 'rating', label: 'Highest Rated', iconType: 'rating' }
+        ]
+      }) %>
+    </div>
   </div>
 
   <!-- Dedicated Results Container -->

@@ -50,6 +50,8 @@
       </div>
 
       <form action="/designs" method="GET" id="filterForm" class="filter-form-body">
+        <% if (search) { %><input type="hidden" name="search" value="<%= search %>"><% } %>
+
         <!-- 1. Categories Accordion -->
         <div class="filter-accordion-group">
           <div class="accordion-header" onclick="toggleAccordion(this)">
@@ -59,12 +61,12 @@
           <div class="accordion-content open">
             <div class="category-chips-wrap">
               <label class="cat-chip-label <%= !selectedCategory ? 'active' : '' %>">
-                <input type="radio" name="category" value="" <%= !selectedCategory ? 'checked' : '' %> onchange="this.form.submit()">
+                <input type="radio" name="category" value="" <%= !selectedCategory ? 'checked' : '' %> onchange="handleFilterChange(this)">
                 All Categories (300+)
               </label>
               <% categories.forEach(cat => { %>
                 <label class="cat-chip-label <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
-                  <input type="radio" name="category" value="<%= cat.slug %>" <%= selectedCategory && selectedCategory.slug === cat.slug ? 'checked' : '' %> onchange="this.form.submit()">
+                  <input type="radio" name="category" value="<%= cat.slug %>" <%= selectedCategory && selectedCategory.slug === cat.slug ? 'checked' : '' %> onchange="handleFilterChange(this)">
                   <%= cat.name %> (<%= cat.description ? cat.description.replace(/\D/g, '') || '300' : '300' %>)
                 </label>
               <% }) %>
@@ -83,26 +85,26 @@
               <span>₹0</span>
               <span id="priceValDisplay">₹<%= max_price || 500 %></span>
             </div>
-            <input type="range" min="0" max="2000" step="50" name="max_price" value="<%= max_price || 500 %>" class="custom-red-range" oninput="document.getElementById('priceValDisplay').innerText = '₹' + this.value" onchange="this.form.submit()">
+            <input type="range" min="0" max="2000" step="50" name="max_price" value="<%= max_price || 500 %>" class="custom-red-range" oninput="document.getElementById('priceValDisplay').innerText = '₹' + this.value" onchange="handleFilterChange(this)">
             
             <div class="price-presets-wrap">
               <label class="price-preset-chip <%= !max_price || max_price == 2000 ? 'active' : '' %>">
-                <input type="radio" name="price_preset" value="2000" onchange="this.form.max_price.value=this.value; this.form.submit()"> All
+                <input type="radio" name="price_preset" value="2000" onchange="this.form.max_price.value=this.value; document.getElementById('priceValDisplay').innerText='₹2000'; handleFilterChange(this)"> All
               </label>
               <label class="price-preset-chip <%= max_price == 100 ? 'active' : '' %>">
-                <input type="radio" name="price_preset" value="100" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹0 - ₹100
+                <input type="radio" name="price_preset" value="100" onchange="this.form.max_price.value=this.value; document.getElementById('priceValDisplay').innerText='₹100'; handleFilterChange(this)"> ₹0 - ₹100
               </label>
               <label class="price-preset-chip <%= max_price == 200 ? 'active' : '' %>">
-                <input type="radio" name="price_preset" value="200" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹101 - ₹200
+                <input type="radio" name="price_preset" value="200" onchange="this.form.max_price.value=this.value; document.getElementById('priceValDisplay').innerText='₹200'; handleFilterChange(this)"> ₹101 - ₹200
               </label>
               <label class="price-preset-chip <%= max_price == 300 ? 'active' : '' %>">
-                <input type="radio" name="price_preset" value="300" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹201 - ₹300
+                <input type="radio" name="price_preset" value="300" onchange="this.form.max_price.value=this.value; document.getElementById('priceValDisplay').innerText='₹300'; handleFilterChange(this)"> ₹201 - ₹300
               </label>
               <label class="price-preset-chip <%= max_price == 400 ? 'active' : '' %>">
-                <input type="radio" name="price_preset" value="400" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹301 - ₹400
+                <input type="radio" name="price_preset" value="400" onchange="this.form.max_price.value=this.value; document.getElementById('priceValDisplay').innerText='₹400'; handleFilterChange(this)"> ₹301 - ₹400
               </label>
               <label class="price-preset-chip <%= max_price == 500 ? 'active' : '' %>">
-                <input type="radio" name="price_preset" value="500" onchange="this.form.max_price.value=this.value; this.form.submit()"> ₹401 - ₹500
+                <input type="radio" name="price_preset" value="500" onchange="this.form.max_price.value=this.value; document.getElementById('priceValDisplay').innerText='₹500'; handleFilterChange(this)"> ₹401 - ₹500
               </label>
             </div>
           </div>
@@ -117,16 +119,16 @@
           <div class="accordion-content">
             <div class="format-checkbox-grid">
               <label class="format-check-item">
-                <input type="checkbox" name="format" value="DST" <%= selectedFormat === 'DST' ? 'checked' : '' %> onchange="this.form.submit()"> DST
+                <input type="checkbox" name="format" value="DST" <%= selectedFormat === 'DST' ? 'checked' : '' %> onchange="handleFilterChange(this)"> DST
               </label>
               <label class="format-check-item">
-                <input type="checkbox" name="format" value="PES" <%= selectedFormat === 'PES' ? 'checked' : '' %> onchange="this.form.submit()"> PES
+                <input type="checkbox" name="format" value="PES" <%= selectedFormat === 'PES' ? 'checked' : '' %> onchange="handleFilterChange(this)"> PES
               </label>
               <label class="format-check-item">
-                <input type="checkbox" name="format" value="JEF" <%= selectedFormat === 'JEF' ? 'checked' : '' %> onchange="this.form.submit()"> JEF
+                <input type="checkbox" name="format" value="JEF" <%= selectedFormat === 'JEF' ? 'checked' : '' %> onchange="handleFilterChange(this)"> JEF
               </label>
               <label class="format-check-item">
-                <input type="checkbox" name="format" value="EXP" <%= selectedFormat === 'EXP' ? 'checked' : '' %> onchange="this.form.submit()"> EXP
+                <input type="checkbox" name="format" value="EXP" <%= selectedFormat === 'EXP' ? 'checked' : '' %> onchange="handleFilterChange(this)"> EXP
               </label>
             </div>
           </div>
@@ -141,19 +143,19 @@
           <div class="accordion-content">
             <div class="rating-radio-list">
               <label class="rating-radio-item">
-                <input type="radio" name="min_rating" value="4.0" <%= min_rating === '4.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <input type="radio" name="min_rating" value="4.0" <%= min_rating === '4.0' ? 'checked' : '' %> onchange="handleFilterChange(this)">
                 <span class="stars-gold">★★★★★</span> 4 & above
               </label>
               <label class="rating-radio-item">
-                <input type="radio" name="min_rating" value="3.0" <%= min_rating === '3.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <input type="radio" name="min_rating" value="3.0" <%= min_rating === '3.0' ? 'checked' : '' %> onchange="handleFilterChange(this)">
                 <span class="stars-gold">★★★★☆</span> 3 & above
               </label>
               <label class="rating-radio-item">
-                <input type="radio" name="min_rating" value="2.0" <%= min_rating === '2.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <input type="radio" name="min_rating" value="2.0" <%= min_rating === '2.0' ? 'checked' : '' %> onchange="handleFilterChange(this)">
                 <span class="stars-gold">★★★☆☆</span> 2 & above
               </label>
               <label class="rating-radio-item">
-                <input type="radio" name="min_rating" value="1.0" <%= min_rating === '1.0' ? 'checked' : '' %> onchange="this.form.submit()">
+                <input type="radio" name="min_rating" value="1.0" <%= min_rating === '1.0' ? 'checked' : '' %> onchange="handleFilterChange(this)">
                 <span class="stars-gold">★★☆☆☆</span> 1 & above
               </label>
             </div>
@@ -169,22 +171,22 @@
           <div class="accordion-content">
             <div class="sort-radio-list">
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="newest" <%= !sort || sort === 'newest' || sort === 'latest' ? 'checked' : '' %> onchange="this.form.submit()"> Latest
+                <input type="radio" name="sort" value="newest" <%= !sort || sort === 'newest' || sort === 'latest' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Latest
               </label>
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="oldest" <%= sort === 'oldest' ? 'checked' : '' %> onchange="this.form.submit()"> Oldest
+                <input type="radio" name="sort" value="oldest" <%= sort === 'oldest' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Oldest
               </label>
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="price_low" <%= sort === 'price_low' ? 'checked' : '' %> onchange="this.form.submit()"> Price: Low to High
+                <input type="radio" name="sort" value="price_low" <%= sort === 'price_low' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Price: Low to High
               </label>
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="price_high" <%= sort === 'price_high' ? 'checked' : '' %> onchange="this.form.submit()"> Price: High to Low
+                <input type="radio" name="sort" value="price_high" <%= sort === 'price_high' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Price: High to Low
               </label>
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="popular" <%= sort === 'popular' ? 'checked' : '' %> onchange="this.form.submit()"> Most Popular
+                <input type="radio" name="sort" value="popular" <%= sort === 'popular' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Most Popular
               </label>
               <label class="sort-radio-item">
-                <input type="radio" name="sort" value="rating" <%= sort === 'rating' ? 'checked' : '' %> onchange="this.form.submit()"> Highest Rated
+                <input type="radio" name="sort" value="rating" <%= sort === 'rating' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Highest Rated
               </label>
             </div>
           </div>
@@ -217,16 +219,36 @@
         let hasActiveFilters = search || selectedCategory || selectedFormat || (max_price && Number(max_price) < 2000) || min_rating;
       %>
 
-      <!-- Controls Top Bar -->
+      <%
+        const pageNum = typeof currentPage !== 'undefined' ? (parseInt(currentPage) || 1) : 1;
+        const pageLimit = 12;
+        const totalCount = typeof total !== 'undefined' ? parseInt(total) : designs.length;
+        const fromNum = designs.length > 0 ? ((pageNum - 1) * pageLimit + 1) : 0;
+        const toNum = designs.length > 0 ? Math.min((pageNum - 1) * pageLimit + designs.length, totalCount) : 0;
+        const totalDisplay = totalCount >= 10 ? (totalCount + '+') : (totalCount || designs.length);
+      %>
+
+      <!-- Controls Top Bar matching Reference Screenshot -->
       <div class="shop-controls-bar">
-        <button type="button" class="mobile-filter-toggle-btn" id="openFilterBtn">
-          <i class="fa-solid fa-sliders"></i> Filters <% if (hasActiveFilters) { %><span class="filter-dot-badge"></span><% } %>
+        <!-- 1. Filters Button -->
+        <button type="button" class="mobile-filter-toggle-btn" id="openFilterBtn" aria-label="Open Filters">
+          <i class="fa-solid fa-sliders"></i> <span>Filters</span>
+          <% if (hasActiveFilters) { %><span class="filter-dot-badge"></span><% } %>
         </button>
 
-        <div class="results-count">
-          Showing <strong>1–<%= designs.length %></strong> of <strong><%= total || designs.length %>+</strong> designs
+        <!-- 2. Vertical Divider -->
+        <div class="toolbar-divider"></div>
+
+        <!-- 3. Exact Two-Line Results Count -->
+        <div class="results-count-twoline">
+          <span class="rc-line1">Showing</span>
+          <span class="rc-line2"><strong><%= fromNum %>–<%= toNum %></strong> of <strong><%= totalDisplay %></strong> designs</span>
         </div>
+
+        <!-- 4. Vertical Divider -->
+        <div class="toolbar-divider"></div>
         
+        <!-- 5. Sort By label and dropdown + Desktop Controls -->
         <div class="controls-right">
           <%- include('../partials/sort-dropdown', {
             id: 'shop_sort_dd',
@@ -243,8 +265,8 @@
           }) %>
 
           <div class="view-toggle-btns">
-            <button class="view-btn active" title="Grid View"><i class="fa-solid fa-border-all"></i></button>
-            <button class="view-btn" title="List View"><i class="fa-solid fa-list"></i></button>
+            <button class="view-btn active" title="Grid View" type="button"><i class="fa-solid fa-border-all"></i></button>
+            <button class="view-btn" title="List View" type="button"><i class="fa-solid fa-list"></i></button>
           </div>
         </div>
       </div>
@@ -439,6 +461,25 @@
     }
   }
 
+  function handleFilterChange(input) {
+    if (!input) return;
+    // Visually toggle active chips immediately for instant feedback
+    if (input.name === 'category') {
+      document.querySelectorAll('.cat-chip-label').forEach(el => el.classList.remove('active'));
+      const parent = input.closest('.cat-chip-label');
+      if (parent) parent.classList.add('active');
+    } else if (input.name === 'price_preset') {
+      document.querySelectorAll('.price-preset-chip').forEach(el => el.classList.remove('active'));
+      const parent = input.closest('.price-preset-chip');
+      if (parent) parent.classList.add('active');
+    }
+
+    // On desktop screen (> 991px), submit immediately for live filtering
+    if (window.innerWidth > 991) {
+      if (input.form) input.form.submit();
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     const openBtn = document.getElementById('openFilterBtn');
     const closeBtn = document.getElementById('closeFilterBtn');
@@ -446,9 +487,15 @@
     const overlay = document.getElementById('filterOverlay');
 
     function openSidebar() {
-      if (sidebar) sidebar.classList.add('open');
-      if (overlay) overlay.classList.add('active');
-      document.body.style.overflow = 'hidden';
+      if (window.innerWidth <= 991) {
+        if (sidebar) sidebar.classList.add('open');
+        if (overlay) overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      } else {
+        if (sidebar) {
+          sidebar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
     }
 
     function closeSidebar() {
@@ -460,6 +507,13 @@
     if (openBtn) openBtn.addEventListener('click', openSidebar);
     if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
     if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    // Escape key closes filter popup
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
+        closeSidebar();
+      }
+    });
   });
 </script>
 
