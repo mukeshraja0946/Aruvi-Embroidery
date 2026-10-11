@@ -5001,6 +5001,9 @@ textarea.form-control {
     margin-bottom: 0.8rem !important;
     padding-bottom: 4px !important;
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
     -webkit-overflow-scrolling: touch !important;
     scrollbar-width: none !important;
   }
@@ -5088,6 +5091,7 @@ textarea.form-control {
     box-shadow: 0 2px 8px rgba(45, 35, 30, 0.04) !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     flex-wrap: nowrap !important;
@@ -5100,14 +5104,14 @@ textarea.form-control {
   .mobile-filter-toggle-btn {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 5px !important;
-    padding: 0 9px !important;
+    gap: 4px !important;
+    padding: 0 8px !important;
     height: 32px !important;
     min-height: 32px !important;
     background: #FFFFFF !important;
     border: 1px solid #E2D9CF !important;
     border-radius: 999px !important;
-    font-size: 0.78rem !important;
+    font-size: 0.76rem !important;
     font-weight: 600 !important;
     color: #2D231E !important;
     cursor: pointer !important;
@@ -5135,11 +5139,11 @@ textarea.form-control {
 
   .toolbar-divider {
     width: 1px !important;
-    height: 22px !important;
+    height: 20px !important;
     background-color: #EAE3D9 !important;
     flex: 0 0 1px !important;
     flex-shrink: 0 !important;
-    margin: 0 3px !important;
+    margin: 0 2px !important;
   }
 
   .results-count-twoline {
@@ -5149,13 +5153,13 @@ textarea.form-control {
     align-items: flex-start !important;
     line-height: 1.15 !important;
     flex: 1 1 auto !important;
-    min-width: 75px !important;
+    min-width: 0 !important;
     overflow: hidden !important;
     padding: 0 1px !important;
   }
 
   .results-count-twoline .rc-line1 {
-    font-size: 0.68rem !important;
+    font-size: 0.65rem !important;
     font-weight: 400 !important;
     color: #8A7D75 !important;
     letter-spacing: -0.01em !important;
@@ -5164,7 +5168,7 @@ textarea.form-control {
   }
 
   .results-count-twoline .rc-line2 {
-    font-size: 0.72rem !important;
+    font-size: 0.70rem !important;
     color: #8A7D75 !important;
     white-space: nowrap !important;
     line-height: 1.15 !important;
@@ -5198,7 +5202,7 @@ textarea.form-control {
   }
 
   .shop-controls-bar .aruvi-sort-label {
-    font-size: 0.72rem !important;
+    font-size: 0.70rem !important;
     font-weight: 400 !important;
     color: #8A7D75 !important;
     display: inline-block !important;
@@ -5230,8 +5234,8 @@ textarea.form-control {
   }
 
   .shop-controls-bar .aruvi-sort-icon {
-    width: 13px !important;
-    height: 13px !important;
+    width: 12px !important;
+    height: 12px !important;
     color: #BD442E !important;
     flex-shrink: 0 !important;
   }
@@ -5242,11 +5246,11 @@ textarea.form-control {
   }
 
   .shop-controls-bar .aruvi-sort-value-text {
-    font-size: 0.74rem !important;
+    font-size: 0.72rem !important;
     font-weight: 600 !important;
     color: #2D231E !important;
     white-space: nowrap !important;
-    max-width: 60px !important;
+    max-width: 55px !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
@@ -5261,7 +5265,7 @@ textarea.form-control {
   .shop-controls-bar .aruvi-sort-menu {
     right: 0 !important;
     left: auto !important;
-    min-width: 160px !important;
+    min-width: 150px !important;
   }
 
   @media (max-width: 350px) {
@@ -5327,6 +5331,8 @@ textarea.form-control {
     border: 1px solid var(--border-light) !important;
     border-radius: 10px !important;
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
   }
 
@@ -5604,9 +5610,10 @@ textarea.form-control {
   .grid-4-strict {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px !important;
+    gap: 8px !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
   }
 
@@ -5864,21 +5871,44 @@ textarea.form-control {
   }
 
   /* 7. Listing Page Shop Layout & Hero Section */
-  .designs-page-container {
+  .designs-page-container,
+  .category-detail-container {
     margin-top: 0.8rem !important;
     margin-bottom: 2.5rem !important;
     padding-left: 10px !important;
     padding-right: 10px !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
   }
 
   .shop-listing-layout {
-    grid-template-columns: 1fr !important;
-    gap: 1rem !important;
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .shop-main-content {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .pagination-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+    margin-top: 1.5rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
   }
 
@@ -6873,6 +6903,12 @@ textarea.form-control {
   .aruvi-sort-dropdown:not(.shop-controls-bar .aruvi-sort-dropdown) {
     flex: 1;
     min-width: 0;
+  }
+
+  .shop-controls-bar .aruvi-sort-dropdown {
+    min-width: 0 !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
   }
 }
 
