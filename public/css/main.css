@@ -1541,6 +1541,43 @@ textarea.form-control {
   text-decoration: none;
 }
 
+.card-buynow-form {
+  width: 100%;
+  margin: 6px 0 0 0;
+}
+
+.card-btn-buynow {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+  background: #BD442E;
+  border: none;
+  color: #FFFFFF;
+  font-size: 0.84rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.card-btn-buynow:hover {
+  background: #A3331F;
+}
+
+.card-btn-buynow.is-owned {
+  background: #E8F5E9;
+  border: 1px solid #C8E6C9;
+  color: #2E7D32;
+  text-decoration: none;
+}
+
 .card-actions-row {
   display: flex;
   align-items: center;
@@ -5271,13 +5308,10 @@ textarea.form-control {
       min-height: 28px !important;
       font-size: 0.76rem !important;
     }
-    .card-actions-row {
-      gap: 3px !important;
-    }
-    .card-btn-add, .card-btn-buy {
-      font-size: 0.66rem !important;
-      height: 28px !important;
-      min-height: 28px !important;
+    .card-btn-buynow {
+      height: 32px !important;
+      min-height: 32px !important;
+      font-size: 0.76rem !important;
     }
   }
 
@@ -5663,10 +5697,71 @@ textarea.form-control {
     margin-top: 4px !important;
   }
 
+  .card-item-category {
+    font-size: 0.72rem !important;
+    color: #8A7D75 !important;
+    margin: 0 0 2px 0 !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-weight: 400 !important;
+  }
+
+  .format-pill-row {
+    display: flex !important;
+    gap: 3px !important;
+    flex-wrap: wrap !important;
+    margin: 0 0 3px 0 !important;
+  }
+
+  .fmt-pill {
+    font-size: 0.60rem !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+    line-height: 1.1 !important;
+    background: #F4EFE6 !important;
+    color: #554A42 !important;
+    font-weight: 600 !important;
+    display: inline-block !important;
+  }
+
+  .card-rating-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    font-size: 0.72rem !important;
+    margin: 0 0 4px 0 !important;
+  }
+
+  .card-rating-row i.fa-star {
+    color: #F5A623 !important;
+    font-size: 0.72rem !important;
+  }
+
+  .card-rating-row .rating-num {
+    font-weight: 700 !important;
+    color: #2D231E !important;
+    font-size: 0.74rem !important;
+  }
+
+  .card-rating-row .rating-count {
+    color: #8A7D75 !important;
+    font-size: 0.70rem !important;
+  }
+
+  .card-price-action-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    margin: 2px 0 6px 0 !important;
+  }
+
   .card-price-group {
     display: flex !important;
     align-items: baseline !important;
-    gap: 6px !important;
+    gap: 5px !important;
   }
 
   .old-price {
@@ -5721,82 +5816,51 @@ textarea.form-control {
     text-decoration: none !important;
   }
 
-  .card-item-category {
-    font-size: 0.68rem !important;
-    color: #8A7D75 !important;
-    margin-bottom: 2px !important;
-    line-height: 1.15 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  .format-pill-row {
-    display: flex !important;
-    gap: 3px !important;
-    flex-wrap: wrap !important;
-    margin-bottom: 3px !important;
-  }
-
-  .fmt-pill {
-    font-size: 0.58rem !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
-    line-height: 1.1 !important;
-    background: #F4EFE6 !important;
-    color: #796B63 !important;
-  }
-
-  .card-rating-row {
-    display: flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-    font-size: 0.68rem !important;
-    margin-bottom: 3px !important;
-  }
-
-  .card-rating-row.muted {
-    min-height: 16px !important;
-  }
-
-  .discount-badge {
-    font-size: 0.58rem !important;
-    padding: 1px 3px !important;
-    border-radius: 3px !important;
-    background: #FFEBEE !important;
-    color: #C62828 !important;
-    font-weight: 600 !important;
-  }
-
-  /* Dual Action Buttons side-by-side on mobile */
-  .card-actions-row {
-    display: flex !important;
-    flex-direction: row !important;
-    gap: 4px !important;
+  .card-buynow-form {
     width: 100% !important;
-    margin-top: 2px !important;
-  }
-
-  .card-actions-row form {
-    flex: 1 !important;
-    width: 50% !important;
     margin: 0 !important;
+    box-sizing: border-box !important;
   }
 
-  .card-btn-add, .card-btn-buy {
-    font-size: 0.70rem !important;
-    font-weight: 600 !important;
-    padding: 0 !important;
-    min-height: 30px !important;
-    height: 30px !important;
-    border-radius: 6px !important;
+  .card-btn-buynow {
     width: 100% !important;
-    display: inline-flex !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    border-radius: 8px !important;
+    background: #BD442E !important;
+    border: none !important;
+    color: #FFFFFF !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    font-family: var(--font-body) !important;
+    display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 2px !important;
-    white-space: nowrap !important;
+    gap: 6px !important;
+    cursor: pointer !important;
     box-sizing: border-box !important;
+    transition: background 0.2s ease, transform 0.1s ease !important;
+    text-decoration: none !important;
+  }
+
+  .card-btn-buynow:hover {
+    background: #A3331F !important;
+  }
+
+  .card-btn-buynow.is-owned {
+    background: #E8F5E9 !important;
+    border: 1px solid #C8E6C9 !important;
+    color: #2E7D32 !important;
+    text-decoration: none !important;
+  }
+
+  .card-btn-buynow i {
+    font-size: 0.82rem !important;
+    color: #FFFFFF !important;
+  }
+
+  .card-btn-buynow.is-owned i {
+    color: #2E7D32 !important;
   }
 
   /* 7. Listing Page Shop Layout & Hero Section */

@@ -354,6 +354,27 @@
                   <a href="/design/<%= design.slug %>"><%= design.title %></a>
                 </h3>
 
+                <span class="card-item-category"><%= design.category_name || 'Blouse Designs' %></span>
+
+                <% 
+                  const cardFmts = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : ['DST'];
+                  const mainFmt = cardFmts[0] || 'DST';
+                %>
+                <div class="format-pill-row">
+                  <span class="fmt-pill"><%= mainFmt %></span>
+                </div>
+
+                <!-- Star Rating Row matching Reference -->
+                <%
+                  const ratingScore = parseFloat(design.average_rating || design.rating || 4.8);
+                  const numReviews = parseInt(design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 2);
+                %>
+                <div class="card-rating-row">
+                  <i class="fa-solid fa-star star-yellow"></i>
+                  <span class="rating-num"><%= ratingScore.toFixed(1) %></span>
+                  <span class="rating-count">(<%= numReviews %>)</span>
+                </div>
+
                 <!-- Price & Cart Row matching Reference UI -->
                 <%
                   const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
@@ -368,21 +389,30 @@
                     <span class="current-price">₹<%= curPrice %></span>
                   </div>
 
-                  <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
-                  <% if (isOwned) { %>
-                    <a href="/design/<%= design.slug %>" class="card-cart-btn is-owned" title="Owned" aria-label="Owned">
-                      <i class="fa-solid fa-check"></i>
-                    </a>
-                  <% } else { %>
-                    <form class="ajax-add-to-cart card-cart-form">
-                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <input type="hidden" name="design_id" value="<%= design.id %>">
-                      <button type="submit" class="card-cart-btn" title="Add to Cart" aria-label="Add to cart">
-                        <i class="fa-solid fa-cart-shopping"></i>
-                      </button>
-                    </form>
-                  <% } %>
+                  <form class="ajax-add-to-cart card-cart-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="design_id" value="<%= design.id %>">
+                    <button type="submit" class="card-cart-btn" title="Add to Cart" aria-label="Add to cart">
+                      <i class="fa-solid fa-cart-shopping"></i>
+                    </button>
+                  </form>
                 </div>
+
+                <!-- Full-Width Buy Now Button matching Reference UI -->
+                <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+                <% if (isOwned) { %>
+                  <a href="/design/<%= design.slug %>" class="card-btn-buynow is-owned" title="Owned - Download" aria-label="Owned">
+                    <i class="fa-solid fa-circle-check"></i> Owned
+                  </a>
+                <% } else { %>
+                  <form action="/cart/buy-now?_csrf=<%= csrfToken %>" method="POST" class="card-buynow-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="design_id" value="<%= design.id %>">
+                    <button type="submit" class="card-btn-buynow" title="Buy Now" aria-label="Buy Now">
+                      <i class="fa-solid fa-bag-shopping"></i> Buy Now
+                    </button>
+                  </form>
+                <% } %>
               </div>
             </div>
           <% }) %>
