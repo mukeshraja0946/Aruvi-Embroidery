@@ -4,7 +4,11 @@ const AdminStatsService = require('../../services/adminStatsService');
 exports.getCustomers = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { users: customers, total } = await User.getAll({ page, limit: 15 });
+    const sort = req.query.sort || 'newest';
+    const search = req.query.search || null;
+    const status = req.query.status || null;
+
+    const { users: customers, total } = await User.getAll({ page, limit: 15, sort, search, status });
     const stats = await AdminStatsService.getCustomerStats();
 
     res.render('admin/customers/index', {
@@ -13,7 +17,10 @@ exports.getCustomers = async (req, res, next) => {
       total,
       stats,
       currentPage: page,
-      totalPages: Math.ceil(total / 15)
+      totalPages: Math.ceil(total / 15),
+      currentSort: sort,
+      currentSearch: search || '',
+      currentStatus: status || ''
     });
   } catch (err) {
     next(err);

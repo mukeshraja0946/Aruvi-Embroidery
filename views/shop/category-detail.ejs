@@ -27,17 +27,20 @@
     const sortVal = typeof currentSort !== 'undefined' ? currentSort : 'latest';
   %>
   <div class="filter-bar-container" style="justify-content: flex-end;">
-    <div class="sort-select-box">
-      <span class="sort-label">Sort by:</span>
-      <select class="form-control sort-select-input" onchange="location = this.value;">
-        <option value="/category/<%= category.slug %>?sort=latest" <%= !sortVal || sortVal === 'latest' || sortVal === 'newest' ? 'selected' : '' %>>Latest</option>
-        <option value="/category/<%= category.slug %>?sort=oldest" <%= sortVal === 'oldest' ? 'selected' : '' %>>Oldest</option>
-        <option value="/category/<%= category.slug %>?sort=price_low" <%= sortVal === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
-        <option value="/category/<%= category.slug %>?sort=price_high" <%= sortVal === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
-        <option value="/category/<%= category.slug %>?sort=popular" <%= sortVal === 'popular' ? 'selected' : '' %>>Most Popular</option>
-        <option value="/category/<%= category.slug %>?sort=rating" <%= sortVal === 'rating' ? 'selected' : '' %>>Highest Rated</option>
-      </select>
-    </div>
+    <%- include('../partials/sort-dropdown', {
+      id: 'cat_sort_dd',
+      label: 'Sort by:',
+      actionType: 'url',
+      currentSort: sortVal,
+      options: [
+        { value: 'latest', label: 'Latest', iconType: 'latest' },
+        { value: 'oldest', label: 'Oldest', iconType: 'oldest' },
+        { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
+        { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
+        { value: 'popular', label: 'Most Popular', iconType: 'popular' },
+        { value: 'rating', label: 'Highest Rated', iconType: 'rating' }
+      ]
+    }) %>
   </div>
 
   <!-- Dedicated Results Container -->

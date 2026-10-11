@@ -41,12 +41,26 @@ class CustomOrder {
     return newId;
   }
 
-  static async getAll({ page = 1, limit = 20 } = {}) {
+  static async getAll({ page = 1, limit = 20, status = null, search = null, sort = 'newest' } = {}) {
     if (db.isConnected()) {
       try {
+        let whereClauses = [];
+        let params = [];
+        if (status) {
+          whereClauses.push('status = ?');
+          params.push(status);
+        }
+        if (search && search.trim()) {
+          const q = `%${search.trim()}%`;
+          whereClauses.push('(full_name LIKE ? OR email LIKE ? OR phone LIKE ? OR design_details LIKE ?)');
+          params.push(q, q, q, q);
+        }
+        const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
         const offset = (page - 1) * limit;
-        const requests = await db.query('SELECT * FROM custom_orders ORDER BY created_at DESC LIMIT ? OFFSET ?', [parseInt(limit), parseInt(offset)]);
-        const countRes = await db.query('SELECT COUNT(*) as total FROM custom_orders');
+
+        const orderSql = sort === 'oldest' ? 'ORDER BY created_at ASC' : 'ORDER BY created_at DESC';
+        const requests = await db.query(`SELECT * FROM custom_orders ${whereClause} ${orderSql} LIMIT ? OFFSET ?`, [...params, parseInt(limit), parseInt(offset)]);
+        const countRes = await db.query(`SELECT COUNT(*) as total FROM custom_orders ${whereClause}`, params);
         if (requests && Array.isArray(requests)) {
           return { requests, total: (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : requests.length };
         }
@@ -54,7 +68,15 @@ class CustomOrder {
         console.error('CustomOrder.getAll DB error:', err.message);
       }
     }
-    return { requests: fallbackCustomOrders, total: fallbackCustomOrders.length };
+    let list = [...fallbackCustomOrders];
+    if (status) list = list.filter(r => r.status === status);
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(r => (r.full_name && r.full_name.toLowerCase().includes(q)) || (r.email && r.email.toLowerCase().includes(q)) || (r.design_details && r.design_details.toLowerCase().includes(q)));
+    }
+    if (sort === 'oldest') list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+    else list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    return { requests: list, total: list.length };
   }
 
   static async getById(id) {

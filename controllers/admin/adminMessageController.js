@@ -6,8 +6,9 @@ exports.getMessages = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const status = req.query.status || null;
     const search = req.query.search || null;
+    const sort = req.query.sort || 'newest';
 
-    const { messages, total } = await ContactMessage.getAll({ page, limit: 15, status, search });
+    const { messages, total } = await ContactMessage.getAll({ page, limit: 15, status, search, sort });
     const stats = await AdminStatsService.getMessageStats();
 
     res.render('admin/messages/index', {
@@ -17,6 +18,7 @@ exports.getMessages = async (req, res, next) => {
       stats,
       currentPage: page,
       totalPages: Math.ceil(total / 15),
+      currentSort: sort,
       query: req.query
     });
   } catch (err) {

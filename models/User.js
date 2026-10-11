@@ -125,15 +125,31 @@ class User {
     return fallbackUsers.filter(u => u.role !== 'admin');
   }
 
-  static async getAll({ page = 1, limit = 20 } = {}) {
+  static async getAll({ page = 1, limit = 20, status = null, search = null, sort = 'newest' } = {}) {
     if (db.isConnected()) {
       try {
+        let whereClauses = [];
+        let params = [];
+        if (status === 'active') {
+          whereClauses.push('is_active = 1');
+        } else if (status === 'inactive') {
+          whereClauses.push('is_active = 0');
+        }
+        if (search && search.trim()) {
+          const q = `%${search.trim()}%`;
+          whereClauses.push('(full_name LIKE ? OR email LIKE ? OR phone LIKE ?)');
+          params.push(q, q, q);
+        }
+        const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
         const offset = (page - 1) * limit;
-        const rows = await db.query(
-          'SELECT id, full_name, email, phone, role, is_active, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?',
-          [parseInt(limit), parseInt(offset)]
-        );
-        const countRes = await db.query('SELECT COUNT(*) as total FROM users');
+
+        let orderSql = 'ORDER BY id DESC';
+        if (sort === 'name') orderSql = 'ORDER BY full_name ASC';
+        else if (sort === 'spent_high') orderSql = 'ORDER BY (SELECT COALESCE(SUM(final_amount), 0) FROM orders WHERE user_id = users.id AND status IN ("completed", "paid")) DESC, id DESC';
+
+        const sql = `SELECT id, full_name, email, phone, role, is_active, created_at FROM users ${whereClause} ${orderSql} LIMIT ? OFFSET ?`;
+        const rows = await db.query(sql, [...params, parseInt(limit), parseInt(offset)]);
+        const countRes = await db.query(`SELECT COUNT(*) as total FROM users ${whereClause}`, params);
         if (rows && Array.isArray(rows)) {
           return { users: rows, total: (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : rows.length };
         }
@@ -141,7 +157,17 @@ class User {
         console.error('User.getAll DB error:', err.message);
       }
     }
-    return { users: fallbackUsers, total: fallbackUsers.length };
+    let list = [...fallbackUsers];
+    if (status === 'active') list = list.filter(u => u.is_active !== false);
+    else if (status === 'inactive') list = list.filter(u => u.is_active === false);
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(u => (u.full_name && u.full_name.toLowerCase().includes(q)) || (u.email && u.email.toLowerCase().includes(q)) || (u.phone && u.phone.includes(q)));
+    }
+    if (sort === 'name') list.sort((a,b) => (a.full_name || '').localeCompare(b.full_name || ''));
+    else if (sort === 'spent_high') list.sort((a,b) => (b.total_spent || 0) - (a.total_spent || 0));
+    else list.sort((a,b) => (b.id || 0) - (a.id || 0));
+    return { users: list, total: list.length };
   }
 
   static async updateProfile(id, { full_name, phone, address, profile_picture }) {

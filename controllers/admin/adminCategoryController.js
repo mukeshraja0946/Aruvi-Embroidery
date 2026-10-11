@@ -2,10 +2,14 @@ const Category = require('../../models/Category');
 
 exports.getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.getAll();
+    const { sort, search, status } = req.query;
+    const categories = await Category.getAll({ sort: sort || 'newest', search, status });
     res.render('admin/categories/index', {
       title: 'Manage Categories - Admin',
-      categories
+      categories,
+      currentSort: sort || 'newest',
+      currentSearch: search || '',
+      currentStatus: status || ''
     });
   } catch (err) {
     next(err);

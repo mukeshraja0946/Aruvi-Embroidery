@@ -101,7 +101,7 @@ class ContactMessage {
   /**
    * Get paginated enquiries
    */
-  static async getAll({ page = 1, limit = 20, status = null, search = null } = {}) {
+  static async getAll({ page = 1, limit = 20, status = null, search = null, sort = 'newest' } = {}) {
     if (db.isConnected()) {
       const offset = (page - 1) * limit;
       let sql = 'SELECT * FROM contact_messages WHERE 1=1';
@@ -118,7 +118,8 @@ class ContactMessage {
         params.push(q, q, q, q);
       }
 
-      sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      const orderSql = sort === 'oldest' ? 'ORDER BY created_at ASC' : 'ORDER BY created_at DESC';
+      sql += ` ${orderSql} LIMIT ? OFFSET ?`;
       params.push(parseInt(limit), parseInt(offset));
 
       const messages = await db.query(sql, params);
@@ -154,7 +155,11 @@ class ContactMessage {
         m.message.toLowerCase().includes(q)
       );
     }
-    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    if (sort === 'oldest') {
+      filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    } else {
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
 
     return { messages: filtered, total: filtered.length };
   }

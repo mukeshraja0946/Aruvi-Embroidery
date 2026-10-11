@@ -228,16 +228,19 @@
         </div>
         
         <div class="controls-right">
-          <div class="sort-wrapper">
-            <span class="sort-label">Sort by:</span>
-            <select name="sort" class="sort-select" onchange="location = '/designs?sort=' + this.value + '&category=<%= selectedCategory ? selectedCategory.slug : '' %>';">
-              <option value="newest" <%= !sort || sort === 'newest' || sort === 'latest' ? 'selected' : '' %>>Latest</option>
-              <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest</option>
-              <option value="price_low" <%= sort === 'price_low' ? 'selected' : '' %>>Price: Low to High</option>
-              <option value="price_high" <%= sort === 'price_high' ? 'selected' : '' %>>Price: High to Low</option>
-              <option value="popular" <%= sort === 'popular' ? 'selected' : '' %>>Most Popular</option>
-            </select>
-          </div>
+          <%- include('../partials/sort-dropdown', {
+            id: 'shop_sort_dd',
+            label: 'Sort by:',
+            actionType: 'url',
+            currentSort: sort || 'newest',
+            options: [
+              { value: 'newest', label: 'Latest', iconType: 'latest' },
+              { value: 'oldest', label: 'Oldest', iconType: 'oldest' },
+              { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
+              { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
+              { value: 'popular', label: 'Most Popular', iconType: 'popular' }
+            ]
+          }) %>
 
           <div class="view-toggle-btns">
             <button class="view-btn active" title="Grid View"><i class="fa-solid fa-border-all"></i></button>

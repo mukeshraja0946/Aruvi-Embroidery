@@ -3,14 +3,21 @@ const CustomOrder = require('../../models/CustomOrder');
 exports.getCustomOrders = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { requests, total } = await CustomOrder.getAll({ page, limit: 15 });
+    const sort = req.query.sort || 'newest';
+    const search = req.query.search || null;
+    const status = req.query.status || null;
+
+    const { requests, total } = await CustomOrder.getAll({ page, limit: 15, sort, search, status });
 
     res.render('admin/custom-orders/index', {
       title: 'Custom Order Requests - Admin',
       requests,
       total,
       currentPage: page,
-      totalPages: Math.ceil(total / 15)
+      totalPages: Math.ceil(total / 15),
+      currentSort: sort,
+      currentSearch: search || '',
+      currentStatus: status || ''
     });
   } catch (err) {
     next(err);

@@ -5,7 +5,18 @@ exports.getOrders = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const statusFilter = req.query.status || null;
-    const { orders, total } = await Order.getAll({ page, limit: 15, status: statusFilter });
+    const sortFilter = req.query.sort || 'newest';
+    const searchFilter = req.query.search || null;
+    const paymentFilter = req.query.payment || null;
+
+    const { orders, total } = await Order.getAll({
+      page,
+      limit: 15,
+      status: statusFilter,
+      sort: sortFilter,
+      search: searchFilter,
+      payment: paymentFilter
+    });
     const stats = await AdminStatsService.getOrderStats();
 
     res.render('admin/orders/index', {
@@ -15,7 +26,10 @@ exports.getOrders = async (req, res, next) => {
       stats,
       currentPage: page,
       totalPages: Math.ceil(total / 15),
-      currentStatus: statusFilter
+      currentStatus: statusFilter,
+      currentSort: sortFilter,
+      currentSearch: searchFilter,
+      currentPayment: paymentFilter
     });
   } catch (err) {
     next(err);

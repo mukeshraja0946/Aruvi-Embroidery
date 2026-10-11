@@ -291,14 +291,20 @@
             <option value="inactive" <%= (typeof selectedStatus !== 'undefined' && selectedStatus === 'inactive') ? 'selected' : '' %>>Inactive / Draft</option>
           </select>
 
-          <!-- Sort Filter -->
-          <select name="sort" onchange="this.form.submit()" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
-            <option value="newest" <%= (typeof selectedSort !== 'undefined' && selectedSort === 'newest') ? 'selected' : '' %>>Sort by Newest</option>
-            <option value="oldest" <%= (typeof selectedSort !== 'undefined' && selectedSort === 'oldest') ? 'selected' : '' %>>Sort by Oldest</option>
-            <option value="price_low" <%= (typeof selectedSort !== 'undefined' && selectedSort === 'price_low') ? 'selected' : '' %>>Price: Low to High</option>
-            <option value="price_high" <%= (typeof selectedSort !== 'undefined' && selectedSort === 'price_high') ? 'selected' : '' %>>Price: High to Low</option>
-            <option value="popular" <%= (typeof selectedSort !== 'undefined' && selectedSort === 'popular') ? 'selected' : '' %>>Most Downloaded</option>
-          </select>
+          <!-- Standardized Sort Filter -->
+          <%- include('../../partials/sort-dropdown', {
+            id: 'admin_designs_sort_dd',
+            label: 'Sort by:',
+            actionType: 'submit',
+            currentSort: typeof selectedSort !== 'undefined' ? selectedSort : 'newest',
+            options: [
+              { value: 'newest', label: 'Sort by Newest', iconType: 'latest' },
+              { value: 'oldest', label: 'Sort by Oldest', iconType: 'oldest' },
+              { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
+              { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
+              { value: 'popular', label: 'Most Downloaded', iconType: 'popular' }
+            ]
+          }) %>
 
           <!-- Reset Button -->
           <a href="/admin/designs" class="btn btn-outline" style="height: 40px; border-radius: 8px; font-size: 0.85rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 6px;">
@@ -960,6 +966,6 @@
     });
   }
 </script>
-
+<script src="/public/js/sort-dropdown.js"></script>
 </body>
 </html>

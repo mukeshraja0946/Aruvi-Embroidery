@@ -1308,26 +1308,36 @@ textarea.form-control {
 
 .view-toggle-btns {
   display: flex;
-  gap: 4px;
+  gap: 8px;
+  align-items: center;
 }
 
 .view-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-light);
-  background: white;
-  color: var(--text-muted);
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid #EBE4DC;
+  background: #FFFFFF;
+  color: #5A4D45;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  font-size: 1.05rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.view-btn:hover:not(.active) {
+  border-color: #BD442E;
+  color: #BD442E;
 }
 
 .view-btn.active {
-  background-color: var(--primary);
-  color: white;
-  border-color: var(--primary);
+  background-color: #BD442E;
+  color: #FFFFFF;
+  border-color: #BD442E;
+  box-shadow: 0 2px 6px rgba(189, 68, 46, 0.2);
 }
 
 /* 4-Column Product Grid */
@@ -5848,10 +5858,228 @@ textarea.form-control {
   }
 }
 
+/* ==========================================================================
+   ARUVI STANDARDIZED SORT BY DROPDOWN COMPONENT (EXACT UI REFERENCE)
+   ========================================================================== */
 
+.aruvi-sort-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  font-family: var(--font-body, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
+  vertical-align: middle;
+}
 
+.aruvi-sort-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #796B63; /* Muted brown matching reference */
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  user-select: none;
+}
 
+.aruvi-sort-dropdown {
+  position: relative;
+  min-width: 220px;
+  user-select: none;
+}
 
+/* Trigger Button */
+.aruvi-sort-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: #FFFFFF;
+  border: 1.5px solid #BD442E; /* Thin terracotta-red border */
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(189, 68, 46, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: border-radius 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  outline: none;
+  box-sizing: border-box;
+}
 
+.aruvi-sort-trigger:hover {
+  box-shadow: 0 2px 8px rgba(189, 68, 46, 0.14);
+}
 
+.aruvi-sort-trigger:focus-visible {
+  outline: 2px solid rgba(189, 68, 46, 0.4);
+  outline-offset: 1px;
+}
+
+/* When open, smooth connection to dropdown */
+.aruvi-sort-dropdown.open .aruvi-sort-trigger {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(189, 68, 46, 0.12);
+}
+
+.aruvi-sort-trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.aruvi-sort-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #BD442E; /* Terracotta-red left icon */
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+.aruvi-sort-icon svg {
+  display: block;
+}
+
+.aruvi-sort-value-text {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #2D231E; /* Dark brown selected text */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.aruvi-sort-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2D231E;
+  margin-left: 10px;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.aruvi-sort-chevron svg {
+  display: block;
+}
+
+.aruvi-sort-dropdown.open .aruvi-sort-chevron {
+  transform: rotate(180deg);
+}
+
+/* Floating Dropdown Panel */
+.aruvi-sort-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  margin-top: 2px;
+  background: #FFFFFF;
+  border: 1px solid #EBE4DC; /* Subtle beige border */
+  border-radius: 0 0 14px 14px; /* Rounded bottom corners */
+  box-shadow: 0 12px 28px -4px rgba(45, 35, 30, 0.14), 0 6px 12px -2px rgba(45, 35, 30, 0.06); /* Soft shadow */
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 100050;
+  max-height: 340px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.aruvi-sort-dropdown.open .aruvi-sort-menu {
+  display: flex;
+  animation: aruviSortMenuFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes aruviSortMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Options */
+.aruvi-sort-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 450;
+  color: #2D231E; /* Dark brown */
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.aruvi-sort-option .aruvi-sort-opt-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #6E625B; /* Unselected option icon */
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.aruvi-sort-option .aruvi-sort-opt-icon svg {
+  display: block;
+}
+
+.aruvi-sort-option-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aruvi-sort-option:hover:not(.selected) {
+  background: #FAF6F0; /* Soft warm hover */
+  color: #1E1612;
+}
+
+/* Selected Option Highlight */
+.aruvi-sort-option.selected {
+  background: #FDF2EE; /* Pale terracotta background */
+  color: #BD442E;      /* Terracotta text */
+  font-weight: 600;
+}
+
+.aruvi-sort-option.selected .aruvi-sort-opt-icon {
+  color: #BD442E;      /* Terracotta icon */
+}
+
+/* High z-index stacking context safety */
+.aruvi-sort-dropdown.open {
+  z-index: 100050;
+}
+
+/* Responsive adjustment for small screens */
+@media (max-width: 600px) {
+  .aruvi-sort-container {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .aruvi-sort-dropdown {
+    flex: 1;
+    min-width: 0;
+  }
+}
 

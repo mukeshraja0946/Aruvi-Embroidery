@@ -144,19 +144,49 @@ class Order {
     return fallbackOrders.filter(o => o.user_id == userId);
   }
 
-  static async getAll({ page = 1, limit = 20, status = null } = {}) {
+  static async getAll({ page = 1, limit = 20, status = null, sort = 'newest', search = null, payment = null } = {}) {
     if (db.isConnected()) {
-      let whereClause = status ? 'WHERE status = ?' : '';
-      let params = status ? [status] : [];
+      let whereClauses = [];
+      let params = [];
+      if (status) {
+        whereClauses.push('o.status = ?');
+        params.push(status);
+      }
+      if (payment) {
+        if (payment === 'paid') {
+          whereClauses.push('(o.status = "completed" OR o.status = "paid" OR o.razorpay_payment_id IS NOT NULL OR o.cashfree_payment_id IS NOT NULL)');
+        } else if (payment === 'pending') {
+          whereClauses.push('o.status = "pending"');
+        }
+      }
+      if (search && search.trim()) {
+        const q = `%${search.trim()}%`;
+        whereClauses.push('(o.order_number LIKE ? OR u.full_name LIKE ? OR u.email LIKE ? OR o.guest_name LIKE ? OR o.guest_email LIKE ?)');
+        params.push(q, q, q, q, q);
+      }
+      const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
       const offset = (page - 1) * limit;
 
-      const sql = `SELECT o.*, u.full_name as user_name, u.email as user_email FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`;
+      let orderSql = 'ORDER BY o.created_at DESC';
+      if (sort === 'oldest') orderSql = 'ORDER BY o.created_at ASC';
+      else if (sort === 'amount_high') orderSql = 'ORDER BY o.final_amount DESC';
+
+      const sql = `SELECT o.*, u.full_name as user_name, u.email as user_email FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause} ${orderSql} LIMIT ? OFFSET ?`;
       const orders = await db.query(sql, [...params, parseInt(limit), parseInt(offset)]);
 
-      const countRes = await db.query(`SELECT COUNT(*) as total FROM orders ${whereClause}`, params);
+      const countRes = await db.query(`SELECT COUNT(*) as total FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause}`, params);
       return { orders, total: countRes[0].total };
     }
-    return { orders: fallbackOrders, total: fallbackOrders.length };
+    let list = [...fallbackOrders];
+    if (status) list = list.filter(o => o.status === status);
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(o => (o.order_number && o.order_number.toLowerCase().includes(q)) || (o.guest_name && o.guest_name.toLowerCase().includes(q)) || (o.guest_email && o.guest_email.toLowerCase().includes(q)));
+    }
+    if (sort === 'oldest') list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+    else if (sort === 'amount_high') list.sort((a,b) => (b.final_amount || 0) - (a.final_amount || 0));
+    else list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    return { orders: list, total: list.length };
   }
 
   static async getByCashfreeOrderId(cfOrderId) {

@@ -10,16 +10,39 @@ const fallbackCategories = [
 ];
 
 class Category {
-  static async getAll() {
+  static async getAll({ sort = null, search = null, status = null } = {}) {
     if (db.isConnected()) {
       try {
-        const rows = await db.query('SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id GROUP BY c.id ORDER BY c.display_order ASC, c.name ASC');
+        let whereClauses = [];
+        let params = [];
+        if (search && search.trim()) {
+          const q = `%${search.trim()}%`;
+          whereClauses.push('(c.name LIKE ? OR c.description LIKE ?)');
+          params.push(q, q);
+        }
+        const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+        let orderSql = 'ORDER BY c.display_order ASC, c.name ASC';
+        if (sort === 'name') orderSql = 'ORDER BY c.name ASC';
+        else if (sort === 'count') orderSql = 'ORDER BY design_count DESC';
+        else if (sort === 'newest') orderSql = 'ORDER BY c.id DESC';
+
+        const sql = `SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id ${whereClause} GROUP BY c.id ${orderSql}`;
+        const rows = await db.query(sql, params);
         if (rows && Array.isArray(rows)) return rows;
       } catch (err) {
         console.error('Category.getAll DB error:', err.message);
       }
     }
-    return fallbackCategories.map(cat => ({ ...cat, design_count: 3 }));
+    let list = fallbackCategories.map(cat => ({ ...cat, design_count: 3 }));
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.description && c.description.toLowerCase().includes(q)));
+    }
+    if (sort === 'name') list.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+    else if (sort === 'count') list.sort((a,b) => (b.design_count || 0) - (a.design_count || 0));
+    else if (sort === 'newest') list.sort((a,b) => (b.id || 0) - (a.id || 0));
+    return list;
   }
 
   static async getById(id) {

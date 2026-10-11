@@ -207,10 +207,17 @@
             <option value="completed">Completed</option>
           </select>
 
-          <select name="sort" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
-            <option value="newest">Sort by Newest</option>
-            <option value="oldest">Sort by Oldest</option>
-          </select>
+          <!-- Standardized Sort Filter -->
+          <%- include('../../partials/sort-dropdown', {
+            id: 'admin_custom_orders_sort_dd',
+            label: 'Sort by:',
+            actionType: 'submit',
+            currentSort: typeof currentSort !== 'undefined' ? currentSort : 'newest',
+            options: [
+              { value: 'newest', label: 'Sort by Newest', iconType: 'latest' },
+              { value: 'oldest', label: 'Sort by Oldest', iconType: 'oldest' }
+            ]
+          }) %>
 
           <a href="/admin/custom-orders" class="btn btn-outline" style="height: 40px; border-radius: 8px; font-size: 0.85rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 6px; background: #FFF;">
             <i class="fa-solid fa-rotate-left"></i> Reset
@@ -393,6 +400,6 @@
     setTimeout(() => { if (toast) toast.style.display = 'none'; }, 4000);
   }
 </script>
-
+<script src="/public/js/sort-dropdown.js"></script>
 </body>
 </html>
