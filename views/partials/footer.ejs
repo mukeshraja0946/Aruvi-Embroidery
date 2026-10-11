@@ -1,5 +1,17 @@
 <%
   const settings = (typeof siteSettings !== 'undefined' && siteSettings) ? siteSettings : {};
+
+  function isValidExternalUrl(urlStr) {
+    if (!urlStr || typeof urlStr !== 'string') return false;
+    const trimmed = urlStr.trim();
+    if (!trimmed) return false;
+    try {
+      const u = new URL(trimmed);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch (_) {
+      return false;
+    }
+  }
 %>
 
   <!-- Footer -->
@@ -20,20 +32,17 @@
             We specialize in bridal blouse necklines, saree borders, temple gods, peacock motifs, and contemporary floral art.
           </p>
           <div class="social-icons">
-            <% if (settings.facebook_url) { %>
-              <a href="<%= settings.facebook_url %>" class="social-icon" target="_blank" rel="noopener noreferrer" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+            <% if (isValidExternalUrl(settings.facebook_url)) { %>
+              <a href="<%= settings.facebook_url.trim() %>" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
             <% } %>
-            <% if (settings.instagram_url) { %>
-              <a href="<%= settings.instagram_url %>" class="social-icon" target="_blank" rel="noopener noreferrer" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+            <% if (isValidExternalUrl(settings.instagram_url)) { %>
+              <a href="<%= settings.instagram_url.trim() %>" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
             <% } %>
-            <% if (settings.pinterest_url) { %>
-              <a href="<%= settings.pinterest_url %>" class="social-icon" target="_blank" rel="noopener noreferrer" title="Pinterest"><i class="fa-brands fa-pinterest-p"></i></a>
+            <% if (isValidExternalUrl(settings.pinterest_url)) { %>
+              <a href="<%= settings.pinterest_url.trim() %>" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="Pinterest" title="Pinterest"><i class="fa-brands fa-pinterest-p"></i></a>
             <% } %>
-            <% if (settings.youtube_url) { %>
-              <a href="<%= settings.youtube_url %>" class="social-icon" target="_blank" rel="noopener noreferrer" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
-            <% } %>
-            <% if (settings.twitter_url) { %>
-              <a href="<%= settings.twitter_url %>" class="social-icon" target="_blank" rel="noopener noreferrer" title="Twitter"><i class="fa-brands fa-x-twitter"></i></a>
+            <% if (isValidExternalUrl(settings.youtube_url)) { %>
+              <a href="<%= settings.youtube_url.trim() %>" class="social-icon" target="_blank" rel="noopener noreferrer" aria-label="YouTube" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
             <% } %>
           </div>
         </div>

@@ -22,6 +22,43 @@ exports.getSettings = async (req, res, next) => {
   }
 };
 
+function validateSocialMediaUrl(rawUrl, platformName, allowedDomains) {
+  if (rawUrl === undefined || rawUrl === null) {
+    return { valid: true, cleanUrl: '' };
+  }
+  let trimmed = String(rawUrl).trim();
+  if (trimmed === '') {
+    return { valid: true, cleanUrl: '' };
+  }
+
+  // Prepend https:// if protocol was omitted
+  if (!/^https?:\/\//i.test(trimmed)) {
+    trimmed = 'https://' + trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { valid: false, error: `${platformName} URL must use HTTP or HTTPS protocol.` };
+    }
+
+    if (Array.isArray(allowedDomains) && allowedDomains.length > 0) {
+      const host = parsed.hostname.toLowerCase();
+      const isDomainMatch = allowedDomains.some(d => host === d || host.endsWith('.' + d));
+      if (!isDomainMatch) {
+        return {
+          valid: false,
+          error: `${platformName} URL must point to a valid ${platformName} address (e.g. https://${allowedDomains[0]}/yourprofile), not another platform.`
+        };
+      }
+    }
+
+    return { valid: true, cleanUrl: parsed.toString() };
+  } catch (e) {
+    return { valid: false, error: `Invalid ${platformName} URL format. Please enter a valid web address.` };
+  }
+}
+
 exports.postSettings = async (req, res, next) => {
   try {
     const b = req.body || {};
@@ -48,14 +85,40 @@ exports.postSettings = async (req, res, next) => {
     const mobile_logo_url = b.mobile_logo_url;
     const favicon_url = b.favicon_url;
 
-    // Validation for Pinterest URL
-    const cleanPinterest = (pinterest_url || '').trim();
-    if (cleanPinterest && !/^https?:\/\//i.test(cleanPinterest)) {
-      const errMessage = 'Invalid Pinterest URL format. URL must start with http:// or https:// (e.g. https://pinterest.com/aruviembroidery).';
+    // Validation for Social Media URLs
+    const fbCheck = validateSocialMediaUrl(facebook_url, 'Facebook', ['facebook.com', 'fb.com', 'fb.me', 'fb.watch']);
+    if (!fbCheck.valid) {
       if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
-        return res.status(400).json({ success: false, message: errMessage });
+        return res.status(400).json({ success: false, message: fbCheck.error });
       }
-      req.flash('error', errMessage);
+      req.flash('error', fbCheck.error);
+      return res.redirect('/admin/settings');
+    }
+
+    const instaCheck = validateSocialMediaUrl(instagram_url, 'Instagram', ['instagram.com', 'instagr.am']);
+    if (!instaCheck.valid) {
+      if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
+        return res.status(400).json({ success: false, message: instaCheck.error });
+      }
+      req.flash('error', instaCheck.error);
+      return res.redirect('/admin/settings');
+    }
+
+    const pinCheck = validateSocialMediaUrl(pinterest_url, 'Pinterest', ['pinterest.com', 'pin.it', 'pinterest.co.uk', 'pinterest.ca']);
+    if (!pinCheck.valid) {
+      if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
+        return res.status(400).json({ success: false, message: pinCheck.error });
+      }
+      req.flash('error', pinCheck.error);
+      return res.redirect('/admin/settings');
+    }
+
+    const ytCheck = validateSocialMediaUrl(youtube_url, 'YouTube', ['youtube.com', 'youtu.be']);
+    if (!ytCheck.valid) {
+      if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
+        return res.status(400).json({ success: false, message: ytCheck.error });
+      }
+      req.flash('error', ytCheck.error);
       return res.redirect('/admin/settings');
     }
 
@@ -77,10 +140,10 @@ exports.postSettings = async (req, res, next) => {
       contact_phone,
       address,
       currency_symbol,
-      facebook_url,
-      instagram_url,
-      pinterest_url: cleanPinterest,
-      youtube_url,
+      facebook_url: fbCheck.cleanUrl,
+      instagram_url: instaCheck.cleanUrl,
+      pinterest_url: pinCheck.cleanUrl,
+      youtube_url: ytCheck.cleanUrl,
       upi_id: cleanUpiId,
       upi_name: upi_name.trim()
     };
@@ -116,7 +179,7 @@ exports.postSettings = async (req, res, next) => {
       };
     }
 
-    const successMessage = 'Payment settings and store branding updated successfully! All changes are synchronized across database and website.';
+    const successMessage = 'Store settings and social media links updated successfully! All changes are synchronized with the website footer.';
 
     if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
       return res.json({
