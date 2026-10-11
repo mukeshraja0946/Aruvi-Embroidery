@@ -39,10 +39,15 @@
       </div>
 
       <div class="form-group" style="margin-bottom: 0.9rem;">
-        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Verified Email Address</label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+          <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin: 0;">Verified Email Address</label>
+          <span style="color: #2E7D32; font-size: 0.74rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+            <i class="fa-solid fa-circle-check"></i> Verified via Google
+          </span>
+        </div>
         <div style="position: relative;">
           <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.95rem;"></i>
-          <input type="email" value="<%= user ? user.email : '' %>" disabled class="form-control" style="padding-left: 2.6rem; background: #F7F3EC; color: #776A62; height: 44px; font-weight: 500;">
+          <input type="email" value="<%= user ? user.email : '' %>" disabled class="form-control" style="padding-left: 2.6rem; background: #F7F3EC; color: #555555; height: 44px; font-weight: 500; cursor: not-allowed;">
         </div>
       </div>
 
@@ -64,7 +69,7 @@
       </button>
 
       <div style="text-align: center;">
-        <a href="/user/dashboard" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: underline;">Skip for now</a>
+        <a href="<%= (typeof returnUrl !== 'undefined' && returnUrl) ? returnUrl : '/user/dashboard' %>" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: underline;">Skip for now</a>
       </div>
     </form>
 

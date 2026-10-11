@@ -36,35 +36,72 @@ exports.updateProfile = async (req, res, next) => {
 };
 
 exports.getCompleteProfile = async (req, res) => {
+  if (!req.user) {
+    req.flash('error', 'Please sign in to complete your profile.');
+    return res.redirect('/auth/login');
+  }
+
+  const profilePicture = (req.user && req.user.profile_picture) || req.session.googlePicture || null;
+  const returnUrl = req.session.returnTo || '/user/dashboard';
+
   res.render('user/complete-profile', {
     title: 'Complete Your Profile - Aruvi Embroidery',
-    user: req.user
+    user: {
+      ...req.user,
+      profile_picture: profilePicture
+    },
+    returnUrl
   });
 };
 
 exports.postCompleteProfile = async (req, res, next) => {
   try {
+    if (!req.user) {
+      req.flash('error', 'Session expired. Please sign in again.');
+      return res.redirect('/auth/login');
+    }
+
     const { full_name, phone, address } = req.body;
 
-    const cleanName = (full_name || (req.user ? req.user.full_name : '') || 'Customer').trim();
+    const cleanName = (full_name || (req.user ? req.user.full_name : '') || '').trim();
     const cleanPhone = (phone || '').trim();
     const cleanAddress = (address || '').trim();
+    const profilePicture = (req.user && req.user.profile_picture) || req.session.googlePicture || null;
 
-    if (!cleanPhone || cleanPhone.length < 7) {
-      req.flash('error', 'Please enter a valid mobile number.');
+    if (!cleanName || cleanName.length < 2) {
+      req.flash('error', 'Please enter your full name.');
+      return res.redirect('/user/complete-profile');
+    }
+
+    const digitsOnly = cleanPhone.replace(/\D/g, '');
+    if (!cleanPhone || digitsOnly.length < 10) {
+      req.flash('error', 'Please enter a valid 10-digit mobile phone number.');
       return res.redirect('/user/complete-profile');
     }
 
     await User.updateProfile(req.user.id, {
       full_name: cleanName,
       phone: cleanPhone,
-      address: cleanAddress
+      address: cleanAddress,
+      profile_picture: profilePicture
     });
 
-    req.flash('success', 'Profile completed successfully! Welcome to Aruvi Embroidery.');
-    res.redirect('/user/dashboard');
+    if (req.user) {
+      req.user.full_name = cleanName;
+      req.user.phone = cleanPhone;
+      req.user.address = cleanAddress;
+      if (profilePicture) req.user.profile_picture = profilePicture;
+    }
+
+    const targetRedirect = req.session.returnTo || '/user/dashboard';
+    delete req.session.returnTo;
+
+    req.flash('success', 'Profile confirmed successfully! Welcome to Aruvi Embroidery.');
+    res.redirect(targetRedirect);
   } catch (err) {
-    next(err);
+    console.error('[postCompleteProfile error]:', err);
+    req.flash('error', 'Failed to save profile: ' + err.message);
+    res.redirect('/user/complete-profile');
   }
 };
 

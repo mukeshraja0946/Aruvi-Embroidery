@@ -98,6 +98,11 @@
                 <input type="tel" name="phone" value="<%= currentUser ? currentUser.phone : '' %>" placeholder="98765 43210" required>
               </div>
             </div>
+
+            <div class="form-group-field span-2">
+              <label>Delivery / Studio Address <span class="req">*</span></label>
+              <textarea name="address" rows="2" placeholder="Street, City, State, Pincode" required style="width: 100%; border: 1px solid var(--border-light); border-radius: 8px; padding: 0.6rem 0.8rem; font-family: inherit; font-size: 0.9rem;"><%= currentUser ? (currentUser.address || '') : '' %></textarea>
+            </div>
           </div>
         </div>
 

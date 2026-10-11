@@ -224,14 +224,14 @@ exports.postGoogleVerify = async (req, res) => {
       // Establish customer session (Never grant admin privileges via Google Sign-In)
       req.session.userId = user.id;
 
-      const needsProfile = !user.phone || String(user.phone).trim() === '' || !user.address || String(user.address).trim() === '';
-      const targetRedirect = needsProfile ? '/user/complete-profile' : (req.session.returnTo || '/user/dashboard');
-      delete req.session.returnTo;
+      if (tokenInfo.picture) {
+        await User.updateProfile(user.id, { profile_picture: tokenInfo.picture });
+      }
 
       return res.json({
         success: true,
-        message: `Welcome back, ${user.full_name}!`,
-        redirect: targetRedirect
+        message: `Welcome back, ${user.full_name}! Please confirm your profile details.`,
+        redirect: '/user/complete-profile'
       });
     }
 
@@ -242,6 +242,8 @@ exports.postGoogleVerify = async (req, res) => {
       email: email,
       password: randomPassword,
       phone: null,
+      address: null,
+      profile_picture: tokenInfo.picture || null,
       role: 'customer'
     });
 
@@ -384,12 +386,12 @@ exports.getGoogleCallback = async (req, res, next) => {
 
       req.session.userId = user.id;
 
-      const needsProfile = !user.phone || String(user.phone).trim() === '' || !user.address || String(user.address).trim() === '';
-      const targetRedirect = needsProfile ? '/user/complete-profile' : (req.session.returnTo || '/user/dashboard');
-      delete req.session.returnTo;
+      if (tokenInfo.picture) {
+        await User.updateProfile(user.id, { profile_picture: tokenInfo.picture });
+      }
 
-      req.flash('success', `Welcome back, ${user.full_name}!`);
-      return res.redirect(targetRedirect);
+      req.flash('success', `Welcome back, ${user.full_name}! Please confirm your details.`);
+      return res.redirect('/user/complete-profile');
     }
 
     // Create New Customer
@@ -399,6 +401,8 @@ exports.getGoogleCallback = async (req, res, next) => {
       email: email,
       password: randomPassword,
       phone: null,
+      address: null,
+      profile_picture: tokenInfo.picture || null,
       role: 'customer'
     });
 

@@ -90,7 +90,31 @@ exports.createRazorpayOrder = async (req, res, next) => {
     const isLocalTest = !isProduction || process.env.PAYMENT_MODE === 'local_test';
 
     const userId = req.user.id;
-    const { full_name, email, phone, design_id, payment_mode } = req.body;
+    const { full_name, email, phone, address, design_id, payment_mode } = req.body;
+
+    const cleanPhone = (phone || (req.user ? req.user.phone : '') || '').trim();
+    const cleanAddress = (address || (req.user ? req.user.address : '') || '').trim();
+
+    if (!cleanPhone || cleanPhone.replace(/\D/g, '').length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid 10-digit mobile phone number is required at checkout.'
+      });
+    }
+
+    if (!cleanAddress || cleanAddress.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Delivery / Studio address is required at checkout.'
+      });
+    }
+
+    // Update customer profile with phone & address
+    await User.updateProfile(userId, {
+      full_name: full_name || req.user.full_name,
+      phone: cleanPhone,
+      address: cleanAddress
+    });
 
     // Production security guard — reject any local test payment attempt on production
     if (isProduction && (payment_mode === 'local_test' || req.body.is_local_test)) {

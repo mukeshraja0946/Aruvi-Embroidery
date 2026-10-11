@@ -53,7 +53,9 @@ class User {
           return userWithoutPass;
         }
       } catch (e) {
-        const rows = await db.query('SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE id = ? LIMIT 1', [id]);
+        const rows = await db.query('SELECT id, full_name, email, phone, role, is_active, created_at, address, profile_picture FROM users WHERE id = ? LIMIT 1', [id]).catch(async () => {
+          return await db.query('SELECT id, full_name, email, phone, role, is_active, created_at FROM users WHERE id = ? LIMIT 1', [id]);
+        });
         return rows[0] || null;
       }
     }
@@ -63,16 +65,26 @@ class User {
     return userWithoutPass;
   }
 
-  static async create({ full_name, email, password, phone = null, role = 'customer' }) {
+  static async create({ full_name, email, password, phone = null, role = 'customer', address = null, profile_picture = null }) {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
     if (db.isConnected()) {
-      const result = await db.query(
-        'INSERT INTO users (full_name, email, password_hash, phone, role) VALUES (?, ?, ?, ?, ?)',
-        [full_name, email.toLowerCase().trim(), password_hash, phone, role]
-      );
-      return result.insertId;
+      try {
+        await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL').catch(() => {});
+        await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT DEFAULT NULL').catch(() => {});
+        const result = await db.query(
+          'INSERT INTO users (full_name, email, password_hash, phone, role, address, profile_picture) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [full_name, email.toLowerCase().trim(), password_hash, phone, role, address, profile_picture]
+        );
+        return result.insertId;
+      } catch (insertErr) {
+        const result = await db.query(
+          'INSERT INTO users (full_name, email, password_hash, phone, role) VALUES (?, ?, ?, ?, ?)',
+          [full_name, email.toLowerCase().trim(), password_hash, phone, role]
+        );
+        return result.insertId;
+      }
     }
 
     const newId = fallbackUsers.length + 1;
@@ -82,6 +94,8 @@ class User {
       email: email.toLowerCase().trim(),
       password_hash,
       phone,
+      address,
+      profile_picture,
       role,
       is_active: 1,
       created_at: new Date()
@@ -130,13 +144,17 @@ class User {
     return { users: fallbackUsers, total: fallbackUsers.length };
   }
 
-  static async updateProfile(id, { full_name, phone, address }) {
+  static async updateProfile(id, { full_name, phone, address, profile_picture }) {
     if (db.isConnected()) {
       try {
         await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL').catch(() => {});
+        await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT DEFAULT NULL').catch(() => {});
         await db.query('UPDATE users SET full_name = ?, phone = ? WHERE id = ?', [full_name, phone, id]);
         if (address !== undefined) {
           await db.query('UPDATE users SET address = ? WHERE id = ?', [address, id]).catch(() => {});
+        }
+        if (profile_picture !== undefined && profile_picture !== null) {
+          await db.query('UPDATE users SET profile_picture = ? WHERE id = ?', [profile_picture, id]).catch(() => {});
         }
       } catch (e) {
         console.error('User.updateProfile error:', e.message);
@@ -148,6 +166,7 @@ class User {
       if (full_name !== undefined) u.full_name = full_name;
       if (phone !== undefined) u.phone = phone;
       if (address !== undefined) u.address = address;
+      if (profile_picture !== undefined && profile_picture !== null) u.profile_picture = profile_picture;
     }
     return true;
   }
