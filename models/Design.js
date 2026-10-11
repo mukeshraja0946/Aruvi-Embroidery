@@ -268,9 +268,8 @@ class Design {
     let detected = [];
     const zipFile = files.find(f => (f.file_format || '').toUpperCase() === 'ZIP' || (f.file_name || '').toLowerCase().endsWith('.zip'));
     if (zipFile && zipFile.file_path) {
-      let relPath = zipFile.file_path.startsWith('/') ? zipFile.file_path.substring(1) : zipFile.file_path;
-      const fullPath = path.join(__dirname, '..', relPath);
-      if (fs.existsSync(fullPath)) {
+      const fullPath = storage.resolveFilePath(zipFile.file_path);
+      if (fullPath && fs.existsSync(fullPath)) {
         try {
           const zip = new AdmZip(fullPath);
           const entries = zip.getEntries();
@@ -309,10 +308,9 @@ class Design {
       let detectedFormats = [];
 
       if (zipFile && zipFile.file_path) {
-        let relPath = zipFile.file_path.startsWith('/') ? zipFile.file_path.substring(1) : zipFile.file_path;
-        const fullZipPath = path.join(__dirname, '..', relPath);
+        const fullZipPath = storage.resolveFilePath(zipFile.file_path);
 
-        if (fs.existsSync(fullZipPath) && zipFile.file_name && zipFile.file_name.toLowerCase().endsWith('.zip')) {
+        if (fullZipPath && fs.existsSync(fullZipPath) && zipFile.file_name && zipFile.file_name.toLowerCase().endsWith('.zip')) {
           try {
             const zip = new AdmZip(fullZipPath);
             const entries = zip.getEntries();
@@ -354,8 +352,8 @@ class Design {
         packageName: rawPkgName,
         fileCount: fileCount || 1,
         formats: detectedFormats,
-        file_path: zipFile.file_path || '/public/uploads/designs/sample_peacock.zip',
-        file_size: zipFile.file_size || 2450123
+        file_path: zipFile.file_path || null,
+        file_size: zipFile.file_size || 0
       };
 
       design.formats = detectedFormats.join(', ');
@@ -369,8 +367,8 @@ class Design {
         packageName: `${design.title || design.sku || ('AED ' + design.id)}.zip`,
         fileCount: existingFmts.length || 1,
         formats: existingFmts,
-        file_path: design.file_path || '/public/uploads/designs/sample_peacock.zip',
-        file_size: 2450123
+        file_path: design.file_path || null,
+        file_size: 0
       };
       design.formats = existingFmts.join(', ');
     }
@@ -494,9 +492,10 @@ class Design {
     const ext = img ? img.split('.').pop().toLowerCase() : '';
     const nonImgExts = ['zip', 'dst', 'pes', 'jef', 'exp', 'hus', 'vip', 'vp3', 'xxx'];
 
+    // Placeholder is used ONLY when a product has no image or an invalid non-image format
+    // Admin-uploaded images are NEVER overwritten
     if (!img || nonImgExts.includes(ext)) {
-      const idx = Math.abs((parseInt(d.id) || 1) - 1) % availablePreviewImages.length;
-      img = availablePreviewImages[idx];
+      img = '/public/images/hero_embroidery.jpg';
     }
 
     if (img && !img.startsWith('/') && !img.startsWith('http')) {
@@ -1107,10 +1106,8 @@ class Design {
       const { design_id, file_path, file_format, is_preview } = files[0];
 
       if (file_path) {
-        let relPath = file_path;
-        if (relPath.startsWith('/')) relPath = relPath.substring(1);
-        const fullPath = path.join(__dirname, '..', relPath);
-        if (fs.existsSync(fullPath)) {
+        const fullPath = storage.resolveFilePath(file_path);
+        if (fullPath && fs.existsSync(fullPath)) {
           try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete file from disk:', fullPath); }
         }
       }

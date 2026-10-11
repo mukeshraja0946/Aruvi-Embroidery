@@ -60,42 +60,8 @@ async function initPool() {
       const connection = await pool.getConnection();
       connection.release();
 
-      // 3. Auto-initialize tables if empty (NEVER run seed.sql in production)
-      try {
-        const isProduction = process.env.NODE_ENV === 'production';
-        const [tables] = await pool.query("SHOW TABLES LIKE 'designs'");
-        if (!tables || tables.length === 0) {
-          console.log(`[DB] Database '${dbConfig.database}' missing tables. Running schema initialization...`);
-          const schemaPath = path.join(__dirname, '../schema.sql');
-          if (fs.existsSync(schemaPath)) {
-            const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-            await pool.query(schemaSql);
-            console.log(`[DB] Schema tables initialized successfully.`);
-          }
-          // Seed data is ONLY for explicit local dev with AUTO_SEED=true, NEVER production
-          if (!isProduction && process.env.AUTO_SEED === 'true') {
-            const seedPath = path.join(__dirname, '../seed.sql');
-            if (fs.existsSync(seedPath)) {
-              const seedSql = fs.readFileSync(seedPath, 'utf8');
-              await pool.query(seedSql);
-              console.log(`[DB Dev] Seed data initialized.`);
-            }
-          }
-        }
-
-          // Auto-migrate orders table columns for Cashfree if missing
-          try {
-            const [cols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'cashfree_order_id'");
-            if (!cols || cols.length === 0) {
-              await pool.query("ALTER TABLE orders ADD COLUMN payment_gateway VARCHAR(50) DEFAULT 'cashfree', ADD COLUMN cashfree_order_id VARCHAR(100) DEFAULT NULL, ADD COLUMN cashfree_payment_id VARCHAR(100) DEFAULT NULL;");
-              console.log("[DB Migration] Added Cashfree columns (payment_gateway, cashfree_order_id, cashfree_payment_id) to orders table.");
-            }
-          } catch (colErr) {
-            // Ignore if orders table check fails
-          }
-      } catch (initErr) {
-        console.warn(`[DB Init Warning]: ${initErr.message}`);
-      }
+      // Database safety: Never auto-run schema.sql, seed.sql, TRUNCATE, or DROP on startup.
+      // Migrations are run safely via `npm run migrate` and seed runs only manually via `npm run seed`.
 
       isConnected = true;
       console.log(`==================================================\nLOCAL DATABASE:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nStatus: Connected to MySQL\n==================================================`);

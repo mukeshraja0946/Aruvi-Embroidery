@@ -3,7 +3,7 @@ const fs = require('fs');
 const Design = require('../../models/Design');
 const Category = require('../../models/Category');
 const emailService = require('../../services/emailService');
-const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists } = require('../../config/storage');
+const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDriver, uploadToCloudinary, uploadToS3OrR2 } = require('../../config/storage');
 
 const AdminStatsService = require('../../services/adminStatsService');
 
@@ -329,7 +329,19 @@ exports.postCreate = async (req, res, next) => {
       for (const file of imgFiles) {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
-        const filePath = `/public/uploads/previews/${file.filename}`;
+        let filePath = `/public/uploads/previews/${file.filename}`;
+
+        if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
+          try {
+            const cloudUrl = await uploadToCloudinary(file.path);
+            if (cloudUrl) {
+              filePath = cloudUrl;
+            }
+          } catch (cloudErr) {
+            console.warn('[Cloudinary upload fallback]:', cloudErr.message);
+          }
+        }
+
         await Design.addFile(designId, file.originalname, filePath, ext, file.size, 1);
       }
     }
@@ -517,7 +529,19 @@ exports.postEdit = async (req, res, next) => {
       for (const file of imgFiles) {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
-        const filePath = `/public/uploads/previews/${file.filename}`;
+        let filePath = `/public/uploads/previews/${file.filename}`;
+
+        if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
+          try {
+            const cloudUrl = await uploadToCloudinary(file.path);
+            if (cloudUrl) {
+              filePath = cloudUrl;
+            }
+          } catch (cloudErr) {
+            console.warn('[Cloudinary upload fallback]:', cloudErr.message);
+          }
+        }
+
         await Design.addFile(id, file.originalname, filePath, ext, file.size, 1);
       }
     }

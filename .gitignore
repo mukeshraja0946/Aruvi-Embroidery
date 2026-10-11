@@ -1,7 +1,25 @@
-node_modules/
+# Environment & Secrets (NEVER track in Git)
 .env
-.env.local
+.env.*
+!.env.example
+
+# Node Dependencies
+node_modules/
+
+# Logs & Temporary Scratch Files
 *.log
 scratch/
 backups/
 
+# Uploaded Files & Content (Must NEVER be tracked in Git or overwritten on deploy)
+public/uploads/*
+!public/uploads/.gitkeep
+!public/uploads/**/.gitkeep
+
+uploads/*
+!uploads/.gitkeep
+!uploads/**/.gitkeep
+
+private_uploads/*
+!private_uploads/.gitkeep
+!private_uploads/**/.gitkeep

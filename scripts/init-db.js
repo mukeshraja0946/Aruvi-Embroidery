@@ -1,54 +1,24 @@
-const mysql = require('mysql2/promise');
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
-
-dotenv.config();
+const runMigrations = require('./migrate');
+const runSeed = require('./seed');
 
 async function initDatabase() {
-  console.log('--- Initializing Aruvi Embroidery MySQL Database ---');
-  const host = process.env.DB_HOST || 'localhost';
-  const port = parseInt(process.env.DB_PORT || '3306');
-  const user = process.env.DB_USER || 'root';
-  const password = process.env.DB_PASSWORD || '';
-  const dbName = process.env.DB_NAME || 'aruvi_embroidery';
-
-  if (process.env.NODE_ENV === 'production' && process.env.FORCE_PRODUCTION_SEED !== 'true') {
-    console.error('❌ Refusing to run seed.sql in production environment! To protect existing production product records, database re-seeding is blocked in production.');
-    return;
-  }
-
+  console.log('--- Initializing Aruvi Embroidery Database ---');
   try {
-    // 1. Connect without selecting database to create it
-    const connection = await mysql.createConnection({
-      host,
-      port,
-      user,
-      password,
-      multipleStatements: true
-    });
+    // 1. Run migrations safely (CREATE TABLE IF NOT EXISTS, never drops data)
+    await runMigrations();
 
-    console.log(`Connected to MySQL server at ${host}:${port}`);
+    // 2. Run seed safely (only runs if database has no existing designs/users)
+    await runSeed();
 
-    // 2. Read schema.sql and seed.sql
-    const schemaSql = fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8');
-    const seedSql = fs.readFileSync(path.join(__dirname, '../seed.sql'), 'utf8');
-
-    console.log(`Executing schema.sql on database '${dbName}'...`);
-    await connection.query(schemaSql);
-    console.log('✓ Database schema created / verified successfully.');
-
-    console.log(`Executing seed.sql on database '${dbName}'...`);
-    await connection.query(seedSql);
-    console.log('✓ Seed data inserted successfully.');
-
-    await connection.end();
-    console.log('--- Database Initialization Complete! ---');
+    console.log('--- Database Initialization / Verification Finished Successfully ---');
   } catch (err) {
-    console.error('❌ Database Initialization Failed:');
-    console.error(err.message);
-    console.log('\nPlease ensure MySQL is running and credentials in .env are correct.');
+    console.error('❌ Database Initialization Failed:', err.message);
+    process.exit(1);
   }
 }
 
-initDatabase();
+if (require.main === module) {
+  initDatabase();
+}
+
+module.exports = initDatabase;
