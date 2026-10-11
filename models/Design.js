@@ -35,7 +35,7 @@ const fallbackDesigns = Array.from({ length: 5 }, (_, idx) => {
   return {
     id: num,
     title: `AED ${num}`,
-    sku: `AED ${num}`,
+    sku: `AED-BLO-0${num}`,
     slug: `aed-${num}`,
     price: 399.00,
     sale_price: 299.00,
@@ -515,7 +515,7 @@ class Design {
     if (norm.includes('t-shirt') || norm.includes('tshirt')) return 'TSH';
     if (norm.includes('shirt logo') || norm.includes('logo')) return 'SLG';
     if (norm.includes('shirt')) return 'SHI';
-    if (norm.includes('animal') || norm.includes('bird')) return 'ANI';
+    if (norm.includes('animal') || norm.includes('bird')) return 'ABD';
     if (norm.includes('custom')) return 'CUS';
     if (norm.includes('kid') || norm.includes('child')) return 'KID';
     if (norm.includes('tradition')) return 'TRD';
@@ -531,12 +531,24 @@ class Design {
     return (cleaned + 'XXX').substring(0, 3);
   }
 
+  static async sanitizeDeletedSkus() {
+    if (db.isConnected()) {
+      try {
+        await db.query("UPDATE designs SET sku = CONCAT(sku, '_DEL_', id) WHERE is_active < 0 AND sku NOT LIKE '%_DEL_%'");
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
   static async isSkuExists(sku, excludeDesignId = null) {
     if (!sku || typeof sku !== 'string') return false;
     const cleanSku = sku.trim();
+    if (cleanSku.includes('_DEL_')) return false;
+
     if (db.isConnected()) {
       try {
-        let sql = 'SELECT id FROM designs WHERE LOWER(sku) = LOWER(?)';
+        let sql = 'SELECT id FROM designs WHERE LOWER(sku) = LOWER(?) AND is_active >= 0';
         let params = [cleanSku];
         if (excludeDesignId) {
           sql += ' AND id != ?';
@@ -550,13 +562,17 @@ class Design {
       }
     }
     const found = fallbackDesigns.find(d => 
-      d.sku && d.sku.trim().toLowerCase() === cleanSku.toLowerCase() &&
+      (d.is_active === undefined || d.is_active >= 0) &&
+      d.sku && !d.sku.includes('_DEL_') &&
+      d.sku.trim().toLowerCase() === cleanSku.toLowerCase() &&
       (!excludeDesignId || d.id != excludeDesignId)
     );
     return Boolean(found);
   }
 
   static async getNextSkuForCategory(categoryId, currentDesignId = null) {
+    await this.sanitizeDeletedSkus();
+
     let catName = '';
     if (categoryId) {
       const Category = require('./Category');
@@ -573,7 +589,7 @@ class Design {
 
     if (db.isConnected()) {
       try {
-        let sql = 'SELECT sku FROM designs WHERE category_id = ?';
+        let sql = 'SELECT sku FROM designs WHERE category_id = ? AND is_active >= 0';
         let params = [parseInt(categoryId)];
         if (currentDesignId) {
           sql += ' AND id != ?';
@@ -582,20 +598,21 @@ class Design {
         const rows = await db.query(sql, params);
         if (rows && Array.isArray(rows)) {
           designCountInCategory = rows.length;
-          matchingSkus = rows.map(r => r.sku).filter(Boolean);
+          matchingSkus = rows.map(r => r.sku).filter(s => Boolean(s) && !s.includes('_DEL_'));
         }
       } catch (err) {
         console.error('[getNextSkuForCategory DB Error]:', err.message);
       }
     } else {
       const filtered = fallbackDesigns.filter(d => 
+        (d.is_active === undefined || d.is_active >= 0) &&
         d.category_id == categoryId && (!currentDesignId || d.id != currentDesignId)
       );
       designCountInCategory = filtered.length;
-      matchingSkus = filtered.map(d => d.sku).filter(Boolean);
+      matchingSkus = filtered.map(d => d.sku).filter(s => Boolean(s) && !s.includes('_DEL_'));
     }
 
-    if (designCountInCategory === 0) {
+    if (designCountInCategory === 0 || matchingSkus.length === 0) {
       let num = 1;
       let candidate = `${prefix}${String(num).padStart(2, '0')}`;
       while (await this.isSkuExists(candidate, currentDesignId)) {
@@ -621,7 +638,7 @@ class Design {
       }
     }
 
-    let maxNum = extractedNumbers.length > 0 ? Math.max(...extractedNumbers) : designCountInCategory;
+    let maxNum = extractedNumbers.length > 0 ? Math.max(...extractedNumbers) : matchingSkus.length;
     let nextSeq = maxNum + 1;
     let candidateSku = `${prefix}${String(nextSeq).padStart(2, '0')}`;
 
@@ -750,6 +767,16 @@ class Design {
     // Ensure slug is non-empty and unique
     const finalSlug = slug ? slug : await this.generateUniqueSlug(title);
 
+    let finalSku = (sku && sku.trim()) ? sku.trim() : null;
+    if (!finalSku) {
+      finalSku = await this.getNextSkuForCategory(category_id);
+    } else {
+      const exists = await this.isSkuExists(finalSku);
+      if (exists) {
+        finalSku = await this.getNextSkuForCategory(category_id);
+      }
+    }
+
     const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : 4.80;
     const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : 0;
 
@@ -762,7 +789,7 @@ class Design {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             title,
-            sku || null,
+            finalSku,
             finalSlug,
             price,
             sale_price || null,
@@ -783,6 +810,37 @@ class Design {
         if (res && res.insertId) insertedId = res.insertId;
       } catch (err) {
         console.error('[Design.create DB Error]:', err.message);
+        if (err.code === 'ER_DUP_ENTRY' && String(err.message).toLowerCase().includes('sku')) {
+          try {
+            finalSku = await this.getNextSkuForCategory(category_id);
+            const retryRes = await db.query(
+              `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                title,
+                finalSku,
+                finalSlug,
+                price,
+                sale_price || null,
+                category_id || null,
+                hoop_size || '5x7 inch (130x180 mm)',
+                stitch_count || 24800,
+                dimensions || '140mm x 180mm',
+                formats || '',
+                is_featured ? 1 : 0,
+                is_trending ? 1 : 0,
+                is_active ? 1 : 0,
+                download_count ? parseInt(download_count) : 0,
+                tags || null,
+                avgRatingVal,
+                revCountVal
+              ]
+            );
+            if (retryRes && retryRes.insertId) insertedId = retryRes.insertId;
+          } catch (retryErr) {
+            console.error('[Design.create Retry Error]:', retryErr.message);
+          }
+        }
       }
     }
 
@@ -794,7 +852,7 @@ class Design {
     const newDesign = {
       id: insertedId,
       title,
-      sku: sku || `AED ${insertedId}`,
+      sku: finalSku || `AED ${insertedId}`,
       slug: finalSlug,
       price: parseFloat(price),
       sale_price: sale_price ? parseFloat(sale_price) : null,
@@ -1192,7 +1250,7 @@ class Design {
 
         if (hasPurchases) {
           // Soft-delete to preserve financial/order history and satisfy MySQL FK ON DELETE RESTRICT
-          await db.query('UPDATE designs SET is_active = -1 WHERE id = ?', [id]);
+          await db.query("UPDATE designs SET is_active = -1, sku = CONCAT(COALESCE(sku, 'AED'), '_DEL_', UNIX_TIMESTAMP()) WHERE id = ?", [id]);
         } else {
           // Hard-delete row if design was never purchased
           await db.query('DELETE FROM designs WHERE id = ?', [id]);
@@ -1216,7 +1274,7 @@ class Design {
   static async deleteAll() {
     if (db.isConnected()) {
       try {
-        const designs = await db.query('SELECT id FROM designs WHERE is_active != -1') || [];
+        const designs = await db.query('SELECT id FROM designs WHERE is_active >= 0') || [];
         for (const d of designs) {
           await this.delete(d.id);
         }

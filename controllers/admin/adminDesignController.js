@@ -247,10 +247,16 @@ exports.postCreate = async (req, res, next) => {
     if (finalSku) {
       const isDuplicate = await Design.isSkuExists(finalSku);
       if (isDuplicate) {
-        const errMsg = `Design Code / SKU "${finalSku}" is already in use by another product. Please enter a unique SKU.`;
-        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
-        req.flash('error', errMsg);
-        return res.redirect('back');
+        const isAutoPattern = /^AED-[A-Z]{2,4}-\d+$/i.test(finalSku);
+        if (isAutoPattern) {
+          // Resolve simultaneous product creation safely with next available sequence
+          finalSku = await Design.getNextSkuForCategory(category_id);
+        } else {
+          const errMsg = `Design Code / SKU "${finalSku}" is already in use by another product. Please enter a unique SKU.`;
+          if (isAjax) return res.status(400).json({ success: false, message: errMsg });
+          req.flash('error', errMsg);
+          return res.redirect('back');
+        }
       }
     } else {
       finalSku = await Design.getNextSkuForCategory(category_id);

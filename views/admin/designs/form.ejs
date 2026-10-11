@@ -214,7 +214,7 @@
                   <label class="form-label-custom">Design Code / SKU <span class="req">*</span></label>
                   <div style="position: relative;">
                     <input type="text" name="sku" id="skuInput" class="form-control-custom" value="<%= design ? (design.sku || '') : (typeof defaultSku !== 'undefined' ? defaultSku : '') %>" required placeholder="e.g. AED-BLO-01">
-                    <button type="button" onclick="autoGenerateSku()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #F4EFEA; border: 1px solid var(--admin-border); border-radius: 6px; padding: 4px 10px; color: var(--admin-primary); cursor: pointer; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;" title="Auto-generate suggested SKU">
+                    <button type="button" onclick="forceAutoGenerateSku()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #F4EFEA; border: 1px solid var(--admin-border); border-radius: 6px; padding: 4px 10px; color: var(--admin-primary); cursor: pointer; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;" title="Auto-generate suggested SKU">
                       <i class="fa-solid fa-wand-magic-sparkles"></i> Auto
                     </button>
                   </div>
@@ -225,7 +225,7 @@
               <!-- Category -->
               <div>
                 <label class="form-label-custom">Category <span class="req">*</span></label>
-                <select name="category_id" id="categorySelect" class="form-control-custom" required onchange="autoGenerateSku()">
+                <select name="category_id" id="categorySelect" class="form-control-custom" required onchange="onCategoryChange()">
                   <option value="">Select Category</option>
                   <% categories.forEach(cat => { %>
                     <option value="<%= cat.id %>" <%= (design && design.category_id == cat.id) ? 'selected' : '' %>>
@@ -341,7 +341,7 @@
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
                 <div>
                   <label class="switch-toggle">
-                    <input type="checkbox" name="is_featured" value="1" <%= (design && design.is_featured) || (!design) ? 'checked' : '' %>>
+                    <input type="checkbox" name="is_featured" value="1" <%= (design && design.is_featured) ? 'checked' : '' %>>
                     <span class="slider-round"></span>
                     <div>
                       <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);">Featured Design</strong>
@@ -538,7 +538,9 @@
     }
   }
 
-  function autoGenerateSku() {
+  let isSkuManuallyEdited = false;
+
+  function autoGenerateSku(force = false) {
     const catSelect = document.getElementById('categorySelect');
     const skuInput = document.getElementById('skuInput');
     if (!catSelect || !skuInput) return;
@@ -552,6 +554,9 @@
       .then(data => {
         if (data.success && data.sku) {
           skuInput.value = data.sku;
+          if (force) {
+            isSkuManuallyEdited = false;
+          }
         }
       })
       .catch(err => {
@@ -559,11 +564,34 @@
       });
   }
 
+  function forceAutoGenerateSku() {
+    autoGenerateSku(true);
+  }
+
+  function onCategoryChange() {
+    const skuInput = document.getElementById('skuInput');
+    const currentVal = skuInput ? skuInput.value.trim() : '';
+    // Standard SKU pattern like AED-BLO-01 or empty input can be safely updated
+    const isStandardAedPattern = /^AED-[A-Z]{2,4}-\d+$/i.test(currentVal);
+
+    if (!isSkuManuallyEdited || !currentVal || isStandardAedPattern) {
+      autoGenerateSku(false);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     calcDiscount();
     initTags();
     initDragAndDrop();
     initFormSubmit();
+
+    const skuInput = document.getElementById('skuInput');
+    if (skuInput) {
+      skuInput.addEventListener('input', function() {
+        isSkuManuallyEdited = true;
+      });
+    }
+
     <% if (!design) { %>
       if (document.getElementById('categorySelect') && document.getElementById('categorySelect').value && !document.getElementById('skuInput').value) {
         autoGenerateSku();
