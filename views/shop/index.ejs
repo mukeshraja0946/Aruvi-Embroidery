@@ -461,8 +461,8 @@
       if (parent) parent.classList.add('active');
     }
 
-    // On desktop screen (> 991px), submit immediately for live filtering
-    if (window.innerWidth > 991) {
+    // On desktop screen (>= 768px), submit immediately for live filtering
+    if (window.innerWidth >= 768) {
       if (input.form) input.form.submit();
     }
   }
@@ -474,10 +474,11 @@
     const overlay = document.getElementById('filterOverlay');
 
     function openSidebar() {
-      if (window.innerWidth <= 991) {
+      if (window.innerWidth < 768) {
         if (sidebar) sidebar.classList.add('open');
         if (overlay) overlay.classList.add('active');
         document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
       } else {
         if (sidebar) {
           sidebar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -489,11 +490,17 @@
       if (sidebar) sidebar.classList.remove('open');
       if (overlay) overlay.classList.remove('active');
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     }
 
     if (openBtn) openBtn.addEventListener('click', openSidebar);
     if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
-    if (overlay) overlay.addEventListener('click', closeSidebar);
+    if (overlay) {
+      overlay.addEventListener('click', closeSidebar);
+      overlay.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+    }
 
     // Escape key closes filter popup
     document.addEventListener('keydown', function(e) {

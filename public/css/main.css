@@ -5377,7 +5377,7 @@ textarea.form-control {
   }
 
   /* ============================================================
-     MOBILE FILTER BOTTOM SHEET POPUP (50% Viewport Height)
+     MOBILE FILTER BOTTOM SHEET POPUP (Half-Screen 50vh)
      ============================================================ */
   .filter-sidebar {
     display: flex !important;
@@ -5387,11 +5387,13 @@ textarea.form-control {
     right: 0 !important;
     top: auto !important;
     width: 100% !important;
-    max-width: 100% !important;
-    height: 52vh !important;
-    max-height: 80vh !important;
+    max-width: 100vw !important;
+    height: 50vh !important;
+    height: 50dvh !important;
+    max-height: 50vh !important;
+    max-height: 50dvh !important;
     background: #FAF6F0 !important;
-    border-radius: 20px 20px 0 0 !important;
+    border-radius: 24px 24px 0 0 !important;
     border: 1px solid #EAE3D9 !important;
     border-bottom: none !important;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.22) !important;
@@ -5420,8 +5422,10 @@ textarea.form-control {
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
+    height: 100dvh !important;
     background: rgba(0, 0, 0, 0.45) !important;
     backdrop-filter: blur(2px) !important;
+    -webkit-backdrop-filter: blur(2px) !important;
     z-index: 99999 !important;
     opacity: 0 !important;
     visibility: hidden !important;
@@ -5436,18 +5440,18 @@ textarea.form-control {
   }
 
   .filter-drawer-header {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 10 !important;
+    position: static !important;
+    z-index: 20 !important;
     background: #FAF6F0 !important;
     border-bottom: 1px solid #EAE3D9 !important;
-    padding: 0.8rem 1rem !important;
+    padding: 0.85rem 1.1rem !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     width: 100% !important;
     box-sizing: border-box !important;
     flex-shrink: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
   }
 
   .drawer-header-left {
@@ -5458,21 +5462,24 @@ textarea.form-control {
 
   .red-filter-icon {
     color: #BD442E !important;
-    font-size: 1.1rem !important;
+    font-size: 1.15rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
   }
 
   .drawer-title {
-    font-family: var(--font-heading) !important;
+    font-family: var(--font-heading, 'Playfair Display', serif) !important;
     font-size: 1.15rem !important;
     font-weight: 700 !important;
-    color: var(--text-dark) !important;
+    color: var(--text-dark, #2D231E) !important;
     margin: 0 !important;
+    line-height: 1.2 !important;
   }
 
   .drawer-header-right {
     display: flex !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 14px !important;
   }
 
   .clear-all-link {
@@ -5480,27 +5487,54 @@ textarea.form-control {
     font-weight: 600 !important;
     font-size: 0.85rem !important;
     text-decoration: underline !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+  }
+
+  .clear-all-link:hover {
+    color: #8C2B1A !important;
   }
 
   .close-filter-btn {
     background: transparent !important;
     border: none !important;
-    font-size: 1.3rem !important;
-    color: var(--text-dark) !important;
+    font-size: 1.35rem !important;
+    color: var(--text-dark, #2D231E) !important;
     cursor: pointer !important;
     padding: 4px 6px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    line-height: 1 !important;
+  }
+
+  .close-filter-btn:hover {
+    color: #BD442E !important;
   }
 
   .filter-form-body {
     display: flex !important;
     flex-direction: column !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     flex: 1 1 auto !important;
+    min-height: 0 !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 0 0 0.8rem 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .filter-form-body .filter-accordion-group {
+    border-bottom: 1px solid #EAE3D9 !important;
+    padding: 0.85rem 1.1rem !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .filter-form-body .filter-accordion-group:last-of-type {
+    margin-bottom: 0.8rem !important;
   }
 
   .drawer-apply-footer {
@@ -5509,9 +5543,9 @@ textarea.form-control {
     left: 0 !important;
     width: 100% !important;
     background: #FAF6F0 !important;
-    padding: 0.7rem 1rem !important;
+    padding: 0.65rem 1.1rem calc(0.65rem + env(safe-area-inset-bottom, 0px)) 1.1rem !important;
     border-top: 1px solid #EAE3D9 !important;
-    z-index: 10 !important;
+    z-index: 15 !important;
     box-sizing: border-box !important;
     flex-shrink: 0 !important;
     margin: 0 !important;
@@ -5531,6 +5565,11 @@ textarea.form-control {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    transition: background 0.2s ease, transform 0.1s ease !important;
+  }
+
+  .apply-filters-btn:active {
+    transform: scale(0.98) !important;
   }
 
   /* Filter Bar Container & Scroll Row */
