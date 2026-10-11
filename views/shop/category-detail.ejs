@@ -88,15 +88,12 @@
           </button>
           
           <!-- Image Box -->
-          <div class="card-image-box" style="background: #FAF6F0; position: relative;">
+          <div class="card-image-box">
             <a href="/design/<%= design.slug %>" style="display: block; width: 100%; height: 100%;">
               <% if (design.primary_image) { %>
-                <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;">
+                <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
               <% } else { %>
-                <div style="width: 100%; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">
-                  <i class="fa-regular fa-image" style="font-size: 1.8rem; margin-bottom: 4px; opacity: 0.5;"></i>
-                  <span>No Preview</span>
-                </div>
+                <img src="/public/images/cat_blouse.jpg" alt="<%= design.title %>" loading="lazy">
               <% } %>
             </a>
           </div>

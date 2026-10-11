@@ -1,11 +1,11 @@
 <%- include('../partials/header') %>
 
-<div class="container designs-page-container" style="margin-top: 2rem; margin-bottom: 4rem;">
+<div class="container designs-page-container">
   <!-- Listing Page Top Banner matching Reference -->
   <div class="page-banner-card">
     <div class="banner-content">
       <div class="breadcrumb-trail">
-        <a href="/">Home</a> &nbsp;>&nbsp; <span><%= selectedCategory ? selectedCategory.name : 'Designs' %></span>
+        <a href="/">Home</a> <span class="breadcrumb-sep">›</span> <span><%= selectedCategory ? selectedCategory.name : 'Designs' %></span>
       </div>
       <h1 class="page-banner-title"><%= selectedCategory ? selectedCategory.name : 'All Designs' %></h1>
       <p class="page-banner-subtitle">
@@ -338,94 +338,51 @@
               </button>
               
               <!-- Image Banner -->
-              <div class="card-image-box" style="background: #FAF6F0; position: relative;">
+              <div class="card-image-box">
                 <a href="/design/<%= design.slug %>" style="display: block; width: 100%; height: 100%;">
                   <% if (design.primary_image) { %>
-                    <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;">
+                    <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
                   <% } else { %>
-                    <div style="width: 100%; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">
-                      <i class="fa-regular fa-image" style="font-size: 1.8rem; margin-bottom: 4px; opacity: 0.5;"></i>
-                      <span>No Preview</span>
-                    </div>
+                    <img src="/public/images/cat_blouse.jpg" alt="<%= design.title %>" loading="lazy">
                   <% } %>
                 </a>
               </div>
 
-              <!-- Card Body -->
+              <!-- Card Body Content matching Reference UI -->
               <div class="card-body-content">
                 <h3 class="card-item-title">
                   <a href="/design/<%= design.slug %>"><%= design.title %></a>
                 </h3>
-                <span class="card-item-category"><%= design.category_name || 'Embroidery Designs' %></span>
 
-                <% const cardFmts = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : []; %>
-                <% if (cardFmts.length > 0) { %>
-                  <div class="format-pill-row">
-                    <% cardFmts.forEach(fmt => { %>
-                      <span class="fmt-pill"><%= fmt %></span>
-                    <% }) %>
-                  </div>
-                <% } %>
-
-                <!-- Star Rating Row matching Reference -->
-                <%
-                  const ratingScore = parseFloat(design.average_rating || design.rating || 0);
-                  const numReviews = parseInt(design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0);
-                %>
-                <% if (numReviews > 0 || ratingScore > 0) { %>
-                  <div class="card-rating-row">
-                    <i class="fa-solid fa-star star-yellow"></i>
-                    <span class="rating-num"><%= ratingScore.toFixed(1) %></span>
-                    <span class="rating-count">(<%= numReviews %>)</span>
-                  </div>
-                <% } else { %>
-                  <div class="card-rating-row muted" style="min-height: 20px;">
-                    <span class="rating-count" style="font-size: 0.75rem; color: var(--text-muted);">No reviews yet</span>
-                  </div>
-                <% } %>
-
-                <!-- Price & Discount Tag -->
+                <!-- Price & Cart Row matching Reference UI -->
                 <%
                   const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
                   const origPrice = parseFloat(design.price || 0);
                   const hasDisc = curPrice < origPrice;
-                  const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
                 %>
-                <div class="card-price-row">
-                  <span class="current-price">₹<%= curPrice %></span>
-                  <% if (hasDisc) { %>
-                    <span class="old-price">₹<%= origPrice %></span>
-                    <span class="discount-badge"><%= discPct %>% OFF</span>
+                <div class="card-price-action-row">
+                  <div class="card-price-group">
+                    <% if (hasDisc) { %>
+                      <span class="old-price">₹<%= origPrice %></span>
+                    <% } %>
+                    <span class="current-price">₹<%= curPrice %></span>
+                  </div>
+
+                  <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+                  <% if (isOwned) { %>
+                    <a href="/design/<%= design.slug %>" class="card-cart-btn is-owned" title="Owned" aria-label="Owned">
+                      <i class="fa-solid fa-check"></i>
+                    </a>
+                  <% } else { %>
+                    <form class="ajax-add-to-cart card-cart-form">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="design_id" value="<%= design.id %>">
+                      <button type="submit" class="card-cart-btn" title="Add to Cart" aria-label="Add to cart">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                      </button>
+                    </form>
                   <% } %>
                 </div>
-
-                <!-- Dual Action Buttons: Add to Cart & Buy Now OR Owned Badge -->
-                <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
-                <% if (isOwned) { %>
-                  <div class="card-actions-row">
-                    <a href="/design/<%= design.slug %>" class="btn btn-owned" style="display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 38px; border-radius: 8px; font-weight: 600; font-size: 0.88rem; background: #F4EBE0; color: #2E7D32; border: 1px solid #C8E6C9; text-decoration: none;">
-                      <i class="fa-solid fa-circle-check"></i> ✓ Owned
-                    </a>
-                  </div>
-                <% } else { %>
-                  <div class="card-actions-row">
-                    <form class="ajax-add-to-cart" style="flex: 1;">
-                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <input type="hidden" name="design_id" value="<%= design.id %>">
-                      <button type="submit" class="btn btn-outline card-btn-add">
-                        <i class="fa-solid fa-cart-plus"></i> Add
-                      </button>
-                    </form>
-
-                    <form action="/cart/buy-now?_csrf=<%= csrfToken %>" method="POST" style="flex: 1;">
-                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <input type="hidden" name="design_id" value="<%= design.id %>">
-                      <button type="submit" class="btn btn-primary card-btn-buy">
-                        <i class="fa-solid fa-bolt"></i> Buy Now
-                      </button>
-                    </form>
-                  </div>
-                <% } %>
               </div>
             </div>
           <% }) %>
