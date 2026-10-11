@@ -1,5 +1,6 @@
 const User = require('../../models/User');
 const AdminStatsService = require('../../services/adminStatsService');
+const ActivityLog = require('../../models/ActivityLog');
 
 exports.getCustomers = async (req, res, next) => {
   try {
@@ -8,16 +9,16 @@ exports.getCustomers = async (req, res, next) => {
     const search = req.query.search || null;
     const status = req.query.status || null;
 
-    const { users: customers, total } = await User.getAll({ page, limit: 15, sort, search, status });
+    const { users: customers, total } = await User.getAll({ page, limit: 15, sort, search, status, role: 'customer' });
     const stats = await AdminStatsService.getCustomerStats();
 
     res.render('admin/customers/index', {
       title: 'Customer Directory - Admin',
-      customers,
-      total,
+      customers: customers || [],
+      total: total || 0,
       stats,
       currentPage: page,
-      totalPages: Math.ceil(total / 15),
+      totalPages: Math.ceil((total || 0) / 15) || 1,
       currentSort: sort,
       currentSearch: search || '',
       currentStatus: status || ''
@@ -30,7 +31,10 @@ exports.getCustomers = async (req, res, next) => {
 exports.deleteCustomer = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const user = await User.findById(id);
     await User.delete(id);
+    await ActivityLog.logFromReq(req, 'delete', 'customer', id, `Deleted customer account #${id} (${user ? user.email : id})`);
+
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
 
     if (isAjax) {

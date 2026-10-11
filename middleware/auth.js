@@ -85,6 +85,45 @@ async function attachUserAndCart(req, res, next) {
       }
     }
 
+    // Format date helpers for views (e.g. 12 Oct 2026, 3:45 PM, IST)
+    res.locals.formatDateTime = function(date) {
+      if (!date) return '-';
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }) + ', ' + d.toLocaleTimeString('en-IN', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }) + ', IST';
+    };
+
+    res.locals.formatDateOnly = function(date) {
+      if (!date) return '-';
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    };
+
+    res.locals.formatINR = function(val) {
+      const num = parseFloat(val) || 0;
+      return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    };
+
+    res.locals.adminNavBadges = {
+      pendingOrders: 0,
+      unreadMessages: 0,
+      pendingCustomOrders: 0,
+      unreadNotifications: 0
+    };
+
     res.locals.currentPath = req.path || '/';
     next();
   } catch (err) {
@@ -104,8 +143,28 @@ function isAuthenticated(req, res, next) {
   return res.redirect('/auth/login');
 }
 
-function isAdmin(req, res, next) {
+async function isAdmin(req, res, next) {
   if (req.user && req.user.role === 'admin') {
+    // Populate dynamic live notification & pending counts for admin views
+    const db = require('../config/db');
+    if (db.isConnected()) {
+      try {
+        const [[pOrd]] = await db.query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
+        const [[uMsg]] = await db.query("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'");
+        const [[pCust]] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
+        const pendingOrders = pOrd ? (pOrd.count || 0) : 0;
+        const unreadMessages = uMsg ? (uMsg.count || 0) : 0;
+        const pendingCustomOrders = pCust ? (pCust.count || 0) : 0;
+        res.locals.adminNavBadges = {
+          pendingOrders,
+          unreadMessages,
+          pendingCustomOrders,
+          unreadNotifications: unreadMessages + pendingCustomOrders
+        };
+      } catch (badgeErr) {
+        // Keep default zeros
+      }
+    }
     return next();
   }
   const isAjax = req.xhr || 

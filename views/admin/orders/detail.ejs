@@ -30,9 +30,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/orders?status=pending" class="admin-icon-btn" title="Pending Orders">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.notificationsCount > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.notificationsCount %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -65,7 +67,14 @@
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/custom-orders">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingCustomOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingCustomOrders %></span>
+              <% } %>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -74,7 +83,14 @@
         <div class="sidebar-heading">ORDERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/orders" class="active"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/orders?status=pending"><span><i class="fa-regular fa-clock"></i> Pending Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/orders?status=pending">
+              <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
+            </a>
+          </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
         </ul>
@@ -85,7 +101,15 @@
         <div class="sidebar-heading">CUSTOMERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/messages">
+              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
+              <% } %>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Manage Reviews</span></a></li>
         </ul>
       </div>
 
@@ -118,7 +142,7 @@
             <span style="color: var(--admin-primary); font-weight: 600;">Details</span>
           </div>
           <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Order #<%= order.order_number || order.id %> Details</h1>
-          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Placed on <%= new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) %></p>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Placed on <%= (typeof formatDateTime !== 'undefined' && order.created_at) ? formatDateTime(order.created_at) : new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) %></p>
         </div>
 
         <a href="/admin/orders" class="btn btn-outline" style="height: 44px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; background: #FFF; display: inline-flex; align-items: center; gap: 8px; padding: 0 1.2rem;">

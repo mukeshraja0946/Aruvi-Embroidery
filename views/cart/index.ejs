@@ -66,13 +66,7 @@
                 <span class="price-val">₹<%= item.effective_price %></span>
                 <% if (item.price && item.price > item.effective_price) { %>
                   <span class="price-old">₹<%= item.price %></span>
-                  <span class="discount-badge">25% OFF</span>
-                <% } else if (item.title === 'Rose Floral Design') { %>
-                  <span class="price-old">₹399</span>
-                  <span class="discount-badge">25% OFF</span>
-                <% } else if (item.title === 'Letter A Monogram') { %>
-                  <span class="price-old">₹249</span>
-                  <span class="discount-badge">20% OFF</span>
+                  <span class="discount-badge"><%= Math.round(((item.price - item.effective_price) / item.price) * 100) %>% OFF</span>
                 <% } %>
               </div>
 

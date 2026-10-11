@@ -1,5 +1,6 @@
 const Order = require('../../models/Order');
 const AdminStatsService = require('../../services/adminStatsService');
+const ActivityLog = require('../../models/ActivityLog');
 
 exports.getOrders = async (req, res, next) => {
   try {
@@ -61,6 +62,7 @@ exports.updateOrderStatus = async (req, res, next) => {
     const { status } = req.body;
 
     await Order.updateStatus(id, status);
+    await ActivityLog.logFromReq(req, 'update_status', 'order', id, `Updated order #${id} status to "${status}"`);
     req.flash('success', `Order #${id} status updated to ${status}.`);
     res.redirect('/admin/orders');
   } catch (err) {
@@ -72,6 +74,7 @@ exports.deleteOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
     await Order.delete(id);
+    await ActivityLog.logFromReq(req, 'delete', 'order', id, `Deleted order #${id}`);
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
 
     if (isAjax) {

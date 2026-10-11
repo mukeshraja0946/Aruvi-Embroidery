@@ -36,9 +36,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/messages" class="admin-icon-btn" title="Enquiries">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.unreadMessages %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -71,7 +73,14 @@
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/custom-orders" class="active"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/custom-orders" class="active">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingCustomOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingCustomOrders %></span>
+              <% } %>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -83,7 +92,9 @@
           <li class="sidebar-nav-item">
             <a href="/admin/orders?status=pending">
               <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
-              <span class="sidebar-badge">5</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
@@ -96,7 +107,15 @@
         <div class="sidebar-heading">CUSTOMERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/messages">
+              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
+              <% } %>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Reviews</span></a></li>
         </ul>
       </div>
 
@@ -146,10 +165,9 @@
           <div class="card-info-content">
             <div class="stat-title">Total Requests</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">48</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 14%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.total !== undefined) ? stats.total : (requests ? requests.length : 0) %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">custom digitization inquiries</span>
           </div>
         </div>
 
@@ -158,8 +176,7 @@
           <div class="card-info-content">
             <div class="stat-title">New Requests</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">12</span>
-              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-up"></i> 4 new</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.pending !== undefined) ? stats.pending : 0 %></span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">awaiting review</span>
           </div>
@@ -170,8 +187,7 @@
           <div class="card-info-content">
             <div class="stat-title">In Progress</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">18</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 38%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.in_progress !== undefined) ? stats.in_progress : 0 %></span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">being digitized</span>
           </div>
@@ -182,8 +198,7 @@
           <div class="card-info-content">
             <div class="stat-title">Completed</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">18</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 100%</span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.completed !== undefined) ? stats.completed : 0 %></span>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">delivered files</span>
           </div>
@@ -251,7 +266,7 @@
                     <span style="font-size: 0.74rem; color: var(--admin-text-muted);"><%= r.email %></span>
                   </td>
                   <td style="max-width: 260px;">
-                    <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);"><%= r.design_title || 'Bridal Blouse Custom Motifs' %></strong>
+                    <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);"><%= r.design_title || ('Custom Request #' + r.id) %></strong>
                     <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"><%= r.design_details %></span>
                   </td>
                   <td>
@@ -276,7 +291,7 @@
                     </form>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    <%= r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '01 Oct 2026' %>
+                    <%= formatDateTime(r.created_at) %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
@@ -300,7 +315,7 @@
         <!-- Pagination Bar matching Master Manage Designs UI -->
         <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
-            Showing 1 to <%= requests ? requests.length : 4 %> of <strong><%= requests ? requests.length : 48 %></strong> requests
+            Showing 1 to <%= requests ? requests.length : 0 %> of <strong><%= typeof total !== 'undefined' ? total : (requests ? requests.length : 0) %></strong> requests
           </div>
 
           <div style="display: flex; gap: 6px;">

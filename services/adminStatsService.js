@@ -56,7 +56,7 @@ class AdminStatsService {
         const prevCust = prevMonthCustRes ? prevMonthCustRes.total : 0;
         const customersTrend = calculateTrend(currCust, prevCust);
 
-        // 4. Designs Count & Trend
+        // 4. Designs / Products Count & Trend
         const [totalDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs");
         const [currMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE created_at >= ?", [firstDayThisMonth]);
         const [prevMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
@@ -66,7 +66,23 @@ class AdminStatsService {
         const prevDesigns = prevMonthDesignsRes ? prevMonthDesignsRes.total : 0;
         const designsTrend = calculateTrend(currDesigns, prevDesigns);
 
-        // 5. Orders by Status
+        // 5. Custom Requests Count & Pending
+        let customRequests = { total: 0, pending: 0 };
+        try {
+          const [customRes] = await db.query(`
+            SELECT COUNT(*) as total,
+                   COALESCE(SUM(CASE WHEN status IN ('pending', 'reviewing') THEN 1 ELSE 0 END), 0) as pending
+            FROM custom_orders
+          `);
+          if (customRes) {
+            customRequests.total = Number(customRes.total || 0);
+            customRequests.pending = Number(customRes.pending || 0);
+          }
+        } catch (cErr) {
+          // Table might not exist yet
+        }
+
+        // 6. Orders by Status
         const statusRows = await db.query("SELECT status, COUNT(*) as count FROM orders GROUP BY status");
         const statusMap = { pending: 0, processing: 0, completed: 0, cancelled: 0 };
         if (statusRows && statusRows.length > 0) {
@@ -86,7 +102,7 @@ class AdminStatsService {
           total: totalOrders
         };
 
-        // 6. Monthly Sales (Last 6 Months)
+        // 7. Monthly Sales (Last 6 Months from Paid Orders)
         const monthlySales = [];
         const monthLabels = [];
         for (let i = 5; i >= 0; i--) {
@@ -102,7 +118,35 @@ class AdminStatsService {
           monthlySales.push(mRes ? parseFloat(mRes.total) : 0);
         }
 
-        // 7. Recent Orders (5)
+        // 8. Top Categories Donut (Real percentage share of sold items per category from order_items)
+        let topCategories = [];
+        try {
+          const topCatRows = await db.query(`
+            SELECT c.id, c.name as category_name, COUNT(oi.id) as items_sold
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'paid')
+            JOIN designs d ON oi.design_id = d.id
+            JOIN categories c ON d.category_id = c.id
+            GROUP BY c.id, c.name
+            ORDER BY items_sold DESC
+            LIMIT 6
+          `);
+          const totalItemsSold = (topCatRows || []).reduce((acc, r) => acc + Number(r.items_sold || 0), 0);
+          topCategories = (topCatRows || []).map(r => {
+            const count = Number(r.items_sold || 0);
+            const percentage = totalItemsSold > 0 ? Math.round((count / totalItemsSold) * 100) : 0;
+            return {
+              id: r.id,
+              name: r.category_name,
+              count,
+              percentage
+            };
+          });
+        } catch (catErr) {
+          console.error('Top categories query error:', catErr.message);
+        }
+
+        // 9. Recent Orders (Latest 10 Real Orders)
         const recentOrdersSql = `
           SELECT o.id, o.order_number, o.final_amount, o.status, o.created_at,
                  COALESCE(u.full_name, o.guest_name, 'Guest Customer') as customer_name,
@@ -111,11 +155,11 @@ class AdminStatsService {
           FROM orders o
           LEFT JOIN users u ON o.user_id = u.id
           ORDER BY o.created_at DESC
-          LIMIT 5
+          LIMIT 10
         `;
         const recentOrders = await db.query(recentOrdersSql);
 
-        // 8. Top Selling Designs (5)
+        // 10. Top Selling Designs (Real item sales from paid orders)
         const topDesignsSql = `
           SELECT d.id, d.title, d.slug, d.price, d.sale_price,
                  COUNT(oi.id) as sales_count,
@@ -124,13 +168,17 @@ class AdminStatsService {
                    '/public/images/hero_embroidery.jpg'
                  ) as image_url
           FROM designs d
-          LEFT JOIN order_items oi ON d.id = oi.design_id
-          LEFT JOIN orders o ON oi.order_id = o.id AND (o.status = 'completed' OR LOWER(o.status) = 'paid')
+          JOIN order_items oi ON d.id = oi.design_id
+          JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'paid')
           GROUP BY d.id, d.title, d.slug, d.price, d.sale_price
           ORDER BY sales_count DESC, d.id ASC
           LIMIT 5
         `;
         const topSellingDesigns = await db.query(topDesignsSql);
+
+        // 11. Recent Admin Activity Logs
+        const ActivityLog = require('../models/ActivityLog');
+        const recentActivity = await ActivityLog.getRecent(10);
 
         return {
           totalOrders,
@@ -141,21 +189,25 @@ class AdminStatsService {
           customersTrend,
           totalDesigns,
           designsTrend,
+          customRequests,
           ordersByStatus,
           monthlySales,
           monthLabels,
+          topCategories,
           recentOrders: recentOrders || [],
-          topSellingDesigns: topSellingDesigns || []
+          topSellingDesigns: topSellingDesigns || [],
+          recentActivity: recentActivity || []
         };
       } catch (err) {
         console.error('AdminStatsService.getDashboardStats error:', err);
       }
     }
 
-    // Fallback mode logic (using models' internal storage)
+    // Fallback mode logic (using models' internal storage - real zero states)
     const Order = require('../models/Order');
     const User = require('../models/User');
     const Design = require('../models/Design');
+    const ActivityLog = require('../models/ActivityLog');
 
     const { orders: allOrders } = await Order.getAll({ limit: 1000 });
     const totalOrders = allOrders ? allOrders.length : 0;
@@ -166,6 +218,7 @@ class AdminStatsService {
     const cancelledOrdersCount = allOrders ? allOrders.filter(o => o.status === 'cancelled' || o.status === 'failed').length : 0;
     const totalCustomers = await User.count();
     const totalDesigns = await Design.count();
+    const recentActivity = await ActivityLog.getRecent(10);
 
     return {
       totalOrders,
@@ -176,6 +229,7 @@ class AdminStatsService {
       customersTrend: { text: '0%', isPositive: true },
       totalDesigns,
       designsTrend: { text: '0%', isPositive: true },
+      customRequests: { total: 0, pending: 0 },
       ordersByStatus: {
         pending: pendingOrdersCount,
         processing: processingOrdersCount,
@@ -183,10 +237,12 @@ class AdminStatsService {
         cancelled: cancelledOrdersCount,
         total: totalOrders
       },
-      monthlySales: [0, 0, 0, 0, 0, totalSales],
+      monthlySales: [0, 0, 0, 0, 0, 0],
       monthLabels: ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
-      recentOrders: allOrders ? allOrders.slice(0, 5) : [],
-      topSellingDesigns: []
+      topCategories: [],
+      recentOrders: allOrders ? allOrders.slice(0, 10) : [],
+      topSellingDesigns: [],
+      recentActivity: recentActivity || []
     };
   }
 

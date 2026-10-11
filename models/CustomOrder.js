@@ -1,18 +1,7 @@
 const db = require('../config/db');
 
-const fallbackCustomOrders = [
-  {
-    id: 1,
-    user_id: 2,
-    full_name: 'Priya Lakshmi',
-    email: 'customer@aruviembroidery.com',
-    phone: '+91 91234 56789',
-    design_details: 'Need a custom 10x14 inch jumbo peacock neck design for silk saree blouse with zardozi thread density.',
-    reference_image_url: '/public/images/logo.jpg',
-    status: 'reviewing',
-    created_at: new Date()
-  }
-];
+// Empty fallback in-memory store for offline DB mode (no fake custom orders)
+const fallbackCustomOrders = [];
 
 class CustomOrder {
   static async create({ userId = null, full_name, email, phone = null, design_details, reference_image_url = null }) {
@@ -110,6 +99,35 @@ class CustomOrder {
       }
     }
     return fallbackCustomOrders.length;
+  }
+
+  static async getStats() {
+    if (db.isConnected()) {
+      try {
+        const [counts] = await db.query(`
+          SELECT
+            COUNT(*) as total,
+            COALESCE(SUM(CASE WHEN status IN ('pending', 'reviewing') THEN 1 ELSE 0 END), 0) as pending,
+            COALESCE(SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END), 0) as in_progress,
+            COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completed
+          FROM custom_orders
+        `);
+        return {
+          total: Number(counts.total || 0),
+          pending: Number(counts.pending || 0),
+          in_progress: Number(counts.in_progress || 0),
+          completed: Number(counts.completed || 0)
+        };
+      } catch (e) {
+        console.error('CustomOrder.getStats error:', e.message);
+      }
+    }
+    return {
+      total: fallbackCustomOrders.length,
+      pending: fallbackCustomOrders.filter(r => ['pending', 'reviewing'].includes(r.status)).length,
+      in_progress: fallbackCustomOrders.filter(r => r.status === 'in_progress').length,
+      completed: fallbackCustomOrders.filter(r => r.status === 'completed').length
+    };
   }
 
   static async delete(id) {

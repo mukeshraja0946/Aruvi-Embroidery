@@ -36,9 +36,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/orders?status=pending" class="admin-icon-btn" title="Pending Orders">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.notificationsCount > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.notificationsCount %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -71,7 +73,14 @@
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/custom-orders">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingCustomOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingCustomOrders %></span>
+              <% } %>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -83,7 +92,9 @@
           <li class="sidebar-nav-item">
             <a href="/admin/orders?status=pending">
               <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
-              <span class="sidebar-badge">5</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
@@ -96,7 +107,15 @@
         <div class="sidebar-heading">CUSTOMERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/messages">
+              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
+              <% } %>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Manage Reviews</span></a></li>
         </ul>
       </div>
 
@@ -154,53 +173,43 @@
         </div>
       <% } %>
 
-      <!-- 4 Stat Summary Cards Row matching Master Manage Designs UI -->
-      <div class="admin-stats-row" style="margin-bottom: 1.8rem;">
+      <!-- Live Stat Summary Cards Row from DB -->
+      <% 
+        const totalBanners = (banners && banners.length) ? banners.length : 0;
+        const activeBanners = (banners && banners.length) ? banners.filter(b => b.is_active !== false && b.is_active !== 0 && b.is_active !== '0').length : 0;
+        const inactiveBanners = totalBanners - activeBanners;
+      %>
+      <div class="admin-stats-row" style="margin-bottom: 1.8rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
         <div class="admin-summary-card">
           <div class="card-icon-badge"><i class="fa-regular fa-image"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Total Banners</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= banners ? banners.length : 6 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 2 new</span>
+              <span class="stat-num"><%= totalBanners %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">configured banners</span>
           </div>
         </div>
 
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-regular fa-eye"></i></div>
+          <div class="card-icon-badge" style="background: #E8F5E9; color: #2E7D32;"><i class="fa-regular fa-circle-check"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Active Banners</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">5</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 83%</span>
+              <span class="stat-num"><%= activeBanners %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">currently displayed</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">live on storefront</span>
           </div>
         </div>
 
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-regular fa-calendar"></i></div>
+          <div class="card-icon-badge" style="background: #FFF3E0; color: #E65100;"><i class="fa-solid fa-pause"></i></div>
           <div class="card-info-content">
-            <div class="stat-title">Scheduled</div>
+            <div class="stat-title">Inactive Banners</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">1</span>
-              <span class="stat-trend" style="color: var(--admin-primary);"><i class="fa-solid fa-arrow-up"></i> upcoming</span>
+              <span class="stat-num"><%= inactiveBanners %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">festive offer</span>
-          </div>
-        </div>
-
-        <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-solid fa-pause"></i></div>
-          <div class="card-info-content">
-            <div class="stat-title">Inactive</div>
-            <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">0</span>
-              <span class="stat-trend" style="color: var(--admin-text-muted);">0%</span>
-            </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">expired banners</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">hidden or draft</span>
           </div>
         </div>
       </div>
@@ -210,13 +219,13 @@
         <form action="/admin/banners" method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
           <div style="flex: 1; min-width: 280px; position: relative;">
             <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--admin-text-muted); font-size: 0.88rem;"></i>
-            <input type="text" name="search" placeholder="Search banners by title or link..." style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding-left: 2.5rem; font-size: 0.85rem;">
+            <input type="text" name="search" placeholder="Search banners by title or link..." value="<%= typeof search !== 'undefined' ? search : '' %>" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding-left: 2.5rem; font-size: 0.85rem;">
           </div>
 
           <select name="status" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
-            <option value="">All Positions</option>
-            <option value="hero">Homepage Main Hero</option>
-            <option value="middle">Middle Promo Banner</option>
+            <option value="">All Statuses</option>
+            <option value="active" <%= (typeof status !== 'undefined' && status === 'active') ? 'selected' : '' %>>Active</option>
+            <option value="inactive" <%= (typeof status !== 'undefined' && status === 'inactive') ? 'selected' : '' %>>Inactive</option>
           </select>
 
           <a href="/admin/banners" class="btn btn-outline" style="height: 40px; border-radius: 8px; font-size: 0.85rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 6px; background: #FFF;">
@@ -243,6 +252,7 @@
           <tbody>
             <% if (banners && banners.length > 0) { %>
               <% banners.forEach((b, idx) => { %>
+                <% const isActive = (b.is_active !== false && b.is_active !== 0 && b.is_active !== '0'); %>
                 <tr id="bannerRow-<%= b.id %>">
                   <td style="text-align: center;"><input type="checkbox"></td>
                   <td>
@@ -257,10 +267,15 @@
                     <code style="font-size: 0.78rem; background: #FAF6F0; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--admin-border);"><%= b.link_url || '/designs' %></code>
                   </td>
                   <td>
-                    <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 600;">Active</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <button type="button" onclick="toggleBannerStatus('<%= b.id %>')" id="bannerStatusBtn-<%= b.id %>" style="cursor: pointer; border: none; padding: 4px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 600; background: <%= isActive ? '#E8F5E9' : '#FFEBEE' %>; color: <%= isActive ? '#2E7D32' : '#C62828' %>; transition: 0.2s;">
+                        <i class="fa-solid <%= isActive ? 'fa-check' : 'fa-xmark' %>" style="margin-right: 4px;"></i>
+                        <span id="bannerStatusText-<%= b.id %>"><%= isActive ? 'Active' : 'Inactive' %></span>
+                      </button>
+                    </div>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    01 Oct 2026
+                    <%= (typeof formatDateTime !== 'undefined' && b.created_at) ? formatDateTime(b.created_at) : (b.created_at ? new Date(b.created_at).toLocaleDateString('en-GB') : '—') %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
@@ -272,8 +287,12 @@
               <% }) %>
             <% } else { %>
               <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
-                  No promotional banners found.
+                <td colspan="8" style="text-align: center; padding: 3rem 1.5rem; color: var(--admin-text-muted);">
+                  <div style="width: 48px; height: 48px; border-radius: 50%; background: #FAF6F0; color: var(--admin-text-muted); display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.8rem; border: 1px solid var(--admin-border);">
+                    <i class="fa-regular fa-image"></i>
+                  </div>
+                  <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">No banners found</h3>
+                  <p style="font-size: 0.84rem; color: var(--admin-text-muted); margin: 0;">Upload promotional banners to showcase offers on your homepage.</p>
                 </td>
               </tr>
             <% } %>
@@ -283,8 +302,16 @@
         <!-- Pagination Bar matching Master Manage Designs UI -->
         <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
-            Showing 1 to <%= banners ? banners.length : 3 %> of <strong><%= banners ? banners.length : 6 %></strong> banners
+            Showing 1 to <%= banners ? banners.length : 0 %> of <strong><%= banners ? banners.length : 0 %></strong> banners
           </div>
+
+          <div style="display: flex; gap: 6px;">
+            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-left" style="font-size: 0.7rem;"></i></a>
+            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px; background: var(--admin-primary); color: #FFFFFF; border-color: var(--admin-primary); font-weight: 700;">1</a>
+            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i></a>
+          </div>
+        </div>
+      </div>
 
           <div style="display: flex; gap: 6px;">
             <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-left" style="font-size: 0.7rem;"></i></a>
@@ -415,17 +442,39 @@
     });
   }
 
-  function showAdminToast(msg) {
-    let toast = document.getElementById('adminToastPopup');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'adminToastPopup';
-      toast.style.cssText = 'position: fixed; top: 25px; right: 25px; background: #1B5E20; color: white; padding: 1.1rem 1.8rem; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 999999; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 1rem; border: 2px solid #81C784;';
-      document.body.appendChild(toast);
-    }
-    toast.innerHTML = `<i class="fa-solid fa-circle-check" style="font-size: 1.5rem; color: #66BB6A;"></i><span>${msg}</span><button type="button" onclick="this.parentElement.style.display='none'" style="background: none; border: none; color: white; margin-left: 15px; cursor: pointer; font-size: 1.3rem;">&times;</button>`;
-    toast.style.display = 'flex';
-    setTimeout(() => { if (toast) toast.style.display = 'none'; }, 4000);
+  function toggleBannerStatus(id) {
+    const csrfToken = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+    const btn = document.getElementById('bannerStatusBtn-' + id);
+    const txt = document.getElementById('bannerStatusText-' + id);
+
+    fetch('/admin/banners/toggle-status/' + id, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify({ _csrf: csrfToken })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const isActive = data.is_active;
+        if (btn) {
+          btn.style.background = isActive ? '#E8F5E9' : '#FFEBEE';
+          btn.style.color = isActive ? '#2E7D32' : '#C62828';
+          btn.innerHTML = `<i class="fa-solid ${isActive ? 'fa-check' : 'fa-xmark'}" style="margin-right: 4px;"></i><span id="bannerStatusText-${id}">${isActive ? 'Active' : 'Inactive'}</span>`;
+        }
+        showAdminToast(data.message || 'Banner status updated.');
+      } else {
+        alert(data.message || 'Failed to update banner status.');
+      }
+    })
+    .catch(err => {
+      console.error('Error toggling banner status:', err);
+      alert('Network error while toggling banner status.');
+    });
   }
 </script>
 

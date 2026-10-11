@@ -1,37 +1,8 @@
 const db = require('../config/db');
 
-// Fallback in-memory store for offline database mode
-let fallbackCampaigns = [
-  {
-    id: 1,
-    subject: 'Welcome to Aruvi Embroidery Studio!',
-    body_html: `
-      <p>Hello Customer,</p>
-      <p>Welcome to <strong>Aruvi Embroidery</strong>! Explore high-precision digitized embroidery designs crafted for passionate makers.</p>
-      <p><a href="https://aruviembroidery.com/" style="display:inline-block; background:#B8402A; color:#FFF; padding:10px 20px; text-decoration:none; border-radius:6px; font-weight:bold;">Explore Designs</a></p>
-      <p>Best regards,<br>Team Aruvi Embroidery</p>
-    `,
-    total_recipients: 1,
-    success_count: 1,
-    failed_count: 0,
-    status: 'Completed',
-    sent_at: new Date(),
-    created_at: new Date()
-  }
-];
-
-let fallbackLogs = [
-  {
-    id: 1,
-    campaign_id: 1,
-    recipient_email: 'customer@aruviembroidery.com',
-    recipient_name: 'Priya Lakshmi',
-    status: 'Sent',
-    error_message: null,
-    sent_at: new Date(),
-    created_at: new Date()
-  }
-];
+// Fallback in-memory store for offline database mode (no fake campaigns)
+let fallbackCampaigns = [];
+let fallbackLogs = [];
 
 let fallbackUnsubscribed = new Set();
 

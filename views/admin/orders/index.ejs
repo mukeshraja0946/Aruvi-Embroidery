@@ -36,9 +36,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/messages" class="admin-icon-btn" title="Enquiries">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.unreadMessages %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -71,7 +73,14 @@
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/custom-orders">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingCustomOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingCustomOrders %></span>
+              <% } %>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -83,7 +92,9 @@
           <li class="sidebar-nav-item">
             <a href="/admin/orders?status=pending" class="<%= typeof currentStatus !== 'undefined' && currentStatus === 'pending' ? 'active' : '' %>">
               <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
-              <span class="sidebar-badge">5</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed" class="<%= typeof currentStatus !== 'undefined' && currentStatus === 'completed' ? 'active' : '' %>"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
@@ -96,7 +107,15 @@
         <div class="sidebar-heading">CUSTOMERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/messages">
+              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
+              <% } %>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Reviews</span></a></li>
         </ul>
       </div>
 
@@ -279,19 +298,19 @@
                   <td style="text-align: center;"><input type="checkbox"></td>
                   <td><strong style="color: var(--admin-text-dark); font-size: 0.85rem;"><%= ord.order_number || '#100' + (idx + 1) %></strong></td>
                   <td>
-                    <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);"><%= ord.user_name || ord.guest_name || 'Priya Lakshmi' %></strong>
-                    <span style="font-size: 0.74rem; color: var(--admin-text-muted);"><%= ord.user_email || ord.guest_email || 'priya@example.com' %></span>
+                    <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);"><%= ord.user_name || ord.guest_name || 'Customer' %></strong>
+                    <span style="font-size: 0.74rem; color: var(--admin-text-muted);"><%= ord.user_email || ord.guest_email || '-' %></span>
                   </td>
                   <td>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                      <img src="/public/images/hero_embroidery.jpg" style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover;">
+                      <img src="<%= ord.item_image || '/public/images/hero_embroidery.jpg' %>" style="width: 32px; height: 32px; border-radius: 6px; object-fit: cover;">
                       <div>
-                        <strong style="display: block; font-size: 0.82rem;"><%= (ord.items && ord.items[0]) ? ord.items[0].title : 'Embroidery Design Pack' %></strong>
-                        <span style="font-size: 0.7rem; color: var(--admin-text-muted);">DST, PES, JEF, EXP</span>
+                        <strong style="display: block; font-size: 0.82rem;"><%= ord.item_title || ('Order #' + ord.order_number) %></strong>
+                        <span style="font-size: 0.7rem; color: var(--admin-text-muted);"><%= ord.item_count ? ord.item_count + ' item(s)' : 'DST, PES, JEF, EXP' %></span>
                       </div>
                     </div>
                   </td>
-                  <td><strong style="font-size: 0.9rem; color: var(--admin-primary);">₹<%= ord.final_amount || '60' %></strong></td>
+                  <td><strong style="font-size: 0.9rem; color: var(--admin-primary);">₹<%= ord.final_amount !== undefined ? formatINR(ord.final_amount) : '0' %></strong></td>
                   <td>
                     <span style="background: #E8F5E9; color: #2E7D32; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase;">
                       <%= (ord.payment_gateway || 'razorpay').toUpperCase() %>
@@ -308,7 +327,7 @@
                     </span>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    <%= ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '01 Oct 2026' %>
+                    <%= formatDateTime(ord.created_at) %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
@@ -331,7 +350,7 @@
         <!-- Pagination Bar matching Master Manage Designs UI -->
         <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
-            Showing 1 to <%= orders ? orders.length : 5 %> of <strong><%= orders ? orders.length : 124 %></strong> orders
+            Showing 1 to <%= orders ? orders.length : 0 %> of <strong><%= typeof total !== 'undefined' ? total : (orders ? orders.length : 0) %></strong> orders
           </div>
 
           <div style="display: flex; gap: 6px;">

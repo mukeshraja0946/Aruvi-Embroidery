@@ -322,14 +322,14 @@
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
                 <div>
                   <label class="form-label-custom">Displayed Rating (0.0 – 5.0)</label>
-                  <input type="number" step="0.1" min="0" max="5" name="average_rating" class="form-control-custom" value="<%= design ? (design.average_rating !== undefined ? design.average_rating : 4.8) : 4.8 %>" placeholder="e.g. 4.8">
+                  <input type="number" step="0.1" min="0" max="5" name="average_rating" class="form-control-custom" value="<%= design ? (design.average_rating !== undefined && design.average_rating !== null ? design.average_rating : 0) : 0 %>" placeholder="e.g. 4.8">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Controls customer page star rating score.</span>
                 </div>
 
                 <div>
-                  <label class="form-label-custom">Review Count (0 – 149)</label>
-                  <input type="number" min="0" max="149" name="reviews_count" class="form-control-custom" value="<%= design ? (design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0) : (typeof suggestedReviewCount !== 'undefined' ? suggestedReviewCount : Math.floor(Math.random() * 150)) %>" placeholder="e.g. 85" required>
-                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Controls displayed review count (0 to 149). Suggested on product creation.</span>
+                  <label class="form-label-custom">Review Count</label>
+                  <input type="number" min="0" name="reviews_count" class="form-control-custom" value="<%= design ? (design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0) : 0 %>" placeholder="e.g. 0" required>
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Number of customer reviews for this design.</span>
                 </div>
               </div>
             </div>

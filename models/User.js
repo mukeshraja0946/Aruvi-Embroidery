@@ -1,35 +1,15 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 
-// Fallback in-memory store for offline DB mode
+// Fallback in-memory store for offline DB mode (Admin account only)
 const fallbackUsers = [
   {
     id: 1,
     full_name: 'Aruvi Admin',
-    email: 'aruviembroidery@gmail.com',
-    password_hash: bcrypt.hashSync('admin123', 10),
-    phone: '+91 98765 43210',
-    role: 'admin',
-    is_active: 1,
-    created_at: new Date()
-  },
-  {
-    id: 2,
-    full_name: 'Aruvi Admin (Legacy)',
     email: 'admin@aruviembroidery.com',
     password_hash: bcrypt.hashSync('admin123', 10),
     phone: '+91 98765 43210',
     role: 'admin',
-    is_active: 1,
-    created_at: new Date()
-  },
-  {
-    id: 3,
-    full_name: 'Priya Lakshmi',
-    email: 'customer@aruviembroidery.com',
-    password_hash: bcrypt.hashSync('customer123', 10),
-    phone: '+91 91234 56789',
-    role: 'customer',
     is_active: 1,
     created_at: new Date()
   }
@@ -125,31 +105,44 @@ class User {
     return fallbackUsers.filter(u => u.role !== 'admin');
   }
 
-  static async getAll({ page = 1, limit = 20, status = null, search = null, sort = 'newest' } = {}) {
+  static async getAll({ page = 1, limit = 20, status = null, search = null, sort = 'newest', role = 'customer' } = {}) {
     if (db.isConnected()) {
       try {
         let whereClauses = [];
         let params = [];
+        if (role === 'customer') {
+          whereClauses.push("(u.role = 'customer' OR u.role IS NULL OR u.role = '')");
+        }
         if (status === 'active') {
-          whereClauses.push('is_active = 1');
+          whereClauses.push('u.is_active = 1');
         } else if (status === 'inactive') {
-          whereClauses.push('is_active = 0');
+          whereClauses.push('u.is_active = 0');
         }
         if (search && search.trim()) {
           const q = `%${search.trim()}%`;
-          whereClauses.push('(full_name LIKE ? OR email LIKE ? OR phone LIKE ?)');
+          whereClauses.push('(u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)');
           params.push(q, q, q);
         }
         const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
         const offset = (page - 1) * limit;
 
-        let orderSql = 'ORDER BY id DESC';
-        if (sort === 'name') orderSql = 'ORDER BY full_name ASC';
-        else if (sort === 'spent_high') orderSql = 'ORDER BY (SELECT COALESCE(SUM(final_amount), 0) FROM orders WHERE user_id = users.id AND status IN ("completed", "paid")) DESC, id DESC';
+        let orderSql = 'ORDER BY u.id DESC';
+        if (sort === 'name') orderSql = 'ORDER BY u.full_name ASC';
+        else if (sort === 'spent_high') orderSql = 'ORDER BY total_spent DESC, u.id DESC';
 
-        const sql = `SELECT id, full_name, email, phone, role, is_active, created_at FROM users ${whereClause} ${orderSql} LIMIT ? OFFSET ?`;
+        const sql = `
+          SELECT u.id, u.full_name, u.email, u.phone, u.role, u.is_active, u.created_at,
+                 COUNT(DISTINCT o.id) as orders_count,
+                 COALESCE(SUM(CASE WHEN o.status IN ('completed', 'paid') THEN o.final_amount ELSE 0 END), 0) as total_spent
+          FROM users u
+          LEFT JOIN orders o ON u.id = o.user_id
+          ${whereClause}
+          GROUP BY u.id
+          ${orderSql}
+          LIMIT ? OFFSET ?
+        `;
         const rows = await db.query(sql, [...params, parseInt(limit), parseInt(offset)]);
-        const countRes = await db.query(`SELECT COUNT(*) as total FROM users ${whereClause}`, params);
+        const countRes = await db.query(`SELECT COUNT(*) as total FROM users u ${whereClause}`, params);
         if (rows && Array.isArray(rows)) {
           return { users: rows, total: (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : rows.length };
         }
@@ -157,7 +150,7 @@ class User {
         console.error('User.getAll DB error:', err.message);
       }
     }
-    let list = [...fallbackUsers];
+    let list = fallbackUsers.filter(u => u.role !== 'admin');
     if (status === 'active') list = list.filter(u => u.is_active !== false);
     else if (status === 'inactive') list = list.filter(u => u.is_active === false);
     if (search && search.trim()) {
@@ -197,14 +190,22 @@ class User {
     return true;
   }
 
-  static async count() {
+  static async count(role = 'customer') {
     if (db.isConnected()) {
       try {
-        const res = await db.query('SELECT COUNT(*) as total FROM users');
+        let sql = 'SELECT COUNT(*) as total FROM users';
+        let params = [];
+        if (role === 'customer') {
+          sql += " WHERE role = 'customer' OR role IS NULL OR role = ''";
+        }
+        const res = await db.query(sql, params);
         if (res && res[0] && res[0].total !== undefined) return res[0].total;
       } catch (err) {
         console.error('User.count DB error:', err.message);
       }
+    }
+    if (role === 'customer') {
+      return fallbackUsers.filter(u => u.role !== 'admin').length;
     }
     return fallbackUsers.length;
   }

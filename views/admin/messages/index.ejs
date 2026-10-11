@@ -36,9 +36,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/orders?status=pending" class="admin-icon-btn" title="Pending Orders">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.notificationsCount > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.notificationsCount %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -71,7 +73,14 @@
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/custom-orders">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingCustomOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingCustomOrders %></span>
+              <% } %>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -83,7 +92,9 @@
           <li class="sidebar-nav-item">
             <a href="/admin/orders?status=pending">
               <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
-              <span class="sidebar-badge">5</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
@@ -96,7 +107,15 @@
         <div class="sidebar-heading">CUSTOMERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/messages" class="active"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/messages" class="active">
+              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
+              <% } %>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Manage Reviews</span></a></li>
         </ul>
       </div>
 
@@ -279,7 +298,7 @@
                     </span>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    <%= m.created_at ? new Date(m.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '01 Oct 2026' %>
+                    <%= (typeof formatDateTime !== 'undefined' && m.created_at) ? formatDateTime(m.created_at) : (m.created_at ? new Date(m.created_at).toLocaleDateString('en-GB') : '—') %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
@@ -307,7 +326,7 @@
         <!-- Pagination Bar matching Master Manage Designs UI -->
         <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
-            Showing 1 to <%= messages ? messages.length : 5 %> of <strong><%= messages ? messages.length : 42 %></strong> enquiries
+            Showing 1 to <%= messages ? messages.length : 0 %> of <strong><%= (typeof total !== 'undefined') ? total : (messages ? messages.length : 0) %></strong> enquiries
           </div>
 
           <div style="display: flex; gap: 6px;">

@@ -15,6 +15,7 @@ const adminMessageController = require('../controllers/admin/adminMessageControl
 const adminBannerController = require('../controllers/admin/adminBannerController');
 const adminSettingController = require('../controllers/admin/adminSettingController');
 const adminEmailCampaignController = require('../controllers/admin/adminEmailCampaignController');
+const adminReviewController = require('../controllers/admin/adminReviewController');
 
 // 1. Unprotected Admin Login Routes
 router.get('/admin/login', adminAuthController.getLogin);
@@ -63,6 +64,7 @@ router.post('/admin/designs/import-commit', adminDesignController.postImportComm
 
 router.post('/admin/products/delete/:id', adminDesignController.deleteDesign);
 router.post('/admin/designs/delete/:id', adminDesignController.deleteDesign);
+router.post('/admin/designs/duplicate/:id', adminDesignController.duplicateDesign);
 router.post('/admin/designs/delete-all', adminDesignController.deleteAllDesigns);
 router.post('/admin/designs/delete-bulk', adminDesignController.deleteBulkDesigns);
 
@@ -70,6 +72,7 @@ router.post('/admin/designs/delete-bulk', adminDesignController.deleteBulkDesign
 router.get('/admin/categories', adminCategoryController.getCategories);
 router.post('/admin/categories/create', upload.single('image'), adminCategoryController.postCreate);
 router.post('/admin/categories/edit/:id', upload.single('image'), adminCategoryController.postUpdate);
+router.post('/admin/categories/toggle-status/:id', adminCategoryController.toggleStatus);
 router.post('/admin/categories/delete/:id', adminCategoryController.deleteCategory);
 
 // Orders Management
@@ -87,6 +90,11 @@ router.post('/admin/custom-orders/delete/:id', adminCustomOrderController.delete
 router.get('/admin/customers', adminCustomerController.getCustomers);
 router.post('/admin/customers/delete/:id', adminCustomerController.deleteCustomer);
 
+// Customer Reviews Management
+router.get('/admin/reviews', adminReviewController.getReviews);
+router.post('/admin/reviews/toggle-status/:id', adminReviewController.toggleStatus);
+router.post('/admin/reviews/delete/:id', adminReviewController.deleteReview);
+
 // Coupons
 router.get('/admin/coupons', adminCouponController.getCoupons);
 router.post('/admin/coupons/create', adminCouponController.postCreate);
@@ -101,6 +109,7 @@ router.post('/admin/messages/delete/:id', adminMessageController.deleteMessage);
 // Banners Management
 router.get('/admin/banners', adminBannerController.getBanners);
 router.post('/admin/banners/create', upload.single('image'), adminBannerController.postCreate);
+router.post('/admin/banners/toggle-status/:id', adminBannerController.toggleStatus);
 router.post('/admin/banners/delete/:id', adminBannerController.deleteBanner);
 
 // Homepage Editor

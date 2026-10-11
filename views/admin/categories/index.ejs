@@ -54,9 +54,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/messages" class="admin-icon-btn" title="Enquiries">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.unreadMessages %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -89,7 +91,14 @@
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories" class="active"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/custom-orders">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingCustomOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingCustomOrders %></span>
+              <% } %>
+            </a>
+          </li>
         </ul>
       </div>
 
@@ -101,7 +110,9 @@
           <li class="sidebar-nav-item">
             <a href="/admin/orders?status=pending">
               <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
-              <span class="sidebar-badge">5</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
@@ -114,7 +125,15 @@
         <div class="sidebar-heading">CUSTOMERS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item">
+            <a href="/admin/messages">
+              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
+              <% } %>
+            </a>
+          </li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Reviews</span></a></li>
         </ul>
       </div>
 
@@ -172,6 +191,12 @@
         </div>
       <% } %>
 
+      <%
+        const totalCats = categories ? categories.length : 0;
+        const activeCats = categories ? categories.filter(c => c.is_active !== 0 && c.is_active !== false).length : 0;
+        const inactiveCats = categories ? categories.filter(c => c.is_active === 0 || c.is_active === false).length : 0;
+        const totalDesignsCount = categories ? categories.reduce((sum, c) => sum + (parseInt(c.design_count) || 0), 0) : 0;
+      %>
       <!-- 4 Stat Summary Cards Row matching Manage Designs Master UI -->
       <div class="admin-stats-row" style="margin-bottom: 1.8rem;">
         <!-- Total Categories Card -->
@@ -180,10 +205,9 @@
           <div class="card-info-content">
             <div class="stat-title">Total Categories</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= categories ? categories.length : 8 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 8%</span>
+              <span class="stat-num"><%= totalCats %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">organized categories</span>
           </div>
         </div>
 
@@ -193,10 +217,9 @@
           <div class="card-info-content">
             <div class="stat-title">Active Categories</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= categories ? categories.length : 8 %></span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 10%</span>
+              <span class="stat-num"><%= activeCats %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">visible on store</span>
           </div>
         </div>
 
@@ -206,10 +229,9 @@
           <div class="card-info-content">
             <div class="stat-title">Inactive Categories</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">0</span>
-              <span class="stat-trend" style="color: var(--admin-text-muted);">0%</span>
+              <span class="stat-num"><%= inactiveCats %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">hidden from catalog</span>
           </div>
         </div>
 
@@ -219,10 +241,9 @@
           <div class="card-info-content">
             <div class="stat-title">Total Designs</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">520</span>
-              <span class="stat-trend"><i class="fa-solid fa-arrow-up"></i> 12%</span>
+              <span class="stat-num"><%= totalDesignsCount %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">across all categories</span>
           </div>
         </div>
       </div>
@@ -308,17 +329,17 @@
                     <code style="font-size: 0.78rem; background: #FAF6F0; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--admin-border);"><%= cat.slug %></code>
                   </td>
                   <td>
-                    <strong style="font-size: 0.88rem; color: var(--admin-primary);"><%= cat.description || (cat.design_count || 300) + '+ Designs' %></strong>
+                    <strong style="font-size: 0.88rem; color: var(--admin-primary);"><%= cat.design_count !== undefined ? cat.design_count : 0 %> Designs</strong>
                   </td>
                   <td>
                     <label class="switch-toggle">
-                      <input type="checkbox" checked>
+                      <input type="checkbox" <%= (cat.is_active !== 0 && cat.is_active !== false) ? 'checked' : '' %> onchange="toggleCategoryStatus('<%= cat.id %>')">
                       <span class="slider-round"></span>
-                      <span style="font-size: 0.78rem; font-weight: 600; color: #2E7D32;">Active</span>
+                      <span id="catStatusLabel-<%= cat.id %>" style="font-size: 0.78rem; font-weight: 600; color: <%= (cat.is_active !== 0 && cat.is_active !== false) ? '#2E7D32' : 'var(--admin-text-muted)' %>;"><%= (cat.is_active !== 0 && cat.is_active !== false) ? 'Active' : 'Inactive' %></span>
                     </label>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    01 Oct 2026
+                    <%= formatDateTime(cat.created_at) %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
@@ -342,7 +363,7 @@
         <!-- Pagination Bar matching Master Manage Designs UI -->
         <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
-            Showing 1 to <%= categories ? categories.length : 8 %> of <strong><%= categories ? categories.length : 8 %></strong> categories
+            Showing 1 to <%= totalCats %> of <strong><%= totalCats %></strong> categories
           </div>
 
           <div style="display: flex; gap: 6px;">
@@ -511,6 +532,28 @@
     toast.innerHTML = `<i class="fa-solid fa-circle-check" style="font-size: 1.5rem; color: #66BB6A;"></i><span>${msg}</span><button type="button" onclick="this.parentElement.style.display='none'" style="background: none; border: none; color: white; margin-left: 15px; cursor: pointer; font-size: 1.3rem;">&times;</button>`;
     toast.style.display = 'flex';
     setTimeout(() => { if (toast) toast.style.display = 'none'; }, 4000);
+  }
+
+  async function toggleCategoryStatus(id) {
+    try {
+      const res = await fetch('/admin/categories/toggle-status/' + id, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const lbl = document.getElementById('catStatusLabel-' + id);
+        if (lbl) {
+          lbl.innerText = data.is_active ? 'Active' : 'Inactive';
+          lbl.style.color = data.is_active ? '#2E7D32' : 'var(--admin-text-muted)';
+        }
+        showAdminToast(data.message || 'Category status updated.');
+      } else {
+        alert(data.message || 'Error updating category status');
+      }
+    } catch (e) {
+      alert('Network error updating category status.');
+    }
   }
 </script>
 <script src="/public/js/sort-dropdown.js"></script>

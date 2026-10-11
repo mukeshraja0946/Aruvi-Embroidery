@@ -15,6 +15,11 @@ class Category {
       try {
         let whereClauses = [];
         let params = [];
+        if (status === 'active') {
+          whereClauses.push('c.is_active = 1');
+        } else if (status === 'inactive') {
+          whereClauses.push('c.is_active = 0');
+        }
         if (search && search.trim()) {
           const q = `%${search.trim()}%`;
           whereClauses.push('(c.name LIKE ? OR c.description LIKE ?)');
@@ -34,7 +39,9 @@ class Category {
         console.error('Category.getAll DB error:', err.message);
       }
     }
-    let list = fallbackCategories.map(cat => ({ ...cat, design_count: 3 }));
+    let list = fallbackCategories.map(cat => ({ ...cat, is_active: cat.is_active !== undefined ? cat.is_active : 1, design_count: 0 }));
+    if (status === 'active') list = list.filter(c => c.is_active === 1);
+    else if (status === 'inactive') list = list.filter(c => c.is_active === 0);
     if (search && search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.description && c.description.toLowerCase().includes(q)));
@@ -110,6 +117,20 @@ class Category {
     const index = fallbackCategories.findIndex(c => c.id == id);
     if (index !== -1) fallbackCategories.splice(index, 1);
     return true;
+  }
+
+  static async toggleStatus(id) {
+    if (db.isConnected()) {
+      await db.query('UPDATE categories SET is_active = NOT is_active WHERE id = ?', [id]);
+      const [row] = await db.query('SELECT is_active, name FROM categories WHERE id = ?', [id]);
+      return row ? row.is_active : false;
+    }
+    const cat = fallbackCategories.find(c => c.id == id);
+    if (cat) {
+      cat.is_active = cat.is_active ? 0 : 1;
+      return cat.is_active;
+    }
+    return false;
   }
 }
 

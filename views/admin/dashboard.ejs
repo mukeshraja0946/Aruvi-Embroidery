@@ -32,9 +32,11 @@
 
     <!-- Right User Header Icons -->
     <div class="admin-header-right">
-      <a href="#" class="admin-icon-btn" title="Notifications">
+      <a href="/admin/messages" class="admin-icon-btn" title="Notifications">
         <i class="fa-regular fa-bell"></i>
-        <span class="badge-count">3</span>
+        <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadNotifications > 0) { %>
+          <span class="badge-count"><%= adminNavBadges.unreadNotifications %></span>
+        <% } %>
       </a>
 
       <div class="admin-user-menu">
@@ -80,7 +82,9 @@
           <li class="sidebar-nav-item">
             <a href="/admin/orders?status=pending">
               <span><i class="fa-regular fa-clock"></i> Pending Orders</span>
-              <span class="sidebar-badge">5</span>
+              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.pendingOrders > 0) { %>
+                <span class="sidebar-badge"><%= adminNavBadges.pendingOrders %></span>
+              <% } %>
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
@@ -95,6 +99,7 @@
           <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-comment-dots"></i> Enquiries</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/email-campaigns"><span><i class="fa-solid fa-paper-plane"></i> Email Campaigns 📧</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Reviews</span></a></li>
         </ul>
       </div>
 
@@ -104,8 +109,6 @@
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
         </ul>
       </div>
@@ -123,44 +126,59 @@
       <!-- Hero Welcome Banner -->
       <div class="admin-welcome-hero">
         <div class="welcome-hero-text">
-          <span style="font-size: 0.72rem; letter-spacing: 1.5px; font-weight: 700; color: var(--admin-primary); text-transform: uppercase;">WELCOME BACK,</span>
-          <h1>Admin!</h1>
-          <p>Here's an overview of your embroidery store.<br>Manage designs, orders, customers and more.</p>
+          <span style="font-size: 0.72rem; letter-spacing: 1.5px; font-weight: 700; color: var(--admin-primary); text-transform: uppercase;">LIVE STORE DASHBOARD</span>
+          <h1>Admin Overview</h1>
+          <p>Real-time data from your store database.<br>Live products, paid revenues, orders and customer activities.</p>
         </div>
         <div class="welcome-hero-image">
           <img src="/public/images/hero_embroidery.jpg" alt="Embroidery Craft Header">
         </div>
       </div>
 
-      <!-- 4 Stat Summary Cards Row matching Reference -->
-      <div class="admin-stats-row">
+      <!-- 5 Stat Summary Cards Row -->
+      <div class="admin-stats-row" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
+        <!-- Total Products Card -->
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-box-archive"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Total Products</div>
+            <div style="display: flex; align-items: baseline;">
+              <span class="stat-num"><%= stats.totalDesigns || 0 %></span>
+              <span class="stat-trend" style="color: <%= stats.designsTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                <i class="fa-solid fa-arrow-<%= stats.designsTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.designsTrend.text %>
+              </span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">active in catalog</span>
+          </div>
+        </div>
+
         <!-- Total Orders Card -->
         <div class="admin-summary-card">
           <div class="card-icon-badge"><i class="fa-solid fa-bag-shopping"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Total Orders</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= stats.totalOrders %></span>
+              <span class="stat-num"><%= stats.totalOrders || 0 %></span>
               <span class="stat-trend" style="color: <%= stats.ordersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
                 <i class="fa-solid fa-arrow-<%= stats.ordersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.ordersTrend.text %>
               </span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">all-time orders</span>
           </div>
         </div>
 
-        <!-- Total Sales Card -->
+        <!-- Total Revenue Card (SUM of paid orders only) -->
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-solid fa-cart-shopping"></i></div>
+          <div class="card-icon-badge"><i class="fa-solid fa-indian-rupee-sign"></i></div>
           <div class="card-info-content">
-            <div class="stat-title">Total Sales</div>
+            <div class="stat-title">Paid Revenue</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num">₹<%= parseFloat(stats.totalSales || 0).toLocaleString('en-IN') %></span>
+              <span class="stat-num">₹<%= parseFloat(stats.totalSales || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }) %></span>
               <span class="stat-trend" style="color: <%= stats.salesTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
                 <i class="fa-solid fa-arrow-<%= stats.salesTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.salesTrend.text %>
               </span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">paid orders only</span>
           </div>
         </div>
 
@@ -170,101 +188,96 @@
           <div class="card-info-content">
             <div class="stat-title">Total Customers</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= stats.totalCustomers %></span>
+              <span class="stat-num"><%= stats.totalCustomers || 0 %></span>
               <span class="stat-trend" style="color: <%= stats.customersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
                 <i class="fa-solid fa-arrow-<%= stats.customersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.customersTrend.text %>
               </span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">registered customers</span>
           </div>
         </div>
 
-        <!-- Total Designs Card -->
+        <!-- Custom Requests Card -->
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-solid fa-box-archive"></i></div>
+          <div class="card-icon-badge"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
           <div class="card-info-content">
-            <div class="stat-title">Total Designs</div>
+            <div class="stat-title">Custom Requests</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= stats.totalDesigns %></span>
-              <span class="stat-trend" style="color: <%= stats.designsTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
-                <i class="fa-solid fa-arrow-<%= stats.designsTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.designsTrend.text %>
+              <span class="stat-num"><%= (stats.customRequests && stats.customRequests.total !== undefined) ? stats.customRequests.total : 0 %></span>
+              <% const pendingCount = (stats.customRequests && stats.customRequests.pending) ? stats.customRequests.pending : 0; %>
+              <span class="stat-trend" style="color: <%= pendingCount > 0 ? '#F57F17' : '#2E7D32' %>;">
+                <%= pendingCount %> pending
               </span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">from last month</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">custom motifs</span>
           </div>
         </div>
       </div>
 
-      <!-- Charts Section (2 Columns: Sales Overview & Orders by Status) -->
+      <!-- Charts Section (2 Columns: Sales Overview & Top Categories Donut) -->
       <div class="admin-charts-row">
         <!-- Card 1: Sales Overview Area Chart -->
         <div class="admin-card-box">
           <div class="card-header-flex">
             <h3>Sales Overview</h3>
-            <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Last 6 Months</span>
+            <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Last 6 Months (Paid Orders)</span>
           </div>
-          <div style="height: 220px; position: relative;">
+          <div style="height: 240px; position: relative;">
             <canvas id="salesOverviewChart"></canvas>
           </div>
         </div>
 
-        <!-- Card 2: Orders by Status Donut Chart -->
+        <!-- Card 2: Top Categories Donut Chart (Percentage share by items sold per category) -->
         <div class="admin-card-box">
           <div class="card-header-flex">
-            <h3>Orders by Status</h3>
+            <h3>Top Categories</h3>
+            <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Share of Items Sold</span>
           </div>
           
-          <div style="display: flex; align-items: center; gap: 1.2rem; height: 220px;">
-            <!-- Donut Canvas Container -->
-            <div style="width: 150px; height: 150px; position: relative; flex-shrink: 0; margin: 0 auto;">
-              <canvas id="ordersStatusChart"></canvas>
-              <!-- Center Text -->
-              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
-                <div style="font-size: 1.4rem; font-family: var(--font-heading); font-weight: 700; color: var(--admin-text-dark); line-height: 1;"><%= stats.ordersByStatus.total %></div>
-                <div style="font-size: 0.68rem; color: var(--admin-text-muted);">Orders</div>
-              </div>
-            </div>
+          <% const hasCategorySales = stats.topCategories && stats.topCategories.length > 0; %>
+          <% const totalSoldSum = hasCategorySales ? stats.topCategories.reduce((s, c) => s + c.count, 0) : 0; %>
 
-            <!-- Custom Legend Stack -->
-            <div style="display: flex; flex-direction: column; gap: 10px; flex: 1; font-size: 0.8rem;">
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #FFC107;"></span>
-                  <span>Pending</span>
+          <div style="display: flex; align-items: center; gap: 1.2rem; height: 240px;">
+            <% if (hasCategorySales && totalSoldSum > 0) { %>
+              <!-- Donut Canvas Container -->
+              <div style="width: 160px; height: 160px; position: relative; flex-shrink: 0; margin: 0 auto;">
+                <canvas id="topCategoriesChart"></canvas>
+                <!-- Center Text -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                  <div style="font-size: 1.4rem; font-family: var(--font-heading); font-weight: 700; color: var(--admin-text-dark); line-height: 1;"><%= totalSoldSum %></div>
+                  <div style="font-size: 0.68rem; color: var(--admin-text-muted);">Items Sold</div>
                 </div>
-                <strong><%= stats.ordersByStatus.pending %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.pending / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
               </div>
 
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #2196F3;"></span>
-                  <span>Processing</span>
-                </div>
-                <strong><%= stats.ordersByStatus.processing %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.processing / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
+              <!-- Real Category Legend Stack -->
+              <div style="display: flex; flex-direction: column; gap: 8px; flex: 1; font-size: 0.8rem; max-height: 220px; overflow-y: auto;">
+                <% const catPalette = ['#B8402A', '#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4']; %>
+                <% stats.topCategories.forEach((cat, idx) => { %>
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= catPalette[idx % catPalette.length] %>; flex-shrink: 0;"></span>
+                      <span style="font-weight: 500;"><%= cat.name %></span>
+                    </div>
+                    <strong><%= cat.count %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= cat.percentage %>%)</span></strong>
+                  </div>
+                <% }); %>
               </div>
-
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #4CAF50;"></span>
-                  <span>Completed</span>
+            <% } else { %>
+              <!-- Friendly Empty State -->
+              <div style="width: 100%; text-align: center; color: var(--admin-text-muted); padding: 2rem;">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: #FAF6F0; color: var(--admin-text-muted); display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.6rem; border: 1px solid var(--admin-border);">
+                  <i class="fa-solid fa-chart-pie"></i>
                 </div>
-                <strong><%= stats.ordersByStatus.completed %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.completed / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
+                <div style="font-weight: 600; color: var(--admin-text-dark); font-size: 0.95rem;">No category sales yet</div>
+                <p style="font-size: 0.8rem; margin: 4px 0 0;">Sold items will reflect percentage shares per category automatically.</p>
               </div>
-
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #F44336;"></span>
-                  <span>Cancelled</span>
-                </div>
-                <strong><%= stats.ordersByStatus.cancelled %> <span style="font-weight: 400; color: var(--admin-text-muted); font-size: 0.75rem;">(<%= stats.ordersByStatus.total > 0 ? Math.round((stats.ordersByStatus.cancelled / stats.ordersByStatus.total) * 100) : 0 %>%)</span></strong>
-              </div>
-            </div>
+            <% } %>
           </div>
         </div>
       </div>
 
-      <!-- Bottom Row (3 Columns: Recent Orders, Top Selling Designs, Quick Actions) -->
-      <div class="admin-bottom-grid">
+      <!-- Bottom Grid: Recent Orders, Top Selling Designs, Admin Activity Log -->
+      <div class="admin-bottom-grid" style="grid-template-columns: 1.4fr 1fr; margin-bottom: 1.8rem;">
         
         <!-- Column 1: Recent Orders -->
         <div class="admin-card-box">
@@ -276,7 +289,7 @@
           <table class="admin-table-styled">
             <thead>
               <tr>
-                <th>#</th>
+                <th>Order #</th>
                 <th>Customer</th>
                 <th>Design</th>
                 <th>Amount</th>
@@ -288,28 +301,31 @@
               <% if (stats.recentOrders && stats.recentOrders.length > 0) { %>
                 <% stats.recentOrders.forEach(ord => { %>
                   <tr>
-                    <td><strong><%= ord.order_number || ('#' + ord.id) %></strong></td>
+                    <td><a href="/admin/orders/<%= ord.id %>" style="color: var(--admin-primary); font-weight: 700; text-decoration: none;"><%= ord.order_number || ('#' + ord.id) %></a></td>
                     <td><%= ord.customer_name || 'Guest Customer' %></td>
                     <td>
                       <div style="display: flex; align-items: center; gap: 6px;">
-                        <img src="<%= ord.item_image || '/public/images/hero_embroidery.jpg' %>" alt="<%= ord.item_title || 'Design' %>" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
-                        <span style="font-size: 0.8rem;"><%= ord.item_title || 'Embroidery Design' %></span>
+                        <img src="<%= ord.item_image || '/public/images/hero_embroidery.jpg' %>" alt="Design" style="width: 26px; height: 26px; border-radius: 4px; object-fit: cover;">
+                        <span style="font-size: 0.8rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= ord.item_title || 'Design File' %></span>
                       </div>
                     </td>
-                    <td><strong>₹<%= ord.final_amount || 0 %></strong></td>
+                    <td><strong>₹<%= (typeof formatINR === 'function' ? formatINR(ord.final_amount) : ord.final_amount) || 0 %></strong></td>
                     <td>
                       <span style="background: <%= ord.status === 'completed' || ord.status === 'paid' ? '#E8F5E9' : (ord.status === 'pending' ? '#FFF8E1' : '#FFEBEE') %>; color: <%= ord.status === 'completed' || ord.status === 'paid' ? '#2E7D32' : (ord.status === 'pending' ? '#F57F17' : '#C62828') %>; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; text-transform: capitalize;">
                         <%= ord.status %>
                       </span>
                     </td>
-                    <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                      <%= ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '' %>
+                    <td style="color: var(--admin-text-muted); font-size: 0.76rem; white-space: nowrap;">
+                      <%= typeof formatDateTime === 'function' ? formatDateTime(ord.created_at) : (ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-GB') : '-') %>
                     </td>
                   </tr>
                 <% }) %>
               <% } else { %>
                 <tr>
-                  <td colspan="6" style="text-align: center; padding: 1.8rem; color: var(--admin-text-muted);">No orders recorded yet.</td>
+                  <td colspan="6" style="text-align: center; padding: 2.5rem 1rem; color: var(--admin-text-muted);">
+                    <i class="fa-regular fa-clipboard" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>
+                    No orders placed yet. Real orders from the storefront will appear here.
+                  </td>
                 </tr>
               <% } %>
             </tbody>
@@ -319,77 +335,72 @@
         <!-- Column 2: Top Selling Designs -->
         <div class="admin-card-box">
           <div class="card-header-flex">
-            <h3>Top Selling Designs</h3>
+            <h3>Top Selling Products</h3>
             <a href="/admin/designs" class="view-all-link">View All &rarr;</a>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 10px;">
             <% if (stats.topSellingDesigns && stats.topSellingDesigns.length > 0) { %>
               <% stats.topSellingDesigns.forEach((des, idx) => { %>
-                <div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--admin-border);">
                   <span style="width: 22px; height: 22px; border-radius: 50%; background: <%= idx === 0 ? '#F6E5E0' : '#F4EFEA' %>; color: <%= idx === 0 ? 'var(--admin-primary)' : 'var(--admin-text-dark)' %>; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;"><%= idx + 1 %></span>
                   <img src="<%= des.image_url || '/public/images/hero_embroidery.jpg' %>" alt="<%= des.title %>" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover;">
                   <div style="flex: 1;">
                     <strong style="display: block; font-size: 0.85rem; color: var(--admin-text-dark);"><%= des.title %></strong>
-                    <span style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= des.sales_count || 0 %> sales</span>
+                    <span style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= des.sales_count || 0 %> sales &bull; ₹<%= des.sale_price || des.price %></span>
                   </div>
                 </div>
               <% }) %>
             <% } else { %>
-              <div style="padding: 1.5rem; text-align: center; color: var(--admin-text-muted);">No design sales recorded yet.</div>
+              <div style="padding: 2.5rem 1rem; text-align: center; color: var(--admin-text-muted);">
+                <i class="fa-solid fa-box-open" style="font-size: 1.8rem; margin-bottom: 0.5rem; display: block;"></i>
+                No product sales recorded yet.
+              </div>
             <% } %>
           </div>
         </div>
 
-        <!-- Column 3: Quick Actions -->
-        <div class="admin-card-box">
-          <div class="card-header-flex">
-            <h3>Quick Actions</h3>
-          </div>
+      </div>
 
-          <div style="display: flex; flex-direction: column;">
-            <a href="/admin/designs/create" class="quick-action-btn">
-              <div>
-                <i class="fa-regular fa-circle-plus action-icon"></i>
-                <span>Add New Design</span>
-              </div>
-              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
-            </a>
-
-            <a href="/admin/categories" class="quick-action-btn">
-              <div>
-                <i class="fa-solid fa-border-all action-icon"></i>
-                <span>Manage Categories</span>
-              </div>
-              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
-            </a>
-
-            <a href="/admin/orders" class="quick-action-btn">
-              <div>
-                <i class="fa-regular fa-newspaper action-icon"></i>
-                <span>View All Orders</span>
-              </div>
-              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
-            </a>
-
-            <a href="/admin/customers" class="quick-action-btn">
-              <div>
-                <i class="fa-solid fa-users action-icon"></i>
-                <span>Manage Customers</span>
-              </div>
-              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
-            </a>
-
-            <a href="/admin/homepage" class="quick-action-btn">
-              <div>
-                <i class="fa-regular fa-image action-icon"></i>
-                <span>Update Homepage</span>
-              </div>
-              <i class="fa-solid fa-chevron-right" style="font-size: 0.75rem; color: var(--admin-text-muted);"></i>
-            </a>
-          </div>
+      <!-- Real Admin Activity Log Section -->
+      <div class="admin-card-box" style="margin-bottom: 2rem;">
+        <div class="card-header-flex">
+          <h3>Recent Admin Activity Log</h3>
+          <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Audit Trail</span>
         </div>
 
+        <table class="admin-table-styled">
+          <thead>
+            <tr>
+              <th style="width: 140px;">Action</th>
+              <th style="width: 120px;">Admin</th>
+              <th style="width: 120px;">Entity</th>
+              <th>Details</th>
+              <th style="width: 180px; text-align: right;">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (stats.recentActivity && stats.recentActivity.length > 0) { %>
+              <% stats.recentActivity.forEach(act => { %>
+                <tr>
+                  <td><strong style="color: var(--admin-primary); font-size: 0.82rem;"><%= act.action %></strong></td>
+                  <td><span style="font-size: 0.82rem; font-weight: 500;"><%= act.admin_name || 'Admin' %></span></td>
+                  <td><span style="background: #FAF6F0; border: 1px solid var(--admin-border); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;"><%= act.entity_type %></span></td>
+                  <td style="font-size: 0.8rem; color: var(--admin-text-dark);"><%= act.details || '-' %></td>
+                  <td style="text-align: right; color: var(--admin-text-muted); font-size: 0.76rem; white-space: nowrap;">
+                    <%= typeof formatDateTime === 'function' ? formatDateTime(act.created_at) : new Date(act.created_at).toLocaleString() %>
+                  </td>
+                </tr>
+              <% }); %>
+            <% } else { %>
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                  No administrative actions logged yet. Actions performed in the admin panel will appear here.
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
       </div>
 
     </main>
@@ -400,73 +411,79 @@
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     // 1. Sales Overview Area Chart
-    const ctxSales = document.getElementById('salesOverviewChart').getContext('2d');
-    const gradient = ctxSales.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, 'rgba(184, 64, 42, 0.35)');
-    gradient.addColorStop(1, 'rgba(184, 64, 42, 0.01)');
+    const salesCanvas = document.getElementById('salesOverviewChart');
+    if (salesCanvas) {
+      const ctxSales = salesCanvas.getContext('2d');
+      const gradient = ctxSales.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, 'rgba(184, 64, 42, 0.35)');
+      gradient.addColorStop(1, 'rgba(184, 64, 42, 0.01)');
 
-    const monthLabels = <%- JSON.stringify(stats.monthLabels || ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']) %>;
-    const monthlySalesData = <%- JSON.stringify(stats.monthlySales || [0, 0, 0, 0, 0, 0]) %>;
+      const monthLabels = <%- JSON.stringify(stats.monthLabels || ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']) %>;
+      const monthlySalesData = <%- JSON.stringify(stats.monthlySales || [0, 0, 0, 0, 0, 0]) %>;
 
-    new Chart(ctxSales, {
-      type: 'line',
-      data: {
-        labels: monthLabels,
-        datasets: [{
-          label: 'Sales (₹)',
-          data: monthlySalesData,
-          borderColor: '#B8402A',
-          borderWidth: 2.5,
-          backgroundColor: gradient,
-          fill: true,
-          tension: 0.4,
-          pointBackgroundColor: '#B8402A',
-          pointRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false } },
-          y: {
-            ticks: {
-              callback: function(val) {
-                return val === 0 ? '0' : (val >= 1000 ? (val / 1000).toFixed(0) + 'K' : val);
+      new Chart(ctxSales, {
+        type: 'line',
+        data: {
+          labels: monthLabels,
+          datasets: [{
+            label: 'Paid Sales (₹)',
+            data: monthlySalesData,
+            borderColor: '#B8402A',
+            borderWidth: 2.5,
+            backgroundColor: gradient,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#B8402A',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(val) {
+                  return val === 0 ? '₹0' : (val >= 1000 ? '₹' + (val / 1000).toFixed(0) + 'K' : '₹' + val);
+                }
               }
             }
           }
         }
-      }
-    });
+      });
+    }
 
-    // 2. Orders by Status Donut Chart
-    const ctxStatus = document.getElementById('ordersStatusChart').getContext('2d');
-    const statusData = [
-      <%= stats.ordersByStatus.pending || 0 %>,
-      <%= stats.ordersByStatus.processing || 0 %>,
-      <%= stats.ordersByStatus.completed || 0 %>,
-      <%= stats.ordersByStatus.cancelled || 0 %>
-    ];
+    // 2. Top Categories Donut Chart (Percentage share by items sold per category)
+    const catCanvas = document.getElementById('topCategoriesChart');
+    <% if (hasCategorySales && totalSoldSum > 0) { %>
+      if (catCanvas) {
+        const ctxCat = catCanvas.getContext('2d');
+        const catLabels = <%- JSON.stringify(stats.topCategories.map(c => c.name)) %>;
+        const catData = <%- JSON.stringify(stats.topCategories.map(c => c.count)) %>;
+        const catColors = ['#B8402A', '#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4'];
 
-    new Chart(ctxStatus, {
-      type: 'doughnut',
-      data: {
-        labels: ['Pending', 'Processing', 'Completed', 'Cancelled'],
-        datasets: [{
-          data: statusData,
-          backgroundColor: ['#FFC107', '#2196F3', '#4CAF50', '#F44336'],
-          borderWidth: 0,
-          cutout: '76%'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } }
+        new Chart(ctxCat, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels,
+            datasets: [{
+              data: catData,
+              backgroundColor: catColors.slice(0, catLabels.length),
+              borderWidth: 0,
+              cutout: '74%'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+          }
+        });
       }
-    });
+    <% } %>
   });
 </script>
 

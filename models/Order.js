@@ -1,36 +1,7 @@
 const db = require('../config/db');
 
-const fallbackOrders = [
-  {
-    id: 1,
-    order_number: 'AE-20261001-9812',
-    user_id: 2,
-    guest_email: null,
-    guest_name: 'Priya Lakshmi',
-    guest_phone: '+91 91234 56789',
-    total_amount: 499.00,
-    discount_amount: 50.00,
-    final_amount: 449.00,
-    coupon_code: 'ARUVIFLAT50',
-    status: 'completed',
-    razorpay_order_id: 'order_test_981234',
-    razorpay_payment_id: 'pay_test_981234',
-    created_at: new Date('2026-10-01T10:00:00Z'),
-    items: [
-      {
-        id: 1,
-        order_id: 1,
-        design_id: 1,
-        title: 'Royal Bridal Peacock Neckline & Sleeve Set',
-        slug: 'royal-bridal-peacock-neckline-sleeve-set',
-        price_at_purchase: 499.00,
-        primary_image: '/public/images/logo.jpg',
-        file_name: 'Royal_Bridal_Peacock_Set.zip',
-        file_path: '/public/uploads/designs/sample_peacock.zip'
-      }
-    ]
-  }
-];
+// Empty fallback store for offline database mode (no fake orders)
+const fallbackOrders = [];
 
 class Order {
   static async createOrder({
@@ -171,7 +142,11 @@ class Order {
       if (sort === 'oldest') orderSql = 'ORDER BY o.created_at ASC';
       else if (sort === 'amount_high') orderSql = 'ORDER BY o.final_amount DESC';
 
-      const sql = `SELECT o.*, u.full_name as user_name, u.email as user_email FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause} ${orderSql} LIMIT ? OFFSET ?`;
+      const sql = `SELECT o.*, u.full_name as user_name, u.email as user_email,
+        (SELECT d.title FROM order_items oi JOIN designs d ON oi.design_id = d.id WHERE oi.order_id = o.id LIMIT 1) as item_title,
+        (SELECT di.image_url FROM order_items oi JOIN design_images di ON oi.design_id = di.design_id WHERE oi.order_id = o.id ORDER BY di.is_primary DESC, di.id ASC LIMIT 1) as item_image,
+        (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) as item_count
+      FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause} ${orderSql} LIMIT ? OFFSET ?`;
       const orders = await db.query(sql, [...params, parseInt(limit), parseInt(offset)]);
 
       const countRes = await db.query(`SELECT COUNT(*) as total FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause}`, params);

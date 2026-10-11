@@ -4,6 +4,7 @@ const Design = require('../../models/Design');
 const Category = require('../../models/Category');
 const emailService = require('../../services/emailService');
 const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDriver, uploadToCloudinary, uploadToS3OrR2 } = require('../../config/storage');
+const ActivityLog = require('../../models/ActivityLog');
 
 const AdminStatsService = require('../../services/adminStatsService');
 
@@ -169,7 +170,7 @@ exports.getNextSku = async (req, res, next) => {
 exports.getCreateForm = async (req, res, next) => {
   try {
     const categories = await Category.getAll();
-    const suggestedReviewCount = Math.floor(Math.random() * 150);
+    const suggestedReviewCount = 0;
     let defaultSku = 'AED-GEN-01';
     if (categories && categories.length > 0) {
       defaultSku = await Design.getNextSkuForCategory(categories[0].id);
@@ -352,6 +353,7 @@ exports.postCreate = async (req, res, next) => {
 
     const statusMsg = finalActiveState === 1 ? 'published' : 'saved as draft';
     console.log(`[PUBLISH SUCCESS] Design #${designId} "${title}" ${statusMsg} successfully.`);
+    await ActivityLog.logFromReq(req, 'create', 'design', designId, `Created design #${designId} "${title}" (SKU: ${finalSku})`);
 
     if (isAjax) {
       return res.json({
@@ -552,6 +554,7 @@ exports.postEdit = async (req, res, next) => {
 
     const statusMsg = finalActiveState === 1 ? 'published' : 'saved as draft';
     console.log(`[PUBLISH SUCCESS] Design #${id} "${title}" updated and ${statusMsg} successfully.`);
+    await ActivityLog.logFromReq(req, 'update', 'design', id, `Updated design #${id} "${title}"`);
 
     if (isAjax) {
       return res.json({
@@ -585,6 +588,7 @@ exports.toggleStatus = async (req, res, next) => {
 
     const newStatus = design.is_active ? 0 : 1;
     await Design.updateStatus(id, newStatus);
+    await ActivityLog.logFromReq(req, 'update_status', 'design', id, `Changed design #${id} "${design.title}" status to ${newStatus ? 'Active' : 'Inactive'}`);
 
     if (req.xhr || (req.headers.accept && req.headers.accept.indexOf('json') > -1)) {
       return res.json({ success: true, is_active: newStatus, message: `Design status changed to ${newStatus ? 'Active' : 'Inactive'}` });
@@ -682,6 +686,7 @@ exports.deleteDesign = async (req, res, next) => {
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
 
     await Design.delete(id);
+    await ActivityLog.logFromReq(req, 'delete', 'design', id, `Deleted design #${id}`);
 
     if (isAjax) {
       return res.json({
@@ -709,6 +714,7 @@ exports.deleteDesign = async (req, res, next) => {
 exports.deleteAllDesigns = async (req, res, next) => {
   try {
     await Design.deleteAll();
+    await ActivityLog.logFromReq(req, 'delete_all', 'design', null, 'Deleted all designs permanently');
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
 
     if (isAjax) {
@@ -735,6 +741,7 @@ exports.deleteBulkDesigns = async (req, res, next) => {
     }
 
     await Design.deleteBulk(ids);
+    await ActivityLog.logFromReq(req, 'delete_bulk', 'design', null, `Bulk deleted ${ids.length} design(s)`);
 
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
     if (isAjax) {
@@ -750,6 +757,84 @@ exports.deleteBulkDesigns = async (req, res, next) => {
       return res.status(500).json({ success: false, message: err.message || 'Unable to delete selected designs.' });
     }
     next(err);
+  }
+};
+
+exports.duplicateDesign = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const original = await Design.getById(id);
+    if (!original) {
+      const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+      if (isAjax) return res.status(404).json({ success: false, message: 'Design not found.' });
+      req.flash('error', 'Design not found.');
+      return res.redirect('/admin/designs');
+    }
+
+    const newTitle = `${original.title} (Copy)`;
+    const newSlug = await Design.generateUniqueSlug(newTitle);
+
+    let newSku = null;
+    try {
+      if (original.category_id) {
+        newSku = await Design.getNextSkuForCategory(original.category_id);
+      }
+    } catch (e) {
+      newSku = `AED-CPY-${Date.now().toString().slice(-4)}`;
+    }
+
+    const newDesignId = await Design.create({
+      title: newTitle,
+      slug: newSlug,
+      sku: newSku,
+      description: original.description || '',
+      price: original.price || 0,
+      sale_price: original.sale_price !== null && original.sale_price !== undefined ? original.sale_price : null,
+      category_id: original.category_id,
+      hoop_size: original.hoop_size || null,
+      stitch_count: original.stitch_count || null,
+      dimensions: original.dimensions || null,
+      formats: original.formats || 'DST',
+      tags: original.tags || null,
+      is_featured: 0,
+      is_active: 0 // Inactive draft upon duplication
+    });
+
+    // Copy design images
+    if (original.images && original.images.length > 0) {
+      for (const img of original.images) {
+        await Design.addImage(newDesignId, img.image_url, img.is_primary, img.display_order);
+      }
+    }
+
+    // Copy design files
+    if (original.files && original.files.length > 0) {
+      for (const f of original.files) {
+        await Design.addFile(newDesignId, f.file_name, f.file_path, f.file_format, f.file_size, f.is_preview);
+      }
+    }
+
+    await ActivityLog.logFromReq(req, 'duplicate', 'design', newDesignId, `Duplicated design #${id} "${original.title}" into #${newDesignId} "${newTitle}"`);
+
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: `Design duplicated successfully as "${newTitle}" with SKU ${newSku}.`,
+        newDesignId
+      });
+    }
+
+    req.flash('success', `Design duplicated successfully as "${newTitle}" (SKU: ${newSku}).`);
+    res.redirect('/admin/designs');
+  } catch (err) {
+    console.error('duplicateDesign error:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message || 'Unable to duplicate design.' });
+    }
+    req.flash('error', `Unable to duplicate design: ${err.message}`);
+    res.redirect('/admin/designs');
   }
 };
 
