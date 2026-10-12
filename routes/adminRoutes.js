@@ -57,6 +57,8 @@ router.post('/admin/designs/delete-image/:imageId', adminDesignController.delete
 router.post('/admin/designs/set-primary-image/:imageId', adminDesignController.setPrimaryImage);
 router.post('/admin/designs/delete-file/:fileId', adminDesignController.deleteFile);
 router.post('/admin/designs/delete-all-files/:designId', adminDesignController.deleteAllFiles);
+router.post('/admin/designs/replace-image/:id', upload.any(), adminDesignController.replaceImage);
+router.post('/admin/designs/bulk-upload-images', upload.any(), adminDesignController.bulkUploadImages);
 
 router.get('/admin/designs/import-template', adminDesignController.downloadImportTemplate);
 router.post('/admin/designs/import-preview', upload.any(), adminDesignController.postImportPreview);

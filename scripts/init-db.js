@@ -7,10 +7,9 @@ async function initDatabase() {
     // 1. Run migrations safely (CREATE TABLE IF NOT EXISTS, never drops data)
     await runMigrations();
 
-    // 2. Run seed safely (only runs if database has no existing designs/users)
-    await runSeed();
-
-    console.log('--- Database Initialization / Verification Finished Successfully ---');
+    // NOTE: Demo/sample seed data is NEVER run on deploy or initialization.
+    // If you explicitly want demo seed data, run manually: npm run seed:demo
+    console.log('--- Database Migrations Finished Successfully ---');
   } catch (err) {
     console.error('❌ Database Initialization Failed:', err.message);
     process.exit(1);

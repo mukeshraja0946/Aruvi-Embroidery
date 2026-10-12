@@ -186,6 +186,9 @@
           <button type="button" onclick="openBulkImportModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid var(--admin-primary); color: var(--admin-primary); cursor: pointer; white-space: nowrap; transition: all 0.2s;">
             <i class="fa-solid fa-file-import"></i> Bulk Import
           </button>
+          <button type="button" onclick="openBulkImageUploadModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #795548; color: #5D4037; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk upload/restore product images">
+            <i class="fa-solid fa-images"></i> Bulk Images
+          </button>
           <button type="button" id="deleteSelectedBtn" onclick="confirmDeleteSelectedDesigns()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #C62828; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
             <i class="fa-regular fa-trash-can"></i> Delete Selected (<span id="selectedCountNum">0</span>)
           </button>
@@ -365,11 +368,27 @@
                   <td style="text-align: center;"><input type="checkbox" class="design-checkbox" value="<%= d.id %>" onchange="updateSelectedCount()"></td>
                   <td><strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong></td>
                   <td>
-                    <% if (d.primary_image) { %>
-                      <img src="<%= d.primary_image %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);" onerror="this.onerror=null; this.src='/public/images/hero_embroidery.jpg';">
-                    <% } else { %>
-                      <div style="width: 52px; height: 52px; border-radius: 8px; background: #FAF6F0; border: 1px dashed var(--admin-border); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--admin-text-muted); font-size: 0.65rem; font-weight: 600; text-align: center; padding: 2px;"><i class="fa-regular fa-image" style="font-size: 0.85rem; margin-bottom: 2px;"></i> No Preview</div>
-                    <% } %>
+                    <div style="position: relative; width: 52px; height: 52px; display: inline-block;">
+                      <% if (d.primary_image) { %>
+                        <% if (d.is_image_missing) { %>
+                          <div style="width: 52px; height: 52px; border-radius: 8px; background: #FFF3CD; border: 1px solid #FFEEBA; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #856404; font-size: 0.65rem; font-weight: 700; text-align: center; padding: 2px;" title="File missing on disk: <%= d.primary_image %>">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 0.85rem; color: #E65100; margin-bottom: 2px;"></i>
+                            Missing
+                          </div>
+                        <% } else { %>
+                          <img id="designImg-<%= d.id %>" src="<%= d.primary_image %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                          <div style="display: none; width: 52px; height: 52px; border-radius: 8px; background: #FFF3CD; border: 1px solid #FFEEBA; flex-direction: column; align-items: center; justify-content: center; color: #856404; font-size: 0.65rem; font-weight: 700; text-align: center; padding: 2px;" title="File missing on disk">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 0.85rem; color: #E65100; margin-bottom: 2px;"></i>
+                            Missing
+                          </div>
+                        <% } %>
+                      <% } else { %>
+                        <div style="width: 52px; height: 52px; border-radius: 8px; background: #FAF6F0; border: 1px dashed var(--admin-border); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--admin-text-muted); font-size: 0.65rem; font-weight: 600; text-align: center; padding: 2px;" title="No image uploaded">
+                          <i class="fa-regular fa-image" style="font-size: 0.85rem; margin-bottom: 2px;"></i>
+                          No Image
+                        </div>
+                      <% } %>
+                    </div>
                   </td>
                   <td>
                     <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark); margin-bottom: 1px;"><%= d.title %></strong>
@@ -406,7 +425,7 @@
                   </td>
                   <td>
                     <span style="font-size: 0.82rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 4px;">
-                      <i class="fa-solid fa-download" style="font-size: 0.75rem; color: var(--admin-primary);"></i> <%= d.download_count !== undefined && d.download_count !== null ? d.download_count : (d.total_sales || 0) %>
+                      <i class="fa-solid fa-download" style="font-size: 0.75rem; color: var(--admin-primary);"></i> <%= d.download_count !== undefined && d.download_count !== null ? d.download_count : 0 %>
                     </span>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
@@ -414,6 +433,7 @@
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
+                      <button type="button" onclick="openReplaceImageModal('<%= d.id %>', '<%= d.title.replace(/'/g, "\\'") %>')" class="action-icon-btn" title="Replace Image"><i class="fa-solid fa-image"></i></button>
                       <button type="button" onclick="duplicateDesign('<%= d.id %>', '<%= d.title.replace(/'/g, "\\'") %>')" class="action-icon-btn" title="Duplicate Design"><i class="fa-regular fa-copy"></i></button>
                       <a href="/admin/designs/edit/<%= d.id %>" class="action-icon-btn" title="Edit Design"><i class="fa-regular fa-pen-to-square"></i></a>
                       <a href="/design/<%= d.slug %>" target="_blank" class="action-icon-btn" title="View on Site"><i class="fa-regular fa-eye"></i></a>
@@ -1005,7 +1025,211 @@
       alert('Network error duplicating design.');
     }
   }
+
+  // Replace Single Product Image Modal Handlers
+  function openReplaceImageModal(id, title) {
+    document.getElementById('replaceImageDesignId').value = id;
+    document.getElementById('replaceImageTitle').textContent = `Product: ${title} (#${id})`;
+    document.getElementById('replaceImageFileInput').value = '';
+    document.getElementById('replaceImagePreviewContainer').style.display = 'none';
+    document.getElementById('replaceImageModal').style.display = 'flex';
+  }
+
+  function closeReplaceImageModal() {
+    document.getElementById('replaceImageModal').style.display = 'none';
+  }
+
+  function previewSelectedReplaceImage(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('replaceImagePreviewImg').src = e.target.result;
+        document.getElementById('replaceImagePreviewContainer').style.display = 'block';
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  async function submitReplaceImage(event) {
+    event.preventDefault();
+    const id = document.getElementById('replaceImageDesignId').value;
+    const fileInput = document.getElementById('replaceImageFileInput');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Please select an image file to upload.');
+      return;
+    }
+
+    const btn = document.getElementById('replaceImageSubmitBtn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+    const formData = new FormData();
+    formData.append('_csrf', '<%= csrfToken %>');
+    formData.append('image', fileInput.files[0]);
+
+    try {
+      const res = await fetch(`/admin/designs/replace-image/${id}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+      });
+      const data = await res.json();
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+
+      if (data.success) {
+        closeReplaceImageModal();
+        if (typeof showToast === 'function') showToast(data.message || 'Image replaced successfully!');
+        else alert(data.message || 'Image replaced successfully!');
+        setTimeout(() => { window.location.reload(); }, 900);
+      } else {
+        alert(data.message || 'Failed to replace image.');
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      alert('Network error while replacing image: ' + e.message);
+    }
+  }
+
+  // Bulk Image Upload Modal Handlers
+  function openBulkImageUploadModal() {
+    document.getElementById('bulkImageFilesInput').value = '';
+    document.getElementById('bulkImageStatus').style.display = 'none';
+    document.getElementById('bulkImageUploadModal').style.display = 'flex';
+  }
+
+  function closeBulkImageUploadModal() {
+    document.getElementById('bulkImageUploadModal').style.display = 'none';
+  }
+
+  async function submitBulkImageUpload(event) {
+    event.preventDefault();
+    const fileInput = document.getElementById('bulkImageFilesInput');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Please select one or more image files.');
+      return;
+    }
+
+    const btn = document.getElementById('bulkImageSubmitBtn');
+    const statusDiv = document.getElementById('bulkImageStatus');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading & Linking...';
+
+    const formData = new FormData();
+    formData.append('_csrf', '<%= csrfToken %>');
+    for (let i = 0; i < fileInput.files.length; i++) {
+      formData.append('images', fileInput.files[i]);
+    }
+
+    try {
+      const res = await fetch('/admin/designs/bulk-upload-images', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+      });
+      const data = await res.json();
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+
+      if (data.success) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#E8F5E9';
+        statusDiv.style.color = '#2E7D32';
+        statusDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message}`;
+        setTimeout(() => {
+          closeBulkImageUploadModal();
+          window.location.reload();
+        }, 1200);
+      } else {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#FFEBEE';
+        statusDiv.style.color = '#C62828';
+        statusDiv.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.message || 'Upload failed.'}`;
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      alert('Network error during bulk upload: ' + e.message);
+    }
+  }
 </script>
+
+<!-- Replace Image Modal Component -->
+<div id="replaceImageModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 90%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
+    <div style="padding: 1.25rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
+      <h3 style="margin: 0; font-size: 1.05rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-image" style="color: var(--admin-primary);"></i> Replace Product Image
+      </h3>
+      <button type="button" onclick="closeReplaceImageModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+    </div>
+    <form id="replaceImageForm" onsubmit="submitReplaceImage(event)" enctype="multipart/form-data" style="padding: 1.5rem;">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" id="replaceImageDesignId" name="designId">
+      
+      <p id="replaceImageTitle" style="font-size: 0.88rem; color: var(--admin-text-dark); font-weight: 600; margin-bottom: 1.2rem;"></p>
+      
+      <div style="margin-bottom: 1.2rem;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Select New Image (PNG, JPG, WEBP)</label>
+        <input type="file" id="replaceImageFileInput" name="image" accept=".png,.jpg,.jpeg,.webp,.avif" required onchange="previewSelectedReplaceImage(this)" style="display: block; width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; font-size: 0.85rem;">
+      </div>
+
+      <div id="replaceImagePreviewContainer" style="display: none; margin-bottom: 1.2rem; text-align: center;">
+        <img id="replaceImagePreviewImg" src="" alt="Preview" style="max-width: 140px; max-height: 140px; border-radius: 8px; border: 1px solid var(--admin-border); object-fit: contain; background: #FAF6F0;">
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" onclick="closeReplaceImageModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">Cancel</button>
+        <button type="submit" id="replaceImageSubmitBtn" style="padding: 8px 20px; border-radius: 8px; border: none; background: var(--admin-primary); color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload & Replace
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Bulk Image Upload Modal Component -->
+<div id="bulkImageUploadModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 90%; max-width: 540px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
+    <div style="padding: 1.25rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
+      <h3 style="margin: 0; font-size: 1.05rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-images" style="color: var(--admin-primary);"></i> Bulk Restore / Re-upload Images
+      </h3>
+      <button type="button" onclick="closeBulkImageUploadModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+    </div>
+    <form id="bulkImageForm" onsubmit="submitBulkImageUpload(event)" enctype="multipart/form-data" style="padding: 1.5rem;">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      
+      <div style="background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 12px 14px; margin-bottom: 1.2rem; font-size: 0.8rem; color: #2E7D32;">
+        <strong><i class="fa-solid fa-circle-info"></i> How Automatic Matching Works:</strong>
+        <p style="margin: 4px 0 0 0; line-height: 1.4;">Name image files after the product <strong>SKU</strong> (e.g. <code>AED-BLO-01.png</code>), <strong>Product ID</strong> (e.g. <code>1.png</code>), or <strong>Title</strong>. The system will automatically link each image to the corresponding product and set it as primary.</p>
+      </div>
+
+      <div style="margin-bottom: 1.2rem;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Select Images (Multiple allowed)</label>
+        <input type="file" id="bulkImageFilesInput" name="images" accept=".png,.jpg,.jpeg,.webp,.avif" multiple required style="display: block; width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; font-size: 0.85rem;">
+      </div>
+
+      <div id="bulkImageStatus" style="display: none; margin-bottom: 1rem; font-size: 0.82rem; padding: 10px; border-radius: 8px;"></div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" onclick="closeBulkImageUploadModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">Cancel</button>
+        <button type="submit" id="bulkImageSubmitBtn" style="padding: 8px 20px; border-radius: 8px; border: none; background: var(--admin-primary); color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload Images
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 <script src="/public/js/sort-dropdown.js"></script>
 </body>
 </html>

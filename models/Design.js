@@ -4,65 +4,8 @@ const fs = require('fs');
 const AdmZip = require('adm-zip');
 const storage = require('../config/storage');
 
-const availablePreviewImages = [
-  '/public/images/hero_embroidery.jpg',
-  '/public/images/cat_blouse.jpg',
-  '/public/images/cat_floral.jpg',
-  '/public/images/cat_traditional.jpg',
-  '/public/images/cat_border.jpg',
-  '/public/images/cat_monogram.jpg',
-  '/public/uploads/previews/design_file-1791042254214-185248588.png',
-  '/public/uploads/previews/design_file-1791042328059-900556097.png',
-  '/public/uploads/previews/design_file-1791043703946-812496920.png',
-  '/public/uploads/previews/design_file-1791044351993-377176697.png'
-];
-
-const categoryMetaMap = {
-  1: { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs' },
-  2: { id: 2, name: 'Blouse Designs', slug: 'blouse-designs' },
-  3: { id: 3, name: 'Saree Designs', slug: 'saree-designs' },
-  4: { id: 4, name: 'Shirt Designs', slug: 'shirt-designs' },
-  5: { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs' },
-  6: { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs' }
-};
-
-const fallbackDesigns = Array.from({ length: 5 }, (_, idx) => {
-  const num = idx + 1;
-  const catId = 2; // Blouse Designs (5 designs: AED 1, AED 2, AED 3, AED 4, AED 5 matching production)
-  const catMeta = categoryMetaMap[catId];
-  const imgUrl = availablePreviewImages[(num - 1) % availablePreviewImages.length];
-
-  return {
-    id: num,
-    title: `AED ${num}`,
-    sku: `AED-BLO-0${num}`,
-    slug: `aed-${num}`,
-    price: 399.00,
-    sale_price: 299.00,
-    discount_pct: 25,
-    category_id: catMeta.id,
-    category_name: catMeta.name,
-    category_slug: catMeta.slug,
-    hoop_size: '5x7 inch (130x180 mm)',
-    stitch_count: 24800,
-    dimensions: '140mm x 180mm',
-    formats: 'DST, PES, JEF, EXP',
-    is_featured: num <= 6 ? 1 : 0,
-    is_trending: num <= 10 ? 1 : 0,
-    is_active: 1,
-    download_count: 256,
-    primary_image: imgUrl,
-    images: [{ id: num, image_url: imgUrl, is_primary: 1 }],
-    files: [{
-      id: num,
-      file_name: `AED ${num}.zip`,
-      file_path: '/public/uploads/designs/sample_peacock.zip',
-      file_format: 'ZIP',
-      file_size: 2450123,
-      is_preview: 0
-    }]
-  };
-});
+// Persistent empty fallback store (no fake dummy products or fake download counts)
+const fallbackDesigns = [];
 
 class Design {
   static async getAll({
@@ -175,6 +118,7 @@ class Design {
           // Post-process designs to derive formats 100% dynamically from design_files table
           for (const d of designs) {
             this.normalizePrimaryImage(d);
+            d.is_image_missing = Boolean(d.primary_image && !storage.fileExists(d.primary_image));
             try {
               const mFiles = await db.query(
                 'SELECT file_format, file_name FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) IN ("DST","PES","JEF","EXP")',
@@ -223,8 +167,10 @@ class Design {
     if (category_id) filtered = filtered.filter(d => d.category_id == category_id);
     if (category_slug) filtered = filtered.filter(d => d.category_slug === category_slug);
 
-    // Compute dynamic formats for fallback designs
+    // Compute dynamic formats and check images for fallback designs
     for (const d of filtered) {
+      this.normalizePrimaryImage(d);
+      d.is_image_missing = Boolean(d.primary_image && !storage.fileExists(d.primary_image));
       const mFiles = (d.files || []).filter(f => !f.is_preview && !['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase()));
       if (mFiles.length > 0) {
         d.formats = [...new Set(mFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
@@ -426,24 +372,58 @@ class Design {
     return this.getBySlug(id);
   }
 
-  static async incrementDownloadCount(id) {
+  static async incrementDownloadCount(id, { userId = null, fileId = null, ip = null, userAgent = null } = {}) {
     if (db.isConnected()) {
       try {
         await db.query('UPDATE designs SET download_count = download_count + 1 WHERE id = ?', [id]);
-      } catch (e) {}
+        await db.query(
+          'INSERT INTO download_logs (user_id, design_id, file_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)',
+          [userId, id, fileId, ip, userAgent]
+        );
+      } catch (e) {
+        console.warn('[incrementDownloadCount error]:', e.message);
+      }
     } else {
       const d = fallbackDesigns.find(item => item.id == id);
       if (d) d.download_count = (d.download_count || 0) + 1;
     }
   }
 
-  static async getById(id) {
-    return await this.getBySlug(id);
-  }
+  static async replacePrimaryImage(designId, imageUrl, fileName = null, fileSize = 0) {
+    const finalFileName = fileName || path.basename(imageUrl);
+    const ext = finalFileName.split('.').pop().toUpperCase();
+    if (db.isConnected()) {
+      try {
+        // Demote previous primary flags
+        await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [designId]);
+        await db.query('UPDATE design_files SET is_preview = 0 WHERE design_id = ?', [designId]);
 
-  static async getFeatured(limit = 6) {
-    const res = await this.getAll({ is_active_only: true, is_featured: true, limit });
-    return res.designs;
+        // Check if image already exists in design_images
+        const existingImg = await db.query('SELECT id FROM design_images WHERE design_id = ? AND image_url = ?', [designId, imageUrl]);
+        if (existingImg && existingImg.length > 0) {
+          await db.query('UPDATE design_images SET is_primary = 1 WHERE id = ?', [existingImg[0].id]);
+        } else {
+          await db.query('INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)', [designId, imageUrl]);
+        }
+
+        // Check if preview file exists in design_files
+        const existingFile = await db.query('SELECT id FROM design_files WHERE design_id = ? AND file_path = ?', [designId, imageUrl]);
+        if (existingFile && existingFile.length > 0) {
+          await db.query('UPDATE design_files SET is_preview = 1 WHERE id = ?', [existingFile[0].id]);
+        } else {
+          await db.query('INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview) VALUES (?, ?, ?, ?, ?, 1)', [designId, finalFileName, imageUrl, ext, fileSize]);
+        }
+        return true;
+      } catch (err) {
+        console.error('Design.replacePrimaryImage error:', err.message);
+        throw err;
+      }
+    }
+    const target = fallbackDesigns.find(d => d.id == designId);
+    if (target) {
+      target.primary_image = imageUrl;
+    }
+    return true;
   }
 
   static async getFeatured(limit = 6) {
@@ -492,13 +472,12 @@ class Design {
     const ext = img ? img.split('.').pop().toLowerCase() : '';
     const nonImgExts = ['zip', 'dst', 'pes', 'jef', 'exp', 'hus', 'vip', 'vp3', 'xxx'];
 
-    // Placeholder is used ONLY when a product has no image or an invalid non-image format
-    // Admin-uploaded images are NEVER overwritten
+    // Placeholder is used ONLY when a product has no image or an invalid non-image format.
+    // Neutral placeholder is handled in UI; primary_image remains null.
+    // Admin-uploaded images are NEVER overwritten.
     if (!img || nonImgExts.includes(ext)) {
-      img = '/public/images/hero_embroidery.jpg';
-    }
-
-    if (img && !img.startsWith('/') && !img.startsWith('http')) {
+      img = null;
+    } else if (!img.startsWith('/') && !img.startsWith('http')) {
       img = '/' + img;
     }
 
@@ -869,7 +848,7 @@ class Design {
       tags: tags || null,
       average_rating: avgRatingVal,
       reviews_count: revCountVal,
-      primary_image: '/public/images/logo.jpg',
+      primary_image: null,
       images: [],
       files: []
     };

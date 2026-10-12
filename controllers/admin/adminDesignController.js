@@ -500,7 +500,7 @@ exports.postEdit = async (req, res, next) => {
       is_featured: is_featured ? 1 : 0,
       is_trending: is_trending ? 1 : 0,
       is_active: finalActiveState,
-      download_count: download_count ? parseInt(download_count) : 0,
+      download_count: (download_count !== undefined && download_count !== '') ? parseInt(download_count) : (existingDesign.download_count || 0),
       tags: tags || null,
       average_rating: parsedRating,
       reviews_count: parsedReviews
@@ -1347,4 +1347,126 @@ exports.postImportCommit = async (req, res, next) => {
     return res.status(500).json({ success: false, message: `Import commit failed: ${err.message}` });
   }
 };
+
+exports.replaceImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const design = await Design.getById(id);
+    if (!design) {
+      return res.status(404).json({ success: false, message: 'Design not found' });
+    }
+
+    const files = req.files ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat()) : [];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please select an image file to upload.' });
+    }
+
+    const file = files[0];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif'].includes(ext)) {
+      return res.status(400).json({ success: false, message: 'Invalid image format. Supported formats: JPG, PNG, WEBP, SVG, AVIF' });
+    }
+
+    let filePath = `/public/uploads/previews/${file.filename}`;
+    if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
+      try {
+        const cloudUrl = await uploadToCloudinary(file.path);
+        if (cloudUrl) filePath = cloudUrl;
+      } catch (cloudErr) {
+        console.warn('[Cloudinary upload fallback]:', cloudErr.message);
+      }
+    }
+
+    await Design.replacePrimaryImage(id, filePath, file.originalname, file.size);
+    await ActivityLog.logFromReq(req, 'update_image', 'design', id, `Replaced primary image for design #${id} "${design.title}"`);
+
+    const isAjax = checkIsAjax(req);
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: `Image for "${design.title}" updated successfully!`,
+        imageUrl: filePath,
+        designId: id
+      });
+    }
+
+    req.flash('success', `Image for "${design.title}" updated successfully!`);
+    return res.redirect('back');
+  } catch (err) {
+    console.error('replaceImage error:', err);
+    const isAjax = checkIsAjax(req);
+    if (isAjax) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+    req.flash('error', `Failed to replace image: ${err.message}`);
+    return res.redirect('back');
+  }
+};
+
+exports.bulkUploadImages = async (req, res) => {
+  try {
+    const files = req.files ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat()) : [];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No images were uploaded.' });
+    }
+
+    let matchedCount = 0;
+    const results = [];
+
+    for (const file of files) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif'].includes(ext)) {
+        continue;
+      }
+
+      // Extract filename without extension (e.g. "AED-BLO-01" from "AED-BLO-01.png" or "AED 1" from "AED 1.jpg")
+      const baseName = path.basename(file.originalname, ext).trim();
+      let matchedDesign = null;
+
+      if (db.isConnected()) {
+        const bySku = await db.query('SELECT id, title, sku FROM designs WHERE sku = ? LIMIT 1', [baseName]);
+        if (bySku && bySku.length > 0) {
+          matchedDesign = bySku[0];
+        } else if (!isNaN(baseName)) {
+          const byId = await db.query('SELECT id, title, sku FROM designs WHERE id = ? LIMIT 1', [parseInt(baseName)]);
+          if (byId && byId.length > 0) matchedDesign = byId[0];
+        } else {
+          const byTitle = await db.query('SELECT id, title, sku FROM designs WHERE title = ? OR slug = ? LIMIT 1', [baseName, baseName]);
+          if (byTitle && byTitle.length > 0) matchedDesign = byTitle[0];
+        }
+      }
+
+      if (matchedDesign) {
+        let filePath = `/public/uploads/previews/${file.filename}`;
+        if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
+          try {
+            const cloudUrl = await uploadToCloudinary(file.path);
+            if (cloudUrl) filePath = cloudUrl;
+          } catch (e) {}
+        }
+
+        await Design.replacePrimaryImage(matchedDesign.id, filePath, file.originalname, file.size);
+        matchedCount++;
+        results.push({ designId: matchedDesign.id, title: matchedDesign.title, sku: matchedDesign.sku, filename: file.originalname, status: 'matched' });
+      } else {
+        results.push({ filename: file.originalname, status: 'unmatched' });
+      }
+    }
+
+    await ActivityLog.logFromReq(req, 'bulk_upload_images', 'design', null, `Bulk uploaded ${files.length} images (${matchedCount} matched to designs)`);
+
+    const message = `Bulk image processing complete: ${matchedCount} of ${files.length} images successfully linked to products.`;
+    return res.json({
+      success: true,
+      message,
+      matchedCount,
+      totalUploaded: files.length,
+      details: results
+    });
+  } catch (err) {
+    console.error('bulkUploadImages error:', err);
+    return res.status(500).json({ success: false, message: `Bulk image upload failed: ${err.message}` });
+  }
+};
+
 

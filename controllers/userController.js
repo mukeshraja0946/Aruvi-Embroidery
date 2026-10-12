@@ -206,7 +206,11 @@ exports.downloadDesignZip = async (req, res, next) => {
     if (machineFiles.length === 1 && machineFiles[0].file_path) {
       const singlePath = resolveFilePath(machineFiles[0].file_path);
       if (singlePath && fs.existsSync(singlePath) && path.extname(singlePath).toLowerCase() === '.zip') {
-        await Design.incrementDownloadCount(targetDesignId);
+        await Design.incrementDownloadCount(targetDesignId, {
+          userId: req.user ? req.user.id : null,
+          ip: req.ip,
+          userAgent: req.get('user-agent')
+        });
         return res.download(singlePath, zipFileName);
       }
     }
@@ -252,7 +256,11 @@ exports.downloadDesignZip = async (req, res, next) => {
       return res.redirect('/user/dashboard');
     }
 
-    await Design.incrementDownloadCount(targetDesignId);
+    await Design.incrementDownloadCount(targetDesignId, {
+      userId: req.user ? req.user.id : null,
+      ip: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     const zipBuffer = zip.toBuffer();
     res.setHeader('Content-Type', 'application/zip');

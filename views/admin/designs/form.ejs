@@ -453,8 +453,8 @@
                 <div>
                   <label class="form-label-custom">Download Count</label>
                   <div style="position: relative;">
-                    <input type="number" name="download_count" class="form-control-custom" value="<%= design ? (design.download_count !== undefined && design.download_count !== null ? design.download_count : (design.total_sales || 256)) : 256 %>">
-                    <i class="fa-regular fa-circle-question" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--admin-text-muted);" title="Tracked downloads count"></i>
+                    <input type="number" name="download_count" class="form-control-custom" value="<%= design ? (design.download_count !== undefined && design.download_count !== null ? design.download_count : (design.total_sales || 0)) : 0 %>">
+                    <i class="fa-regular fa-circle-question" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--admin-text-muted);" title="Tracked customer downloads count"></i>
                   </div>
                 </div>
               </div>
@@ -464,7 +464,7 @@
             <div class="form-section-card">
               <h3>Tags (Optional)</h3>
 
-              <input type="hidden" name="tags" id="tagsHiddenInput" value="<%= design ? (design.tags || 'rose, floral, blouse, saree, flower') : 'rose, floral, blouse, saree, flower' %>">
+              <input type="hidden" name="tags" id="tagsHiddenInput" value="<%= design ? (design.tags || '') : '' %>">
               <div id="tagPillsContainer" style="border: 1px solid var(--admin-border); border-radius: 10px; padding: 8px 10px; background: #FFFFFF; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px;">
                 <!-- Tag Pills inserted dynamically via JS -->
                 <input type="text" id="tagTextInput" placeholder="Type and press Enter to add tag..." style="border: none; outline: none; font-size: 0.8rem; background: transparent; flex: 1; min-width: 160px;" onkeydown="handleTagKeyDown(event)">

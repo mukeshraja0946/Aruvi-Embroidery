@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const { getPreviewsDir, getDesignsDir } = require('../config/storage');
 
@@ -17,9 +18,10 @@ const storage = multer.diskStorage({
     }
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const randomHex = crypto.randomBytes(8).toString('hex');
+    const uniqueSuffix = `${Date.now()}-${randomHex}`;
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, file.fieldname + '-' + uniqueSuffix + (ext || '.png'));
+    cb(null, `${file.fieldname}-${uniqueSuffix}${ext || '.png'}`);
   }
 });
 

@@ -164,8 +164,8 @@ class AdminStatsService {
           SELECT d.id, d.title, d.slug, d.price, d.sale_price,
                  COUNT(oi.id) as sales_count,
                  COALESCE(
-                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1),
-                   '/public/images/hero_embroidery.jpg'
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1)
                  ) as image_url
           FROM designs d
           JOIN order_items oi ON d.id = oi.design_id
