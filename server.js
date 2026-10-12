@@ -72,29 +72,33 @@ const storage = require('./config/storage');
 storage.initStorage();
 storage.validateStorageConfiguration();
 
-// Serve preview images publicly from persistent storage
-app.use('/public/uploads/previews', express.static(storage.getPreviewsDir()));
-app.use('/uploads/previews', express.static(storage.getPreviewsDir()));
-
-// Fallback to default previews if custom persistent directory is configured
-if (path.resolve(storage.getPreviewsDir()) !== path.resolve(path.join(storage.defaultUploadsDir, 'previews'))) {
-  app.use('/public/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews')));
-  app.use('/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews')));
-}
-
 // Strict Security: Block unauthenticated static access to paid design archives & private uploads
 // Paid design files must be downloaded ONLY through authenticated customer/user download routes
-app.use(['/public/uploads/designs', '/uploads/designs', '/private_uploads'], (req, res) => {
+app.use(['/public/uploads/designs', '/uploads/designs', '/private_uploads', '/public/uploads/private_designs'], (req, res) => {
   res.status(403).json({ error: 'Access forbidden. Paid design archives can only be downloaded via authenticated routes.' });
 });
 
+// Serve preview images and public uploads from persistent storage
+app.use('/public/uploads/previews', express.static(storage.getPreviewsDir()));
+app.use('/uploads/previews', express.static(storage.getPreviewsDir()));
+app.use('/public/uploads', express.static(storage.getUploadsDir()));
+app.use('/uploads', express.static(storage.getUploadsDir()));
+
+// Fallback to project default public/uploads if custom persistent directory is configured
+if (path.resolve(storage.getUploadsDir()) !== path.resolve(storage.defaultUploadsDir)) {
+  app.use('/public/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews')));
+  app.use('/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews')));
+  app.use('/public/uploads', express.static(storage.defaultUploadsDir));
+  app.use('/uploads', express.static(storage.defaultUploadsDir));
+}
+
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
-// Safe preview image resolver (locates preview images across persistent and fallback storage)
+// Universal preview image resolver (locates preview images across persistent and fallback storage)
 const serveUploadedPreview = (req, res, next) => {
   const ext = path.extname(req.path).toLowerCase();
-  if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg'].includes(ext)) {
-    const resolved = storage.resolveFilePath(path.join('previews', req.path));
+  if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg', '.ico'].includes(ext)) {
+    const resolved = storage.resolveFilePath(req.path) || storage.resolveFilePath(path.join('previews', req.path));
     if (resolved && fs.existsSync(resolved)) {
       return res.sendFile(resolved);
     }
@@ -104,6 +108,8 @@ const serveUploadedPreview = (req, res, next) => {
 
 app.use('/public/uploads/previews', serveUploadedPreview);
 app.use('/uploads/previews', serveUploadedPreview);
+app.use('/public/uploads', serveUploadedPreview);
+app.use('/uploads', serveUploadedPreview);
 
 // Session Management
 app.use(

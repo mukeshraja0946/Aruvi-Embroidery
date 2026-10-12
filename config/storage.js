@@ -18,6 +18,9 @@ module.exports = {
   uploadToS3OrR2: (filePath, destFilename) => storageService.savePrivateFile(filePath, destFilename),
   savePublicFile: (file, originalName, mimeType) => storageService.savePublicFile(file, originalName, mimeType),
   savePrivateFile: (file, originalName, mimeType) => storageService.savePrivateFile(file, originalName, mimeType),
-  getSignedDownloadUrl: (key, expiresIn) => storageService.getSignedDownloadUrl(key, expiresIn),
+  getThumbsDir: () => storageService.getThumbsDir(),
+  buildPublicUrl: (keyOrPath) => storageService.buildPublicUrl(keyOrPath),
+  buildThumbnailUrl: (keyOrPath) => storageService.buildThumbnailUrl(keyOrPath),
+  generateThumbnail: (source, filename) => storageService.generateThumbnail(source, filename),
   storageService
 };

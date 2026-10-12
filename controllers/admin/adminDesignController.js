@@ -2,8 +2,10 @@ const path = require('path');
 const fs = require('fs');
 const Design = require('../../models/Design');
 const Category = require('../../models/Category');
+const db = require('../../config/db');
 const emailService = require('../../services/emailService');
-const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDriver, uploadToCloudinary, uploadToS3OrR2 } = require('../../config/storage');
+const storage = require('../../config/storage');
+const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDriver, uploadToCloudinary, uploadToS3OrR2 } = storage;
 const ActivityLog = require('../../models/ActivityLog');
 
 const AdminStatsService = require('../../services/adminStatsService');
@@ -188,11 +190,13 @@ exports.getCreateForm = async (req, res, next) => {
 };
 
 function checkIsAjax(req) {
+  if (!req) return false;
   if (req.xhr) return true;
-  const acceptHeader = String((typeof req.get === 'function' ? req.get('accept') : req.headers['accept']) || req.headers['accept'] || '').toLowerCase();
+  const headers = req.headers || {};
+  const acceptHeader = String((typeof req.get === 'function' ? req.get('accept') : headers['accept']) || headers['accept'] || '').toLowerCase();
   if (acceptHeader.includes('json')) return true;
 
-  const requestedWith = String((typeof req.get === 'function' ? req.get('x-requested-with') : req.headers['x-requested-with']) || req.headers['x-requested-with'] || '').toLowerCase();
+  const requestedWith = String((typeof req.get === 'function' ? req.get('x-requested-with') : headers['x-requested-with']) || headers['x-requested-with'] || '').toLowerCase();
   if (requestedWith.includes('xmlhttprequest')) return true;
 
   if (req.query && (req.query.format === 'json' || req.query.ajax === '1' || req.query.is_ajax === '1')) return true;
@@ -330,20 +334,8 @@ exports.postCreate = async (req, res, next) => {
       for (const file of imgFiles) {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
-        let filePath = `/public/uploads/previews/${file.filename}`;
-
-        if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
-          try {
-            const cloudUrl = await uploadToCloudinary(file.path);
-            if (cloudUrl) {
-              filePath = cloudUrl;
-            }
-          } catch (cloudErr) {
-            console.warn('[Cloudinary upload fallback]:', cloudErr.message);
-          }
-        }
-
-        await Design.addFile(designId, file.originalname, filePath, ext, file.size, 1);
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        await Design.addFile(designId, file.originalname, savedUrl, ext, file.size, 1);
       }
     }
 
@@ -531,20 +523,8 @@ exports.postEdit = async (req, res, next) => {
       for (const file of imgFiles) {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
-        let filePath = `/public/uploads/previews/${file.filename}`;
-
-        if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
-          try {
-            const cloudUrl = await uploadToCloudinary(file.path);
-            if (cloudUrl) {
-              filePath = cloudUrl;
-            }
-          } catch (cloudErr) {
-            console.warn('[Cloudinary upload fallback]:', cloudErr.message);
-          }
-        }
-
-        await Design.addFile(id, file.originalname, filePath, ext, file.size, 1);
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        await Design.addFile(id, file.originalname, savedUrl, ext, file.size, 1);
       }
     }
 
@@ -816,7 +796,7 @@ exports.duplicateDesign = async (req, res, next) => {
 
     await ActivityLog.logFromReq(req, 'duplicate', 'design', newDesignId, `Duplicated design #${id} "${original.title}" into #${newDesignId} "${newTitle}"`);
 
-    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    const isAjax = checkIsAjax(req);
     if (isAjax) {
       return res.json({
         success: true,
@@ -825,16 +805,20 @@ exports.duplicateDesign = async (req, res, next) => {
       });
     }
 
-    req.flash('success', `Design duplicated successfully as "${newTitle}" (SKU: ${newSku}).`);
-    res.redirect('/admin/designs');
+    if (typeof req.flash === 'function') {
+      req.flash('success', `Design duplicated successfully as "${newTitle}" (SKU: ${newSku}).`);
+    }
+    if (typeof res.redirect === 'function') res.redirect('/admin/designs');
   } catch (err) {
     console.error('duplicateDesign error:', err);
-    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    const isAjax = checkIsAjax(req);
     if (isAjax) {
       return res.status(500).json({ success: false, message: err.message || 'Unable to duplicate design.' });
     }
-    req.flash('error', `Unable to duplicate design: ${err.message}`);
-    res.redirect('/admin/designs');
+    if (typeof req.flash === 'function') {
+      req.flash('error', `Unable to duplicate design: ${err.message}`);
+    }
+    if (typeof res.redirect === 'function') res.redirect('/admin/designs');
   }
 };
 
@@ -992,17 +976,8 @@ exports.replaceImage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid image format. Supported formats: JPG, PNG, WEBP, SVG, AVIF' });
     }
 
-    let filePath = `/public/uploads/previews/${file.filename}`;
-    if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
-      try {
-        const cloudUrl = await uploadToCloudinary(file.path);
-        if (cloudUrl) filePath = cloudUrl;
-      } catch (cloudErr) {
-        console.warn('[Cloudinary upload fallback]:', cloudErr.message);
-      }
-    }
-
-    await Design.replacePrimaryImage(id, filePath, file.originalname, file.size);
+    const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+    await Design.replacePrimaryImage(id, savedUrl, file.originalname, file.size);
     await ActivityLog.logFromReq(req, 'update_image', 'design', id, `Replaced primary image for design #${id} "${design.title}"`);
 
     const isAjax = checkIsAjax(req);
@@ -1010,7 +985,7 @@ exports.replaceImage = async (req, res) => {
       return res.json({
         success: true,
         message: `Image for "${design.title}" updated successfully!`,
-        imageUrl: filePath,
+        imageUrl: savedUrl,
         designId: id
       });
     }
@@ -1062,15 +1037,8 @@ exports.bulkUploadImages = async (req, res) => {
       }
 
       if (matchedDesign) {
-        let filePath = `/public/uploads/previews/${file.filename}`;
-        if (getStorageDriver() === 'cloudinary' || getStorageDriver() === 'cloud') {
-          try {
-            const cloudUrl = await uploadToCloudinary(file.path);
-            if (cloudUrl) filePath = cloudUrl;
-          } catch (e) {}
-        }
-
-        await Design.replacePrimaryImage(matchedDesign.id, filePath, file.originalname, file.size);
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        await Design.replacePrimaryImage(matchedDesign.id, savedUrl, file.originalname, file.size);
         matchedCount++;
         results.push({ designId: matchedDesign.id, title: matchedDesign.title, sku: matchedDesign.sku, filename: file.originalname, status: 'matched' });
       } else {

@@ -118,7 +118,6 @@ class Design {
           // Post-process designs to derive formats 100% dynamically from design_files table
           for (const d of designs) {
             this.normalizePrimaryImage(d);
-            d.is_image_missing = Boolean(d.primary_image && !storage.fileExists(d.primary_image));
             try {
               const mFiles = await db.query(
                 'SELECT file_format, file_name FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) IN ("DST","PES","JEF","EXP")',
@@ -170,7 +169,6 @@ class Design {
     // Compute dynamic formats and check images for fallback designs
     for (const d of filtered) {
       this.normalizePrimaryImage(d);
-      d.is_image_missing = Boolean(d.primary_image && !storage.fileExists(d.primary_image));
       const mFiles = (d.files || []).filter(f => !f.is_preview && !['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase()));
       if (mFiles.length > 0) {
         d.formats = [...new Set(mFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
@@ -354,6 +352,7 @@ class Design {
 
           // Attach zipPackage metadata & sync formats
           this.attachZipPackage(design);
+          this.normalizePrimaryImage(design);
 
           return design;
         }
@@ -477,11 +476,20 @@ class Design {
     // Admin-uploaded images are NEVER overwritten.
     if (!img || nonImgExts.includes(ext)) {
       img = null;
-    } else if (!img.startsWith('/') && !img.startsWith('http')) {
-      img = '/' + img;
+      d.thumbnail_image = null;
+    } else {
+      img = storage.buildPublicUrl(img);
+      d.thumbnail_image = storage.buildThumbnailUrl(img);
     }
 
     d.primary_image = img;
+
+    if (d.images && Array.isArray(d.images)) {
+      for (const im of d.images) {
+        if (im.image_url) im.image_url = storage.buildPublicUrl(im.image_url);
+      }
+    }
+
     return d;
   }
 

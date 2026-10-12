@@ -63,6 +63,14 @@ class StorageService {
     return dir;
   }
 
+  getThumbsDir() {
+    const dir = path.join(this.getPreviewsDir(), 'thumbs');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    }
+    return dir;
+  }
+
   getDesignsDir() {
     const dir = this.getPrivateUploadsDir();
     if (!fs.existsSync(dir)) {
@@ -74,13 +82,18 @@ class StorageService {
   initStorageDirs() {
     try {
       this.getPreviewsDir();
+      this.getThumbsDir();
       this.getDesignsDir();
       
       // Fallback local dirs inside project root
       const defaultPreviews = path.join(defaultUploadsDir, 'previews');
+      const defaultThumbs = path.join(defaultPreviews, 'thumbs');
       const defaultDesigns = path.join(defaultUploadsDir, 'designs');
       if (!fs.existsSync(defaultPreviews)) {
         try { fs.mkdirSync(defaultPreviews, { recursive: true }); } catch (e) {}
+      }
+      if (!fs.existsSync(defaultThumbs)) {
+        try { fs.mkdirSync(defaultThumbs, { recursive: true }); } catch (e) {}
       }
       if (!fs.existsSync(defaultDesigns)) {
         try { fs.mkdirSync(defaultDesigns, { recursive: true }); } catch (e) {}
@@ -171,7 +184,39 @@ class StorageService {
   }
 
   /**
+   * Generates a fast 300px WebP thumbnail using sharp.
+   */
+  async generateThumbnail(sourcePathOrBuffer, filename) {
+    try {
+      const sharp = require('sharp');
+      const baseNameWithoutExt = path.basename(filename, path.extname(filename));
+      const thumbFilename = `${baseNameWithoutExt}.webp`;
+      const thumbDestPath = path.join(this.getThumbsDir(), thumbFilename);
+
+      let imagePipeline;
+      if (Buffer.isBuffer(sourcePathOrBuffer)) {
+        imagePipeline = sharp(sourcePathOrBuffer);
+      } else if (typeof sourcePathOrBuffer === 'string' && fs.existsSync(sourcePathOrBuffer)) {
+        imagePipeline = sharp(sourcePathOrBuffer);
+      } else {
+        return null;
+      }
+
+      await imagePipeline
+        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toFile(thumbDestPath);
+
+      return `/public/uploads/previews/thumbs/${thumbFilename}`;
+    } catch (err) {
+      console.warn('[Thumbnail Generation Warning]:', err.message);
+      return null;
+    }
+  }
+
+  /**
    * Saves a PUBLIC preview image, banner, logo, or favicon.
+   * Generates a 300px WebP thumbnail for fast admin listing.
    * Returns web-accessible URL or path.
    */
   async savePublicFile(filePathOrBuffer, originalName, mimeType = null) {
@@ -224,7 +269,74 @@ class StorageService {
       fs.copyFileSync(filePathOrBuffer, destPath);
     }
 
+    // Generate 300px WebP thumbnail for images
+    if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.jfif', '.bmp'].includes(ext)) {
+      await this.generateThumbnail(destPath, uniqueFilename);
+    }
+
     return `/public/uploads/previews/${uniqueFilename}`;
+  }
+
+  /**
+   * Builds the canonical browser-loadable public URL from any relative key, path, or remote URL.
+   */
+  buildPublicUrl(keyOrPath) {
+    if (!keyOrPath || typeof keyOrPath !== 'string') return null;
+    const clean = keyOrPath.trim();
+    if (!clean) return null;
+
+    // Remote HTTP / HTTPS URL
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+
+    // Normalizing slashes
+    const normalized = clean.replace(/\\/g, '/');
+
+    // Already public URL
+    if (normalized.startsWith('/public/uploads/')) {
+      return normalized;
+    }
+    if (normalized.startsWith('public/uploads/')) {
+      return '/' + normalized;
+    }
+    if (normalized.startsWith('/uploads/')) {
+      return '/public' + normalized;
+    }
+    if (normalized.startsWith('uploads/')) {
+      return '/public/' + normalized;
+    }
+
+    // Relative key e.g. "previews/xyz.jpg" or "previews/thumbs/xyz.webp"
+    if (normalized.startsWith('previews/') || normalized.startsWith('/previews/')) {
+      return `/public/uploads/${normalized.replace(/^\/+/, '')}`;
+    }
+
+    // Plain filename e.g. "preview-123.jpg"
+    return `/public/uploads/previews/${path.basename(normalized)}`;
+  }
+
+  /**
+   * Returns a 300px WebP thumbnail URL if available, otherwise falls back to canonical public URL.
+   */
+  buildThumbnailUrl(keyOrPath) {
+    if (!keyOrPath || typeof keyOrPath !== 'string') return null;
+    const clean = keyOrPath.trim();
+    if (!clean) return null;
+
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+
+    const baseNameWithoutExt = path.basename(clean, path.extname(clean));
+    const thumbFilename = `${baseNameWithoutExt}.webp`;
+    const localThumbPath = path.join(this.getThumbsDir(), thumbFilename);
+
+    if (fs.existsSync(localThumbPath)) {
+      return `/public/uploads/previews/thumbs/${thumbFilename}`;
+    }
+
+    return this.buildPublicUrl(clean);
   }
 
   /**
@@ -346,37 +458,55 @@ class StorageService {
   resolveFilePath(filePath, returnTargetIfMissing = false) {
     if (!filePath || typeof filePath !== 'string') return null;
 
+    let clean = filePath.trim();
+    try {
+      clean = decodeURIComponent(clean);
+    } catch (_) {}
+
     // If already absolute on disk
-    if (path.isAbsolute(filePath) && fs.existsSync(filePath)) {
-      return filePath;
+    if (path.isAbsolute(clean) && fs.existsSync(clean)) {
+      return clean;
     }
 
-    let clean = filePath.trim().replace(/^\/+/, '');
+    clean = clean.replace(/\\/g, '/').replace(/^\/+/, '');
     const baseName = path.basename(clean);
 
-    // 1. Check in custom persistent UPLOAD_DIR
+    // 1. Direct path check inside UPLOAD_DIR
+    const directUploads = path.join(this.getUploadsDir(), clean);
+    if (fs.existsSync(directUploads)) return directUploads;
+
+    // 2. Direct path check inside projectRoot
+    const rootDirect = path.join(projectRoot, clean);
+    if (fs.existsSync(rootDirect)) return rootDirect;
+
+    const publicDirect = path.join(projectRoot, 'public', clean.replace(/^public\//, ''));
+    if (fs.existsSync(publicDirect)) return publicDirect;
+
+    // 3. Check by filename in persistent previews, thumbs, designs
     const persistentPreviews = path.join(this.getPreviewsDir(), baseName);
     if (fs.existsSync(persistentPreviews)) return persistentPreviews;
+
+    const persistentThumbs = path.join(this.getThumbsDir(), baseName);
+    if (fs.existsSync(persistentThumbs)) return persistentThumbs;
 
     const persistentDesigns = path.join(this.getDesignsDir(), baseName);
     if (fs.existsSync(persistentDesigns)) return persistentDesigns;
 
-    // 2. Check in project public/uploads
+    // 4. Check by filename in default project uploads
     const inDefaultPreviews = path.join(defaultUploadsDir, 'previews', baseName);
     if (fs.existsSync(inDefaultPreviews)) return inDefaultPreviews;
+
+    const inDefaultThumbs = path.join(defaultUploadsDir, 'previews', 'thumbs', baseName);
+    if (fs.existsSync(inDefaultThumbs)) return inDefaultThumbs;
 
     const inDefaultDesigns = path.join(defaultUploadsDir, 'designs', baseName);
     if (fs.existsSync(inDefaultDesigns)) return inDefaultDesigns;
 
-    // 3. Check in brand assets folder (only if explicitly requested)
+    // 5. Check in brand assets folder
     if (clean.includes('brand') || clean.includes('assets')) {
       const inBrand = path.join(projectRoot, 'public', 'assets', 'brand', baseName);
       if (fs.existsSync(inBrand)) return inBrand;
     }
-
-    // 4. Check relative from project root
-    const rootCandidate = path.join(projectRoot, clean);
-    if (fs.existsSync(rootCandidate)) return rootCandidate;
 
     return returnTargetIfMissing ? path.join(this.getPreviewsDir(), baseName) : null;
   }
