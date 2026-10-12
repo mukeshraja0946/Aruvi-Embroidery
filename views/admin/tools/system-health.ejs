@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .health-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .health-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 14px;
+      padding: 1.35rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .health-stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+    }
+    .health-stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .health-stat-icon.green { background: #E8F5E9; color: #2E7D32; }
+    .health-stat-icon.red { background: #FFEBEE; color: #C62828; }
+    .health-stat-icon.blue { background: #E3F2FD; color: #1565C0; }
+    .health-stat-icon.purple { background: #F3E5F5; color: #7B1FA2; }
+    .health-stat-data strong {
+      display: block;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--admin-text);
+      line-height: 1.2;
+    }
+    .health-stat-data span {
+      font-size: 0.82rem;
+      color: #666;
+      font-weight: 500;
+    }
+    .health-banner {
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .health-banner.healthy {
+      background: #E8F5E9;
+      border: 1px solid #A5D6A7;
+      color: #1B5E20;
+    }
+    .health-banner.unhealthy {
+      background: #FFEBEE;
+      border: 1px solid #FFCDD2;
+      color: #B71C1C;
+    }
+    .schema-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .schema-card-header {
+      padding: 1rem 1.25rem;
+      background: #FAFAFA;
+      border-bottom: 1px solid var(--admin-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .schema-card-body {
+      padding: 1.25rem;
+    }
+    .col-pill-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .col-pill {
+      font-size: 0.78rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: monospace;
+      font-weight: 500;
+    }
+    .col-pill.ok {
+      background: #E8F5E9;
+      color: #2E7D32;
+      border: 1px solid #C8E6C9;
+    }
+    .col-pill.missing {
+      background: #FFEBEE;
+      color: #C62828;
+      border: 1px solid #FFCDD2;
+      font-weight: 700;
+      animation: pulseAlert 1.5s infinite alternate;
+    }
+    @keyframes pulseAlert {
+      from { box-shadow: 0 0 0 rgba(220, 53, 69, 0.2); }
+      to { box-shadow: 0 0 8px rgba(220, 53, 69, 0.6); }
+    }
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-status.ok {
+      background: #2E7D32;
+      color: #FFF;
+    }
+    .badge-status.error {
+      background: #C62828;
+      color: #FFF;
+    }
+    .badge-status.warning {
+      background: #F57F17;
+      color: #FFF;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="tableSearchInput" placeholder="Filter tables or columns..." onkeyup="filterTables()">
+    </div>
+
+    <div class="admin-header-right">
+      <a href="/admin/tools/system-health" class="admin-icon-btn active" title="System Health">
+        <i class="fa-solid fa-heart-pulse"></i>
+      </a>
+      <a href="/admin/tools/missing-files" class="admin-icon-btn" title="Missing Files">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & RECOVERY</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health" class="active"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-image-relink"><span><i class="fa-solid fa-images"></i> Bulk Image Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-file-relink"><span><i class="fa-solid fa-file-zipper"></i> Bulk File Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Storage</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">SYSTEM SETTINGS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main-content">
+      <!-- Page Header -->
+      <div class="admin-page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+        <div>
+          <div class="admin-breadcrumb" style="font-size: 0.82rem; color: #888; margin-bottom: 0.35rem;">
+            <a href="/admin" style="color: inherit; text-decoration: none;">Admin</a> &rsaquo; 
+            <a href="/admin/tools/system-health" style="color: inherit; text-decoration: none;">Tools</a> &rsaquo; 
+            <span>System Health</span>
+          </div>
+          <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--admin-text); margin: 0;">
+            <i class="fa-solid fa-heart-pulse" style="color: <%= health.isHealthy ? '#2E7D32' : '#C62828' %>; margin-right: 8px;"></i>
+            Database & System Health
+          </h1>
+          <p style="font-size: 0.88rem; color: #666; margin-top: 4px;">
+            Live schema verification across all <%= health.stats.totalExpectedTables %> database tables and <%= health.stats.totalExpectedColumns %> columns.
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+          <a href="/admin/tools/system-health/download-sync-sql" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-file-arrow-down"></i> Download production_sync.sql
+          </a>
+          <form action="/admin/tools/system-health/migrate" method="POST" style="margin: 0;" onsubmit="return confirm('Run all pending database migrations now? Existing catalog data will never be touched.');">
+            <button type="submit" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <i class="fa-solid fa-bolt"></i> Apply Pending Migrations
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Flash Messages -->
+      <% if (locals.flash && locals.flash.success && locals.flash.success.length > 0) { %>
+        <div style="background: #E8F5E9; border-left: 4px solid #2E7D32; padding: 0.85rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #1B5E20; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-check"></i> <%= locals.flash.success[0] %>
+        </div>
+      <% } %>
+      <% if (locals.flash && locals.flash.info && locals.flash.info.length > 0) { %>
+        <div style="background: #E3F2FD; border-left: 4px solid #1565C0; padding: 0.85rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #0D47A1; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-info"></i> <%= locals.flash.info[0] %>
+        </div>
+      <% } %>
+      <% if (locals.flash && locals.flash.error && locals.flash.error.length > 0) { %>
+        <div style="background: #FFEBEE; border-left: 4px solid #C62828; padding: 0.85rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #B71C1C; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-triangle-exclamation"></i> <%= locals.flash.error[0] %>
+        </div>
+      <% } %>
+
+      <!-- Health Status Banner -->
+      <div class="health-banner <%= health.isHealthy ? 'healthy' : 'unhealthy' %>">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="font-size: 2rem;">
+            <i class="fa-solid <%= health.isHealthy ? 'fa-shield-halved' : 'fa-triangle-exclamation' %>"></i>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">
+              <%= health.isHealthy ? 'All Systems Operational — Database Fully Synchronized' : 'Database Schema Incomplete — Missing Tables or Columns Detected' %>
+            </h3>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; opacity: 0.9;">
+              Connected to <strong><%= health.databaseName %></strong> on <strong><%= health.host %></strong>.
+              <%= health.isHealthy ? 'All required catalog, bulk import, and admin features are 100% ready.' : 'Some features (like Bulk Import) may fail until missing tables/columns are created.' %>
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <span style="font-size: 1.3rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 30px; background: <%= health.isHealthy ? '#C8E6C9' : '#FFCDD2' %>; color: <%= health.isHealthy ? '#1B5E20' : '#B71C1C' %>;">
+            <%= health.stats.healthPercentage %>% Complete
+          </span>
+        </div>
+      </div>
+
+      <!-- KPI Stat Cards -->
+      <div class="health-stat-grid">
+        <div class="health-stat-card">
+          <div class="health-stat-icon <%= health.stats.missingTablesCount === 0 ? 'green' : 'red' %>">
+            <i class="fa-solid fa-table"></i>
+          </div>
+          <div class="health-stat-data">
+            <strong><%= health.stats.existingTablesCount %> / <%= health.stats.totalExpectedTables %></strong>
+            <span>Tables Existing</span>
+          </div>
+        </div>
+
+        <div class="health-stat-card">
+          <div class="health-stat-icon <%= health.stats.missingColumnsCount === 0 ? 'green' : 'red' %>">
+            <i class="fa-solid fa-table-columns"></i>
+          </div>
+          <div class="health-stat-data">
+            <strong><%= health.stats.existingColumnsCount %> / <%= health.stats.totalExpectedColumns %></strong>
+            <span>Columns Verified</span>
+          </div>
+        </div>
+
+        <div class="health-stat-card">
+          <div class="health-stat-icon <%= health.migrations.pendingCount === 0 ? 'green' : 'blue' %>">
+            <i class="fa-solid fa-code-merge"></i>
+          </div>
+          <div class="health-stat-data">
+            <strong><%= health.migrations.appliedCount %> / <%= health.migrations.total %></strong>
+            <span>Migrations Applied</span>
+          </div>
+        </div>
+
+        <div class="health-stat-card">
+          <div class="health-stat-icon <%= health.isHealthy ? 'green' : 'red' %>">
+            <i class="fa-solid fa-heart-pulse"></i>
+          </div>
+          <div class="health-stat-data">
+            <strong><%= health.isHealthy ? 'PERFECT' : health.stats.missingTablesCount + ' MISSING' %></strong>
+            <span>Overall Status</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Missing Items Alert (if any) -->
+      <% if (!health.isHealthy) { %>
+        <div style="background: #FFFFFF; border: 2px solid #FFCDD2; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+          <h3 style="color: #C62828; margin: 0 0 0.8rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-exclamation"></i> Action Required to Prevent Production Errors:
+          </h3>
+          <p style="font-size: 0.88rem; color: #555; margin-bottom: 1rem;">
+            Click <strong>"Apply Pending Migrations"</strong> above, or download <strong>production_sync.sql</strong> and run it inside your live phpMyAdmin panel.
+          </p>
+
+          <% if (health.missingTables.length > 0) { %>
+            <div style="margin-bottom: 0.8rem;">
+              <strong style="color: #C62828; font-size: 0.85rem;">Missing Tables (<%= health.missingTables.length %>):</strong>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
+                <% health.missingTables.forEach(t => { %>
+                  <span class="col-pill missing"><i class="fa-solid fa-xmark"></i> <%= t %></span>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (health.missingColumns.length > 0) { %>
+            <div>
+              <strong style="color: #C62828; font-size: 0.85rem;">Missing Columns (<%= health.missingColumns.length %>):</strong>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
+                <% health.missingColumns.forEach(c => { %>
+                  <span class="col-pill missing"><i class="fa-solid fa-xmark"></i> <%= c.table %>.<%= c.column %></span>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
+
+      <!-- Migrations History Accordion -->
+      <div class="schema-card">
+        <div class="schema-card-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-clock-rotate-left" style="color: var(--admin-primary);"></i>
+            <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--admin-text);">
+              Migration Version History (<%= health.migrations.appliedCount %> applied, <%= health.migrations.pendingCount %> pending)
+            </h3>
+          </div>
+          <span class="badge-status <%= health.migrations.isUpToDate ? 'ok' : 'warning' %>">
+            <%= health.migrations.isUpToDate ? 'Up To Date' : health.migrations.pendingCount + ' Pending' %>
+          </span>
+        </div>
+        <div class="schema-card-body" style="padding: 0;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead>
+              <tr style="background: #F9FAFB; border-bottom: 1px solid var(--admin-border); text-align: left;">
+                <th style="padding: 0.75rem 1.25rem;">Version</th>
+                <th style="padding: 0.75rem 1.25rem;">Migration File</th>
+                <th style="padding: 0.75rem 1.25rem;">Status</th>
+                <th style="padding: 0.75rem 1.25rem;">Applied At</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (health.migrations.migrations && health.migrations.migrations.length > 0) { %>
+                <% health.migrations.migrations.forEach(m => { %>
+                  <tr style="border-bottom: 1px solid var(--admin-border);">
+                    <td style="padding: 0.65rem 1.25rem; font-family: monospace; font-weight: 600;">
+                      <%= m.version %>
+                    </td>
+                    <td style="padding: 0.65rem 1.25rem; font-family: monospace;">
+                      <%= m.file %>
+                    </td>
+                    <td style="padding: 0.65rem 1.25rem;">
+                      <span class="badge-status <%= m.isApplied ? 'ok' : 'warning' %>" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">
+                        <%= m.isApplied ? 'Applied' : 'Pending' %>
+                      </span>
+                    </td>
+                    <td style="padding: 0.65rem 1.25rem; color: #666;">
+                      <%= m.appliedAt ? new Date(m.appliedAt).toLocaleString('en-IN') : '—' %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="4" style="padding: 1.5rem; text-align: center; color: #888;">No migration files recorded.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Database Tables & Columns Health Breakdown -->
+      <div style="margin-top: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text); margin: 0;">
+            <i class="fa-solid fa-list-check" style="color: var(--admin-primary); margin-right: 6px;"></i>
+            Schema Integrity by Table
+          </h2>
+          <div style="font-size: 0.82rem; color: #777;">
+            Showing all <%= health.tables.length %> required application tables
+          </div>
+        </div>
+
+        <div id="tableListContainer">
+          <% health.tables.forEach(tbl => { %>
+            <div class="schema-card table-row-item" data-tablename="<%= tbl.name.toLowerCase() %>" data-status="<%= tbl.isFullyHealthy ? 'healthy' : 'issue' %>">
+              <div class="schema-card-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="badge-status <%= tbl.exists ? 'ok' : 'error' %>">
+                    <%= tbl.exists ? 'TABLE OK' : 'TABLE MISSING' %>
+                  </span>
+                  <span style="font-family: monospace; font-size: 1rem; font-weight: 700; color: #222;">
+                    `<%= tbl.name %>`
+                  </span>
+                  <span style="font-size: 0.8rem; color: #777;">
+                    (<%= tbl.columns.filter(c => c.exists).length %> of <%= tbl.columns.length %> columns verified)
+                  </span>
+                </div>
+
+                <div>
+                  <% if (tbl.missingColumnCount > 0) { %>
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #C62828;">
+                      <i class="fa-solid fa-triangle-exclamation"></i> <%= tbl.missingColumnCount %> Column(s) Missing!
+                    </span>
+                  <% } else { %>
+                    <span style="font-size: 0.78rem; font-weight: 600; color: #2E7D32;">
+                      <i class="fa-solid fa-circle-check"></i> Complete
+                    </span>
+                  <% } %>
+                </div>
+              </div>
+
+              <div class="schema-card-body">
+                <div class="col-pill-grid">
+                  <% tbl.columns.forEach(col => { %>
+                    <span class="col-pill <%= col.exists ? 'ok' : 'missing' %>" title="<%= col.exists ? 'Column is active in MySQL' : 'CRITICAL: Column is missing in MySQL!' %>">
+                      <i class="fa-solid <%= col.exists ? 'fa-check' : 'fa-xmark' %>"></i> <%= col.name %>
+                    </span>
+                  <% }) %>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+function filterTables() {
+  const query = (document.getElementById('tableSearchInput').value || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.table-row-item');
+  rows.forEach(row => {
+    const tableName = row.getAttribute('data-tablename');
+    const textContent = row.textContent.toLowerCase();
+    if (!query || tableName.includes(query) || textContent.includes(query)) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+</script>
+
+</body>
+</html>

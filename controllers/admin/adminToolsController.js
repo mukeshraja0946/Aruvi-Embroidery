@@ -9,6 +9,8 @@ const healthCheckService = require('../../services/healthCheckService');
 const { runBackup, backupsDir } = require('../../scripts/backup');
 const Design = require('../../models/Design');
 const ActivityLog = require('../../models/ActivityLog');
+const { checkSystemHealth } = require('../../services/schemaHealthService');
+const { runPendingMigrations } = require('../../services/migrationRunner');
 
 const projectRoot = path.resolve(__dirname, '../..');
 const stagingBaseDir = path.join(projectRoot, 'scratch', 'relink_staging');
@@ -703,3 +705,95 @@ exports.downloadBackup = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * System & Database Schema Health Dashboard
+ * GET /admin/tools/system-health
+ */
+exports.getSystemHealth = async (req, res, next) => {
+  try {
+    const health = await checkSystemHealth();
+    res.render('admin/tools/system-health', {
+      title: 'Database & System Health - Admin',
+      health,
+      page: 'system-health'
+    });
+  } catch (err) {
+    console.error('❌ [getSystemHealth Controller Error]:', err);
+    res.status(500).render('admin/tools/system-health', {
+      title: 'Database & System Health - Admin',
+      health: {
+        connected: false,
+        error: 'A database inspection error occurred. Detailed error logged to server console.',
+        tables: [],
+        missingTables: [],
+        missingColumns: [],
+        stats: { totalExpectedTables: 0, existingTablesCount: 0, missingTablesCount: 0, totalExpectedColumns: 0, existingColumnsCount: 0, missingColumnsCount: 0, healthPercentage: 0 },
+        migrations: { total: 0, appliedCount: 0, pendingCount: 0, isUpToDate: false, migrations: [] },
+        isHealthy: false
+      },
+      page: 'system-health'
+    });
+  }
+};
+
+/**
+ * Run Pending Database Migrations from UI
+ * POST /admin/tools/system-health/migrate
+ */
+exports.postRunMigrations = async (req, res, next) => {
+  try {
+    console.log('[Admin Tools] Manual migration execution triggered by admin user');
+    const result = await runPendingMigrations({ silent: false });
+    await ActivityLog.logFromReq(req, 'migrate', 'system', null, `Executed database migrations (${result.appliedCount} applied)`);
+
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: result.appliedCount === 0 
+          ? 'Database schema is already up to date! Zero pending migrations.' 
+          : `Successfully applied ${result.appliedCount} migration(s)!`,
+        result
+      });
+    }
+
+    if (result.appliedCount === 0) {
+      req.flash('info', 'Database schema is already up to date. All migrations have been applied.');
+    } else {
+      req.flash('success', `Successfully applied ${result.appliedCount} new database migration(s)!`);
+    }
+    res.redirect('/admin/tools/system-health');
+  } catch (err) {
+    // Log real cause in server logs, show user-friendly message in UI
+    console.error('❌ [Admin Tools] Error during manual migration run:', err);
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+    if (isAjax) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database migration failed. Please check the server error logs for full details.'
+      });
+    }
+    req.flash('error', 'Migration operation could not be completed. The error has been logged for system diagnosis.');
+    res.redirect('/admin/tools/system-health');
+  }
+};
+
+/**
+ * Download production_sync.sql file
+ * GET /admin/tools/system-health/download-sync-sql
+ */
+exports.downloadProductionSyncSql = async (req, res, next) => {
+  try {
+    const syncSqlPath = path.resolve(__dirname, '../../migrations/production_sync.sql');
+    if (!fs.existsSync(syncSqlPath)) {
+      req.flash('error', 'production_sync.sql file is not present on server.');
+      return res.redirect('/admin/tools/system-health');
+    }
+    res.download(syncSqlPath, 'production_sync.sql');
+  } catch (err) {
+    console.error('[downloadProductionSyncSql Error]:', err);
+    next(err);
+  }
+};
+

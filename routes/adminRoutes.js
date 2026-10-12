@@ -164,4 +164,9 @@ router.get('/admin/tools/backup', adminToolsController.getBackupPage);
 router.post('/admin/tools/backup/run', adminToolsController.postRunBackup);
 router.get('/admin/tools/backup/download/:filename', adminToolsController.downloadBackup);
 
+// Database & System Health Dashboard
+router.get('/admin/tools/system-health', adminToolsController.getSystemHealth);
+router.post('/admin/tools/system-health/migrate', adminToolsController.postRunMigrations);
+router.get('/admin/tools/system-health/download-sync-sql', adminToolsController.downloadProductionSyncSql);
+
 module.exports = router;

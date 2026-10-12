@@ -157,27 +157,38 @@ tar -czf backup_aruvi_uploads_$(date +%F_%T).tar.gz -C /var/data uploads
 ---
 
 ### 3. How to Deploy Without Losing Data
+**Deploy = git push + restart; migrations apply automatically.**
+
 When pushing or pulling code updates to production:
 
-1. **Keep `.env` intact:** Ensure `.env` is outside Git and contains your persistent storage path:
+1. **Keep `.env` intact:** Ensure `.env` is outside Git and contains your persistent storage path and live DB configuration:
    ```env
    UPLOAD_DIR=/var/data/uploads
    STORAGE_DRIVER=local
+   DB_HOST=127.0.0.1
+   DB_NAME=u101925264_aedesign
+   DB_USER=u101925264_aedesign
+   DB_PASSWORD=your_production_password
    ```
-2. **Pull the latest code:**
+2. **Deploy updates (Git Push & Restart):**
    ```bash
    git pull origin main
-   ```
-3. **Install production dependencies:**
-   ```bash
    npm install --production
+   pm2 restart aruvi-app || npm start
    ```
-4. **Run safe numbered migrations:**
+   *Migrations apply automatically on server start!* `server.js` executes any pending numbered migrations (`migrations/001_*.sql`, etc.) sequentially, records them in `schema_migrations`, and never touches existing data.
+3. **Manual Migration Command (Optional):**
    ```bash
    npm run migrate
    ```
-   *(Migrations use `CREATE TABLE IF NOT EXISTS` and track executed migrations in `_migrations`. They will never drop tables or overwrite existing records).*
-5. **Restart application process:**
+4. **Live phpMyAdmin One-Click Sync:**
+   If your live database is missing newer tables (e.g., `import_jobs`, `file_scan_results`, `download_logs`), you can copy and run the idempotent sync script directly in phpMyAdmin:
+   `migrations/production_sync.sql`
+   *(Contains only `CREATE TABLE IF NOT EXISTS` and safe dynamic column/index checks. Never drops or alters existing data).*
+5. **System Health Verification:**
+   Visit **Admin → Tools → System Health** (`/admin/tools/system-health`) to verify that all 28 tables and 225+ columns exist with green indicators.
+6. **Future Development Rule:**
+   Every future feature that introduces a new table or column **must** include a new numbered migration file in `migrations/` (e.g., `migrations/011_feature_name.sql`). Deploying will automatically apply it upon restart.
    ```bash
    pm2 restart aruvi-embroidery
    # or: systemctl restart aruvi-embroidery
