@@ -9,6 +9,7 @@ module.exports = {
   getDesignsDir: () => storageService.getDesignsDir(),
   resolveFilePath: (filePath, returnTargetIfMissing = false) => storageService.resolveFilePath(filePath, returnTargetIfMissing),
   fileExists: (filePath) => storageService.fileExists(filePath),
+  fileExistsAsync: (filePath) => storageService.fileExistsAsync(filePath),
   resolveBrandAsset: (type, candidateUrl) => storageService.resolveBrandAsset(type, candidateUrl),
   getWebPath: (filename, type = 'previews') => `/public/uploads/${type}/${require('path').basename(filename)}`,
   defaultUploadsDir: require('path').join(__dirname, '../public/uploads'),

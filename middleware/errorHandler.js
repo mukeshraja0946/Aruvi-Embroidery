@@ -70,24 +70,35 @@ function errorHandler(err, req, res, next) {
     return res.redirect(targetRedirect);
   }
 
-  // Baseline Safety: Ensure res.locals is completely populated to prevent secondary rendering errors
-  if (!res.locals.siteSettings) {
-    res.locals.siteSettings = (req.app && req.app.locals.siteSettings) ? req.app.locals.siteSettings : {};
+  const fs = require('fs');
+  const path = require('path');
+  const crypto = require('crypto');
+
+  const isAdminRoute = req.originalUrl && req.originalUrl.startsWith('/admin');
+  const errorId = 'ERR-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+
+  // Log error with stack trace and timestamp
+  try {
+    const logsDir = path.join(__dirname, '../logs');
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+    const logLine = `[${new Date().toISOString()}] [${errorId}] ${req.method} ${req.originalUrl}\nError: ${err.message}\nStack: ${err.stack || 'No stack'}\n\n`;
+    fs.appendFileSync(path.join(logsDir, 'admin-error.log'), logLine, 'utf8');
+  } catch (logErr) {
+    console.error('Failed to write to admin-error.log:', logErr.message);
   }
-  if (!res.locals.currentUser) {
-    res.locals.currentUser = (req.app && req.app.locals.currentUser) ? req.app.locals.currentUser : null;
-  }
-  if (!res.locals.currentPath) {
-    res.locals.currentPath = req.path || '';
-  }
-  if (!res.locals.cartCount) {
-    res.locals.cartCount = 0;
-  }
-  if (!res.locals.flash) {
-    res.locals.flash = { success: [], error: [], info: [] };
-  }
-  if (typeof res.locals.csrfToken === 'undefined') {
-    res.locals.csrfToken = (typeof req.csrfToken === 'function' ? req.csrfToken() : '');
+
+  if (isAdminRoute) {
+    const adminMsg = process.env.NODE_ENV === 'production'
+      ? 'An unexpected error occurred while processing this admin request. The issue has been logged with reference ID.'
+      : (err.message || 'An unexpected error occurred.');
+
+    return res.status(statusCode).render('admin/error', {
+      title: `Error ${statusCode} - Admin`,
+      statusCode,
+      message: adminMsg,
+      errorId,
+      stack: err.stack
+    });
   }
 
   res.status(statusCode).render('pages/error', {

@@ -10,6 +10,7 @@ async function attachUserAndCart(req, res, next) {
   res.locals.cart = { items: [], total: 0, count: 0 };
   res.locals.siteSettings = { ...(req.app ? req.app.locals.siteSettings : {}) };
   res.locals.flash = { success: [], error: [], info: [] };
+  res.locals.messages = { success: '', error: '', info: '' };
   res.locals.csrfToken = '';
 
   try {
@@ -67,12 +68,20 @@ async function attachUserAndCart(req, res, next) {
     res.locals.settings = res.locals.siteSettings;
 
     if (req.flash) {
+      const flashSuccess = req.flash('success') || [];
+      const flashError = req.flash('error') || [];
+      const flashInfo = req.flash('info') || [];
       res.locals.flash = {
-        success: req.flash('success') || [],
-        error: req.flash('error') || [],
-        info: req.flash('info') || [],
+        success: flashSuccess,
+        error: flashError,
+        info: flashInfo,
         account_not_found: req.flash('account_not_found') || false,
         account_email: req.flash('account_email') || ''
+      };
+      res.locals.messages = {
+        success: flashSuccess.length > 0 ? flashSuccess[0] : '',
+        error: flashError.length > 0 ? flashError[0] : '',
+        info: flashInfo.length > 0 ? flashInfo[0] : ''
       };
     }
 

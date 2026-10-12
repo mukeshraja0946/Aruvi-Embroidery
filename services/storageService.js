@@ -295,10 +295,11 @@ class StorageService {
   }
 
   /**
-   * Checks whether a file physically exists in persistent storage or remote storage.
+   * Asynchronously checks whether a file physically exists in persistent storage or remote storage.
+   * Uses fs.promises.access and wraps all checks in try/catch so corrupted paths never throw.
    */
-  fileExists(filePathOrUrl) {
-    if (!filePathOrUrl || typeof filePathOrUrl !== 'string') return false;
+  async fileExistsAsync(filePathOrUrl) {
+    if (!filePathOrUrl || typeof filePathOrUrl !== 'string' || !filePathOrUrl.trim()) return false;
 
     // Remote HTTP / HTTPS URLs (Cloudinary, Cloudflare R2 CDN, S3)
     if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
@@ -309,8 +310,34 @@ class StorageService {
       return Boolean(this.s3Client);
     }
 
-    const resolved = this.resolveFilePath(filePathOrUrl, false);
-    return Boolean(resolved && fs.existsSync(resolved));
+    try {
+      const resolved = this.resolveFilePath(filePathOrUrl, false);
+      if (!resolved) return false;
+      await fs.promises.access(resolved, fs.constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  fileExists(filePathOrUrl) {
+    if (!filePathOrUrl || typeof filePathOrUrl !== 'string' || !filePathOrUrl.trim()) return false;
+
+    // Remote HTTP / HTTPS URLs (Cloudinary, Cloudflare R2 CDN, S3)
+    if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
+      return true;
+    }
+
+    if (filePathOrUrl.startsWith('s3://')) {
+      return Boolean(this.s3Client);
+    }
+
+    try {
+      const resolved = this.resolveFilePath(filePathOrUrl, false);
+      return Boolean(resolved && fs.existsSync(resolved));
+    } catch {
+      return false;
+    }
   }
 
   /**

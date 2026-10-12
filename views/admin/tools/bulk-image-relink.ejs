@@ -87,14 +87,18 @@
 
     <!-- Main Content Body -->
     <main class="admin-content-body">
-      <% if (messages && messages.success) { %>
+      <% 
+        const alertSuccess = (typeof flash !== 'undefined' && flash.success && flash.success.length ? flash.success[0] : null) || (typeof messages !== 'undefined' && messages.success ? messages.success : null);
+        const alertError = (typeof flash !== 'undefined' && flash.error && flash.error.length ? flash.error[0] : null) || (typeof messages !== 'undefined' && messages.error ? messages.error : null);
+      %>
+      <% if (alertSuccess) { %>
         <div class="alert alert-success" style="margin-bottom: 1.5rem; background: #E8F5E9; color: #2E7D32; padding: 1rem; border-radius: 8px; border: 1px solid #C8E6C9;">
-          <i class="fa-solid fa-circle-check"></i> <%= messages.success %>
+          <i class="fa-solid fa-circle-check"></i> <%= alertSuccess %>
         </div>
       <% } %>
-      <% if (messages && messages.error) { %>
+      <% if (alertError) { %>
         <div class="alert alert-danger" style="margin-bottom: 1.5rem; background: #FFEBEE; color: #C62828; padding: 1rem; border-radius: 8px; border: 1px solid #FFCDD2;">
-          <i class="fa-solid fa-circle-exclamation"></i> <%= messages.error %>
+          <i class="fa-solid fa-circle-exclamation"></i> <%= alertError %>
         </div>
       <% } %>
 

@@ -81,55 +81,130 @@ function matchFileToDesigns(fileName, designs) {
 
 exports.getMissingFiles = async (req, res, next) => {
   try {
-    const scan = await healthCheckService.runHealthScan();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(10, parseInt(req.query.limit, 10) || 50));
     const filter = req.query.filter || 'all';
+    const search = req.query.search || '';
 
-    let list = scan.missingDesigns || [];
-    if (filter === 'missing_image') {
-      list = list.filter(d => d.image_missing && !d.file_missing);
-    } else if (filter === 'missing_file') {
-      list = list.filter(d => d.file_missing && !d.image_missing);
-    } else if (filter === 'missing_both') {
-      list = list.filter(d => d.image_missing && d.file_missing);
-    }
+    const { designs, pagination } = await healthCheckService.getPaginatedDesignsWithStatus({
+      page,
+      limit,
+      filter,
+      search
+    });
+
+    const summary = await healthCheckService.getScanSummary();
 
     res.render('admin/tools/missing-files', {
-      title: 'Missing Files & Integrity Report - Admin',
-      scan,
-      designs: list,
-      currentFilter: filter
+      title: 'Missing Files & Storage Diagnostics - Admin',
+      designs,
+      pagination,
+      summary,
+      currentFilter: filter,
+      currentSearch: search,
+      currentPage: page
     });
   } catch (err) {
     next(err);
   }
 };
 
+exports.triggerFullScan = async (req, res, next) => {
+  try {
+    const result = await healthCheckService.triggerBackgroundScan();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getScanStatus = async (req, res, next) => {
+  try {
+    const summary = await healthCheckService.getScanSummary();
+    const progressPercent = summary.totalDesigns > 0
+      ? Math.round((summary.scannedDesigns / summary.totalDesigns) * 100)
+      : (summary.status === 'completed' ? 100 : 0);
+
+    res.json({
+      success: true,
+      summary: {
+        ...summary,
+        progressPercent: Math.min(100, Math.max(0, progressPercent))
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.exportMissingFilesCsv = async (req, res, next) => {
   try {
-    const scan = await healthCheckService.runHealthScan();
-    const list = scan.missingDesigns || [];
+    if (!db.isConnected()) await db.initPool();
 
-    const headers = ['Design ID', 'Title', 'SKU', 'Category', 'Price', 'Status', 'Image Status', 'Design File Status', 'Current Image Path', 'Current File Path'];
+    let results = [];
+    try {
+      const [tableCheck] = await db.query("SHOW TABLES LIKE 'file_scan_results'");
+      if (tableCheck) {
+        results = await db.query(`
+          SELECT * FROM file_scan_results 
+          WHERE image_status != 'ok' OR file_status != 'ok'
+          ORDER BY design_id DESC
+        `);
+      }
+    } catch (e) {}
+
+    // Dynamic scan fallback if background scan hasn't run yet
+    if (!results || results.length === 0) {
+      const rawDesigns = await db.query(`
+        SELECT 
+          d.id, d.title, d.sku, d.price, d.is_active,
+          c.name AS category_name,
+          (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id ORDER BY di.is_primary DESC, di.id ASC LIMIT 1) AS image_url,
+          (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id ASC LIMIT 1) AS file_path,
+          (SELECT df.file_name FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id ASC LIMIT 1) AS file_name
+        FROM designs d
+        LEFT JOIN categories c ON d.category_id = c.id
+        ORDER BY d.id DESC
+      `);
+
+      results = [];
+      for (const r of rawDesigns) {
+        const imgStatus = await healthCheckService.checkAssetStatus(r.image_url);
+        const fileStatus = await healthCheckService.checkAssetStatus(r.file_path);
+        if (imgStatus !== 'ok' || fileStatus !== 'ok') {
+          results.push({
+            design_id: r.id,
+            sku: r.sku || `AED-${r.id}`,
+            title: r.title || 'Untitled',
+            category_name: r.category_name || 'Uncategorized',
+            price: r.price || 0,
+            is_active: r.is_active,
+            image_status: imgStatus,
+            image_url: r.image_url,
+            file_status: fileStatus,
+            file_name: r.file_name,
+            file_path: r.file_path
+          });
+        }
+      }
+    }
+
+    const headers = ['Design ID', 'SKU', 'Title', 'Category', 'Price', 'Status', 'Image Status', 'Image Path', 'Machine File Status', 'File Name', 'File Path'];
     const rows = [headers.join(',')];
 
-    for (const d of list) {
-      let statusStr = 'Active';
-      if (!d.is_active) statusStr = 'Inactive/Draft';
-
-      let imgStatus = d.image_missing ? 'MISSING' : 'OK';
-      let fileStatus = d.file_missing ? 'MISSING' : 'OK';
-
+    for (const d of results) {
       const row = [
-        d.id,
-        `"${(d.title || '').replace(/"/g, '""')}"`,
-        `"${(d.sku || '').replace(/"/g, '""')}"`,
-        `"${(d.category_name || '').replace(/"/g, '""')}"`,
+        d.design_id || d.id,
+        `"${String(d.sku || '').replace(/"/g, '""')}"`,
+        `"${String(d.title || '').replace(/"/g, '""')}"`,
+        `"${String(d.category_name || '').replace(/"/g, '""')}"`,
         d.price || 0,
-        statusStr,
-        imgStatus,
-        fileStatus,
-        `"${(d.image_url || '').replace(/"/g, '""')}"`,
-        `"${(d.file_path || '').replace(/"/g, '""')}"`
+        d.is_active ? 'Active' : 'Inactive/Draft',
+        d.image_status === 'none' ? 'No Image Uploaded' : (d.image_status === 'missing' ? 'MISSING' : 'OK'),
+        `"${String(d.image_url || '').replace(/"/g, '""')}"`,
+        d.file_status === 'none' ? 'No File Uploaded' : (d.file_status === 'missing' ? 'MISSING' : 'OK'),
+        `"${String(d.file_name || '').replace(/"/g, '""')}"`,
+        `"${String(d.file_path || '').replace(/"/g, '""')}"`
       ];
       rows.push(row.join(','));
     }
@@ -137,7 +212,7 @@ exports.exportMissingFilesCsv = async (req, res, next) => {
     const csvContent = rows.join('\r\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="missing-files-report-${Date.now()}.csv"`);
-    res.send(csvContent);
+    return res.send(csvContent);
   } catch (err) {
     next(err);
   }

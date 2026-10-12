@@ -141,6 +141,8 @@ router.post('/admin/api/email-campaigns/delete/:id', adminEmailCampaignControlle
 const adminToolsController = require('../controllers/admin/adminToolsController');
 
 router.get('/admin/tools/missing-files', adminToolsController.getMissingFiles);
+router.post('/admin/tools/missing-files/trigger-scan', adminToolsController.triggerFullScan);
+router.get('/admin/tools/missing-files/scan-status', adminToolsController.getScanStatus);
 router.get('/admin/tools/missing-files/export-csv', adminToolsController.exportMissingFilesCsv);
 router.post('/admin/tools/replace-file-quick', upload.single('file'), adminToolsController.replaceDesignFileQuick);
 

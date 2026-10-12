@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
+  <title><%= title || 'Missing Files - Admin' %></title>
   <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
   <style>
     .tools-stat-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
     }
@@ -29,13 +29,14 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.03);
     }
     .tools-stat-icon {
-      width: 48px;
-      height: 48px;
+      width: 46px;
+      height: 46px;
       border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
+      font-size: 1.2rem;
+      flex-shrink: 0;
     }
     .tools-stat-icon.green { background: #E8F5E9; color: #2E7D32; }
     .tools-stat-icon.red { background: #FFEBEE; color: #C62828; }
@@ -44,13 +45,13 @@
 
     .tools-stat-data strong {
       display: block;
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: 700;
       color: var(--admin-text-dark);
       line-height: 1.2;
     }
     .tools-stat-data span {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: var(--admin-text-muted);
       font-weight: 500;
     }
@@ -60,7 +61,18 @@
       color: #C62828;
       font-size: 0.72rem;
       font-weight: 700;
-      padding: 0.3rem 0.6rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge-status-none {
+      background: #F3F4F6;
+      color: #6B7280;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.25rem 0.55rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
@@ -71,7 +83,7 @@
       color: #2E7D32;
       font-size: 0.72rem;
       font-weight: 700;
-      padding: 0.3rem 0.6rem;
+      padding: 0.25rem 0.55rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
@@ -82,20 +94,43 @@
       background: #FFFFFF;
       border: 1px solid var(--admin-border);
       color: var(--admin-text-dark);
-      padding: 0.35rem 0.75rem;
+      padding: 0.3rem 0.65rem;
       border-radius: 6px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       transition: all 0.2s;
     }
     .quick-replace-btn:hover {
       border-color: var(--admin-primary);
       color: var(--admin-primary);
       background: #FAF6F0;
+    }
+
+    .scan-progress-box {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .progress-bar-track {
+      background: #E5E7EB;
+      border-radius: 8px;
+      height: 12px;
+      overflow: hidden;
+      margin-top: 0.75rem;
+    }
+    .progress-bar-fill {
+      background: var(--admin-primary);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
     }
 
     .modal-overlay {
@@ -124,13 +159,16 @@
   <!-- Top Header -->
   <header class="admin-top-header">
     <a href="/admin" class="admin-header-brand">
-      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
       <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
     </a>
 
     <div class="admin-search-bar">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" placeholder="Search missing files, designs, SKU...">
+      <form action="/admin/tools/missing-files" method="GET" style="display: flex; width: 100%;">
+        <input type="hidden" name="filter" value="<%= typeof currentFilter !== 'undefined' ? currentFilter : 'all' %>">
+        <input type="text" name="search" value="<%= typeof currentSearch !== 'undefined' ? currentSearch : '' %>" placeholder="Search SKU, product title...">
+      </form>
     </div>
 
     <div class="admin-header-right">
@@ -193,28 +231,54 @@
 
     <!-- Main Content -->
     <main class="admin-content-body">
-      <% if (messages && messages.success) { %>
+      <% 
+        const alertSuccess = (typeof flash !== 'undefined' && flash.success && flash.success.length ? flash.success[0] : null) || (typeof messages !== 'undefined' && messages.success ? messages.success : null);
+        const alertError = (typeof flash !== 'undefined' && flash.error && flash.error.length ? flash.error[0] : null) || (typeof messages !== 'undefined' && messages.error ? messages.error : null);
+      %>
+      <% if (alertSuccess) { %>
         <div class="alert alert-success" style="margin-bottom: 1.5rem; background: #E8F5E9; color: #2E7D32; padding: 1rem; border-radius: 8px; border: 1px solid #C8E6C9;">
-          <i class="fa-solid fa-circle-check"></i> <%= messages.success %>
+          <i class="fa-solid fa-circle-check"></i> <%= alertSuccess %>
         </div>
       <% } %>
-      <% if (messages && messages.error) { %>
+      <% if (alertError) { %>
         <div class="alert alert-danger" style="margin-bottom: 1.5rem; background: #FFEBEE; color: #C62828; padding: 1rem; border-radius: 8px; border: 1px solid #FFCDD2;">
-          <i class="fa-solid fa-circle-exclamation"></i> <%= messages.error %>
+          <i class="fa-solid fa-circle-exclamation"></i> <%= alertError %>
         </div>
       <% } %>
+
+      <!-- Live Background Scanner Box -->
+      <div id="scanProgressBox" class="scan-progress-box">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong style="color: var(--admin-text-dark); font-size: 0.95rem;">
+              <i class="fa-solid fa-spinner fa-spin" style="color: var(--admin-primary); margin-right: 6px;"></i>
+              Background File Integrity Scan in Progress...
+            </strong>
+            <div id="scanStatusText" style="font-size: 0.8rem; color: var(--admin-text-muted); margin-top: 2px;">
+              Scanning catalog designs asynchronously...
+            </div>
+          </div>
+          <span id="scanPercentBadge" style="font-weight: 700; color: var(--admin-primary); font-size: 1rem;">0%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div id="scanProgressBar" class="progress-bar-fill"></div>
+        </div>
+      </div>
 
       <!-- Page Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
         <div>
           <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Missing Files & Storage Diagnostics</h1>
           <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">
-            Scans all <%= scan.totalDesigns %> database designs against persistent storage to identify missing preview images or machine archives.
+            Lightning-fast batch scanner built for 2,000+ catalog designs. Paginated queries with safe async existence checks.
           </p>
         </div>
         <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+          <button type="button" id="startFullScanBtn" onclick="triggerFullScan()" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+            <i class="fa-solid fa-rotate"></i> Run Full Background Scan
+          </button>
           <a href="/admin/tools/missing-files/export-csv" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-file-csv"></i> Export CSV Report
+            <i class="fa-solid fa-file-csv"></i> Download CSV
           </a>
           <a href="/admin/tools/bulk-image-relink" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-images"></i> Bulk Image Relink
@@ -230,7 +294,7 @@
         <div class="tools-stat-card">
           <div class="tools-stat-icon blue"><i class="fa-solid fa-boxes-stacked"></i></div>
           <div class="tools-stat-data">
-            <strong><%= scan.totalDesigns %></strong>
+            <strong><%= (typeof summary !== 'undefined' && summary.totalDesigns) || pagination.totalCount || 0 %></strong>
             <span>Total Catalog Designs</span>
           </div>
         </div>
@@ -238,15 +302,15 @@
         <div class="tools-stat-card">
           <div class="tools-stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
           <div class="tools-stat-data">
-            <strong><%= scan.healthyDesignsCount %></strong>
-            <span>Healthy Products (100% OK)</span>
+            <strong><%= (typeof summary !== 'undefined' && summary.healthyDesigns) || 0 %></strong>
+            <span>Healthy Products</span>
           </div>
         </div>
 
         <div class="tools-stat-card">
           <div class="tools-stat-icon amber"><i class="fa-regular fa-image"></i></div>
           <div class="tools-stat-data">
-            <strong><%= scan.missingImagesCount %></strong>
+            <strong><%= (typeof summary !== 'undefined' && summary.missingImages) || 0 %></strong>
             <span>Missing Preview Images</span>
           </div>
         </div>
@@ -254,43 +318,49 @@
         <div class="tools-stat-card">
           <div class="tools-stat-icon red"><i class="fa-solid fa-file-circle-xmark"></i></div>
           <div class="tools-stat-data">
-            <strong><%= scan.missingFilesCount %></strong>
+            <strong><%= (typeof summary !== 'undefined' && summary.missingFiles) || 0 %></strong>
             <span>Missing Machine Files</span>
           </div>
         </div>
       </div>
 
-      <!-- Filters & Report Table -->
+      <!-- Search, Filters & Report Table -->
       <div style="background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        
+        <!-- Controls Bar -->
         <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            <a href="/admin/tools/missing-files?filter=all" class="btn <%= currentFilter === 'all' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none;">
-              All Issues (<%= scan.totalIssues %>)
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <a href="/admin/tools/missing-files?filter=all<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn <%= currentFilter === 'all' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none;">
+              All Designs
             </a>
-            <a href="/admin/tools/missing-files?filter=missing_image" class="btn <%= currentFilter === 'missing_image' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none;">
-              Missing Images Only
+            <a href="/admin/tools/missing-files?filter=issues<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn <%= currentFilter === 'issues' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none;">
+              All Issues
             </a>
-            <a href="/admin/tools/missing-files?filter=missing_file" class="btn <%= currentFilter === 'missing_file' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none;">
-              Missing Machine Files Only
+            <a href="/admin/tools/missing-files?filter=missing_image<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn <%= currentFilter === 'missing_image' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none;">
+              Missing Image
             </a>
-            <a href="/admin/tools/missing-files?filter=missing_both" class="btn <%= currentFilter === 'missing_both' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none;">
-              Missing Both (<%= scan.missingBothCount %>)
+            <a href="/admin/tools/missing-files?filter=missing_file<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn <%= currentFilter === 'missing_file' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none;">
+              Missing Machine File
+            </a>
+            <a href="/admin/tools/missing-files?filter=no_upload<%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn <%= currentFilter === 'no_upload' ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none;">
+              No File Uploaded
             </a>
           </div>
 
-          <span style="font-size: 0.8rem; color: var(--admin-text-muted);">
-            Scan completed: <%= new Date(scan.scanTime).toLocaleString() %>
-          </span>
+          <!-- Page indicator -->
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted);">
+            Showing page <strong><%= pagination.page %></strong> of <strong><%= pagination.totalPages %></strong> (<%= pagination.totalCount %> designs)
+          </div>
         </div>
 
         <% if (designs.length === 0) { %>
           <div style="text-align: center; padding: 3.5rem 1.5rem;">
-            <div style="width: 64px; height: 64px; background: #E8F5E9; color: #2E7D32; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 1rem;">
+            <div style="width: 58px; height: 58px; background: #E8F5E9; color: #2E7D32; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.75rem; margin-bottom: 0.75rem;">
               <i class="fa-solid fa-circle-check"></i>
             </div>
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.5rem;">Storage System 100% Healthy!</h3>
-            <p style="color: var(--admin-text-muted); font-size: 0.9rem; max-width: 480px; margin: 0 auto;">
-              All <%= scan.totalDesigns %> designs have verified persistent images and authentic machine archives intact on disk.
+            <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.4rem;">No matching designs found</h3>
+            <p style="color: var(--admin-text-muted); font-size: 0.85rem; max-width: 440px; margin: 0 auto;">
+              No products found matching the current filter and search criteria.
             </p>
           </div>
         <% } else { %>
@@ -302,7 +372,7 @@
                   <th style="padding: 0.75rem 1rem;">SKU / Code</th>
                   <th style="padding: 0.75rem 1rem;">Category</th>
                   <th style="padding: 0.75rem 1rem;">Preview Image</th>
-                  <th style="padding: 0.75rem 1rem;">Machine File</th>
+                  <th style="padding: 0.75rem 1rem;">Machine Archive</th>
                   <th style="padding: 0.75rem 1rem; text-align: right;">Action</th>
                 </tr>
               </thead>
@@ -311,11 +381,11 @@
                   <tr style="border-bottom: 1px solid var(--admin-border);">
                     <td style="padding: 0.75rem 1rem;">
                       <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <div style="width: 40px; height: 40px; border-radius: 6px; background: #F3F4F6; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--admin-border);">
-                          <% if (d.image_missing || !d.image_url) { %>
-                            <i class="fa-regular fa-image" style="color: #9CA3AF; font-size: 1.2rem;"></i>
-                          <% } else { %>
+                        <div style="width: 40px; height: 40px; border-radius: 6px; background: #F3F4F6; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--admin-border); flex-shrink: 0;">
+                          <% if (d.image_status === 'ok' && d.image_url) { %>
                             <img src="<%= d.image_url %>" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+                          <% } else { %>
+                            <i class="fa-regular fa-image" style="color: #9CA3AF; font-size: 1.1rem;"></i>
                           <% } %>
                         </div>
                         <div>
@@ -324,29 +394,50 @@
                         </div>
                       </div>
                     </td>
-                    <td style="padding: 0.75rem 1rem; font-weight: 600; color: var(--admin-primary);"><%= d.sku %></td>
-                    <td style="padding: 0.75rem 1rem; color: var(--admin-text-muted);"><%= d.category_name %></td>
+
+                    <td style="padding: 0.75rem 1rem; font-weight: 600; color: var(--admin-primary); font-family: monospace;">
+                      <%= d.sku %>
+                    </td>
+
+                    <td style="padding: 0.75rem 1rem; color: var(--admin-text-muted);">
+                      <%= d.category_name %>
+                    </td>
+
+                    <!-- Image Status -->
                     <td style="padding: 0.75rem 1rem;">
-                      <% if (d.image_missing) { %>
+                      <% if (d.image_status === 'ok') { %>
+                        <span class="badge-status-ok"><i class="fa-solid fa-check"></i> OK</span>
+                      <% } else if (d.image_status === 'missing') { %>
                         <span class="badge-status-missing"><i class="fa-solid fa-triangle-exclamation"></i> MISSING</span>
-                        <button type="button" class="quick-replace-btn" style="margin-left: 6px;" onclick="openReplaceModal(<%= d.id %>, '<%= d.sku %>', 'image')">
-                          <i class="fa-solid fa-upload"></i> Upload
+                        <button type="button" class="quick-replace-btn" style="margin-left: 4px;" onclick="openReplaceModal(<%= d.id %>, '<%= d.sku %>', 'image')">
+                          <i class="fa-solid fa-upload"></i> Relink
                         </button>
                       <% } else { %>
-                        <span class="badge-status-ok"><i class="fa-solid fa-check"></i> OK</span>
+                        <span class="badge-status-none"><i class="fa-regular fa-circle-question"></i> No image uploaded</span>
+                        <button type="button" class="quick-replace-btn" style="margin-left: 4px;" onclick="openReplaceModal(<%= d.id %>, '<%= d.sku %>', 'image')">
+                          <i class="fa-solid fa-upload"></i> Add
+                        </button>
                       <% } %>
                     </td>
+
+                    <!-- File Status -->
                     <td style="padding: 0.75rem 1rem;">
-                      <% if (d.file_missing) { %>
+                      <% if (d.file_status === 'ok') { %>
+                        <span class="badge-status-ok"><i class="fa-solid fa-check"></i> OK</span>
+                        <span style="font-size: 0.72rem; color: var(--admin-text-muted); margin-left: 4px;"><%= d.file_name || 'Design file' %></span>
+                      <% } else if (d.file_status === 'missing') { %>
                         <span class="badge-status-missing"><i class="fa-solid fa-triangle-exclamation"></i> MISSING</span>
-                        <button type="button" class="quick-replace-btn" style="margin-left: 6px;" onclick="openReplaceModal(<%= d.id %>, '<%= d.sku %>', 'file')">
-                          <i class="fa-solid fa-upload"></i> Upload
+                        <button type="button" class="quick-replace-btn" style="margin-left: 4px;" onclick="openReplaceModal(<%= d.id %>, '<%= d.sku %>', 'file')">
+                          <i class="fa-solid fa-upload"></i> Relink
                         </button>
                       <% } else { %>
-                        <span class="badge-status-ok"><i class="fa-solid fa-check"></i> OK</span>
-                        <span style="font-size: 0.72rem; color: var(--admin-text-muted); margin-left: 4px;"><%= d.file_name %></span>
+                        <span class="badge-status-none"><i class="fa-regular fa-circle-question"></i> No file uploaded</span>
+                        <button type="button" class="quick-replace-btn" style="margin-left: 4px;" onclick="openReplaceModal(<%= d.id %>, '<%= d.sku %>', 'file')">
+                          <i class="fa-solid fa-upload"></i> Add
+                        </button>
                       <% } %>
                     </td>
+
                     <td style="padding: 0.75rem 1rem; text-align: right;">
                       <a href="/admin/designs/edit/<%= d.id %>" class="quick-replace-btn" style="text-decoration: none;">
                         <i class="fa-regular fa-pen-to-square"></i> Edit
@@ -357,6 +448,39 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Pagination Bar -->
+          <% if (pagination.totalPages > 1) { %>
+            <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <div>
+                <% if (pagination.hasPrevPage) { %>
+                  <a href="/admin/tools/missing-files?page=<%= pagination.page - 1 %>&filter=<%= currentFilter %><%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.8rem; border-radius: 6px; text-decoration: none;">
+                    &laquo; Previous 50
+                  </a>
+                <% } %>
+              </div>
+
+              <div style="display: flex; gap: 0.3rem;">
+                <% 
+                  const startPage = Math.max(1, pagination.page - 2);
+                  const endPage = Math.min(pagination.totalPages, pagination.page + 2);
+                  for (let p = startPage; p <= endPage; p++) { 
+                %>
+                  <a href="/admin/tools/missing-files?page=<%= p %>&filter=<%= currentFilter %><%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn <%= p === pagination.page ? 'btn-primary' : 'btn-outline' %>" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; border-radius: 6px; text-decoration: none;">
+                    <%= p %>
+                  </a>
+                <% } %>
+              </div>
+
+              <div>
+                <% if (pagination.hasNextPage) { %>
+                  <a href="/admin/tools/missing-files?page=<%= pagination.page + 1 %>&filter=<%= currentFilter %><%= currentSearch ? '&search=' + encodeURIComponent(currentSearch) : '' %>" class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.8rem; border-radius: 6px; text-decoration: none;">
+                    Next 50 &raquo;
+                  </a>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
         <% } %>
       </div>
     </main>
@@ -394,6 +518,70 @@
 </div>
 
 <script>
+  let scanPollingInterval = null;
+
+  async function triggerFullScan() {
+    const btn = document.getElementById('startFullScanBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing scan...';
+
+    const csrf = '<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>';
+
+    try {
+      const res = await fetch('/admin/tools/missing-files/trigger-scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrf
+        },
+        body: JSON.stringify({ _csrf: csrf })
+      });
+      const data = await res.json();
+      if (data.success || data.jobId) {
+        document.getElementById('scanProgressBox').style.display = 'block';
+        startPollingScanStatus();
+      } else {
+        alert(data.message || 'Unable to start background scan.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Run Full Background Scan';
+      }
+    } catch (err) {
+      alert('Error triggering scan: ' + err.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Run Full Background Scan';
+    }
+  }
+
+  function startPollingScanStatus() {
+    if (scanPollingInterval) clearInterval(scanPollingInterval);
+
+    scanPollingInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/admin/tools/missing-files/scan-status');
+        const data = await res.json();
+        if (data.success && data.summary) {
+          const s = data.summary;
+          const pct = s.progressPercent || 0;
+          document.getElementById('scanProgressBar').style.width = pct + '%';
+          document.getElementById('scanPercentBadge').innerText = pct + '%';
+          document.getElementById('scanStatusText').innerText = 
+            `Scanned ${s.scannedDesigns} of ${s.totalDesigns} designs. (Missing: ${s.missingImages} images, ${s.missingFiles} machine files)`;
+
+          if (s.status === 'completed' || s.status === 'failed') {
+            clearInterval(scanPollingInterval);
+            document.getElementById('startFullScanBtn').disabled = false;
+            document.getElementById('startFullScanBtn').innerHTML = '<i class="fa-solid fa-rotate"></i> Run Full Background Scan';
+            setTimeout(() => {
+              window.location.reload();
+            }, 1200);
+          }
+        }
+      } catch (e) {
+        console.warn('Poll status error:', e);
+      }
+    }, 1500);
+  }
+
   function openReplaceModal(designId, sku, type) {
     document.getElementById('modalDesignId').value = designId;
     document.getElementById('modalReplaceType').value = type;
