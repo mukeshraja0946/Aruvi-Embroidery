@@ -62,6 +62,11 @@ router.post('/admin/designs/bulk-upload-images', upload.any(), adminDesignContro
 
 router.get('/admin/designs/import-template', adminDesignController.downloadImportTemplate);
 router.post('/admin/designs/import-preview', upload.any(), adminDesignController.postImportPreview);
+router.post('/admin/designs/import-upload-assets', upload.any(), adminDesignController.postImportUploadAssets);
+router.post('/admin/designs/import-start-job', adminDesignController.postImportStartJob);
+router.get('/admin/designs/import-job-status/:batchId', adminDesignController.getImportJobStatus);
+router.post('/admin/designs/import-rollback/:batchId', adminDesignController.postImportRollback);
+router.get('/admin/designs/import-error-report/:batchId', adminDesignController.downloadImportErrorReport);
 router.post('/admin/designs/import-commit', adminDesignController.postImportCommit);
 
 router.post('/admin/products/delete/:id', adminDesignController.deleteDesign);

@@ -738,100 +738,229 @@
   }
 </script>
 
-<!-- Bulk Import Modal matching Requirements 6 & 7 -->
-<div id="bulkImportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
-  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.3);">
-    <!-- Modal Header -->
-    <div style="padding: 1.2rem 1.6rem; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; background: #FAF6F0;">
-      <div>
-        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
-          <i class="fa-solid fa-file-import" style="color: var(--admin-primary);"></i> Bulk Import Embroidery Designs
-        </h3>
-        <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Import multiple designs from spreadsheet & upload product asset packages (.xlsx, .csv, .docx, .json, .zip, .png)</span>
+<!-- Bulk Import Modal (3-Step Robust Importer) -->
+<div id="bulkImportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 960px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+    
+    <!-- Modal Header & Stepper -->
+    <div style="padding: 1.2rem 1.6rem; border-bottom: 1px solid var(--admin-border); background: #FAF6F0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+            <i class="fa-solid fa-file-import" style="color: var(--admin-primary);"></i> Bulk Import Embroidery Designs
+          </h3>
+          <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Safe, 3-step chunked import supporting up to 3,000 designs with zero timeouts</span>
+        </div>
+        <button type="button" onclick="closeBulkImportModal()" style="background: none; border: none; font-size: 1.5rem; color: var(--admin-text-muted); cursor: pointer; line-height: 1;">&times;</button>
       </div>
-      <button type="button" onclick="closeBulkImportModal()" style="background: none; border: none; font-size: 1.4rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+
+      <!-- Stepper Indicator -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        <div id="stepTab1" style="padding: 8px 12px; border-radius: 8px; background: var(--admin-primary); color: #FFF; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <span style="background: rgba(255,255,255,0.25); border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;">1</span>
+          Spreadsheet Data
+        </div>
+        <div id="stepTab2" style="padding: 8px 12px; border-radius: 8px; background: #ECEFF1; color: #546E7A; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <span style="background: rgba(0,0,0,0.1); border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;">2</span>
+          Assets & Matching
+        </div>
+        <div id="stepTab3" style="padding: 8px 12px; border-radius: 8px; background: #ECEFF1; color: #546E7A; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <span style="background: rgba(0,0,0,0.1); border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem;">3</span>
+          Confirm & Import
+        </div>
+      </div>
     </div>
 
     <!-- Modal Body -->
     <div style="padding: 1.6rem; overflow-y: auto; flex: 1;">
       
-      <!-- Step 1: Upload Files State -->
-      <div id="importStep1">
+      <!-- Error Banner -->
+      <div id="importErrorAlert" style="display: none; background: #FFEBEE; border: 1px solid #FFCDD2; color: #C62828; padding: 0.9rem 1.2rem; border-radius: 10px; margin-bottom: 1.2rem; font-size: 0.85rem;">
+        <div style="display: flex; gap: 8px; align-items: flex-start;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem; margin-top: 2px;"></i>
+          <div style="flex: 1;" id="importErrorMessage"></div>
+          <button type="button" onclick="document.getElementById('importErrorAlert').style.display='none'" style="background:none;border:none;color:#C62828;cursor:pointer;font-size:1.1rem;">&times;</button>
+        </div>
+      </div>
+
+      <!-- ================= STEP 1: SPREADSHEET ================= -->
+      <div id="step1View">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; background: #E3F2FD; border: 1px solid #BBDEFB; padding: 0.9rem 1.2rem; border-radius: 12px; color: #0D47A1;">
           <div style="font-size: 0.82rem; font-weight: 600;">
-            <i class="fa-solid fa-download"></i> Need an import template? Download pre-formatted spreadsheet.
+            <i class="fa-solid fa-download"></i> Use the official template for 100% reliable column matching.
           </div>
           <a href="/admin/designs/import-template" class="btn btn-outline btn-sm" style="background: #FFF; color: #0D47A1; border-color: #0D47A1; font-size: 0.78rem; border-radius: 8px; text-decoration: none; font-weight: 700;">
             <i class="fa-solid fa-file-excel"></i> Download Excel Template (.xlsx)
           </a>
         </div>
 
-        <form id="bulkImportForm" enctype="multipart/form-data">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.2rem;">
-            <!-- Spreadsheet File Upload Card -->
-            <div style="border: 2px dashed var(--admin-primary); border-radius: 12px; padding: 1.5rem; text-align: center; background: #FAF0E8;">
-              <i class="fa-solid fa-file-csv" style="font-size: 2.2rem; color: var(--admin-primary); margin-bottom: 0.5rem;"></i>
-              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 4px;">1. Select Data Spreadsheet *</strong>
-              <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted); margin-bottom: 1rem;">Supports .XLSX, .XLS, .CSV, .DOCX, .JSON</span>
-              <input type="file" id="importSpreadsheetInput" name="import_file" accept=".xlsx,.xls,.csv,.docx,.json" required style="font-size: 0.8rem; width: 100%;">
-            </div>
-
-            <!-- Product Assets Upload Card -->
-            <div style="border: 2px dashed #4CAF50; border-radius: 12px; padding: 1.5rem; text-align: center; background: #E8F5E9;">
-              <i class="fa-solid fa-folder-open" style="font-size: 2.2rem; color: #2E7D32; margin-bottom: 0.5rem;"></i>
-              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 4px;">2. Select Product Assets (Optional)</strong>
-              <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted); margin-bottom: 1rem;">Upload preview images (.png, .jpg) & machine ZIP files (.zip)</span>
-              <input type="file" id="importAssetsInput" name="asset_files" accept=".zip,.png,.jpg,.jpeg,.webp" multiple style="font-size: 0.8rem; width: 100%;">
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <!-- Step 2: Preview & Validation Table State -->
-      <div id="importStep2" style="display: none;">
-        <div id="importValidationSummary" style="margin-bottom: 1.2rem; padding: 0.9rem 1.2rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600; display: flex; gap: 1.5rem; align-items: center;"></div>
-
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 10px;">
-          <table class="admin-table" style="font-size: 0.8rem; margin: 0;">
-            <thead>
-              <tr style="background: #FAF6F0; position: sticky; top: 0; z-index: 10;">
-                <th style="width: 50px;">Row</th>
-                <th style="width: 90px;">Status</th>
-                <th>Design Name</th>
-                <th>SKU</th>
-                <th>Category</th>
-                <th>MRP</th>
-                <th>Selling Price</th>
-                <th>Assets Matched</th>
-                <th>Validation Details</th>
-              </tr>
-            </thead>
-            <tbody id="importPreviewTableBody"></tbody>
-          </table>
+        <div style="border: 2px dashed var(--admin-primary); border-radius: 14px; padding: 2.2rem 1.5rem; text-align: center; background: #FAF0E8; margin-bottom: 1.2rem;">
+          <i class="fa-solid fa-file-excel" style="font-size: 2.8rem; color: var(--admin-primary); margin-bottom: 0.6rem;"></i>
+          <h4 style="font-size: 1rem; color: var(--admin-text-dark); margin: 0 0 6px; font-weight: 700;">Select Spreadsheet File</h4>
+          <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem;">Upload your product catalog sheet (.xlsx, .xls, .csv). Assets are uploaded separately in Step 2.</p>
+          <input type="file" id="step1SpreadsheetInput" accept=".xlsx,.xls,.csv" style="font-size: 0.85rem; max-width: 320px; display: inline-block;">
         </div>
 
-        <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between;">
-          <label style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            <input type="checkbox" id="skipErrorsCheckbox" checked> Skip invalid rows with errors automatically
-          </label>
+        <div style="background: #F8F9FA; border-radius: 10px; padding: 1rem 1.2rem; font-size: 0.78rem; color: var(--admin-text-muted); line-height: 1.5;">
+          <strong style="color: var(--admin-text-dark); display: block; margin-bottom: 4px;"><i class="fa-solid fa-circle-info"></i> Column Checklist:</strong>
+          <span>Required: <code>Design Name</code>, <code>Original Price MRP</code>. Optional: <code>SKU</code>, <code>Category</code>, <code>Selling Price</code>, <code>Available Formats</code>, <code>Description</code>, <code>Tags</code>, <code>Status</code>.</span>
+        </div>
+      </div>
+
+      <!-- ================= STEP 2: ASSETS & MATCHING ================= -->
+      <div id="step2View" style="display: none;">
+        <!-- Validation Summary Pills -->
+        <div id="step2SummaryPills" style="display: flex; gap: 12px; margin-bottom: 1.2rem; flex-wrap: wrap;"></div>
+
+        <!-- Spreadsheet Preview Table (collapsible/scrollable) -->
+        <div style="border: 1px solid var(--admin-border); border-radius: 10px; margin-bottom: 1.4rem; overflow: hidden;">
+          <div style="background: #FAF6F0; padding: 8px 14px; font-size: 0.8rem; font-weight: 700; color: var(--admin-text-dark); border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center;">
+            <span>Spreadsheet Row Preview (First 50 Rows)</span>
+            <span id="previewRowsCountBadge" style="font-size: 0.74rem; color: var(--admin-text-muted);"></span>
+          </div>
+          <div style="max-height: 220px; overflow-y: auto;">
+            <table class="admin-table" style="font-size: 0.76rem; margin: 0;">
+              <thead>
+                <tr style="background: #F5F0EB; position: sticky; top: 0; z-index: 5;">
+                  <th style="width: 45px;">Row</th>
+                  <th style="width: 80px;">Status</th>
+                  <th>SKU</th>
+                  <th>Design Name</th>
+                  <th>Category</th>
+                  <th>MRP / Sale</th>
+                  <th>Validation Note</th>
+                </tr>
+              </thead>
+              <tbody id="step2PreviewTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Asset Upload Section -->
+        <div style="border: 1px solid #C8E6C9; background: #F1F8E9; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 0.88rem; color: #2E7D32;">
+              <i class="fa-solid fa-images"></i> Upload Product Assets (Chunked in Batches of 8)
+            </strong>
+            <span style="font-size: 0.74rem; color: #558B2F;">Uploads up to 3 parallel requests with retry & resume</span>
+          </div>
+          <p style="font-size: 0.78rem; color: #33691E; margin: 0 0 10px;">
+            Select all your preview images (e.g. <code>AED-BLO-01.jpg</code>) and machine ZIP files (e.g. <code>AED-BLO-01.zip</code>). The system matches them to rows by SKU.
+          </p>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="file" id="step2AssetFilesInput" multiple accept=".zip,.dst,.pes,.jef,.exp,.jpg,.jpeg,.png,.webp" style="font-size: 0.82rem; flex: 1;">
+            <button type="button" id="startAssetUploadBtn" onclick="startChunkedAssetUpload()" class="btn btn-primary btn-sm" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700; border-radius: 8px;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Upload Selected Assets
+            </button>
+            <button type="button" id="cancelAssetUploadBtn" onclick="cancelAssetUpload()" class="btn btn-outline btn-sm" style="display: none; border-radius: 8px;">
+              Cancel Upload
+            </button>
+          </div>
+
+          <!-- Asset Upload Progress Bar -->
+          <div id="assetUploadProgressContainer" style="display: none; margin-top: 12px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.76rem; font-weight: 600; color: #2E7D32; margin-bottom: 4px;">
+              <span id="assetUploadStatusText">Uploading batch 1...</span>
+              <span id="assetUploadPercentText">0%</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #DCEDC8; border-radius: 4px; overflow: hidden;">
+              <div id="assetProgressBar" style="width: 0%; height: 100%; background: #2E7D32; transition: width 0.25s ease;"></div>
+            </div>
+          </div>
+
+          <!-- Asset Match Report Card -->
+          <div id="assetMatchReportCard" style="display: none; margin-top: 12px; background: #FFF; border: 1px solid #C8E6C9; border-radius: 8px; padding: 10px 14px; font-size: 0.78rem;">
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; font-weight: 600;">
+              <span style="color: #2E7D32;"><i class="fa-solid fa-circle-check"></i> Matched Images: <strong id="matchedImagesCount">0</strong></span>
+              <span style="color: #1565C0;"><i class="fa-solid fa-file-zipper"></i> Matched ZIPs: <strong id="matchedFilesCount">0</strong></span>
+              <span style="color: #E65100;"><i class="fa-solid fa-triangle-exclamation"></i> Unmatched Files: <strong id="unmatchedCount">0</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= STEP 3: CONFIRM & LIVE PROGRESS ================= -->
+      <div id="step3View" style="display: none;">
+        <!-- Pre-import confirmation checklist -->
+        <div id="step3ConfirmBox" style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.4rem; margin-bottom: 1.2rem;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 10px;">
+            Import Options & Safety Controls
+          </h4>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="skipErrorsCheckbox" checked>
+              <span>Skip invalid rows with errors automatically (recommended)</span>
+            </label>
+            <label style="font-size: 0.82rem; font-weight: 600; color: #C62828; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="updateExistingCheckbox">
+              <span>Update existing designs by SKU (if unticked, existing SKUs are skipped safely)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Live Progress Section -->
+        <div id="step3ProgressBox" style="display: none; background: #FFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.5rem; text-align: center;">
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;" id="importLiveStatusTitle">
+            <i class="fa-solid fa-spinner fa-spin" style="color: var(--admin-primary);"></i> Importing Designs in Background...
+          </div>
+          <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin: 0 0 14px;" id="importLiveStatusSub">
+            0 / 0 rows processed
+          </p>
+
+          <div style="width: 100%; height: 12px; background: #ECEFF1; border-radius: 6px; overflow: hidden; margin-bottom: 14px;">
+            <div id="importLiveProgressBar" style="width: 0%; height: 100%; background: var(--admin-primary); transition: width 0.3s ease;"></div>
+          </div>
+
+          <div style="display: flex; justify-content: center; gap: 20px; font-size: 0.8rem; font-weight: 600;">
+            <span style="color: #2E7D32;">Imported: <strong id="liveImportedCount">0</strong></span>
+            <span style="color: #F57C00;">Skipped: <strong id="liveSkippedCount">0</strong></span>
+            <span style="color: #C62828;">Failed: <strong id="liveFailedCount">0</strong></span>
+          </div>
+        </div>
+
+        <!-- Post-Import Result Summary Card -->
+        <div id="step3ResultCard" style="display: none; background: #E8F5E9; border: 1px solid #A5D6A7; border-radius: 12px; padding: 1.4rem; margin-top: 1.2rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+            <strong style="font-size: 1rem; color: #1B5E20;">
+              <i class="fa-solid fa-circle-check"></i> Import Job Finished!
+            </strong>
+            <div style="display: flex; gap: 8px;">
+              <a id="downloadErrorReportBtn" href="#" class="btn btn-outline btn-sm" style="background: #FFF; border-color: #D32F2F; color: #D32F2F; font-size: 0.78rem; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                <i class="fa-solid fa-file-csv"></i> Download Error Report (CSV)
+              </a>
+              <button type="button" id="rollbackJobBtn" onclick="rollbackCurrentImport()" class="btn btn-outline btn-sm" style="background: #FFF; border-color: #C2185B; color: #C2185B; font-size: 0.78rem; border-radius: 8px; font-weight: 600;">
+                <i class="fa-solid fa-rotate-left"></i> Rollback this Import
+              </button>
+            </div>
+          </div>
+          <div style="font-size: 0.82rem; color: #2E7D32;" id="step3ResultSummaryText"></div>
         </div>
       </div>
 
     </div>
 
-    <!-- Modal Footer -->
+    <!-- Modal Footer Navigation -->
     <div style="padding: 1rem 1.6rem; border-top: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; background: #FAF6F0;">
-      <button type="button" onclick="closeBulkImportModal()" class="btn btn-outline" style="border-radius: 8px; font-size: 0.85rem; background: #FFF;">Cancel</button>
+      <button type="button" onclick="closeBulkImportModal()" class="btn btn-outline" style="border-radius: 8px; font-size: 0.85rem; background: #FFF;">
+        Cancel / Close
+      </button>
 
       <div style="display: flex; gap: 10px;">
-        <button type="button" id="startPreviewBtn" onclick="submitImportPreview()" class="btn btn-primary" style="border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.4rem;">
-          <i class="fa-solid fa-magnifying-glass"></i> Parse & Preview Rows
+        <button type="button" id="step1NextBtn" onclick="submitStep1Spreadsheet()" class="btn btn-primary" style="border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.4rem;">
+          Parse Spreadsheet <i class="fa-solid fa-arrow-right"></i>
         </button>
 
-        <button type="button" id="commitImportBtn" onclick="submitImportCommit()" class="btn btn-primary" style="display: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.6rem; background: #2E7D32; border-color: #2E7D32;">
-          <i class="fa-solid fa-circle-check"></i> Confirm & Import Designs
+        <button type="button" id="step2NextBtn" onclick="goToStep3()" class="btn btn-primary" style="display: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.4rem;">
+          Continue to Confirm <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <button type="button" id="step3StartBtn" onclick="submitStep3StartJob()" class="btn btn-primary" style="display: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.6rem; background: #2E7D32; border-color: #2E7D32;">
+          <i class="fa-solid fa-rocket"></i> Start Background Import
+        </button>
+
+        <button type="button" id="finishRefreshBtn" onclick="finishAndReload()" class="btn btn-primary" style="display: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 0.6rem 1.6rem; background: #1B5E20; border-color: #1B5E20;">
+          <i class="fa-solid fa-check-double"></i> Finish & Refresh Catalog
         </button>
       </div>
     </div>
@@ -840,171 +969,448 @@
 
 <script>
   let currentImportBatchId = null;
+  let importJobPollingTimer = null;
+  let assetUploadAbortController = null;
+  let isAssetUploading = false;
+
+  function showImportError(msg) {
+    const alertEl = document.getElementById('importErrorAlert');
+    const msgEl = document.getElementById('importErrorMessage');
+    msgEl.textContent = msg || 'An unexpected error occurred.';
+    alertEl.style.display = 'block';
+  }
+
+  function clearImportError() {
+    document.getElementById('importErrorAlert').style.display = 'none';
+  }
 
   function openBulkImportModal() {
-    document.getElementById('importStep1').style.display = 'block';
-    document.getElementById('importStep2').style.display = 'none';
-    document.getElementById('startPreviewBtn').style.display = 'inline-flex';
-    document.getElementById('commitImportBtn').style.display = 'none';
+    clearImportError();
+    currentImportBatchId = null;
+    if (importJobPollingTimer) clearInterval(importJobPollingTimer);
+    if (assetUploadAbortController) assetUploadAbortController.abort();
+
+    // Reset views
+    document.getElementById('step1View').style.display = 'block';
+    document.getElementById('step2View').style.display = 'none';
+    document.getElementById('step3View').style.display = 'none';
+
+    document.getElementById('stepTab1').style.background = 'var(--admin-primary)';
+    document.getElementById('stepTab1').style.color = '#FFF';
+    document.getElementById('stepTab2').style.background = '#ECEFF1';
+    document.getElementById('stepTab2').style.color = '#546E7A';
+    document.getElementById('stepTab3').style.background = '#ECEFF1';
+    document.getElementById('stepTab3').style.color = '#546E7A';
+
+    document.getElementById('step1NextBtn').style.display = 'inline-flex';
+    document.getElementById('step2NextBtn').style.display = 'none';
+    document.getElementById('step3StartBtn').style.display = 'none';
+    document.getElementById('finishRefreshBtn').style.display = 'none';
+
     document.getElementById('bulkImportModal').style.display = 'flex';
   }
 
   function closeBulkImportModal() {
+    if (importJobPollingTimer) clearInterval(importJobPollingTimer);
+    if (assetUploadAbortController) assetUploadAbortController.abort();
     document.getElementById('bulkImportModal').style.display = 'none';
   }
 
-  function submitImportPreview() {
-    const fileInput = document.getElementById('importSpreadsheetInput');
-    if (!fileInput.files || fileInput.files.length === 0) {
-      alert('Please select a spreadsheet file (.xlsx, .csv, .docx, .json) to import.');
+  // ================= STEP 1: PARSE SPREADSHEET =================
+  async function submitStep1Spreadsheet() {
+    clearImportError();
+    const input = document.getElementById('step1SpreadsheetInput');
+    if (!input.files || input.files.length === 0) {
+      showImportError('Please select a spreadsheet file (.xlsx, .xls, .csv).');
       return;
     }
 
-    const btn = document.getElementById('startPreviewBtn');
+    const file = input.files[0];
+    const btn = document.getElementById('step1NextBtn');
     const origHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing File...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing Spreadsheet...';
 
-    const formData = new FormData(document.getElementById('bulkImportForm'));
+    const formData = new FormData();
+    formData.append('spreadsheet', file);
 
-    fetch('/admin/designs/import-preview', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': '<%= csrfToken %>'
-      },
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s safe timeout
+
+    try {
+      const res = await fetch('/admin/designs/import-preview', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': '<%= csrfToken %>'
+        },
+        body: formData,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      const data = await res.json();
       btn.disabled = false;
       btn.innerHTML = origHtml;
 
-      if (data.success) {
-        currentImportBatchId = data.batchId;
-        renderImportPreview(data);
-      } else {
-        alert(data.message || 'Error processing import file.');
+      if (!res.ok || !data.success) {
+        showImportError(data.message || 'Failed to parse spreadsheet file.');
+        return;
       }
-    })
-    .catch(err => {
+
+      currentImportBatchId = data.batchId;
+      setupStep2(data);
+    } catch (err) {
+      clearTimeout(timeoutId);
       btn.disabled = false;
       btn.innerHTML = origHtml;
-      console.error(err);
-      alert('Import error: ' + err.message);
-    });
+      if (err.name === 'AbortError') {
+        showImportError('Request timed out. Please verify spreadsheet size or check connection.');
+      } else {
+        showImportError('Network error parsing spreadsheet: ' + err.message);
+      }
+    }
   }
 
-  function renderImportPreview(data) {
-    document.getElementById('importStep1').style.display = 'none';
-    document.getElementById('importStep2').style.display = 'block';
-    document.getElementById('startPreviewBtn').style.display = 'none';
-    document.getElementById('commitImportBtn').style.display = 'inline-flex';
+  // ================= STEP 2: SETUP PREVIEW & ASSET UPLOAD =================
+  function setupStep2(data) {
+    document.getElementById('step1View').style.display = 'none';
+    document.getElementById('step2View').style.display = 'block';
+    document.getElementById('step3View').style.display = 'none';
 
-    const summaryEl = document.getElementById('importValidationSummary');
-    summaryEl.style.background = data.errorCount > 0 ? '#FFF3E0' : '#E8F5E9';
-    summaryEl.style.color = data.errorCount > 0 ? '#E65100' : '#2E7D32';
-    summaryEl.innerHTML = `
-      <span>Total Rows: <strong>${data.totalRows}</strong></span>
-      <span>Valid: <strong style="color:#2E7D32">${data.validCount}</strong></span>
-      <span>Warnings: <strong style="color:#F57C00">${data.warningCount}</strong></span>
-      <span>Errors: <strong style="color:#C62828">${data.errorCount}</strong></span>
+    document.getElementById('stepTab1').style.background = '#ECEFF1';
+    document.getElementById('stepTab1').style.color = '#546E7A';
+    document.getElementById('stepTab2').style.background = 'var(--admin-primary)';
+    document.getElementById('stepTab2').style.color = '#FFF';
+
+    document.getElementById('step1NextBtn').style.display = 'none';
+    document.getElementById('step2NextBtn').style.display = 'inline-flex';
+
+    // Summary pills
+    const pillsEl = document.getElementById('step2SummaryPills');
+    pillsEl.innerHTML = `
+      <div style="background:#E3F2FD; color:#0D47A1; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
+        Total Rows: ${data.totalRows}
+      </div>
+      <div style="background:#E8F5E9; color:#2E7D32; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
+        Valid: ${data.validCount}
+      </div>
+      <div style="background:#FFF3E0; color:#E65100; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
+        Duplicates in Catalog: ${data.duplicateCount}
+      </div>
+      <div style="background:#FFEBEE; color:#C62828; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
+        Errors: ${data.errorCount}
+      </div>
     `;
 
-    const tbody = document.getElementById('importPreviewTableBody');
+    document.getElementById('previewRowsCountBadge').textContent = `Showing ${data.previewRows ? data.previewRows.length : 0} of ${data.totalRows} rows`;
+
+    // Preview table rows
+    const tbody = document.getElementById('step2PreviewTbody');
     tbody.innerHTML = '';
+    const rows = data.previewRows || [];
 
-    data.rows.forEach(row => {
+    rows.forEach(r => {
       const tr = document.createElement('tr');
-      if (row.rowStatus === 'error') tr.style.background = '#FFEBEE';
-      else if (row.rowStatus === 'warning') tr.style.background = '#FFFDE7';
+      if (r.validationStatus === 'error') tr.style.background = '#FFEBEE';
+      else if (r.validationStatus === 'duplicate') tr.style.background = '#FFF8E1';
 
-      let statusBadge = '<span style="background:#E8F5E9; color:#2E7D32; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.72rem;">VALID</span>';
-      if (row.rowStatus === 'error') {
-        statusBadge = '<span style="background:#FFEBEE; color:#C62828; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.72rem;">ERROR</span>';
-      } else if (row.rowStatus === 'warning') {
-        statusBadge = '<span style="background:#FFF3E0; color:#E65100; padding:2px 8px; border-radius:6px; font-weight:700; font-size:0.72rem;">WARNING</span>';
+      let statusBadge = '<span style="background:#E8F5E9; color:#2E7D32; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">VALID</span>';
+      if (r.validationStatus === 'error') {
+        statusBadge = '<span style="background:#FFEBEE; color:#C62828; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">ERROR</span>';
+      } else if (r.validationStatus === 'duplicate') {
+        statusBadge = '<span style="background:#FFF3E0; color:#E65100; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">DUPLICATE</span>';
       }
-
-      let assetStr = '';
-      if (row.previewImage) assetStr += '<span style="color:#2E7D32;" title="Image attached"><i class="fa-solid fa-image"></i> Img</span> ';
-      if (row.zipPackage) assetStr += '<span style="color:#1565C0;" title="ZIP attached"><i class="fa-solid fa-file-zipper"></i> ZIP</span>';
-      if (!assetStr) assetStr = '<span style="color:#999; font-style:italic;">None</span>';
-
-      let detailsStr = '';
-      if (row.errors && row.errors.length > 0) {
-        detailsStr += `<div style="color:#C62828; font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> ${row.errors.join(' ')}</div>`;
-      }
-      if (row.warnings && row.warnings.length > 0) {
-        detailsStr += `<div style="color:#E65100;"><i class="fa-solid fa-circle-info"></i> ${row.warnings.join(' ')}</div>`;
-      }
-      if (!detailsStr) detailsStr = '<span style="color:#2E7D32;">Ready to import</span>';
 
       tr.innerHTML = `
-        <td style="font-weight:700;">${row.rowIndex}</td>
+        <td style="font-weight:700;">${r.rowNumber}</td>
         <td>${statusBadge}</td>
-        <td><strong>${row.title}</strong></td>
-        <td><code>${row.sku}</code></td>
-        <td>${row.category_name || 'Blouse'}</td>
-        <td>₹${row.price}</td>
-        <td>₹${row.sale_price}</td>
-        <td>${assetStr}</td>
-        <td>${detailsStr}</td>
+        <td><code>${r.sku || '-'}</code></td>
+        <td><strong>${r.title}</strong></td>
+        <td>${r.categoryName || '-'}</td>
+        <td>₹${r.price} ${r.salePrice ? '/ ₹' + r.salePrice : ''}</td>
+        <td style="color:${r.validationError ? '#C62828' : '#2E7D32'}; font-size:0.72rem;">${r.validationError || 'Ready'}</td>
       `;
-
       tbody.appendChild(tr);
     });
   }
 
-  function submitImportCommit() {
-    if (!currentImportBatchId) {
-      alert('Invalid batch token. Please re-upload your file.');
+  // ================= CHUNKED ASSET UPLOADER =================
+  async function startChunkedAssetUpload() {
+    clearImportError();
+    const input = document.getElementById('step2AssetFilesInput');
+    if (!input.files || input.files.length === 0) {
+      showImportError('Please select preview images or machine ZIP files to upload.');
       return;
     }
 
-    const btn = document.getElementById('commitImportBtn');
-    const origHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing Designs...';
+    const allFiles = Array.from(input.files);
+    const totalFiles = allFiles.length;
+    const batchSize = 8;
+    const batches = [];
 
+    for (let i = 0; i < totalFiles; i += batchSize) {
+      batches.push(allFiles.slice(i, i + batchSize));
+    }
+
+    const startBtn = document.getElementById('startAssetUploadBtn');
+    const cancelBtn = document.getElementById('cancelAssetUploadBtn');
+    const progressContainer = document.getElementById('assetUploadProgressContainer');
+    const statusText = document.getElementById('assetUploadStatusText');
+    const percentText = document.getElementById('assetUploadPercentText');
+    const progressBar = document.getElementById('assetProgressBar');
+
+    startBtn.disabled = true;
+    cancelBtn.style.display = 'inline-flex';
+    progressContainer.style.display = 'block';
+
+    isAssetUploading = true;
+    assetUploadAbortController = new AbortController();
+
+    let uploadedFilesCount = 0;
+    let totalMatchedImgs = 0;
+    let totalMatchedZIPs = 0;
+    let totalUnmatched = 0;
+
+    // Concurrency limit: 3 parallel batch uploads
+    const concurrency = 3;
+    let currentBatchIndex = 0;
+
+    async function uploadSingleBatch(batch, batchIdx) {
+      if (!isAssetUploading) return;
+      const formData = new FormData();
+      formData.append('batchId', currentImportBatchId);
+      batch.forEach(f => formData.append('assets', f));
+
+      let attempts = 0;
+      let success = false;
+      let resultData = null;
+
+      while (attempts < 3 && !success && isAssetUploading) {
+        attempts++;
+        try {
+          const res = await fetch('/admin/designs/import-upload-assets', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRF-Token': '<%= csrfToken %>'
+            },
+            body: formData,
+            signal: assetUploadAbortController.signal
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            success = true;
+            resultData = data;
+          } else {
+            console.warn(`Batch ${batchIdx + 1} attempt ${attempts} failed:`, data.message);
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn(`Batch ${batchIdx + 1} attempt ${attempts} error:`, err);
+        }
+      }
+
+      if (success && resultData) {
+        uploadedFilesCount += batch.length;
+        totalMatchedImgs = resultData.totalMatchedImages || totalMatchedImgs;
+        totalMatchedZIPs = resultData.totalMatchedFiles || totalMatchedZIPs;
+        if (resultData.results) {
+          totalUnmatched += resultData.results.filter(r => r.status === 'unmatched').length;
+        }
+
+        const pct = Math.min(100, Math.round((uploadedFilesCount / totalFiles) * 100));
+        progressBar.style.width = pct + '%';
+        percentText.textContent = pct + '%';
+        statusText.textContent = `Uploaded ${uploadedFilesCount} / ${totalFiles} asset files...`;
+      }
+    }
+
+    async function worker() {
+      while (currentBatchIndex < batches.length && isAssetUploading) {
+        const idx = currentBatchIndex++;
+        await uploadSingleBatch(batches[idx], idx);
+      }
+    }
+
+    const workers = [];
+    for (let w = 0; w < Math.min(concurrency, batches.length); w++) {
+      workers.push(worker());
+    }
+
+    await Promise.all(workers);
+
+    isAssetUploading = false;
+    startBtn.disabled = false;
+    cancelBtn.style.display = 'none';
+
+    // Update match report card
+    document.getElementById('matchedImagesCount').textContent = totalMatchedImgs;
+    document.getElementById('matchedFilesCount').textContent = totalMatchedZIPs;
+    document.getElementById('unmatchedCount').textContent = totalUnmatched;
+    document.getElementById('assetMatchReportCard').style.display = 'block';
+    statusText.textContent = `Asset upload finished: ${uploadedFilesCount} files processed.`;
+  }
+
+  function cancelAssetUpload() {
+    isAssetUploading = false;
+    if (assetUploadAbortController) assetUploadAbortController.abort();
+    document.getElementById('cancelAssetUploadBtn').style.display = 'none';
+    document.getElementById('startAssetUploadBtn').disabled = false;
+    document.getElementById('assetUploadStatusText').textContent = 'Upload cancelled by user.';
+  }
+
+  // ================= STEP 3: CONFIRM & BACKGROUND IMPORT =================
+  function goToStep3() {
+    clearImportError();
+    document.getElementById('step2View').style.display = 'none';
+    document.getElementById('step3View').style.display = 'block';
+
+    document.getElementById('stepTab2').style.background = '#ECEFF1';
+    document.getElementById('stepTab2').style.color = '#546E7A';
+    document.getElementById('stepTab3').style.background = 'var(--admin-primary)';
+    document.getElementById('stepTab3').style.color = '#FFF';
+
+    document.getElementById('step2NextBtn').style.display = 'none';
+    document.getElementById('step3StartBtn').style.display = 'inline-flex';
+  }
+
+  async function submitStep3StartJob() {
+    clearImportError();
+    const btn = document.getElementById('step3StartBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting Import...';
+
+    const updateExisting = document.getElementById('updateExistingCheckbox').checked;
     const skipErrors = document.getElementById('skipErrorsCheckbox').checked;
 
-    fetch('/admin/designs/import-commit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': '<%= csrfToken %>'
-      },
-      body: JSON.stringify({
-        _csrf: '<%= csrfToken %>',
-        batchId: currentImportBatchId,
-        skipErrors
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      btn.disabled = false;
-      btn.innerHTML = origHtml;
+    try {
+      const res = await fetch('/admin/designs/import-start-job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': '<%= csrfToken %>'
+        },
+        body: JSON.stringify({
+          batchId: currentImportBatchId,
+          updateExisting,
+          skipErrors
+        })
+      });
 
-      if (data.success) {
-        closeBulkImportModal();
-        if (typeof showToast === 'function') showToast(data.message || 'Designs imported successfully!');
-        else alert(data.message || 'Designs imported successfully!');
-        setTimeout(() => { window.location.reload(); }, 1200);
-      } else {
-        alert(data.message || 'Error completing bulk import.');
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rocket"></i> Start Background Import';
+        showImportError(data.message || 'Failed to start import job.');
+        return;
       }
-    })
-    .catch(err => {
+
+      // Switch to progress view
+      btn.style.display = 'none';
+      document.getElementById('step3ConfirmBox').style.display = 'none';
+      document.getElementById('step3ProgressBox').style.display = 'block';
+
+      // Start live polling
+      startLivePolling(currentImportBatchId);
+
+    } catch (err) {
       btn.disabled = false;
-      btn.innerHTML = origHtml;
-      console.error(err);
-      alert('Import commit error: ' + err.message);
-    });
+      btn.innerHTML = '<i class="fa-solid fa-rocket"></i> Start Background Import';
+      showImportError('Error starting import: ' + err.message);
+    }
   }
+
+  function startLivePolling(batchId) {
+    if (importJobPollingTimer) clearInterval(importJobPollingTimer);
+
+    importJobPollingTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/admin/designs/import-job-status/${batchId}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const status = await res.json();
+
+        if (!res.ok || !status.success) return;
+
+        const total = status.totalRows || 1;
+        const processed = (status.importedCount || 0) + (status.skippedCount || 0) + (status.failedCount || 0);
+        const pct = status.progressPercent || 0;
+
+        document.getElementById('importLiveStatusSub').textContent = `${processed} / ${total} designs processed (${pct}%)`;
+        document.getElementById('importLiveProgressBar').style.width = pct + '%';
+        document.getElementById('liveImportedCount').textContent = status.importedCount || 0;
+        document.getElementById('liveSkippedCount').textContent = status.skippedCount || 0;
+        document.getElementById('liveFailedCount').textContent = status.failedCount || 0;
+
+        if (status.status === 'completed' || status.status === 'failed') {
+          clearInterval(importJobPollingTimer);
+          onImportJobCompleted(status);
+        }
+      } catch (pollErr) {
+        console.warn('Job polling warn:', pollErr);
+      }
+    }, 1000);
+  }
+
+  function onImportJobCompleted(status) {
+    document.getElementById('importLiveStatusTitle').innerHTML = '<i class="fa-solid fa-circle-check" style="color:#2E7D32;"></i> Import Completed!';
+    document.getElementById('finishRefreshBtn').style.display = 'inline-flex';
+
+    const resultCard = document.getElementById('step3ResultCard');
+    resultCard.style.display = 'block';
+
+    document.getElementById('step3ResultSummaryText').innerHTML = `
+      Successfully imported <strong>${status.importedCount || 0}</strong> design(s). 
+      ${status.skippedCount > 0 ? `<strong>${status.skippedCount}</strong> row(s) skipped. ` : ''}
+      ${status.failedCount > 0 ? `<span style="color:#C62828;"><strong>${status.failedCount}</strong> row(s) failed.</span>` : ''}
+    `;
+
+    document.getElementById('downloadErrorReportBtn').href = `/admin/designs/import-error-report/${currentImportBatchId}`;
+  }
+
+  async function rollbackCurrentImport() {
+    if (!confirm('Are you sure you want to rollback this import? All designs created by this import session will be permanently deleted from catalog.')) {
+      return;
+    }
+
+    const btn = document.getElementById('rollbackJobBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Rolling back...';
+
+    try {
+      const res = await fetch(`/admin/designs/import-rollback/${currentImportBatchId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': '<%= csrfToken %>'
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(data.message || 'Import rolled back successfully.');
+        window.location.reload();
+      } else {
+        alert(data.message || 'Rollback failed.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Rollback this Import';
+      }
+    } catch (e) {
+      alert('Error rolling back: ' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Rollback this Import';
+    }
+  }
+
+  function finishAndReload() {
+    window.location.reload();
+  }
+</script>
 
   async function duplicateDesign(id, title) {
     if (!confirm(`Duplicate design "${title}"? A new draft copy will be created with the next SKU.`)) return;
