@@ -48,12 +48,13 @@ class BulkImportService {
       { 'Field Name': 'SKU', 'Required': 'NO (Auto-assigned if empty)', 'Description': 'Unique Design Code (e.g. AED-BLO-01). Used to match asset filenames.' },
       { 'Field Name': 'Category', 'Required': 'NO', 'Description': 'Name of category (e.g. Blouse Designs, Floral, Borders). Auto-created if new.' },
       { 'Field Name': 'Original Price MRP', 'Required': 'YES', 'Description': 'MRP / List price in INR (number, e.g. 120).' },
-      { 'Field Name': 'Selling Price', 'Required': 'NO', 'Description': 'Discounted selling price (number, e.g. 49). Must be <= Original Price.' },
+      { 'Field Name': 'Selling Price', 'Required': 'YES', 'Description': 'Discounted selling price (number, e.g. 49). Must be <= Original Price.' },
       { 'Field Name': 'Available Formats', 'Required': 'NO', 'Description': 'Embroidery formats included (default: DST, PES, JEF, EXP).' },
       { 'Field Name': 'Description', 'Required': 'NO', 'Description': 'Full description displayed on customer product page.' },
       { 'Field Name': 'Tags', 'Required': 'NO', 'Description': 'Comma-separated keywords for search.' },
       { 'Field Name': 'Status', 'Required': 'NO', 'Description': '"Active" or "Draft" (default: Active).' },
-      { 'Field Name': 'Asset Naming Rule', 'Required': 'RECOMMENDED', 'Description': 'Name photos like AED-BLO-01.jpg and machine files like AED-BLO-01.zip. The system auto-matches them!' }
+      { 'Field Name': 'Preview Image Filename', 'Required': 'RECOMMENDED', 'Description': 'Exact filename of preview photo (e.g. AED 1.png). Supports spaces.' },
+      { 'Field Name': 'Machine ZIP Filename', 'Required': 'RECOMMENDED', 'Description': 'Exact filename of machine ZIP (e.g. AED 1.zip). Supports spaces.' }
     ];
 
     const wb = XLSX.utils.book_new();
@@ -67,10 +68,58 @@ class BulkImportService {
   }
 
   /**
-   * Helper to normalize keys for flexible alias matching
+   * Helper to normalize keys for flexible alias matching (removes all non-alphanumeric chars)
    */
   normalizeKey(key) {
     return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  /**
+   * Stemming helper for flexible category matching (e.g. "Blouse" = "Blouse Designs")
+   */
+  stemCategory(str) {
+    return String(str || '')
+      .toLowerCase()
+      .replace(/\b(designs?|collections?)\b/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  /**
+   * Flexible category matcher
+   */
+  matchCategoryFlexibly(rawCatName, existingCategories) {
+    if (!rawCatName || !rawCatName.trim()) return null;
+    const raw = rawCatName.trim();
+    const lower = raw.toLowerCase();
+    const normInput = lower.replace(/[^a-z0-9]/g, '');
+    const stemmedInput = this.stemCategory(raw);
+
+    // 1. Exact name or slug match
+    for (const c of existingCategories) {
+      if (c.name.toLowerCase() === lower || (c.slug && c.slug.toLowerCase() === lower)) {
+        return c;
+      }
+    }
+
+    // 2. Alphanumeric normalized match
+    for (const c of existingCategories) {
+      const normName = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normSlug = (c.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normName === normInput || normSlug === normInput) {
+        return c;
+      }
+    }
+
+    // 3. Stemmed match stripping 'design(s)', 'collection(s)'
+    if (stemmedInput.length >= 3) {
+      for (const c of existingCategories) {
+        const stemmedCat = this.stemCategory(c.name);
+        if (stemmedCat === stemmedInput) return c;
+        if (stemmedCat.startsWith(stemmedInput) || stemmedInput.startsWith(stemmedCat)) return c;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -80,38 +129,101 @@ class BulkImportService {
   async parseSpreadsheetFile(filePath, originalFilename, userId = null) {
     if (!db.isConnected()) await db.initPool();
 
-    const ext = path.extname(originalFilename).toLowerCase();
+    const ext = path.extname(originalFilename || '').toLowerCase();
     if (!['.xlsx', '.xls', '.csv'].includes(ext)) {
       throw new Error('Invalid file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) spreadsheet.');
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
+    let fileBuffer;
+    try {
+      fileBuffer = fs.readFileSync(filePath);
+    } catch (readErr) {
+      throw new Error(`Failed to read uploaded file: ${readErr.message}`);
+    }
+
     let workbook;
     try {
       workbook = XLSX.read(fileBuffer, { type: 'buffer', cellDates: true });
     } catch (parseErr) {
-      throw new Error(`Failed to read spreadsheet: ${parseErr.message}. Ensure the file is not password-protected.`);
+      throw new Error(`Failed to read spreadsheet: ${parseErr.message}. Ensure the file is not corrupted or password-protected.`);
     }
 
     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
       throw new Error('The uploaded spreadsheet contains no sheets.');
     }
 
-    // Pick first sheet
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '', blankrows: false });
+    // Pick first non-empty sheet
+    let targetSheetName = workbook.SheetNames[0];
+    let rawRows = [];
+    for (const name of workbook.SheetNames) {
+      const sheet = workbook.Sheets[name];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', blankrows: false });
+      if (rows && rows.length > 0) {
+        targetSheetName = name;
+        rawRows = rows;
+        break;
+      }
+    }
 
     if (!rawRows || rawRows.length === 0) {
       throw new Error('Spreadsheet appears to be empty or contains no data rows.');
     }
 
+    // Inspect headers on first row
+    const foundHeaders = Object.keys(rawRows[0] || {}).map(h => String(h).trim()).filter(Boolean);
+
+    const findMatchingHeader = (aliases) => {
+      for (const alias of aliases) {
+        const normAlias = this.normalizeKey(alias);
+        for (const h of foundHeaders) {
+          if (this.normalizeKey(h) === normAlias) {
+            return h;
+          }
+        }
+      }
+      return null;
+    };
+
+    // 1. Column Alias Definitions
+    const titleAliases = ['design name', 'name', 'title', 'design title', 'product name', 'design'];
+    const mrpAliases = ['mrp', 'original price', 'mrp / original price', 'mrp/original price', 'original price mrp', 'original price (mrp)', 'regular price', 'mrp price', 'original price inr'];
+    const sellingAliases = ['selling price', 'price', 'sale price', 'offer price', 'final price', 'discounted price', 'final selling price'];
+    const skuAliases = ['sku', 'design code', 'design code / sku', 'design code/sku', 'code', 'product code', 'design sku'];
+    const categoryAliases = ['category', 'category name', 'category slug', 'cat'];
+    const formatsAliases = ['available formats', 'formats', 'format', 'file formats', 'file format'];
+    const descAliases = ['description', 'details', 'about', 'design description', 'desc'];
+    const tagsAliases = ['tags', 'keywords', 'tag'];
+    const statusAliases = ['status', 'active', 'is active', 'state'];
+    const previewImageAliases = ['preview image filename', 'preview image', 'image filename', 'image', 'preview file', 'image name', 'photo filename'];
+    const machineZipAliases = ['machine zip filename', 'machine file', 'zip filename', 'machine zip', 'zip file', 'embroidery file', 'file filename'];
+
+    // 2. Validate Required Columns: Design Name, MRP, Selling Price
+    const hasTitle = Boolean(findMatchingHeader(titleAliases));
+    const hasMrp = Boolean(findMatchingHeader(mrpAliases));
+    const hasSelling = Boolean(findMatchingHeader(sellingAliases));
+
+    const missingRequired = [];
+    if (!hasTitle) missingRequired.push('Design Name');
+    if (!hasMrp) missingRequired.push('MRP (Original Price)');
+    if (!hasSelling) missingRequired.push('Selling Price');
+
+    if (missingRequired.length > 0) {
+      throw new Error(`Missing required column(s): ${missingRequired.join(', ')}. Found columns in your spreadsheet: [${foundHeaders.join(', ')}]. Please ensure your file includes Design Name, MRP, and Selling Price.`);
+    }
+
+    // 3. Rating & Review Count Detection (Ignore per requirement 4)
+    const hasRating = Boolean(findMatchingHeader(['rating', 'average rating', 'ratings', 'stars']));
+    const hasReviewCount = Boolean(findMatchingHeader(['review count', 'reviews count', 'reviews', 'number of reviews']));
+    const ratingsIgnored = hasRating || hasReviewCount;
+
     // Load existing SKUs and Categories from DB
     const existingSkuRows = await db.query('SELECT sku FROM designs WHERE sku IS NOT NULL');
     const existingDbSkus = new Set(existingSkuRows.map(r => this.normalizeKey(r.sku)));
+    const existingCategories = await Category.getAll();
 
     const batchId = crypto.randomBytes(16).toString('hex');
     const seenBatchSkus = new Set();
+    const distinctCategoriesMap = new Map();
 
     let validCount = 0;
     let errorCount = 0;
@@ -121,9 +233,9 @@ class BulkImportService {
 
     for (let i = 0; i < rawRows.length; i++) {
       const row = rawRows[i];
-      const rowNum = i + 2; // Row number in spreadsheet (1 is header)
+      const rowNum = i + 2; // Row number in spreadsheet (row 1 is header)
 
-      // Alias getter
+      // Value extractor using alias priority
       const getVal = (aliases) => {
         for (const alias of aliases) {
           const normAlias = this.normalizeKey(alias);
@@ -137,21 +249,34 @@ class BulkImportService {
         return '';
       };
 
-      const title = getVal(['Design Name', 'Title', 'Product Name', 'Name', 'Design']);
-      const sku = getVal(['SKU', 'Design Code / SKU', 'Design Code', 'Code']);
-      const categoryName = getVal(['Category', 'Category Name', 'Cat']);
-      const mrpRaw = getVal(['Original Price MRP', 'MRP / Original Price', 'MRP', 'Original Price', 'Price']);
-      const sellingRaw = getVal(['Selling Price', 'Final Selling Price', 'Sale Price', 'Discounted Price']);
-      const formats = getVal(['Available Formats', 'Formats', 'Format']) || 'DST, PES, JEF, EXP';
-      const description = getVal(['Description', 'Desc']);
-      const tags = getVal(['Tags', 'Tag', 'Keywords']);
-      const statusRaw = getVal(['Status', 'Is Active']) || 'Active';
-      const previewImgRaw = getVal(['Preview Image Filename', 'Preview Image', 'Image Filename', 'Image']);
-      const machineZipRaw = getVal(['Machine ZIP Filename', 'Machine File', 'ZIP Filename', 'File']);
+      const title = getVal(titleAliases);
+      const sku = getVal(skuAliases);
+      const categoryName = getVal(categoryAliases);
+      const mrpRaw = getVal(mrpAliases);
+      const sellingRaw = getVal(sellingAliases);
+      const formats = getVal(formatsAliases) || 'DST, PES, JEF, EXP';
+      const description = getVal(descAliases);
+      const tags = getVal(tagsAliases);
+      const statusRaw = getVal(statusAliases) || 'Active';
+      const previewImgRaw = getVal(previewImageAliases);
+      const machineZipRaw = getVal(machineZipAliases);
 
-      // Skip completely empty rows
-      if (!title && !sku && !mrpRaw && !categoryName) {
+      // Skip completely blank rows
+      if (!title && !sku && !mrpRaw && !sellingRaw && !categoryName) {
         continue;
+      }
+
+      // Track distinct categories for preview mapping
+      if (categoryName) {
+        if (!distinctCategoriesMap.has(categoryName)) {
+          const matched = this.matchCategoryFlexibly(categoryName, existingCategories);
+          distinctCategoriesMap.set(categoryName, {
+            spreadsheetCategory: categoryName,
+            matchedCategoryId: matched ? matched.id : null,
+            matchedCategoryName: matched ? matched.name : null,
+            isMatched: Boolean(matched)
+          });
+        }
       }
 
       const errors = [];
@@ -162,7 +287,7 @@ class BulkImportService {
         errors.push('Missing required "Design Name".');
       }
 
-      // Validation 2: MRP / Price
+      // Validation 2: MRP
       let mrp = parseFloat(mrpRaw);
       if (!mrpRaw || isNaN(mrp) || mrp < 0) {
         errors.push('Invalid "Original Price MRP" (must be a valid number >= 0).');
@@ -179,6 +304,8 @@ class BulkImportService {
         } else if (sellingPrice > mrp) {
           errors.push(`"Selling Price" (₹${sellingPrice}) cannot exceed Original MRP (₹${mrp}).`);
         }
+      } else {
+        errors.push('Missing required "Selling Price".');
       }
 
       // Validation 4: SKU checks
@@ -196,7 +323,7 @@ class BulkImportService {
         }
       }
 
-      const status = statusRaw.toLowerCase().includes('draft') || statusRaw === '0' || statusRaw.toLowerCase() === 'inactive' ? 'Draft' : 'Active';
+      const status = (statusRaw.toLowerCase().includes('draft') || statusRaw === '0' || statusRaw.toLowerCase() === 'inactive') ? 'Draft' : 'Active';
 
       let validationStatus = 'valid';
       if (errors.length > 0) {
@@ -228,10 +355,10 @@ class BulkImportService {
     }
 
     if (validatedItems.length === 0) {
-      throw new Error('No valid design data found in the spreadsheet. Please verify columns match the template.');
+      throw new Error('No valid rows found in spreadsheet. Please verify file content.');
     }
 
-    // Create job in database
+    // Create job record in database
     const jobRes = await db.query(`
       INSERT INTO import_jobs 
         (batch_id, status, total_rows, valid_rows, error_rows, duplicate_rows, spreadsheet_filename, created_by)
@@ -271,16 +398,32 @@ class BulkImportService {
     return {
       batchId,
       jobId,
+      sheetName: targetSheetName,
       totalRows: validatedItems.length,
-      validCount,
-      errorCount,
-      duplicateCount,
-      previewRows: validatedItems.slice(0, 100)
+      validRows: validCount,
+      errorRows: errorCount,
+      duplicateRows: duplicateCount,
+      categoriesFound: Array.from(distinctCategoriesMap.values()),
+      existingCategories: existingCategories.map(c => ({ id: c.id, name: c.name, slug: c.slug })),
+      ratingsIgnored,
+      ratingsIgnoredNote: ratingsIgnored ? 'Note: "Rating" and "Review Count" columns were ignored. Customer ratings & reviews are calculated exclusively from verified customer feedback.' : null,
+      preview: validatedItems.slice(0, 105).map(it => ({
+        rowNumber: it.rowNumber,
+        sku: it.sku,
+        title: it.title,
+        price: it.price,
+        salePrice: it.salePrice,
+        categoryName: it.categoryName,
+        image_filename: it.imageFilename,
+        file_filename: it.fileFilename,
+        isDuplicate: it.validationStatus === 'duplicate',
+        error: it.validationError
+      }))
     };
   }
 
   /**
-   * Step 2: Upload assets in small batches (5-10 files), matching by SKU/filename to import_job_items.
+   * Step 2: Upload assets in small batches (5-10 files), matching by exact filename or SKU to import_job_items.
    */
   async processAssetBatch(batchId, files) {
     if (!db.isConnected()) await db.initPool();
@@ -296,16 +439,17 @@ class BulkImportService {
     let matchedFiles = 0;
     const uploadedAssetResults = [];
 
-    const allowedImg = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
-    const allowedMachine = ['.zip', '.dst', '.pes', '.jef', '.exp', '.rar'];
+    const allowedImg = ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.svg'];
+    const allowedMachine = ['.zip', '.dst', '.pes', '.jef', '.exp', '.rar', '.7z'];
 
     for (const file of files) {
       const ext = path.extname(file.originalname).toLowerCase();
-      const baseNameWithoutExt = path.basename(file.originalname, ext).trim();
-      const normBase = this.normalizeKey(baseNameWithoutExt);
+      const uploadOrigName = file.originalname.trim();
+      const uploadBase = path.basename(uploadOrigName, ext).trim();
+      const normUploadBase = this.normalizeKey(uploadBase);
 
-      let isImage = allowedImg.includes(ext);
-      let isMachine = allowedMachine.includes(ext);
+      const isImage = allowedImg.includes(ext);
+      const isMachine = allowedMachine.includes(ext);
 
       if (!isImage && !isMachine) {
         uploadedAssetResults.push({ filename: file.originalname, status: 'unsupported_extension' });
@@ -316,10 +460,20 @@ class BulkImportService {
         // Save to persistent public preview storage
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
 
-        // Find matching item by SKU or image_filename
+        // Multi-tier matching:
+        // 1. Exact filename match (e.g. "AED 1.png" === "AED 1.png")
+        // 2. Basename match (e.g. "AED 1" === "AED 1")
+        // 3. Normalized key match
+        // 4. Fallback SKU match
         let matchedItem = items.find(it => {
-          if (it.image_filename && this.normalizeKey(path.basename(it.image_filename, path.extname(it.image_filename))) === normBase) return true;
-          if (it.sku && this.normalizeKey(it.sku) === normBase) return true;
+          if (it.image_filename) {
+            const targetOrig = it.image_filename.trim();
+            const targetBase = path.basename(targetOrig, path.extname(targetOrig)).trim();
+            if (targetOrig.toLowerCase() === uploadOrigName.toLowerCase()) return true;
+            if (targetBase.toLowerCase() === uploadBase.toLowerCase()) return true;
+            if (this.normalizeKey(targetBase) === normUploadBase) return true;
+          }
+          if (it.sku && this.normalizeKey(it.sku) === normUploadBase) return true;
           return false;
         });
 
@@ -354,9 +508,16 @@ class BulkImportService {
         // Save to private persistent design storage
         const savedPath = await storage.savePrivateFile(file.path, file.originalname, file.mimetype);
 
+        // Multi-tier matching for machine file
         let matchedItem = items.find(it => {
-          if (it.file_filename && this.normalizeKey(path.basename(it.file_filename, path.extname(it.file_filename))) === normBase) return true;
-          if (it.sku && this.normalizeKey(it.sku) === normBase) return true;
+          if (it.file_filename) {
+            const targetOrig = it.file_filename.trim();
+            const targetBase = path.basename(targetOrig, path.extname(targetOrig)).trim();
+            if (targetOrig.toLowerCase() === uploadOrigName.toLowerCase()) return true;
+            if (targetBase.toLowerCase() === uploadBase.toLowerCase()) return true;
+            if (this.normalizeKey(targetBase) === normUploadBase) return true;
+          }
+          if (it.sku && this.normalizeKey(it.sku) === normUploadBase) return true;
           return false;
         });
 
@@ -384,15 +545,21 @@ class BulkImportService {
       WHERE job_id = ?
     `, [job.id]);
 
+    const totalItems = matchCounts.total_items || 1;
+    const totalMatchedImg = matchCounts.total_matched_images || 0;
+    const totalMatchedFil = matchCounts.total_matched_files || 0;
+
     return {
       success: true,
       batchId,
       uploadedCount: files.length,
       matchedImages,
       matchedFiles,
-      totalMatchedImages: matchCounts.total_matched_images,
-      totalMatchedFiles: matchCounts.total_matched_files,
-      totalItems: matchCounts.total_items,
+      totalMatchedImages: totalMatchedImg,
+      totalMatchedFiles: totalMatchedFil,
+      missingImages: Math.max(0, totalItems - totalMatchedImg),
+      missingFiles: Math.max(0, totalItems - totalMatchedFil),
+      totalItems,
       results: uploadedAssetResults
     };
   }
@@ -400,7 +567,7 @@ class BulkImportService {
   /**
    * Step 3: Start background execution of the import.
    */
-  async startImportJob(batchId, { updateExisting = false, skipErrors = true }) {
+  async startImportJob(batchId, { updateExisting = false, skipErrors = true, categoryMappings = {} } = {}) {
     if (!db.isConnected()) await db.initPool();
 
     const [job] = await db.query('SELECT * FROM import_jobs WHERE batch_id = ?', [batchId]);
@@ -417,7 +584,7 @@ class BulkImportService {
 
     // Run in background detached
     setImmediate(() => {
-      this.executeImportJob(job.id, { updateExisting, skipErrors }).catch(err => {
+      this.executeImportJob(job.id, { updateExisting, skipErrors, categoryMappings }).catch(err => {
         console.error(`[IMPORT JOB #${job.id} CRITICAL ERROR]:`, err);
       });
     });
@@ -428,7 +595,7 @@ class BulkImportService {
   /**
    * Background Execution Worker for the Import Job
    */
-  async executeImportJob(jobId, { updateExisting, skipErrors }) {
+  async executeImportJob(jobId, { updateExisting, skipErrors, categoryMappings = {} }) {
     console.log(`[BULK IMPORT] Executing Import Job #${jobId}...`);
 
     let importedCount = 0;
@@ -462,17 +629,30 @@ class BulkImportService {
           // 1. Resolve or create Category
           let categoryId = null;
           if (item.category_name) {
-            const normCat = this.normalizeKey(item.category_name);
-            if (categoryMap.has(normCat)) {
-              categoryId = categoryMap.get(normCat);
+            // Check explicit mapping from UI
+            if (categoryMappings && categoryMappings[item.category_name] && categoryMappings[item.category_name] !== '__NEW__') {
+              categoryId = parseInt(categoryMappings[item.category_name], 10);
             } else {
-              const newSlug = item.category_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-              categoryId = await Category.create({
-                name: item.category_name,
-                slug: newSlug,
-                display_order: 0
-              });
-              categoryMap.set(normCat, categoryId);
+              // Flexible match against existing categories
+              const matched = this.matchCategoryFlexibly(item.category_name, categories);
+              if (matched) {
+                categoryId = matched.id;
+              } else {
+                // Check if category already exists in DB by slug or name before inserting
+                const newSlug = item.category_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                const [existingCat] = await db.query('SELECT id, name FROM categories WHERE name = ? OR slug = ? LIMIT 1', [item.category_name, newSlug]);
+                if (existingCat) {
+                  categoryId = existingCat.id;
+                } else {
+                  categoryId = await Category.create({
+                    name: item.category_name,
+                    slug: newSlug,
+                    display_order: 0
+                  });
+                  categories.push({ id: categoryId, name: item.category_name, slug: newSlug });
+                  categoryMap.set(this.normalizeKey(item.category_name), categoryId);
+                }
+              }
             }
           }
 
@@ -491,7 +671,7 @@ class BulkImportService {
           let targetDesignId = null;
 
           if (existingDesign && updateExisting) {
-            // Update existing product
+            // Update existing product (Never overwrite ratings or reviews)
             targetDesignId = existingDesign.id;
             await Design.update(targetDesignId, {
               title: item.title,
@@ -521,13 +701,9 @@ class BulkImportService {
             });
           }
 
-          // 3. Attach matched image
+          // 3. Attach matched image (creates design_images & preview design_files + thumbnail)
           if (item.image_stored_url) {
-            await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [targetDesignId]);
-            await db.query(
-              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)',
-              [targetDesignId, item.image_stored_url]
-            );
+            await Design.replacePrimaryImage(targetDesignId, item.image_stored_url, item.image_filename, 0);
           }
 
           // 4. Attach matched machine design file

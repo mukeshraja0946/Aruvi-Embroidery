@@ -513,42 +513,104 @@ function setupStep2(data) {
       Total Rows: ${data.totalRows}
     </div>
     <div style="background:#E8F5E9; color:#2E7D32; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
-      Valid: ${data.validCount}
+      Valid Rows: ${data.validRows !== undefined ? data.validRows : data.validCount}
     </div>
     <div style="background:#FFF3E0; color:#E65100; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
-      Duplicates in Catalog: ${data.duplicateCount}
+      Duplicates in Catalog: ${data.duplicateRows !== undefined ? data.duplicateRows : data.duplicateCount}
     </div>
     <div style="background:#FFEBEE; color:#C62828; padding:6px 12px; border-radius:8px; font-size:0.78rem; font-weight:700;">
-      Errors: ${data.errorCount}
+      Errors: ${data.errorRows !== undefined ? data.errorRows : data.errorCount}
     </div>
   `;
 
-  document.getElementById('previewRowsCountBadge').textContent = `Showing ${data.previewRows ? data.previewRows.length : 0} of ${data.totalRows} rows`;
+  // Render Category Mapping & Ratings Note Container
+  let customSection = document.getElementById('step2CustomMappingSection');
+  if (!customSection) {
+    customSection = document.createElement('div');
+    customSection.id = 'step2CustomMappingSection';
+    pillsEl.parentNode.insertBefore(customSection, pillsEl.nextSibling);
+  }
+
+  let ratingsNoteHtml = '';
+  if (data.ratingsIgnored) {
+    ratingsNoteHtml = `
+      <div style="background: #FFF8E1; border: 1px solid #FFE082; color: #B78103; padding: 10px 14px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-circle-info" style="font-size: 1.1rem; color: #F57F17;"></i>
+        <span>${data.ratingsIgnoredNote || 'Rating and Review Count columns were ignored. Real customer reviews are calculated strictly from verified buyer feedback.'}</span>
+      </div>
+    `;
+  }
+
+  let categoryMappingHtml = '';
+  if (data.categoriesFound && data.categoriesFound.length > 0) {
+    const existingCats = data.existingCategories || [];
+    categoryMappingHtml = `
+      <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.1rem; margin-bottom: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <strong style="font-size: 0.88rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-tags" style="color: var(--admin-primary);"></i> Category Mapping & Resolution
+          </strong>
+          <span style="font-size: 0.74rem; color: var(--admin-text-muted);">Confirm or re-map spreadsheet categories</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${data.categoriesFound.map(cf => {
+            const isMatched = cf.isMatched;
+            const badge = isMatched 
+              ? `<span style="background: #E8F5E9; color: #2E7D32; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-circle-check"></i> Matched to "${cf.matchedCategoryName}"</span>`
+              : `<span style="background: #FFF3E0; color: #E65100; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-triangle-exclamation"></i> Unmatched</span>`;
+
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; background: #FAF6F0; border-radius: 8px; font-size: 0.8rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <strong style="color: var(--admin-text-dark);">${cf.spreadsheetCategory}</strong>
+                  ${badge}
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label style="font-size: 0.74rem; color: var(--admin-text-muted);">Assign to:</label>
+                  <select class="category-map-select" data-raw-category="${cf.spreadsheetCategory}" style="font-size: 0.78rem; padding: 4px 8px; border: 1px solid var(--admin-border); border-radius: 6px; background: #FFF; font-weight: 600;">
+                    ${cf.isMatched ? `<option value="${cf.matchedCategoryId}" selected>Keep Matched: ${cf.matchedCategoryName}</option>` : ''}
+                    <optgroup label="Existing Store Categories">
+                      ${existingCats.map(ec => `<option value="${ec.id}" ${(!cf.isMatched && ec.id === cf.matchedCategoryId) ? 'selected' : ''}>${ec.name}</option>`).join('')}
+                    </optgroup>
+                    <option value="__NEW__" ${!cf.isMatched ? 'selected' : ''}>+ Create New Category "${cf.spreadsheetCategory}"</option>
+                  </select>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  customSection.innerHTML = ratingsNoteHtml + categoryMappingHtml;
+
+  const previewList = data.preview || data.previewRows || [];
+  document.getElementById('previewRowsCountBadge').textContent = `Showing ${previewList.length} of ${data.totalRows} rows`;
 
   const tbody = document.getElementById('step2PreviewTbody');
   tbody.innerHTML = '';
-  const rows = data.previewRows || [];
 
-  rows.forEach(r => {
+  previewList.forEach(r => {
     const tr = document.createElement('tr');
-    if (r.validationStatus === 'error') tr.style.background = '#FFEBEE';
-    else if (r.validationStatus === 'duplicate') tr.style.background = '#FFF8E1';
+    if (r.validationStatus === 'error' || r.error) tr.style.background = '#FFEBEE';
+    else if (r.validationStatus === 'duplicate' || r.isDuplicate) tr.style.background = '#FFF8E1';
 
-    let statusBadge = '<span style="background:#E8F5E9; color:#2E7D32; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">VALID</span>';
-    if (r.validationStatus === 'error') {
-      statusBadge = '<span style="background:#FFEBEE; color:#C62828; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">ERROR</span>';
-    } else if (r.validationStatus === 'duplicate') {
-      statusBadge = '<span style="background:#FFF3E0; color:#E65100; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;">DUPLICATE</span>';
+    let statusBadge = '<span style="background:#E8F5E9; color:#2E7D32; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;"><i class="fa-solid fa-circle-check"></i> VALID</span>';
+    if (r.validationStatus === 'error' || r.error) {
+      statusBadge = '<span style="background:#FFEBEE; color:#C62828; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;"><i class="fa-solid fa-circle-xmark"></i> ERROR</span>';
+    } else if (r.validationStatus === 'duplicate' || r.isDuplicate) {
+      statusBadge = '<span style="background:#FFF3E0; color:#E65100; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.7rem;"><i class="fa-solid fa-triangle-exclamation"></i> DUPLICATE</span>';
     }
 
     tr.innerHTML = `
-      <td style="font-weight:700;">${r.rowNumber}</td>
+      <td style="font-weight:700;">#${r.rowNumber}</td>
       <td>${statusBadge}</td>
       <td><code>${r.sku || '-'}</code></td>
       <td><strong>${r.title}</strong></td>
       <td>${r.categoryName || '-'}</td>
       <td>₹${r.price} ${r.salePrice ? '/ ₹' + r.salePrice : ''}</td>
-      <td style="color:${r.validationError ? '#C62828' : '#2E7D32'}; font-size:0.72rem;">${r.validationError || 'Ready'}</td>
+      <td style="color:${(r.error || r.validationError) ? '#C62828' : '#2E7D32'}; font-size:0.72rem;">${r.error || r.validationError || 'Ready'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -700,6 +762,13 @@ async function submitStep3StartJob() {
   const updateExisting = document.getElementById('updateExistingCheckbox').checked;
   const skipErrors = document.getElementById('skipErrorsCheckbox').checked;
 
+  const categoryMappings = {};
+  document.querySelectorAll('.category-map-select').forEach(sel => {
+    if (sel.dataset && sel.dataset.rawCategory) {
+      categoryMappings[sel.dataset.rawCategory] = sel.value;
+    }
+  });
+
   try {
     const res = await fetch('/admin/designs/import-start-job', {
       method: 'POST',
@@ -712,7 +781,8 @@ async function submitStep3StartJob() {
       body: JSON.stringify({
         batchId: currentImportBatchId,
         updateExisting,
-        skipErrors
+        skipErrors,
+        categoryMappings
       })
     });
 

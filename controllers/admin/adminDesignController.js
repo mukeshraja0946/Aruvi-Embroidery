@@ -892,14 +892,15 @@ exports.postImportUploadAssets = async (req, res, next) => {
  */
 exports.postImportStartJob = async (req, res, next) => {
   try {
-    const { batchId, updateExisting, skipErrors } = req.body;
+    const { batchId, updateExisting, skipErrors, categoryMappings } = req.body;
     if (!batchId) {
       return res.status(400).json({ success: false, message: 'Missing import session batchId.' });
     }
 
     const result = await bulkImportService.startImportJob(batchId, {
       updateExisting: updateExisting === true || updateExisting === 'true' || updateExisting === 1 || updateExisting === '1',
-      skipErrors: skipErrors !== false && skipErrors !== 'false' && skipErrors !== 0 && skipErrors !== '0'
+      skipErrors: skipErrors !== false && skipErrors !== 'false' && skipErrors !== 0 && skipErrors !== '0',
+      categoryMappings: categoryMappings || {}
     });
     return res.json({ success: true, ...result });
   } catch (err) {

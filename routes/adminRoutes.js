@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/multerUpload');
+const { spreadsheetUploadMiddleware } = require('../middleware/spreadsheetUpload');
 
 const adminAuthController = require('../controllers/admin/adminAuthController');
 const adminDashboardController = require('../controllers/admin/adminDashboardController');
@@ -61,7 +62,7 @@ router.post('/admin/designs/replace-image/:id', upload.any(), adminDesignControl
 router.post('/admin/designs/bulk-upload-images', upload.any(), adminDesignController.bulkUploadImages);
 
 router.get('/admin/designs/import-template', adminDesignController.downloadImportTemplate);
-router.post('/admin/designs/import-preview', upload.any(), adminDesignController.postImportPreview);
+router.post('/admin/designs/import-preview', spreadsheetUploadMiddleware, adminDesignController.postImportPreview);
 router.post('/admin/designs/import-upload-assets', upload.any(), adminDesignController.postImportUploadAssets);
 router.post('/admin/designs/import-start-job', adminDesignController.postImportStartJob);
 router.get('/admin/designs/import-job-status/:batchId', adminDesignController.getImportJobStatus);
