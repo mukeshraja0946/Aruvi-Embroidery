@@ -56,10 +56,10 @@ class AdminStatsService {
         const prevCust = prevMonthCustRes ? prevMonthCustRes.total : 0;
         const customersTrend = calculateTrend(currCust, prevCust);
 
-        // 4. Designs / Products Count & Trend
-        const [totalDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs");
-        const [currMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE created_at >= ?", [firstDayThisMonth]);
-        const [prevMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+        // 4. Designs / Products Count & Trend (Strictly non-deleted: is_active >= 0)
+        const [totalDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0");
+        const [currMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0 AND created_at >= ?", [firstDayThisMonth]);
+        const [prevMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0 AND created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
 
         const totalDesigns = totalDesignsRes ? totalDesignsRes.total : 0;
         const currDesigns = currMonthDesignsRes ? currMonthDesignsRes.total : 0;
@@ -330,17 +330,16 @@ class AdminStatsService {
         const firstDayPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-        const [totalRes] = await db.query("SELECT COUNT(*) as total FROM designs");
-        const [currTotalRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE created_at >= ?", [firstDayThisMonth]);
-        const [prevTotalRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+        const [currTotalRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0 AND created_at >= ?", [firstDayThisMonth]);
+        const [prevTotalRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0 AND created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
 
         const [activeRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active = 1");
         const [inactiveRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active = 0");
         const [catRes] = await db.query("SELECT COUNT(*) as total FROM categories");
 
-        const totalDesigns = totalRes ? totalRes.total : 0;
         const activeDesigns = activeRes ? activeRes.total : 0;
         const inactiveDesigns = inactiveRes ? inactiveRes.total : 0;
+        const totalDesigns = activeDesigns + inactiveDesigns;
         const totalCategories = catRes ? catRes.total : 0;
 
         const designsTrend = calculateTrend(currTotalRes ? currTotalRes.total : 0, prevTotalRes ? prevTotalRes.total : 0);

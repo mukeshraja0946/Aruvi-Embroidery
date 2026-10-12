@@ -1159,11 +1159,11 @@ class Design {
   static async count() {
     if (db.isConnected()) {
       try {
-        const res = await db.query('SELECT COUNT(*) as total FROM designs');
+        const res = await db.query('SELECT COUNT(*) as total FROM designs WHERE is_active >= 0');
         if (res && res[0] && res[0].total !== undefined) return res[0].total;
       } catch (e) {}
     }
-    return fallbackDesigns.length;
+    return fallbackDesigns.filter(d => d.is_active >= 0).length;
   }
 
   static async countActive() {

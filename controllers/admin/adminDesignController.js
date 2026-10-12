@@ -39,7 +39,7 @@ exports.getDesigns = async (req, res, next) => {
       title: 'Manage Embroidery Designs - Admin',
       designs,
       categories,
-      total: stats.totalDesigns,
+      total: (search || category || status) ? total : stats.totalDesigns,
       activeCount: stats.activeDesigns,
       inactiveCount: stats.inactiveDesigns,
       categoryCount: stats.totalCategories,
