@@ -3,9 +3,10 @@ const db = require('../config/db');
 const fallbackSettings = {
   shop_name: 'ARUVI EMBROIDERY STUDIO',
   tagline: 'Where Threads Tell Stories',
-  logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
-  mobile_logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
-  favicon_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
+  logo_url: '/public/assets/brand/logo.png',
+  mobile_logo_url: '/public/assets/brand/logo.png',
+  favicon_url: '/public/assets/brand/favicon.ico',
+  hero_image: '/public/assets/brand/hero_embroidery.jpg',
   contact_email: process.env.CONTACT_EMAIL || 'aruviembroidery@gmail.com',
   contact_phone: process.env.CONTACT_PHONE || '',
   address: process.env.SHOP_ADDRESS || '',
@@ -55,7 +56,13 @@ class Setting {
     } catch (err) {
       console.error('[Setting.getAll error]:', err.message);
     }
-    return { ...fallbackSettings };
+    const storage = require('../config/storage');
+    const resolved = { ...fallbackSettings };
+    resolved.logo_url = storage.resolveBrandAsset('logo', resolved.logo_url);
+    resolved.mobile_logo_url = storage.resolveBrandAsset('mobile_logo', resolved.mobile_logo_url);
+    resolved.favicon_url = storage.resolveBrandAsset('favicon', resolved.favicon_url);
+    resolved.hero_image = storage.resolveBrandAsset('hero_image', resolved.hero_image);
+    return resolved;
   }
 
   static async updateAll(settingsData) {

@@ -70,6 +70,7 @@ app.use(cookieParser());
 // Persistent Storage & Static Files
 const storage = require('./config/storage');
 storage.initStorage();
+storage.validateStorageConfiguration();
 
 // Serve preview images publicly from persistent storage
 app.use('/public/uploads/previews', express.static(storage.getPreviewsDir()));
@@ -131,14 +132,15 @@ app.use(csrfProtection);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// App-level global defaults
+// App-level global defaults (always falls back to committed brand assets if custom upload is missing)
 app.locals.siteSettings = {
   shop_name: 'ARUVI EMBROIDERY STUDIO',
   tagline: 'Where Threads Tell Stories',
 
-  logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
-  mobile_logo_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
-  favicon_url: '/public/uploads/previews/logo_image-1791088249075-882339975.png',
+  logo_url: storage.resolveBrandAsset('logo', null),
+  mobile_logo_url: storage.resolveBrandAsset('mobile_logo', null),
+  favicon_url: storage.resolveBrandAsset('favicon', null),
+  hero_image: storage.resolveBrandAsset('hero_image', null),
 
   contact_email:
     process.env.CONTACT_EMAIL || 'aruviembroidery@gmail.com',

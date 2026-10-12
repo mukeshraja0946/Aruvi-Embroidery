@@ -22,9 +22,10 @@ exports.postCreate = async (req, res, next) => {
     const { name, slug, description, display_order } = req.body;
     const generatedSlug = slug ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') : name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    let imageUrl = '/public/images/cat_floral.jpg';
+    const storage = require('../../config/storage');
+    let imageUrl = '/public/assets/brand/hero_embroidery.jpg';
     if (req.file) {
-      imageUrl = `/public/uploads/previews/${req.file.filename}`;
+      imageUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
     }
 
     const newId = await Category.create({
@@ -51,7 +52,8 @@ exports.postUpdate = async (req, res, next) => {
 
     let imageUrl = null;
     if (req.file) {
-      imageUrl = `/public/uploads/previews/${req.file.filename}`;
+      const storage = require('../../config/storage');
+      imageUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
     }
 
     await Category.update(id, {

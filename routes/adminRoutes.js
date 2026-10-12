@@ -137,7 +137,23 @@ router.post('/admin/api/email-campaigns/send', adminEmailCampaignController.send
 router.post('/admin/api/email-campaigns/retry', adminEmailCampaignController.retryFailed);
 router.get('/admin/api/email-campaigns/details/:id', adminEmailCampaignController.getCampaignDetails);
 router.post('/admin/api/email-campaigns/delete/:id', adminEmailCampaignController.deleteCampaign);
-router.post('/admin/api/email-campaigns/save-smtp', adminEmailCampaignController.saveSmtpConfig);
-router.get('/admin/api/email-campaigns/test-smtp', adminEmailCampaignController.testSmtpConnectionApi);
+// Storage Recovery & Bulk Relink Tools
+const adminToolsController = require('../controllers/admin/adminToolsController');
+
+router.get('/admin/tools/missing-files', adminToolsController.getMissingFiles);
+router.get('/admin/tools/missing-files/export-csv', adminToolsController.exportMissingFilesCsv);
+router.post('/admin/tools/replace-file-quick', upload.single('file'), adminToolsController.replaceDesignFileQuick);
+
+router.get('/admin/tools/bulk-image-relink', adminToolsController.getBulkImageRelink);
+router.post('/admin/tools/bulk-image-relink/preview', upload.single('zip_file'), adminToolsController.postBulkImageRelinkPreview);
+router.post('/admin/tools/bulk-image-relink/commit', adminToolsController.postBulkImageRelinkCommit);
+
+router.get('/admin/tools/bulk-file-relink', adminToolsController.getBulkFileRelink);
+router.post('/admin/tools/bulk-file-relink/preview', upload.single('zip_file'), adminToolsController.postBulkFileRelinkPreview);
+router.post('/admin/tools/bulk-file-relink/commit', adminToolsController.postBulkFileRelinkCommit);
+
+router.get('/admin/tools/backup', adminToolsController.getBackupPage);
+router.post('/admin/tools/backup/run', adminToolsController.postRunBackup);
+router.get('/admin/tools/backup/download/:filename', adminToolsController.downloadBackup);
 
 module.exports = router;

@@ -43,9 +43,10 @@ exports.getBanners = async (req, res, next) => {
 exports.postCreate = async (req, res, next) => {
   try {
     const { title, link_url, display_order } = req.body;
-    let imageUrl = '/public/images/hero_embroidery.jpg';
+    const storage = require('../../config/storage');
+    let imageUrl = '/public/assets/brand/hero_embroidery.jpg';
     if (req.file) {
-      imageUrl = `/public/uploads/previews/${req.file.filename}`;
+      imageUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
     }
 
     let newId = null;

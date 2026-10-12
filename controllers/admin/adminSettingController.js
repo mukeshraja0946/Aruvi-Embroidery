@@ -152,19 +152,27 @@ exports.postSettings = async (req, res, next) => {
     if (mobile_logo_url) updates.mobile_logo_url = mobile_logo_url;
     if (favicon_url) updates.favicon_url = favicon_url;
 
-    if (remove_logo === '1') updates.logo_url = '/public/images/logo.jpg';
-    if (remove_mobile_logo === '1') updates.mobile_logo_url = '/public/images/logo.jpg';
-    if (remove_favicon === '1') updates.favicon_url = '/public/images/logo.jpg';
+    const storage = require('../../config/storage');
+
+    if (remove_logo === '1') updates.logo_url = '/public/assets/brand/logo.png';
+    if (remove_mobile_logo === '1') updates.mobile_logo_url = '/public/assets/brand/logo.png';
+    if (remove_favicon === '1') updates.favicon_url = '/public/assets/brand/favicon.ico';
 
     if (req.files) {
       if (req.files.logo_image && req.files.logo_image[0]) {
-        updates.logo_url = `/public/uploads/previews/${req.files.logo_image[0].filename}`;
+        const file = req.files.logo_image[0];
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        updates.logo_url = savedUrl;
       }
       if (req.files.mobile_logo_image && req.files.mobile_logo_image[0]) {
-        updates.mobile_logo_url = `/public/uploads/previews/${req.files.mobile_logo_image[0].filename}`;
+        const file = req.files.mobile_logo_image[0];
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        updates.mobile_logo_url = savedUrl;
       }
       if (req.files.favicon_image && req.files.favicon_image[0]) {
-        updates.favicon_url = `/public/uploads/previews/${req.files.favicon_image[0].filename}`;
+        const file = req.files.favicon_image[0];
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        updates.favicon_url = savedUrl;
       }
     }
 
@@ -231,7 +239,9 @@ exports.postHomepageEditor = async (req, res, next) => {
     };
 
     if (req.file) {
-      updates.hero_image = `/public/uploads/previews/${req.file.filename}`;
+      const storage = require('../../config/storage');
+      const savedHeroUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
+      updates.hero_image = savedHeroUrl;
     }
 
     await Setting.updateAll(updates);

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search bulk recovery tools...">
+    </div>
+
+    <div class="admin-header-right">
+      <a href="/admin/tools/missing-files" class="admin-icon-btn" title="Missing Files">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & RECOVERY</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-image-relink" class="active"><span><i class="fa-solid fa-images"></i> Bulk Image Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-file-relink"><span><i class="fa-solid fa-file-zipper"></i> Bulk File Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Health</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">SYSTEM SETTINGS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Body -->
+    <main class="admin-content-body">
+      <% if (messages && messages.success) { %>
+        <div class="alert alert-success" style="margin-bottom: 1.5rem; background: #E8F5E9; color: #2E7D32; padding: 1rem; border-radius: 8px; border: 1px solid #C8E6C9;">
+          <i class="fa-solid fa-circle-check"></i> <%= messages.success %>
+        </div>
+      <% } %>
+      <% if (messages && messages.error) { %>
+        <div class="alert alert-danger" style="margin-bottom: 1.5rem; background: #FFEBEE; color: #C62828; padding: 1rem; border-radius: 8px; border: 1px solid #FFCDD2;">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= messages.error %>
+        </div>
+      <% } %>
+
+      <div style="margin-bottom: 1.75rem;">
+        <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Bulk Image Relink Tool</h1>
+        <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">
+          Automatically match and reconnect product photos for your 2000+ designs by SKU (e.g. <code>AED-BLO-01.jpg</code>), Title, or Design Code.
+        </p>
+      </div>
+
+      <!-- Upload Form (Step 1) -->
+      <div style="background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.75rem; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        <h2 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--admin-text-dark);">
+          Step 1: Provide Image Archive or Folder
+        </h2>
+        <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+          Upload a ZIP containing product preview photos, or specify a server folder directory. Images will be matched automatically by filename.
+        </p>
+
+        <form action="/admin/tools/bulk-image-relink/preview" method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Option A: ZIP Upload -->
+            <div style="border: 1px dashed var(--admin-border); border-radius: 8px; padding: 1.25rem; background: #FAF9F6;">
+              <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--admin-primary);">
+                <i class="fa-solid fa-file-zipper"></i> Option A: Upload ZIP Archive
+              </label>
+              <input type="file" name="zip_file" accept=".zip" style="width: 100%; font-size: 0.85rem; padding: 0.5rem; background: #FFF; border: 1px solid var(--admin-border); border-radius: 6px;">
+              <small style="display: block; color: var(--admin-text-muted); margin-top: 6px; font-size: 0.75rem;">
+                Supports ZIP containing JPG, PNG, WEBP files up to 500MB.
+              </small>
+            </div>
+
+            <!-- Option B: Server Folder -->
+            <div style="border: 1px dashed var(--admin-border); border-radius: 8px; padding: 1.25rem; background: #FAF9F6;">
+              <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--admin-primary);">
+                <i class="fa-solid fa-folder-open"></i> Option B: Server Directory Path
+              </label>
+              <input type="text" name="folder_path" placeholder="e.g. /var/data/recovered_images or D:\Images\Aruvi" style="width: 100%; font-size: 0.85rem; padding: 0.6rem; background: #FFF; border: 1px solid var(--admin-border); border-radius: 6px;">
+              <small style="display: block; color: var(--admin-text-muted); margin-top: 6px; font-size: 0.75rem;">
+                Direct path to a folder on the host machine containing images.
+              </small>
+            </div>
+          </div>
+
+          <div style="text-align: right;">
+            <button type="submit" class="btn btn-primary" style="font-size: 0.9rem; padding: 0.6rem 1.4rem; border-radius: 8px;">
+              <i class="fa-solid fa-magnifying-glass"></i> Scan & Preview Matches
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Preview Report (Step 2) -->
+      <% if (preview) { %>
+        <div style="background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.75rem; margin-bottom: 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">
+                Step 2: Match Preview Report
+              </h2>
+              <span style="font-size: 0.82rem; color: var(--admin-text-muted);">
+                Found <%= preview.totalExtracted %> images. Review matches before committing to persistent storage.
+              </span>
+            </div>
+
+            <% if (preview.matchedCount > 0) { %>
+              <form action="/admin/tools/bulk-image-relink/commit" method="POST" onsubmit="return confirm('Commit these <%= preview.matchedCount %> matched images to persistent storage and update designs?');">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <input type="hidden" name="sessionId" value="<%= preview.sessionId %>">
+                <button type="submit" class="btn btn-primary" style="font-size: 0.9rem; padding: 0.6rem 1.5rem; border-radius: 8px; background: #2E7D32; border-color: #2E7D32;">
+                  <i class="fa-solid fa-check-double"></i> Apply & Relink <%= preview.matchedCount %> Images
+                </button>
+              </form>
+            <% } %>
+          </div>
+
+          <!-- Summary Metric Pills -->
+          <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+            <div style="background: #E8F5E9; color: #2E7D32; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
+              <i class="fa-solid fa-check"></i> <%= preview.matchedCount %> Matched Designs
+            </div>
+            <div style="background: #FFEBEE; color: #C62828; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
+              <i class="fa-solid fa-xmark"></i> <%= preview.unmatchedCount %> Unmatched Files
+            </div>
+            <div style="background: #FFF8E1; color: #F57F17; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
+              <i class="fa-solid fa-triangle-exclamation"></i> <%= preview.duplicatesCount %> Duplicate Conflicts
+            </div>
+          </div>
+
+          <!-- Matched Table -->
+          <h3 style="font-size: 0.95rem; font-weight: 700; color: #2E7D32; margin-bottom: 0.75rem;">
+            ✓ Matched Files Ready for Relinking (<%= preview.matchedCount %>)
+          </h3>
+          <% if (preview.matched.length === 0) { %>
+            <p style="color: var(--admin-text-muted); font-size: 0.85rem; font-style: italic;">No automatic matches found. Check that filenames contain the design SKU or Title.</p>
+          <% } else { %>
+            <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 8px; margin-bottom: 1.5rem;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+                <thead style="background: #F9FAFB; position: sticky; top: 0;">
+                  <tr style="text-align: left; border-bottom: 1px solid var(--admin-border);">
+                    <th style="padding: 0.6rem 0.8rem;">Uploaded File</th>
+                    <th style="padding: 0.6rem 0.8rem;">Matched SKU</th>
+                    <th style="padding: 0.6rem 0.8rem;">Target Product Title</th>
+                    <th style="padding: 0.6rem 0.8rem;">Match Rule</th>
+                    <th style="padding: 0.6rem 0.8rem;">Confidence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% preview.matched.forEach(m => { %>
+                    <tr style="border-bottom: 1px solid var(--admin-border);">
+                      <td style="padding: 0.5rem 0.8rem; font-family: monospace;"><%= m.filename %></td>
+                      <td style="padding: 0.5rem 0.8rem; font-weight: 700; color: var(--admin-primary);"><%= m.designSku %></td>
+                      <td style="padding: 0.5rem 0.8rem;"><%= m.designTitle %> (#<%= m.designId %>)</td>
+                      <td style="padding: 0.5rem 0.8rem; color: var(--admin-text-muted);"><%= m.method %></td>
+                      <td style="padding: 0.5rem 0.8rem;"><span style="background: #E8F5E9; color: #2E7D32; padding: 2px 6px; border-radius: 4px; font-weight: 600;"><%= m.confidence %></span></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+
+          <!-- Unmatched Files -->
+          <% if (preview.unmatchedCount > 0) { %>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #C62828; margin-bottom: 0.75rem;">
+              ✗ Unmatched Files (<%= preview.unmatchedCount %>)
+            </h3>
+            <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 8px; margin-bottom: 1.5rem; background: #FFF8F8;">
+              <ul style="margin: 0; padding: 0.5rem 1rem; font-family: monospace; font-size: 0.8rem; list-style: none;">
+                <% preview.unmatched.forEach(u => { %>
+                  <li style="padding: 0.25rem 0; color: #C62828;">• <%= u.filename %> (No matching design SKU or Title found)</li>
+                <% }); %>
+              </ul>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>
