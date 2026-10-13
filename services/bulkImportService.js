@@ -337,6 +337,7 @@ class BulkImportService {
       }
 
       validatedItems.push({
+        rowNo: rowNum,
         rowNumber: rowNum,
         sku: sku || null,
         title,
@@ -360,8 +361,8 @@ class BulkImportService {
 
     // Create job record in database
     const jobRes = await db.query(`
-      INSERT INTO import_jobs 
-        (batch_id, status, total_rows, valid_rows, error_rows, duplicate_rows, spreadsheet_filename, created_by)
+      INSERT INTO \`import_jobs\` 
+        (\`batch_id\`, \`status\`, \`total_rows\`, \`valid_rows\`, \`error_rows\`, \`duplicate_rows\`, \`spreadsheet_filename\`, \`created_by\`)
       VALUES (?, 'draft', ?, ?, ?, ?, ?, ?)
     `, [
       batchId,
@@ -374,25 +375,33 @@ class BulkImportService {
     ]);
     const jobId = jobRes.insertId;
 
-    // Insert items in batches of 200
+    // Insert items in batches of 200 using mysql2 VALUES ? bulk array placeholder
     const insertBatchSize = 200;
     for (let b = 0; b < validatedItems.length; b += insertBatchSize) {
       const slice = validatedItems.slice(b, b + insertBatchSize);
-      const valPlaceholders = slice.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-      const params = [];
-      for (const it of slice) {
-        params.push(
-          jobId, it.rowNumber, it.sku, it.title, it.categoryName,
-          it.price, it.salePrice, it.formats, it.description, it.tags,
-          it.status, it.imageFilename, it.fileFilename,
-          it.validationStatus, it.validationError
-        );
-      }
+      const rows = slice.map(it => [
+        jobId,
+        it.rowNo,
+        it.sku,
+        it.title,
+        it.categoryName,
+        it.price,
+        it.salePrice,
+        it.formats,
+        it.description,
+        it.tags,
+        it.status,
+        it.imageFilename,
+        it.fileFilename,
+        it.validationStatus,
+        it.validationError
+      ]);
+
       await db.query(`
-        INSERT INTO import_job_items 
-          (job_id, row_number, sku, title, category_name, price, sale_price, formats, description, tags, status, image_filename, file_filename, validation_status, validation_error)
-        VALUES ${valPlaceholders}
-      `, params);
+        INSERT INTO \`import_job_items\` 
+          (\`job_id\`, \`row_no\`, \`sku\`, \`title\`, \`category_name\`, \`price\`, \`sale_price\`, \`formats\`, \`description\`, \`tags\`, \`status\`, \`image_filename\`, \`file_filename\`, \`validation_status\`, \`validation_error\`)
+        VALUES ?
+      `, [rows]);
     }
 
     return {
@@ -408,7 +417,8 @@ class BulkImportService {
       ratingsIgnored,
       ratingsIgnoredNote: ratingsIgnored ? 'Note: "Rating" and "Review Count" columns were ignored. Customer ratings & reviews are calculated exclusively from verified customer feedback.' : null,
       preview: validatedItems.slice(0, 105).map(it => ({
-        rowNumber: it.rowNumber,
+        rowNo: it.rowNo,
+        rowNumber: it.rowNo,
         sku: it.sku,
         title: it.title,
         price: it.price,
@@ -428,12 +438,12 @@ class BulkImportService {
   async processAssetBatch(batchId, files) {
     if (!db.isConnected()) await db.initPool();
 
-    const [job] = await db.query('SELECT * FROM import_jobs WHERE batch_id = ?', [batchId]);
+    const [job] = await db.query('SELECT * FROM `import_jobs` WHERE `batch_id` = ?', [batchId]);
     if (!job) {
       throw new Error('Import session not found or expired.');
     }
 
-    const items = await db.query('SELECT id, sku, image_filename, file_filename FROM import_job_items WHERE job_id = ?', [job.id]);
+    const items = await db.query('SELECT `id`, `sku`, `image_filename`, `file_filename` FROM `import_job_items` WHERE `job_id` = ?', [job.id]);
 
     let matchedImages = 0;
     let matchedFiles = 0;
@@ -479,7 +489,7 @@ class BulkImportService {
 
         if (matchedItem) {
           await db.query(
-            'UPDATE import_job_items SET image_stored_url = ?, image_matched = 1, image_filename = ? WHERE id = ?',
+            'UPDATE `import_job_items` SET `image_stored_url` = ?, `image_matched` = 1, `image_filename` = ? WHERE `id` = ?',
             [savedUrl, file.originalname, matchedItem.id]
           );
           matchedItem.image_matched = 1;
@@ -523,7 +533,7 @@ class BulkImportService {
 
         if (matchedItem) {
           await db.query(
-            'UPDATE import_job_items SET file_stored_path = ?, file_matched = 1, file_filename = ? WHERE id = ?',
+            'UPDATE `import_job_items` SET `file_stored_path` = ?, `file_matched` = 1, `file_filename` = ? WHERE `id` = ?',
             [savedPath, file.originalname, matchedItem.id]
           );
           matchedItem.file_matched = 1;
@@ -538,11 +548,11 @@ class BulkImportService {
     // Return updated match counts for this job
     const [matchCounts] = await db.query(`
       SELECT 
-        COUNT(CASE WHEN image_matched = 1 THEN 1 END) AS total_matched_images,
-        COUNT(CASE WHEN file_matched = 1 THEN 1 END) AS total_matched_files,
+        COUNT(CASE WHEN \`image_matched\` = 1 THEN 1 END) AS total_matched_images,
+        COUNT(CASE WHEN \`file_matched\` = 1 THEN 1 END) AS total_matched_files,
         COUNT(*) AS total_items
-      FROM import_job_items 
-      WHERE job_id = ?
+      FROM \`import_job_items\` 
+      WHERE \`job_id\` = ?
     `, [job.id]);
 
     const totalItems = matchCounts.total_items || 1;
@@ -570,7 +580,7 @@ class BulkImportService {
   async startImportJob(batchId, { updateExisting = false, skipErrors = true, categoryMappings = {} } = {}) {
     if (!db.isConnected()) await db.initPool();
 
-    const [job] = await db.query('SELECT * FROM import_jobs WHERE batch_id = ?', [batchId]);
+    const [job] = await db.query('SELECT * FROM `import_jobs` WHERE `batch_id` = ?', [batchId]);
     if (!job) throw new Error('Import job not found.');
 
     if (job.status === 'processing') {
@@ -578,7 +588,7 @@ class BulkImportService {
     }
 
     await db.query(
-      "UPDATE import_jobs SET status = 'processing', update_existing = ? WHERE id = ?",
+      "UPDATE `import_jobs` SET `status` = 'processing', `update_existing` = ? WHERE `id` = ?",
       [updateExisting ? 1 : 0, job.id]
     );
 
@@ -604,7 +614,7 @@ class BulkImportService {
     const errorLogs = [];
 
     try {
-      const items = await db.query('SELECT * FROM import_job_items WHERE job_id = ? ORDER BY row_number ASC', [jobId]);
+      const items = await db.query('SELECT * FROM `import_job_items` WHERE `job_id` = ? ORDER BY `row_no` ASC', [jobId]);
       const categories = await Category.getAll();
       const categoryMap = new Map();
       categories.forEach(c => categoryMap.set(this.normalizeKey(c.name), c.id));
@@ -613,7 +623,7 @@ class BulkImportService {
         // Skip invalid rows if skipErrors is checked
         if (item.validation_status === 'error' && skipErrors) {
           skippedCount++;
-          await db.query("UPDATE import_job_items SET import_status = 'skipped', import_message = ? WHERE id = ?", [item.validation_error, item.id]);
+          await db.query("UPDATE `import_job_items` SET `import_status` = 'skipped', `import_message` = ? WHERE `id` = ?", [item.validation_error, item.id]);
           continue;
         }
 
@@ -621,7 +631,7 @@ class BulkImportService {
         if (item.validation_status === 'duplicate' && !updateExisting) {
           skippedCount++;
           const reason = 'Skipped: SKU already exists in catalog and "Update existing designs" was not checked.';
-          await db.query("UPDATE import_job_items SET import_status = 'skipped', import_message = ? WHERE id = ?", [reason, item.id]);
+          await db.query("UPDATE `import_job_items` SET `import_status` = 'skipped', `import_message` = ? WHERE `id` = ?", [reason, item.id]);
           continue;
         }
 
@@ -640,7 +650,7 @@ class BulkImportService {
               } else {
                 // Check if category already exists in DB by slug or name before inserting
                 const newSlug = item.category_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-                const [existingCat] = await db.query('SELECT id, name FROM categories WHERE name = ? OR slug = ? LIMIT 1', [item.category_name, newSlug]);
+                const [existingCat] = await db.query('SELECT `id`, `name` FROM `categories` WHERE `name` = ? OR `slug` = ? LIMIT 1', [item.category_name, newSlug]);
                 if (existingCat) {
                   categoryId = existingCat.id;
                 } else {
@@ -664,7 +674,7 @@ class BulkImportService {
 
           let existingDesign = null;
           if (db.isConnected()) {
-            const [ex] = await db.query('SELECT id, slug FROM designs WHERE sku = ? LIMIT 1', [finalSku]);
+            const [ex] = await db.query('SELECT `id`, `slug` FROM `designs` WHERE `sku` = ? LIMIT 1', [finalSku]);
             existingDesign = ex || null;
           }
 
@@ -709,37 +719,37 @@ class BulkImportService {
           // 4. Attach matched machine design file
           if (item.file_stored_path) {
             const fileExt = path.extname(item.file_filename || '').replace('.', '').toUpperCase() || 'ZIP';
-            await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [targetDesignId]);
+            await db.query('DELETE FROM `design_files` WHERE `design_id` = ? AND `is_preview` = 0', [targetDesignId]);
             await db.query(
-              'INSERT INTO design_files (design_id, file_name, file_path, file_format, is_preview) VALUES (?, ?, ?, ?, 0)',
+              'INSERT INTO `design_files` (`design_id`, `file_name`, `file_path`, `file_format`, `is_preview`) VALUES (?, ?, ?, ?, 0)',
               [targetDesignId, item.file_filename || `${finalSku}.zip`, item.file_stored_path, fileExt]
             );
           }
 
           importedCount++;
           await db.query(
-            "UPDATE import_job_items SET import_status = 'imported', imported_design_id = ?, import_message = 'Imported successfully' WHERE id = ?",
+            "UPDATE `import_job_items` SET `import_status` = 'imported', `imported_design_id` = ?, `import_message` = 'Imported successfully' WHERE `id` = ?",
             [targetDesignId, item.id]
           );
 
         } catch (rowErr) {
           failedCount++;
-          errorLogs.push({ rowNumber: item.row_number, sku: item.sku, title: item.title, error: rowErr.message });
+          errorLogs.push({ rowNo: item.row_no || item.row_number, rowNumber: item.row_no || item.row_number, sku: item.sku, title: item.title, error: rowErr.message });
           await db.query(
-            "UPDATE import_job_items SET import_status = 'failed', import_message = ? WHERE id = ?",
+            "UPDATE `import_job_items` SET `import_status` = 'failed', `import_message` = ? WHERE `id` = ?",
             [rowErr.message, item.id]
           );
         }
 
         // Live progress update on import_jobs
         await db.query(
-          'UPDATE import_jobs SET imported_count = ?, skipped_count = ?, failed_count = ? WHERE id = ?',
+          'UPDATE `import_jobs` SET `imported_count` = ?, `skipped_count` = ?, `failed_count` = ? WHERE `id` = ?',
           [importedCount, skippedCount, failedCount, jobId]
         );
       }
 
       await db.query(
-        "UPDATE import_jobs SET status = 'completed', completed_at = NOW(), error_log = ? WHERE id = ?",
+        "UPDATE `import_jobs` SET `status` = 'completed', `completed_at` = NOW(), `error_log` = ? WHERE `id` = ?",
         [JSON.stringify(errorLogs), jobId]
       );
       console.log(`[BULK IMPORT FINISHED] Job #${jobId}: ${importedCount} imported, ${skippedCount} skipped, ${failedCount} failed.`);
@@ -747,7 +757,7 @@ class BulkImportService {
     } catch (jobErr) {
       console.error(`[BULK IMPORT JOB FAILED] Job #${jobId}:`, jobErr);
       await db.query(
-        "UPDATE import_jobs SET status = 'failed', completed_at = NOW(), error_log = ? WHERE id = ?",
+        "UPDATE `import_jobs` SET `status` = 'failed', `completed_at` = NOW(), `error_log` = ? WHERE `id` = ?",
         [JSON.stringify([{ error: jobErr.message }]), jobId]
       );
     }
@@ -759,7 +769,7 @@ class BulkImportService {
   async getJobStatus(batchId) {
     if (!db.isConnected()) await db.initPool();
 
-    const [job] = await db.query('SELECT * FROM import_jobs WHERE batch_id = ?', [batchId]);
+    const [job] = await db.query('SELECT * FROM `import_jobs` WHERE `batch_id` = ?', [batchId]);
     if (!job) return null;
 
     const total = job.total_rows || 1;
@@ -787,7 +797,7 @@ class BulkImportService {
   async rollbackImportJob(batchId) {
     if (!db.isConnected()) await db.initPool();
 
-    const [job] = await db.query('SELECT * FROM import_jobs WHERE batch_id = ?', [batchId]);
+    const [job] = await db.query('SELECT * FROM `import_jobs` WHERE `batch_id` = ?', [batchId]);
     if (!job) throw new Error('Import job not found.');
 
     if (job.status === 'rolled_back') {
@@ -795,22 +805,22 @@ class BulkImportService {
     }
 
     const items = await db.query(
-      "SELECT imported_design_id FROM import_job_items WHERE job_id = ? AND import_status = 'imported' AND imported_design_id IS NOT NULL",
+      "SELECT `imported_design_id` FROM `import_job_items` WHERE `job_id` = ? AND `import_status` = 'imported' AND `imported_design_id` IS NOT NULL",
       [job.id]
     );
 
     let removedCount = 0;
     for (const it of items) {
       if (it.imported_design_id) {
-        await db.query('DELETE FROM design_images WHERE design_id = ?', [it.imported_design_id]);
-        await db.query('DELETE FROM design_files WHERE design_id = ?', [it.imported_design_id]);
-        await db.query('DELETE FROM designs WHERE id = ?', [it.imported_design_id]);
+        await db.query('DELETE FROM `design_images` WHERE `design_id` = ?', [it.imported_design_id]);
+        await db.query('DELETE FROM `design_files` WHERE `design_id` = ?', [it.imported_design_id]);
+        await db.query('DELETE FROM `designs` WHERE `id` = ?', [it.imported_design_id]);
         removedCount++;
       }
     }
 
-    await db.query("UPDATE import_jobs SET status = 'rolled_back' WHERE id = ?", [job.id]);
-    await db.query("UPDATE import_job_items SET import_status = 'skipped', import_message = 'Rolled back' WHERE job_id = ?", [job.id]);
+    await db.query("UPDATE `import_jobs` SET `status` = 'rolled_back' WHERE `id` = ?", [job.id]);
+    await db.query("UPDATE `import_job_items` SET `import_status` = 'skipped', `import_message` = 'Rolled back' WHERE `job_id` = ?", [job.id]);
 
     return {
       success: true,
@@ -825,11 +835,11 @@ class BulkImportService {
   async generateErrorReportCsv(batchId) {
     if (!db.isConnected()) await db.initPool();
 
-    const [job] = await db.query('SELECT id, batch_id FROM import_jobs WHERE batch_id = ?', [batchId]);
+    const [job] = await db.query('SELECT `id`, `batch_id` FROM `import_jobs` WHERE `batch_id` = ?', [batchId]);
     if (!job) throw new Error('Job not found.');
 
     const failedItems = await db.query(
-      "SELECT row_number, sku, title, import_status, validation_error, import_message FROM import_job_items WHERE job_id = ? AND (import_status IN ('skipped', 'failed') OR validation_status = 'error')",
+      "SELECT `row_no`, `sku`, `title`, `import_status`, `validation_error`, `import_message` FROM `import_job_items` WHERE `job_id` = ? AND (`import_status` IN ('skipped', 'failed') OR `validation_status` = 'error')",
       [job.id]
     );
 
@@ -838,7 +848,7 @@ class BulkImportService {
 
     for (const it of failedItems) {
       const row = [
-        it.row_number,
+        it.row_no || it.row_number,
         `"${String(it.sku || '').replace(/"/g, '""')}"`,
         `"${String(it.title || '').replace(/"/g, '""')}"`,
         it.import_status,

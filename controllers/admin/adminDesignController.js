@@ -823,6 +823,7 @@ exports.duplicateDesign = async (req, res, next) => {
 };
 
 const bulkImportService = require('../../services/bulkImportService');
+const errorLogger = require('../../services/errorLogger');
 
 /**
  * Bulk Import Step 1: Download Spreadsheet Template
@@ -858,8 +859,24 @@ exports.postImportPreview = async (req, res, next) => {
       ...result
     });
   } catch (err) {
-    console.error('postImportPreview error:', err);
-    return res.status(400).json({ success: false, message: err.message || 'Error parsing spreadsheet file.' });
+    const isDbOrInternal = !!(err.sql || err.code || err.sqlState || err.name === 'TypeError' || err.name === 'SyntaxError');
+    const refId = errorLogger.logSqlError({
+      context: 'Bulk Import: Parse Spreadsheet',
+      error: err,
+      query: err.sql,
+      params: err.params
+    });
+
+    console.error(`[Bulk Import Preview Error] [Reference ID: ${refId}]:`, err.message);
+
+    const friendlyMessage = `Import failed. Reference ID: ${refId}`;
+    const isProd = process.env.NODE_ENV === 'production';
+
+    return res.status(400).json({
+      success: false,
+      message: (isProd || isDbOrInternal) ? friendlyMessage : (err.message || friendlyMessage),
+      referenceId: refId
+    });
   }
 };
 
@@ -882,8 +899,24 @@ exports.postImportUploadAssets = async (req, res, next) => {
     const result = await bulkImportService.processAssetBatch(batchId, fileList);
     return res.json({ success: true, ...result });
   } catch (err) {
-    console.error('postImportUploadAssets error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    const isDbOrInternal = !!(err.sql || err.code || err.sqlState);
+    const refId = errorLogger.logSqlError({
+      context: 'Bulk Import: Asset Batch Upload',
+      error: err,
+      query: err.sql,
+      params: err.params
+    });
+
+    console.error(`[Bulk Import Asset Error] [Reference ID: ${refId}]:`, err.message);
+
+    const friendlyMessage = `Asset upload failed. Reference ID: ${refId}`;
+    const isProd = process.env.NODE_ENV === 'production';
+
+    return res.status(500).json({
+      success: false,
+      message: (isProd || isDbOrInternal) ? friendlyMessage : (err.message || friendlyMessage),
+      referenceId: refId
+    });
   }
 };
 
@@ -904,8 +937,24 @@ exports.postImportStartJob = async (req, res, next) => {
     });
     return res.json({ success: true, ...result });
   } catch (err) {
-    console.error('postImportStartJob error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    const isDbOrInternal = !!(err.sql || err.code || err.sqlState);
+    const refId = errorLogger.logSqlError({
+      context: 'Bulk Import: Start Job',
+      error: err,
+      query: err.sql,
+      params: err.params
+    });
+
+    console.error(`[Bulk Import Job Error] [Reference ID: ${refId}]:`, err.message);
+
+    const friendlyMessage = `Import job failed to start. Reference ID: ${refId}`;
+    const isProd = process.env.NODE_ENV === 'production';
+
+    return res.status(500).json({
+      success: false,
+      message: (isProd || isDbOrInternal) ? friendlyMessage : (err.message || friendlyMessage),
+      referenceId: refId
+    });
   }
 };
 
@@ -924,8 +973,18 @@ exports.getImportJobStatus = async (req, res, next) => {
     }
     return res.json({ success: true, ...status });
   } catch (err) {
-    console.error('getImportJobStatus error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    const refId = errorLogger.logSqlError({
+      context: 'Bulk Import: Get Status',
+      error: err,
+      query: err.sql,
+      params: err.params
+    });
+    console.error(`[Bulk Import Status Error] [Reference ID: ${refId}]:`, err.message);
+    return res.status(500).json({
+      success: false,
+      message: `Failed to retrieve import status. Reference ID: ${refId}`,
+      referenceId: refId
+    });
   }
 };
 

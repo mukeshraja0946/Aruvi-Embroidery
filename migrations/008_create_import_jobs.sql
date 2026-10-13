@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS `import_jobs` (
 CREATE TABLE IF NOT EXISTS `import_job_items` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `job_id` INT NOT NULL,
-  `row_number` INT NOT NULL,
+  `row_no` INT NOT NULL,
   `sku` VARCHAR(100) DEFAULT NULL,
   `title` VARCHAR(255) DEFAULT NULL,
   `category_name` VARCHAR(100) DEFAULT NULL,

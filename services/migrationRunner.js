@@ -17,7 +17,8 @@ function getDbConfig() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'aruvi_embroidery',
-    multipleStatements: true
+    multipleStatements: true,
+    charset: 'utf8mb4'
   };
 
   const dbUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL;
@@ -118,9 +119,16 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
     const { namesSet, versionsSet } = await getAppliedMigrations(conn);
     const allFiles = getAvailableMigrationFiles();
 
+    let dbServerVersion = 'Unknown';
+    try {
+      const [vRows] = await conn.query('SELECT VERSION() AS version');
+      if (vRows && vRows[0]) dbServerVersion = vRows[0].version;
+    } catch {}
+
     if (!silent) {
       console.log('====================================================');
       console.log(' 🌸 Aruvi Embroidery — Automated Database Migrations');
+      console.log(` 🐬 DB Server Version: ${dbServerVersion} (Charset: utf8mb4)`);
       console.log(` 📂 Total numbered migration files detected: ${allFiles.length}`);
       console.log('====================================================');
     }

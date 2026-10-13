@@ -17,7 +17,8 @@ let dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  multipleStatements: true
+  multipleStatements: true,
+  charset: 'utf8mb4'
 };
 
 // Support cloud database connection strings (DATABASE_URL / MYSQL_URL / CLEARDB_DATABASE_URL)
@@ -35,6 +36,8 @@ if (dbUrl) {
   }
 }
 
+let dbServerVersion = 'Unknown';
+
 async function initPool() {
   if (initPromise) return initPromise;
 
@@ -47,7 +50,8 @@ async function initPool() {
           port: dbConfig.port,
           user: dbConfig.user,
           password: dbConfig.password,
-          multipleStatements: true
+          multipleStatements: true,
+          charset: 'utf8mb4'
         });
         await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\`;`);
         await rootConn.end();
@@ -58,15 +62,25 @@ async function initPool() {
       // 2. Create pool to target database
       pool = mysql.createPool(dbConfig);
       const connection = await pool.getConnection();
+
+      try {
+        const [vRows] = await connection.query('SELECT VERSION() AS version');
+        if (vRows && vRows[0]) {
+          dbServerVersion = vRows[0].version;
+        }
+      } catch (vErr) {
+        console.warn('[DB Config Warning] Unable to retrieve server version:', vErr.message);
+      }
+
       connection.release();
 
       // Database safety: Never auto-run schema.sql, seed.sql, TRUNCATE, or DROP on startup.
       // Migrations are run safely via `npm run migrate` and seed runs only manually via `npm run seed`.
 
       isConnected = true;
-      console.log(`==================================================\nLOCAL DATABASE:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nStatus: Connected to MySQL\n==================================================`);
+      console.log(`==================================================\nDATABASE CONNECTION:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nDB Server Version: ${dbServerVersion}\nCharset: utf8mb4\nStatus: Connected\n==================================================`);
     } catch (err) {
-      console.log(`==================================================\nLOCAL DATABASE:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nStatus: Offline (Operating in Local Fallback Mode)\n==================================================`);
+      console.log(`==================================================\nDATABASE CONNECTION:\nHost: ${dbConfig.host}\nPort: ${dbConfig.port}\nDatabase: ${dbConfig.database}\nUser: ${dbConfig.user}\nStatus: Offline (Operating in Local Fallback Mode)\nError: ${err.message}\n==================================================`);
       isConnected = false;
     }
   })();
@@ -88,6 +102,8 @@ async function query(sql, params = []) {
       const [rows] = await pool.query(sql, params);
       return rows;
     } catch (error) {
+      error.sql = sql;
+      error.params = params;
       console.error('[DB Query Error]:', error.message, 'SQL:', sql);
       throw error;
     }
@@ -97,8 +113,15 @@ async function query(sql, params = []) {
       initPromise = null;
       await initPool();
       if (pool && isConnected) {
-        const [rows] = await pool.query(sql, params);
-        return rows;
+        try {
+          const [rows] = await pool.query(sql, params);
+          return rows;
+        } catch (error) {
+          error.sql = sql;
+          error.params = params;
+          console.error('[DB Query Error]:', error.message, 'SQL:', sql);
+          throw error;
+        }
       }
     } catch (e) {
       console.warn('[DB] Offline fallback mode active...');

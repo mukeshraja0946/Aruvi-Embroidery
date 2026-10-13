@@ -30,7 +30,7 @@ const REQUIRED_SCHEMA = {
   file_scan_results: ['id', 'design_id', 'title', 'sku', 'category_name', 'price', 'is_active', 'image_url', 'image_status', 'file_path', 'file_name', 'file_status', 'scanned_at'],
   scan_jobs: ['id', 'status', 'total_designs', 'scanned_designs', 'missing_images', 'missing_files', 'missing_both', 'started_at', 'completed_at', 'created_at'],
   import_jobs: ['id', 'batch_id', 'status', 'total_rows', 'valid_rows', 'error_rows', 'duplicate_rows', 'imported_count', 'skipped_count', 'failed_count', 'update_existing', 'spreadsheet_filename', 'created_at', 'completed_at'],
-  import_job_items: ['id', 'job_id', 'row_number', 'sku', 'title', 'category_name', 'price', 'sale_price', 'formats', 'image_filename', 'image_stored_url', 'file_filename', 'file_stored_path', 'validation_status', 'import_status'],
+  import_job_items: ['id', 'job_id', 'row_no', 'sku', 'title', 'category_name', 'price', 'sale_price', 'formats', 'image_filename', 'image_stored_url', 'file_filename', 'file_stored_path', 'validation_status', 'import_status'],
   email_campaigns: ['id', 'subject', 'body_html', 'total_recipients', 'success_count', 'failed_count', 'status', 'created_at'],
   email_campaign_logs: ['id', 'campaign_id', 'recipient_email', 'status', 'error_message', 'created_at'],
   unsubscribed_customers: ['id', 'email', 'created_at']

@@ -389,7 +389,7 @@ CREATE TABLE IF NOT EXISTS `import_jobs` (
 CREATE TABLE IF NOT EXISTS `import_job_items` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `job_id` INT NOT NULL,
-  `row_number` INT NOT NULL,
+  `row_no` INT NOT NULL,
   `sku` VARCHAR(100) DEFAULT NULL,
   `title` VARCHAR(255) DEFAULT NULL,
   `category_name` VARCHAR(100) DEFAULT NULL,
@@ -558,6 +558,16 @@ SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_sch
 SET @query = IF(@col_exists = 0, 'ALTER TABLE `contact_messages` ADD COLUMN `phone` VARCHAR(20) DEFAULT NULL AFTER `email`', 'SELECT 1');
 PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- import_job_items.row_no (Rename legacy reserved keyword row_number safely)
+SET @t_exists = 0;
+SELECT COUNT(*) INTO @t_exists FROM information_schema.tables WHERE table_schema = @dbname AND table_name = 'import_job_items';
+SET @legacy_exists = 0;
+SELECT COUNT(*) INTO @legacy_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'import_job_items' AND column_name = 'row_number';
+SET @new_exists = 0;
+SELECT COUNT(*) INTO @new_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'import_job_items' AND column_name = 'row_no';
+SET @query = IF(@t_exists > 0 AND @legacy_exists > 0 AND @new_exists = 0, 'ALTER TABLE `import_job_items` CHANGE COLUMN `row_number` `row_no` INT NOT NULL', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- ----------------------------------------------------------------------------
 -- 4. Idempotent Index Additions
 -- ----------------------------------------------------------------------------
@@ -605,7 +615,8 @@ INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('007', '007_create_file_scan_results.sql'),
   ('008', '008_create_import_jobs.sql'),
   ('009', '009_create_email_campaigns.sql'),
-  ('010', '010_add_user_profile_and_design_details.sql');
+  ('010', '010_add_user_profile_and_design_details.sql'),
+  ('011', '011_rename_row_number_to_row_no.sql');
 
 -- ============================================================================
 -- End of production_sync.sql

@@ -393,10 +393,14 @@ let importJobPollingTimer = null;
 let assetUploadAbortController = null;
 let isAssetUploading = false;
 
-function showImportError(msg) {
+function showImportError(msg, refId) {
   const alertEl = document.getElementById('importErrorAlert');
   const msgEl = document.getElementById('importErrorMessage');
-  if (msgEl) msgEl.textContent = msg || 'An unexpected error occurred.';
+  let displayMsg = msg || 'An unexpected error occurred.';
+  if (refId && !displayMsg.includes(refId)) {
+    displayMsg += ` (Reference ID: ${refId})`;
+  }
+  if (msgEl) msgEl.textContent = displayMsg;
   if (alertEl) alertEl.style.display = 'block';
 }
 
@@ -476,7 +480,7 @@ async function submitStep1Spreadsheet() {
     btn.innerHTML = origHtml;
 
     if (!res.ok || !data.success) {
-      showImportError(data.message || 'Failed to parse spreadsheet file.');
+      showImportError(data.message || 'Failed to parse spreadsheet file.', data.referenceId);
       return;
     }
 
@@ -604,7 +608,7 @@ function setupStep2(data) {
     }
 
     tr.innerHTML = `
-      <td style="font-weight:700;">#${r.rowNumber}</td>
+      <td style="font-weight:700;">#${r.rowNo || r.rowNumber}</td>
       <td>${statusBadge}</td>
       <td><code>${r.sku || '-'}</code></td>
       <td><strong>${r.title}</strong></td>
@@ -790,7 +794,7 @@ async function submitStep3StartJob() {
     if (!res.ok || !data.success) {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-rocket"></i> Start Background Import';
-      showImportError(data.message || 'Failed to start import job.');
+      showImportError(data.message || 'Failed to start import job.', data.referenceId);
       return;
     }
 
