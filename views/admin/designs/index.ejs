@@ -156,7 +156,17 @@
           <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <!-- STORAGE & TOOLS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & TOOLS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/price-history"><span><i class="fa-solid fa-clock-rotate-left"></i> Price Update History</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Storage</span></a></li>
         </ul>
       </div>
 
@@ -192,6 +202,12 @@
           </button>
           <button type="button" onclick="openBulkZipUploadModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #2E7D32; color: #1B5E20; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk upload/restore machine embroidery ZIP files">
             <i class="fa-solid fa-file-zipper"></i> Bulk Upload ZIP Files
+          </button>
+          <button type="button" onclick="openBulkPriceModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #D97706; color: #B45309; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk update prices safely across catalog">
+            <i class="fa-solid fa-indian-rupee-sign"></i> Bulk Update Price
+          </button>
+          <button type="button" id="updateSelectedPriceBtn" onclick="openBulkPriceModalForSelected()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #D97706; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
+            <i class="fa-solid fa-indian-rupee-sign"></i> Update Selected (<span id="updateSelectedPriceCountNum">0</span>)
           </button>
           <button type="button" id="deleteSelectedBtn" onclick="confirmDeleteSelectedDesigns()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #C62828; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
             <i class="fa-regular fa-trash-can"></i> Delete Selected (<span id="selectedCountNum">0</span>)
@@ -432,13 +448,27 @@
                     <% } %>
                   </td>
                   <td>
-                    <strong style="display: inline-block; font-size: 0.88rem; color: var(--admin-text-dark);">₹<%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %></strong>
-                    <% if (d.sale_price && d.price > d.sale_price) { %>
-                      <span style="font-size: 0.75rem; color: var(--admin-text-muted); text-decoration: line-through; margin-left: 4px;">₹<%= d.price %></span>
-                      <span style="display: block; font-size: 0.68rem; color: #C62828; font-weight: 600;"><%= Math.round(((d.price - d.sale_price) / d.price) * 100) %>% OFF</span>
-                    <% } else { %>
-                      <span style="display: block; font-size: 0.68rem; color: var(--admin-text-muted); font-weight: 500;">Regular</span>
-                    <% } %>
+                    <div class="inline-price-cell" id="priceCell-<%= d.id %>" data-id="<%= d.id %>" data-mrp="<%= d.price %>" data-price="<%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %>">
+                      <div class="price-display-wrapper" onclick="startInlinePriceEdit('<%= d.id %>')" title="Click to edit selling price" style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 2px 5px; border-radius: 6px; transition: all 0.15s; border: 1px dashed transparent;">
+                        <strong class="price-val" style="font-size: 0.88rem; color: var(--admin-text-dark);">₹<span id="priceVal-<%= d.id %>"><%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %></span></strong>
+                        <i class="fa-solid fa-pen" style="font-size: 0.65rem; color: var(--admin-text-muted); opacity: 0.6;"></i>
+                      </div>
+                      <div class="price-edit-wrapper" id="priceEditBox-<%= d.id %>" style="display: none; align-items: center; gap: 4px; margin-top: 4px;">
+                        <span style="font-size: 0.82rem; font-weight: 600; color: var(--admin-primary);">₹</span>
+                        <input type="number" step="0.01" min="1" id="priceInput-<%= d.id %>" value="<%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %>" style="width: 75px; height: 28px; padding: 2px 6px; font-size: 0.82rem; font-weight: 600; border-radius: 4px; border: 1px solid var(--admin-primary);" onkeydown="handleInlinePriceKey(event, '<%= d.id %>')">
+                        <button type="button" onclick="saveInlinePrice('<%= d.id %>')" style="height: 28px; width: 28px; border-radius: 4px; background: #2E7D32; color: #FFF; border: none; cursor: pointer; font-size: 0.72rem;" title="Save (Enter)"><i class="fa-solid fa-check"></i></button>
+                        <button type="button" onclick="cancelInlinePriceEdit('<%= d.id %>')" style="height: 28px; width: 28px; border-radius: 4px; background: #E0E0E0; color: #333; border: none; cursor: pointer; font-size: 0.72rem;" title="Cancel (Esc)"><i class="fa-solid fa-xmark"></i></button>
+                      </div>
+                      <div style="margin-top: 2px;">
+                        <% if (d.sale_price && d.price > d.sale_price) { %>
+                          <span id="mrpLine-<%= d.id %>" style="font-size: 0.74rem; color: var(--admin-text-muted); text-decoration: line-through; margin-right: 4px;">₹<%= d.price %></span>
+                          <span id="discountBadge-<%= d.id %>" style="display: inline-block; font-size: 0.68rem; color: #C62828; font-weight: 600;"><%= Math.round(((d.price - d.sale_price) / d.price) * 100) %>% OFF</span>
+                        <% } else { %>
+                          <span id="mrpLine-<%= d.id %>" style="display: none; font-size: 0.74rem; color: var(--admin-text-muted); text-decoration: line-through; margin-right: 4px;"></span>
+                          <span id="discountBadge-<%= d.id %>" style="display: inline-block; font-size: 0.68rem; color: var(--admin-text-muted); font-weight: 500;">Regular</span>
+                        <% } %>
+                      </div>
+                    </div>
                   </td>
                   <td>
                     <label class="switch-toggle">
@@ -530,25 +560,41 @@
 </div>
 
 <!-- Delete All Designs Confirmation Modal -->
-<div id="deleteAllDesignsModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;">
-  <div style="background: #FFFFFF; border-radius: 16px; padding: 1.8rem; width: 100%; max-width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid var(--admin-border);">
+<div id="deleteAllDesignsModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 99999; padding: 1rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; padding: 1.8rem; width: 100%; max-width: 480px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); position: relative; border: 1px solid var(--admin-border);">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
-      <div style="width: 42px; height: 42px; border-radius: 50%; background: #FFEBEE; color: #900C3F; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
-        <i class="fa-solid fa-trash-can"></i>
+      <div style="width: 44px; height: 44px; border-radius: 50%; background: #FFEBEE; color: #900C3F; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
       </div>
       <div>
-        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px 0;">Delete ALL Designs?</h3>
-        <span style="font-size: 0.8rem; color: #C62828; font-weight: 600;">PERMANENT ACTION — CANNOT BE UNDONE</span>
+        <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px 0;">Delete ALL Designs</h3>
+        <span style="font-size: 0.78rem; color: #C62828; font-weight: 700; text-transform: uppercase;">Dangerous Administrative Action</span>
       </div>
     </div>
 
-    <p style="font-size: 0.88rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.5rem; background: #FFEBEE; padding: 12px 14px; border-radius: 10px; border-left: 4px solid #900C3F;">
-      <strong>Warning:</strong> Are you sure you want to permanently delete <strong>ALL designs</strong> from the store? This will completely clear all designs, images, and design files permanently.
+    <p style="font-size: 0.86rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.2rem; background: #FFEBEE; padding: 12px 14px; border-radius: 10px; border-left: 4px solid #900C3F;">
+      <strong>Safety Guard:</strong> This will remove all active designs from the public store catalog. An <strong>automatic database backup</strong> will be generated immediately before execution, and designs will be safely archived with <strong>30-day recovery protection</strong>.
     </p>
+
+    <div style="margin-bottom: 1rem;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+        1. Type <span style="background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 4px; font-family: monospace;">DELETE ALL</span> to confirm:
+      </label>
+      <input type="text" id="deleteAllConfirmInput" placeholder="Type DELETE ALL here" oninput="checkDeleteAllSafety()" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 12px; font-size: 0.88rem; font-weight: 600;">
+    </div>
+
+    <div style="margin-bottom: 1.4rem;">
+      <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+        2. Enter Admin Password:
+      </label>
+      <input type="password" id="deleteAllPasswordInput" placeholder="Your Administrator Password" oninput="checkDeleteAllSafety()" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 12px; font-size: 0.88rem;">
+    </div>
 
     <div style="display: flex; gap: 10px; justify-content: flex-end;">
       <button type="button" onclick="closeDeleteAllModal()" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-weight: 600; font-size: 0.88rem;">Cancel</button>
-      <button type="button" id="confirmDeleteAllBtn" onclick="executeDeleteAllDesigns()" class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; background: #900C3F; color: #FFFFFF; border: none; cursor: pointer;">Yes, Delete All Designs</button>
+      <button type="button" id="confirmDeleteAllBtn" onclick="executeDeleteAllDesigns()" disabled class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; background: #900C3F; color: #FFFFFF; border: none; cursor: not-allowed; opacity: 0.5;">
+        <i class="fa-solid fa-trash-can"></i> Delete All Designs
+      </button>
     </div>
   </div>
 </div>
@@ -1270,6 +1316,458 @@
 
   </div>
 </div>
+
+<!-- Bulk Price Update Modal (Multi-step Safe Engine) -->
+<div id="bulkPriceModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 980px; max-height: 94vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+    
+    <!-- Modal Header & Stepper -->
+    <div style="padding: 1.2rem 1.6rem; border-bottom: 1px solid var(--admin-border); background: #FAF6F0; flex-shrink: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+            <i class="fa-solid fa-indian-rupee-sign" style="color: #D97706;"></i> Bulk Update Prices
+          </h3>
+          <span style="font-size: 0.8rem; color: var(--admin-text-muted);">
+            Safely update prices across catalog in batches with instant preview, safety validation, and rollback undo
+          </span>
+        </div>
+        <button type="button" onclick="closeBulkPriceModal()" style="background: none; border: none; font-size: 1.6rem; color: var(--admin-text-muted); cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+
+      <!-- Stepper Indicator -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        <div id="stepPriceTab1" class="step-tab active" style="padding: 8px 12px; border-radius: 8px; background: #D97706; color: #FFF; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+          <span style="background: rgba(255,255,255,0.25); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.74rem;">1</span>
+          1. Select Designs
+        </div>
+        <div id="stepPriceTab2" class="step-tab" style="padding: 8px 12px; border-radius: 8px; background: #ECEFF1; color: #546E7A; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+          <span style="background: rgba(0,0,0,0.1); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.74rem;">2</span>
+          2. Choose Update Rule
+        </div>
+        <div id="stepPriceTab3" class="step-tab" style="padding: 8px 12px; border-radius: 8px; background: #ECEFF1; color: #546E7A; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+          <span style="background: rgba(0,0,0,0.1); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.74rem;">3</span>
+          3. Preview & Confirm
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding: 1.5rem; overflow-y: auto; flex: 1;">
+
+      <!-- STEP 1: SELECT WHICH DESIGNS -->
+      <div id="bulkPriceStep1">
+        <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.8rem;">
+          Which designs do you want to update?
+        </h4>
+
+        <!-- Target Scope Options -->
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.4rem;">
+          <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA; transition: border-color 0.15s;">
+            <input type="radio" name="priceScope" value="all" checked onchange="handlePriceScopeChange()">
+            <div>
+              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark);">All Designs</strong>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Apply price update across all active and draft designs in store.</span>
+            </div>
+          </label>
+
+          <label id="scopeSelectedLabel" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA; transition: border-color 0.15s;">
+            <input type="radio" name="priceScope" value="selected" onchange="handlePriceScopeChange()">
+            <div>
+              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark);">
+                Only Checked Table Rows (<span id="modalSelectedCount">0</span> selected)
+              </strong>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Apply only to the rows ticked in the Manage Designs table.</span>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA; transition: border-color 0.15s;">
+            <input type="radio" name="priceScope" value="custom" onchange="handlePriceScopeChange()">
+            <div>
+              <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark);">Filter by Category, Status, Format, Price Range, or SKU</strong>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Target specific subsets using combined custom rules.</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Custom Filter Controls (visible only when scope === 'custom') -->
+        <div id="priceCustomFiltersBox" style="display: none; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.4rem;">
+          
+          <!-- Category Multi-Select -->
+          <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark);">
+                Category (Multi-Select):
+              </label>
+              <div style="font-size: 0.74rem;">
+                <button type="button" onclick="toggleAllCategoryCheckboxes(true)" style="background: none; border: none; color: var(--admin-primary); font-weight: 600; cursor: pointer;">Select All</button>
+                &nbsp;|&nbsp;
+                <button type="button" onclick="toggleAllCategoryCheckboxes(false)" style="background: none; border: none; color: var(--admin-text-muted); cursor: pointer;">Clear</button>
+              </div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 120px; overflow-y: auto; padding: 6px 0;">
+              <% if (typeof categories !== 'undefined' && categories && categories.length > 0) { %>
+                <% categories.forEach(c => { %>
+                  <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; background: #FFF; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--admin-border); cursor: pointer;">
+                    <input type="checkbox" class="price-cat-check" value="<%= c.id %>" onchange="debouncedFetchLiveCount()">
+                    <span><%= c.name %></span>
+                  </label>
+                <% }) %>
+              <% } %>
+            </div>
+          </div>
+
+          <!-- Status & Formats Row -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1rem;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+                Design Status:
+              </label>
+              <select id="priceFilterStatus" onchange="debouncedFetchLiveCount()" style="width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.84rem; background: #FFF;">
+                <option value="all">All (Active & Draft)</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Draft / Inactive Only</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+                Embroidery Formats:
+              </label>
+              <div style="display: flex; gap: 8px; padding-top: 4px;">
+                <% ['DST', 'PES', 'JEF', 'EXP'].forEach(fmt => { %>
+                  <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; background: #FFF; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--admin-border); cursor: pointer;">
+                    <input type="checkbox" class="price-fmt-check" value="<%= fmt %>" onchange="debouncedFetchLiveCount()">
+                    <span><%= fmt %></span>
+                  </label>
+                <% }); %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Price Range & Search/SKU Row -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+                Current Price Range (₹):
+              </label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" id="priceFilterMin" placeholder="Min ₹" min="0" oninput="debouncedFetchLiveCount()" style="width: 50%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.84rem; background: #FFF;">
+                <span style="color: var(--admin-text-muted);">-</span>
+                <input type="number" id="priceFilterMax" placeholder="Max ₹" min="0" oninput="debouncedFetchLiveCount()" style="width: 50%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.84rem; background: #FFF;">
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+                SKU Range or Search Text:
+              </label>
+              <input type="text" id="priceFilterSkuText" placeholder="e.g. AED 1 - AED 50 or Blouse" oninput="debouncedFetchLiveCount()" style="width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.84rem; background: #FFF;">
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Live Target Count Banner -->
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 10px; color: #1E40AF; font-size: 0.92rem; font-weight: 600;">
+            <i class="fa-solid fa-calculator" style="font-size: 1.1rem;"></i>
+            <span id="bulkPriceLiveCountLabel">This will update <strong id="bulkPriceLiveCountNum">...</strong> designs.</span>
+          </div>
+          <span class="badge" style="background: #1D4ED8; color: #FFF; font-size: 0.76rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;">
+            Live Target Count
+          </span>
+        </div>
+
+      </div>
+
+      <!-- STEP 2: CHOOSE THE UPDATE -->
+      <div id="bulkPriceStep2" style="display: none;">
+        
+        <!-- Field Target Selector -->
+        <div style="margin-bottom: 1.4rem;">
+          <label style="display: block; font-size: 0.86rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;">
+            1. Which price field(s) do you want to modify?
+          </label>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <label style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--admin-border); border-radius: 8px; cursor: pointer; background: #FAFAFA; font-size: 0.86rem;">
+              <input type="radio" name="priceTargetField" value="sale_price" checked onchange="handleTargetFieldChange()">
+              <strong>Selling Price (Discounted)</strong>
+            </label>
+            <label style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--admin-border); border-radius: 8px; cursor: pointer; background: #FAFAFA; font-size: 0.86rem;">
+              <input type="radio" name="priceTargetField" value="price" onchange="handleTargetFieldChange()">
+              <strong>MRP (Original Price)</strong>
+            </label>
+            <label style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--admin-border); border-radius: 8px; cursor: pointer; background: #FAFAFA; font-size: 0.86rem;">
+              <input type="radio" name="priceTargetField" value="both" onchange="handleTargetFieldChange()">
+              <strong>Both Selling Price & MRP</strong>
+            </label>
+          </div>
+        </div>
+
+        <!-- Method Selection -->
+        <div style="margin-bottom: 1.4rem;">
+          <label style="display: block; font-size: 0.86rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;">
+            2. Choose Calculation Method:
+          </label>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            
+            <!-- a) Fixed Price -->
+            <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="radio" name="priceMethod" value="fixed" checked onchange="handlePriceMethodChange()">
+                <div>
+                  <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">Set a fixed price</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Example: Set Selling Price = ₹49 for all targeted designs</span>
+                </div>
+              </div>
+              <div id="methodInputBoxFixed" style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 0.88rem; font-weight: 600;">₹</span>
+                <input type="number" id="fixedValInput" min="1" step="0.01" value="49" style="width: 100px; height: 34px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 8px; font-weight: 600; font-size: 0.86rem;">
+              </div>
+            </label>
+
+            <!-- b) Percentage Increase / Decrease -->
+            <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="radio" name="priceMethod" value="percentage" onchange="handlePriceMethodChange()">
+                <div>
+                  <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">Increase / decrease by percentage</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Example: +10% to raise prices, or -15% for storewide sale</span>
+                </div>
+              </div>
+              <div id="methodInputBoxPercentage" style="display: none; align-items: center; gap: 6px;">
+                <input type="number" id="percentageValInput" step="0.1" value="10" placeholder="+10 or -15" style="width: 100px; height: 34px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 8px; font-weight: 600; font-size: 0.86rem;">
+                <span style="font-size: 0.88rem; font-weight: 600;">%</span>
+              </div>
+            </label>
+
+            <!-- c) Amount Increase / Decrease -->
+            <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="radio" name="priceMethod" value="amount" onchange="handlePriceMethodChange()">
+                <div>
+                  <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">Increase / decrease by flat amount</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Example: +₹5 or -₹10 adjustment</span>
+                </div>
+              </div>
+              <div id="methodInputBoxAmount" style="display: none; align-items: center; gap: 6px;">
+                <span style="font-size: 0.88rem; font-weight: 600;">₹</span>
+                <input type="number" id="amountValInput" step="1" value="5" placeholder="+5 or -10" style="width: 100px; height: 34px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 8px; font-weight: 600; font-size: 0.86rem;">
+              </div>
+            </label>
+
+            <!-- d) Discount Off MRP -->
+            <label id="methodDiscountLabel" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="radio" name="priceMethod" value="discount_off_mrp" onchange="handlePriceMethodChange()">
+                <div>
+                  <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">Set discount % off MRP</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Keep original MRP and set Selling Price to X% off MRP (e.g. 20% OFF)</span>
+                </div>
+              </div>
+              <div id="methodInputBoxDiscount" style="display: none; align-items: center; gap: 6px;">
+                <input type="number" id="discountValInput" min="1" max="99" step="1" value="20" placeholder="20" style="width: 80px; height: 34px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 8px; font-weight: 600; font-size: 0.86rem;">
+                <span style="font-size: 0.88rem; font-weight: 600;">% off MRP</span>
+              </div>
+            </label>
+
+            <!-- e) Upload Spreadsheet File -->
+            <label style="display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+              <div style="display: flex; align-items: flex-start; gap: 10px;">
+                <input type="radio" name="priceMethod" value="file" onchange="handlePriceMethodChange()" style="margin-top: 3px;">
+                <div>
+                  <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">Upload CSV / XLSX Spreadsheet</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted); margin-top: 2px;">
+                    Set individual custom prices per design with column alias matching (SKU / Design Code, MRP, Selling Price)
+                  </span>
+                </div>
+              </div>
+              <div id="methodInputBoxFile" style="display: none; flex-direction: column; align-items: flex-end; gap: 4px;">
+                <input type="file" id="priceSpreadsheetFile" accept=".csv, .xlsx, .xls" style="font-size: 0.78rem;">
+                <span style="font-size: 0.7rem; color: var(--admin-text-muted);">Matches columns: SKU, MRP, Selling Price</span>
+              </div>
+            </label>
+
+          </div>
+        </div>
+
+        <!-- Rounding & Min/Max Guard Controls -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
+          
+          <div>
+            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+              Rounding Strategy:
+            </label>
+            <select id="priceRoundingOption" style="width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.84rem; background: #FFF;">
+              <option value="none">None (Standard 2 Decimals)</option>
+              <option value="nearest_1">Nearest ₹1 (e.g. ₹50)</option>
+              <option value="nearest_5">Nearest ₹5 (e.g. ₹45, ₹50)</option>
+              <option value="end_with_9" selected>Psychological: End with 9 (e.g. ₹49, ₹99, ₹149)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 5px;">
+              Safety Guards:
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; margin-bottom: 6px; cursor: pointer;">
+              <input type="checkbox" id="autoCapMrpOption" checked>
+              <span>Auto-cap Selling Price to MRP if it exceeds MRP</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+              <input type="checkbox" id="enablePriceGuardOption" onchange="togglePriceGuardInputs()">
+              <span>Apply only if result is within Min/Max limits</span>
+            </label>
+            <div id="priceGuardInputsRow" style="display: none; gap: 6px; margin-top: 6px; align-items: center;">
+              <input type="number" id="guardMinVal" placeholder="Min ₹" min="1" style="width: 80px; height: 30px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 6px; font-size: 0.78rem;">
+              <span style="font-size: 0.78rem;">to</span>
+              <input type="number" id="guardMaxVal" placeholder="Max ₹" min="1" style="width: 80px; height: 30px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 6px; font-size: 0.78rem;">
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- STEP 3: PREVIEW BEFORE APPLYING -->
+      <div id="bulkPriceStep3" style="display: none;">
+        
+        <!-- Summary Stat Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 1.2rem;">
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 10px; padding: 10px 14px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700;">TOTAL DESIGNS</span>
+            <div id="previewTotalCount" style="font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin-top: 2px;">0</div>
+          </div>
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 10px; padding: 10px 14px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700;">AVG SELLING PRICE</span>
+            <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 2px;">
+              <span id="previewOldAvgPrice" style="font-size: 0.88rem; color: var(--admin-text-muted); text-decoration: line-through;">₹0</span>
+              <span style="font-size: 0.8rem; color: var(--admin-text-muted);">→</span>
+              <strong id="previewNewAvgPrice" style="font-size: 1.15rem; color: var(--admin-primary);">₹0</strong>
+              <span id="previewPctChangeBadge" class="badge" style="font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #E8F5E9; color: #2E7D32;">+0%</span>
+            </div>
+          </div>
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 10px; padding: 10px 14px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700;">READY TO UPDATE</span>
+            <div id="previewValidCount" style="font-size: 1.25rem; font-weight: 700; color: #2E7D32; margin-top: 2px;">0</div>
+          </div>
+          <div id="previewErrorCard" style="display: none; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 10px; padding: 10px 14px;">
+            <span style="font-size: 0.72rem; text-transform: uppercase; color: #C62828; font-weight: 700;">ERRORS / INVALID</span>
+            <div id="previewErrorCount" style="font-size: 1.25rem; font-weight: 700; color: #C62828; margin-top: 2px;">0</div>
+          </div>
+        </div>
+
+        <!-- Filter Bar & Exclude Controls -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="previewSearchInput" placeholder="Filter preview by SKU or title..." oninput="handlePreviewFilter(this.value)" style="width: 260px; height: 34px; border-radius: 6px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.82rem;">
+            <button type="button" onclick="excludeAllErrors()" id="excludeErrorsBtn" style="display: none; height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid #C62828; background: #FFEBEE; color: #C62828; font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+              <i class="fa-solid fa-filter-circle-xmark"></i> Exclude All Invalid Rows
+            </button>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--admin-text-muted);">
+            Ticked rows (<strong id="previewSelectedCount">0</strong>) will be applied. Uncheck any row to exclude.
+          </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div style="max-height: 44vh; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: #F9FAFB; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--admin-border); text-align: left;">
+                <th style="padding: 8px 10px; width: 36px; text-align: center;">
+                  <input type="checkbox" id="previewSelectAllCheckbox" checked onchange="toggleSelectAllPreviewRows(this)">
+                </th>
+                <th style="padding: 8px 10px; width: 90px;">SKU</th>
+                <th style="padding: 8px 10px;">Design Title</th>
+                <th style="padding: 8px 10px;">Category</th>
+                <th style="padding: 8px 10px; text-align: right;">Old MRP</th>
+                <th style="padding: 8px 10px; text-align: right;">Old Price</th>
+                <th style="padding: 8px 10px; text-align: right;">New MRP</th>
+                <th style="padding: 8px 10px; text-align: right;">New Price</th>
+                <th style="padding: 8px 10px; text-align: right;">Change</th>
+                <th style="padding: 8px 10px; text-align: center; width: 100px;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="previewTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 10px; font-size: 0.78rem; color: #555; background: #FFF8E1; border: 1px solid #FFE082; padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-shield-halved" style="color: #F59E0B; font-size: 1rem;"></i>
+          <span><strong>Safety Guarantee:</strong> Nothing is committed to the database until you click "Apply Price Update". All changes are recorded with full audit rollback.</span>
+        </div>
+
+      </div>
+
+      <!-- STEP 4: APPLY PROGRESS & FINISH -->
+      <div id="bulkPriceStep4" style="display: none; text-align: center; padding: 2.5rem 1rem;">
+        
+        <div id="bulkPriceProgressBox">
+          <div style="width: 60px; height: 60px; border-radius: 50%; background: #EFF6FF; color: #2563EB; display: inline-flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 1.2rem;">
+            <i class="fa-solid fa-arrows-rotate fa-spin"></i>
+          </div>
+          <h4 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
+            Applying Price Updates...
+          </h4>
+          <p id="bulkPriceProgressStatusText" style="color: var(--admin-text-muted); font-size: 0.88rem; margin: 0 0 1.5rem;">
+            Updating database in safe transaction batches...
+          </p>
+          <div style="width: 100%; max-width: 480px; height: 10px; background: #E5E7EB; border-radius: 10px; overflow: hidden; margin: 0 auto;">
+            <div id="bulkPriceProgressBar" style="width: 45%; height: 100%; background: #D97706; transition: width 0.3s;"></div>
+          </div>
+        </div>
+
+        <div id="bulkPriceSuccessBox" style="display: none;">
+          <div style="width: 68px; height: 68px; border-radius: 50%; background: #DCFCE7; color: #16A34A; display: inline-flex; align-items: center; justify-content: center; font-size: 2.2rem; margin-bottom: 1rem;">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <h4 style="font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
+            Price Update Successful!
+          </h4>
+          <p id="bulkPriceSuccessText" style="color: var(--admin-text-dark); font-size: 0.92rem; margin: 0 0 1.5rem;">
+            Updated prices for designs across catalog.
+          </p>
+          <div style="display: flex; justify-content: center; gap: 12px;">
+            <a href="/admin/tools/price-history" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-size: 0.86rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-clock-rotate-left"></i> View Audit History
+            </a>
+            <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-size: 0.86rem; font-weight: 700; background: var(--admin-primary); color: #FFF; border: none; cursor: pointer;">
+              Done & Refresh Designs
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Modal Footer Controls -->
+    <div id="bulkPriceFooter" style="padding: 1.1rem 1.6rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+      <div>
+        <button type="button" id="bulkPriceBackBtn" onclick="prevBulkPriceStep()" style="display: none; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-arrow-left"></i> Back
+        </button>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" onclick="closeBulkPriceModal()" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">
+          Cancel
+        </button>
+        <button type="button" id="bulkPriceNextBtn" onclick="nextBulkPriceStep()" class="btn btn-primary" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; background: #D97706; color: #FFF; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          Next: Choose Update Rule <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button type="button" id="bulkPriceApplyBtn" onclick="executeApplyPriceUpdate()" style="display: none; padding: 8px 24px; border-radius: 8px; font-size: 0.88rem; font-weight: 700; background: #16A34A; color: #FFF; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-check"></i> Apply Price Update
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <script>
   window.CSRF_TOKEN = '<%= csrfToken %>';
 </script>

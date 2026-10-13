@@ -11,6 +11,7 @@ const Design = require('../../models/Design');
 const ActivityLog = require('../../models/ActivityLog');
 const { checkSystemHealth } = require('../../services/schemaHealthService');
 const { runPendingMigrations } = require('../../services/migrationRunner');
+const bulkPriceService = require('../../services/bulkPriceService');
 
 const projectRoot = path.resolve(__dirname, '../..');
 const stagingBaseDir = path.join(projectRoot, 'scratch', 'relink_staging');
@@ -796,4 +797,80 @@ exports.downloadProductionSyncSql = async (req, res, next) => {
     next(err);
   }
 };
+
+// =========================================================================
+// 5. BULK PRICE UPDATE HISTORY & AUDIT
+// =========================================================================
+
+/**
+ * Render Price Update History page
+ * GET /admin/tools/price-history
+ */
+exports.getPriceHistory = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 15;
+    const history = await bulkPriceService.getHistory({ page, limit });
+
+    res.render('admin/tools/price-history', {
+      title: 'Price Update History - Admin Tools',
+      logs: history.logs,
+      total: history.total,
+      totalPages: history.totalPages,
+      currentPage: history.currentPage
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get details of a single price update log (JSON)
+ * GET /admin/tools/price-history/:id
+ */
+exports.getPriceHistoryDetail = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const detail = await bulkPriceService.getHistoryDetail(id);
+    res.json({ success: true, ...detail });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Unable to retrieve price update details.' });
+  }
+};
+
+/**
+ * Undo / Revert a past price update
+ * POST /admin/tools/price-history/undo/:id
+ */
+exports.undoPriceHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const force = Boolean(req.body && req.body.force);
+    const result = await bulkPriceService.undoPriceUpdate(id, req.user, force);
+    res.json(result);
+  } catch (err) {
+    console.error('undoPriceHistory error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to revert price update.' });
+  }
+};
+
+/**
+ * Download CSV export of a price update log
+ * GET /admin/tools/price-history/download/:id
+ */
+exports.downloadPriceHistoryCsv = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { filename, csv } = await bulkPriceService.exportHistoryCsv(id);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('downloadPriceHistoryCsv error:', err);
+    req.flash('error', err.message || 'Unable to download price update CSV.');
+    res.redirect('/admin/tools/price-history');
+  }
+};
+
 

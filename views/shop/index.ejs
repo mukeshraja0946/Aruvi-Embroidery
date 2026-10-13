@@ -438,6 +438,9 @@
                       <span class="old-price">₹<%= origPrice %></span>
                     <% } %>
                     <span class="current-price">₹<%= curPrice %></span>
+                    <% if (hasDisc && origPrice > 0) { %>
+                      <span class="discount-badge" style="font-size: 0.72rem; font-weight: 700; color: #C62828; background: #FFEBEE; padding: 2px 6px; border-radius: 4px; margin-left: 4px;"><%= Math.round(((origPrice - curPrice) / origPrice) * 100) %>% OFF</span>
+                    <% } %>
                   </div>
 
                   <form class="ajax-add-to-cart card-cart-form">

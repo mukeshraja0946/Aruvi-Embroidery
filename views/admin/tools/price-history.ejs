@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <style>
+    .history-card-box {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .history-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .history-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .history-stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+    .badge-status-pill {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .badge-active-update {
+      background: #E8F5E9;
+      color: #2E7D32;
+      border: 1px solid #C8E6C9;
+    }
+    .badge-undone-update {
+      background: #ECEFF1;
+      color: #546E7A;
+      border: 1px solid #CFD8DC;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search price updates...">
+    </div>
+
+    <div class="admin-header-right">
+      <a href="/admin/designs" class="btn btn-outline" style="height: 38px; font-size: 0.85rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 6px;">
+        <i class="fa-solid fa-arrow-left"></i> Manage Designs
+      </a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & TOOLS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/price-history" class="active"><span><i class="fa-solid fa-clock-rotate-left"></i> Price Update History</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-image-relink"><span><i class="fa-solid fa-images"></i> Bulk Image Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-file-relink"><span><i class="fa-solid fa-file-zipper"></i> Bulk File Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Storage</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">SYSTEM SETTINGS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Content Body -->
+    <main class="admin-content-body">
+      <% 
+        const alertSuccess = (typeof flash !== 'undefined' && flash.success && flash.success.length ? flash.success[0] : null);
+        const alertError = (typeof flash !== 'undefined' && flash.error && flash.error.length ? flash.error[0] : null);
+      %>
+      <% if (alertSuccess) { %>
+        <div class="alert alert-success" style="margin-bottom: 1.5rem; background: #E8F5E9; color: #2E7D32; padding: 1rem; border-radius: 8px; border: 1px solid #C8E6C9;">
+          <i class="fa-solid fa-circle-check"></i> <%= alertSuccess %>
+        </div>
+      <% } %>
+      <% if (alertError) { %>
+        <div class="alert alert-danger" style="margin-bottom: 1.5rem; background: #FFEBEE; color: #C62828; padding: 1rem; border-radius: 8px; border: 1px solid #FFCDD2;">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= alertError %>
+        </div>
+      <% } %>
+
+      <!-- Breadcrumbs & Heading -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.8rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div style="font-size: 0.82rem; color: var(--admin-text-muted); margin-bottom: 0.35rem;">
+            <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp;
+            <a href="/admin/designs" style="color: var(--admin-text-muted); text-decoration: none;">Designs</a> &nbsp;>&nbsp;
+            <span style="color: var(--admin-primary); font-weight: 600;">Price Update History</span>
+          </div>
+          <h1 style="font-size: 1.7rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.2rem;">
+            Bulk Price Update History & Audit Log
+          </h1>
+          <p style="color: var(--admin-text-muted); font-size: 0.86rem; margin: 0;">
+            Track all automated price updates, view modified designs, download audit CSVs, and safely undo changes.
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <a href="/admin/designs" class="btn btn-primary" style="height: 40px; padding: 0 1.25rem; border-radius: 8px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: var(--admin-primary); color: #FFF; text-decoration: none;">
+            <i class="fa-solid fa-indian-rupee-sign"></i> Bulk Update Prices
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Metrics -->
+      <%
+        let totalDesignsAffected = 0;
+        let activeCount = 0;
+        let undoneCount = 0;
+        if (logs && logs.length > 0) {
+          logs.forEach(l => {
+            totalDesignsAffected += Number(l.total_affected || 0);
+            if (l.is_undone) undoneCount++;
+            else activeCount++;
+          });
+        }
+      %>
+      <div class="history-stat-grid">
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #E0F2FE; color: #0284C7;">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div>
+            <span style="font-size: 0.74rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700; letter-spacing: 0.5px;">TOTAL UPDATES</span>
+            <div style="font-size: 1.4rem; font-weight: 700; color: var(--admin-text-dark);"><%= total || 0 %></div>
+          </div>
+        </div>
+
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #FEF3C7; color: #D97706;">
+            <i class="fa-solid fa-tags"></i>
+          </div>
+          <div>
+            <span style="font-size: 0.74rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700; letter-spacing: 0.5px;">DESIGNS RE-PRICED</span>
+            <div style="font-size: 1.4rem; font-weight: 700; color: var(--admin-text-dark);"><%= totalDesignsAffected %></div>
+          </div>
+        </div>
+
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #DCFCE7; color: #16A34A;">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <span style="font-size: 0.74rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700; letter-spacing: 0.5px;">ACTIVE UPDATES</span>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #16A34A;"><%= activeCount %></div>
+          </div>
+        </div>
+
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #F1F5F9; color: #64748B;">
+            <i class="fa-solid fa-rotate-left"></i>
+          </div>
+          <div>
+            <span style="font-size: 0.74rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700; letter-spacing: 0.5px;">UNDONE / REVERTED</span>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #64748B;"><%= undoneCount %></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Logs Table -->
+      <div class="history-card-box">
+        <div style="padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; background: #FAF6F0;">
+          <div>
+            <h2 style="font-size: 1.05rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+              Price Change Audit Logs (<%= total %>)
+            </h2>
+            <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+              All bulk price executions with one-click reversible rollback
+            </span>
+          </div>
+        </div>
+
+        <% if (!logs || logs.length === 0) { %>
+          <div style="text-align: center; padding: 3.5rem 1.5rem;">
+            <div style="width: 58px; height: 58px; background: #FAF6F0; color: var(--admin-primary); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.6rem; margin-bottom: 1rem;">
+              <i class="fa-solid fa-indian-rupee-sign"></i>
+            </div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.4rem;">No Price Updates Logged Yet</h3>
+            <p style="color: var(--admin-text-muted); font-size: 0.88rem; max-width: 440px; margin: 0 auto 1.4rem;">
+              Whenever you execute a bulk price update from Manage Designs, the complete audit record with old and new prices will appear here.
+            </p>
+            <a href="/admin/designs" class="btn btn-primary" style="height: 38px; padding: 0 1.2rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+              Go to Manage Designs
+            </a>
+          </div>
+        <% } else { %>
+          <div style="overflow-x: auto;">
+            <table class="admin-table-styled" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #F9FAFB; border-bottom: 1px solid var(--admin-border); text-align: left; font-size: 0.82rem; color: var(--admin-text-muted);">
+                  <th style="padding: 0.9rem 1.1rem; width: 70px;">ID</th>
+                  <th style="padding: 0.9rem 1.1rem; width: 170px;">Date & Time</th>
+                  <th style="padding: 0.9rem 1.1rem;">Admin</th>
+                  <th style="padding: 0.9rem 1.1rem;">Filter Scope</th>
+                  <th style="padding: 0.9rem 1.1rem;">Update Method</th>
+                  <th style="padding: 0.9rem 1.1rem; text-align: center;">Designs</th>
+                  <th style="padding: 0.9rem 1.1rem; text-align: center;">Status</th>
+                  <th style="padding: 0.9rem 1.1rem; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody style="font-size: 0.86rem;">
+                <% logs.forEach(log => { %>
+                  <tr style="border-bottom: 1px solid var(--admin-border);">
+                    <td style="padding: 0.9rem 1.1rem; font-weight: 700; color: var(--admin-text-muted);">
+                      #<%= log.id %>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; color: var(--admin-text-dark); white-space: nowrap;">
+                      <%= new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) %>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; font-weight: 600; color: var(--admin-text-dark);">
+                      <i class="fa-regular fa-user" style="color: var(--admin-text-muted); font-size: 0.8rem; margin-right: 4px;"></i>
+                      <%= log.admin_email || 'Administrator' %>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; color: var(--admin-text-dark);">
+                      <span style="background: #F1F5F9; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;">
+                        <%= log.filter_summary || 'All Designs' %>
+                      </span>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; color: var(--admin-text-dark); font-weight: 600;">
+                      <%= log.method_summary || 'Price rule' %>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; text-align: center;">
+                      <span style="font-weight: 700; font-size: 0.92rem; color: var(--admin-text-dark);">
+                        <%= log.total_affected %>
+                      </span>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; text-align: center;">
+                      <% if (log.is_undone) { %>
+                        <span class="badge-status-pill badge-undone-update" title="Reverted on <%= log.undone_at ? new Date(log.undone_at).toLocaleString() : '' %>">
+                          <i class="fa-solid fa-rotate-left"></i> Undone
+                        </span>
+                      <% } else { %>
+                        <span class="badge-status-pill badge-active-update">
+                          <i class="fa-solid fa-check"></i> Applied
+                        </span>
+                      <% } %>
+                    </td>
+                    <td style="padding: 0.9rem 1.1rem; text-align: right; white-space: nowrap;">
+                      <div style="display: inline-flex; gap: 6px; align-items: center;">
+                        <button type="button" onclick="openLogDetailsModal(<%= log.id %>)" class="action-icon-btn" style="width: 32px; height: 32px; border-radius: 8px; background: #F3F4F6; color: var(--admin-text-dark); border: 1px solid var(--admin-border); cursor: pointer;" title="View Modified Designs">
+                          <i class="fa-regular fa-eye"></i>
+                        </button>
+
+                        <a href="/admin/tools/price-history/download/<%= log.id %>" class="action-icon-btn" style="width: 32px; height: 32px; border-radius: 8px; background: #F3F4F6; color: #0284C7; border: 1px solid var(--admin-border); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;" title="Download CSV Audit Report">
+                          <i class="fa-solid fa-file-csv"></i>
+                        </a>
+
+                        <% if (!log.is_undone) { %>
+                          <button type="button" onclick="confirmUndoUpdate(<%= log.id %>, '<%= log.method_summary ? log.method_summary.replace(/'/g, "\\'") : '' %>', <%= log.total_affected %>)" class="btn btn-outline" style="height: 32px; padding: 0 9px; font-size: 0.78rem; font-weight: 600; border-radius: 8px; border: 1px solid #C62828; color: #C62828; background: #FFF;" title="Restore previous prices">
+                            <i class="fa-solid fa-rotate-left"></i> Undo
+                          </button>
+                        <% } %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <% if (totalPages > 1) { %>
+            <div style="padding: 1.1rem 1.4rem; border-top: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span style="font-size: 0.82rem; color: var(--admin-text-muted);">
+                Showing page <strong><%= currentPage %></strong> of <strong><%= totalPages %></strong>
+              </span>
+              <div style="display: flex; gap: 6px;">
+                <% if (currentPage > 1) { %>
+                  <a href="/admin/tools/price-history?page=<%= currentPage - 1 %>" class="btn btn-outline" style="height: 34px; padding: 0 12px; font-size: 0.82rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center;">Previous</a>
+                <% } %>
+                <% for (let p = 1; p <= totalPages; p++) { %>
+                  <% if (p === currentPage) { %>
+                    <span style="height: 34px; width: 34px; display: inline-flex; align-items: center; justify-content: center; background: var(--admin-primary); color: #FFF; font-weight: 700; border-radius: 6px; font-size: 0.82rem;"><%= p %></span>
+                  <% } else if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1) { %>
+                    <a href="/admin/tools/price-history?page=<%= p %>" class="btn btn-outline" style="height: 34px; width: 34px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; border-radius: 6px; text-decoration: none;"><%= p %></a>
+                  <% } %>
+                <% } %>
+                <% if (currentPage < totalPages) { %>
+                  <a href="/admin/tools/price-history?page=<%= currentPage + 1 %>" class="btn btn-outline" style="height: 34px; padding: 0 12px; font-size: 0.82rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center;">Next</a>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Details Modal -->
+<div id="logDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+    <div style="padding: 1.2rem 1.6rem; border-bottom: 1px solid var(--admin-border); background: #FAF6F0; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h3 id="detailModalTitle" style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+          Update Details
+        </h3>
+        <span id="detailModalSub" style="font-size: 0.8rem; color: var(--admin-text-muted);"></span>
+      </div>
+      <button type="button" onclick="closeLogDetailsModal()" style="background: none; border: none; font-size: 1.6rem; color: var(--admin-text-muted); cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+
+    <div style="padding: 1.4rem; overflow-y: auto; flex: 1;">
+      <div id="detailLoadingSpinner" style="text-align: center; padding: 2.5rem 0;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--admin-primary);"></i>
+        <p style="margin-top: 10px; color: var(--admin-text-muted); font-size: 0.88rem;">Loading price audit rows...</p>
+      </div>
+
+      <div id="detailTableContainer" style="display: none;">
+        <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <input type="text" id="detailFilterSearch" placeholder="Filter by SKU or title..." oninput="filterDetailRows(this.value)" style="height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--admin-border); font-size: 0.84rem; width: 260px;">
+          <a id="detailDownloadCsvBtn" href="#" class="btn btn-outline" style="height: 36px; font-size: 0.82rem; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+            <i class="fa-solid fa-download"></i> Download CSV
+          </a>
+        </div>
+
+        <div style="max-height: 50vh; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+            <thead>
+              <tr style="background: #F9FAFB; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--admin-border); text-align: left;">
+                <th style="padding: 8px 12px;">SKU</th>
+                <th style="padding: 8px 12px;">Title</th>
+                <th style="padding: 8px 12px;">Old MRP</th>
+                <th style="padding: 8px 12px;">Old Price</th>
+                <th style="padding: 8px 12px;">New MRP</th>
+                <th style="padding: 8px 12px;">New Price</th>
+                <th style="padding: 8px 12px; text-align: right;">Change</th>
+              </tr>
+            </thead>
+            <tbody id="detailTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 1rem 1.6rem; border-top: 1px solid var(--admin-border); background: #FAF6F0; display: flex; justify-content: flex-end;">
+      <button type="button" onclick="closeLogDetailsModal()" class="btn btn-outline" style="height: 38px; padding: 0 1.2rem; border-radius: 8px; font-size: 0.86rem; font-weight: 600;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Undo Confirmation Modal -->
+<div id="undoConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 480px; padding: 1.8rem; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;">
+      <div style="width: 44px; height: 44px; border-radius: 50%; background: #FFEBEE; color: #C62828; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0;">
+        <i class="fa-solid fa-rotate-left"></i>
+      </div>
+      <div>
+        <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+          Undo Price Update?
+        </h3>
+        <span id="undoLogSub" style="font-size: 0.8rem; color: var(--admin-text-muted);">Log #</span>
+      </div>
+    </div>
+
+    <p id="undoModalMessage" style="font-size: 0.88rem; color: var(--admin-text-dark); line-height: 1.5; margin-bottom: 1.2rem; background: #FAF6F0; padding: 12px 14px; border-radius: 10px; border-left: 3px solid var(--admin-primary);">
+      Are you sure you want to restore the previous prices?
+    </p>
+
+    <!-- Conflict Warning Box (if prices changed since) -->
+    <div id="undoConflictBox" style="display: none; background: #FFFBEB; border: 1px solid #FCD34D; color: #92400E; padding: 12px; border-radius: 8px; margin-bottom: 1.2rem; font-size: 0.82rem;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="undoConflictMsg">Some designs have been modified by subsequent price updates.</span>
+      <div style="margin-top: 8px;">
+        <label style="display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
+          <input type="checkbox" id="forceUndoCheckbox"> Force restore anyway (overwrite recent changes)
+        </label>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button type="button" onclick="closeUndoModal()" class="btn btn-outline" style="height: 40px; padding: 0 1.2rem; border-radius: 8px; font-size: 0.86rem; font-weight: 600;">Cancel</button>
+      <button type="button" id="confirmUndoBtn" onclick="executeUndoUpdate()" class="btn" style="height: 40px; padding: 0 1.4rem; border-radius: 8px; font-size: 0.86rem; font-weight: 700; background: #C62828; color: #FFF; border: none; cursor: pointer;">
+        Restore Old Prices
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let activeLogItems = [];
+  let pendingUndoLogId = null;
+
+  function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+  }
+
+  function openLogDetailsModal(id) {
+    const modal = document.getElementById('logDetailModal');
+    const spinner = document.getElementById('detailLoadingSpinner');
+    const tableContainer = document.getElementById('detailTableContainer');
+    const titleEl = document.getElementById('detailModalTitle');
+    const subEl = document.getElementById('detailModalSub');
+    const dlBtn = document.getElementById('detailDownloadCsvBtn');
+
+    titleEl.textContent = `Price Update #${id} Audit Log`;
+    subEl.textContent = 'Loading details...';
+    dlBtn.href = `/admin/tools/price-history/download/${id}`;
+
+    spinner.style.display = 'block';
+    tableContainer.style.display = 'none';
+    modal.style.display = 'flex';
+
+    fetch(`/admin/tools/price-history/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        spinner.style.display = 'none';
+        if (!data.success) {
+          alert(data.message || 'Error loading details.');
+          return;
+        }
+
+        const log = data.log;
+        activeLogItems = data.items || [];
+        subEl.textContent = `${log.method_summary} • ${log.total_affected} designs • ${new Date(log.created_at).toLocaleString()}`;
+
+        renderDetailRows(activeLogItems);
+        tableContainer.style.display = 'block';
+      })
+      .catch(err => {
+        spinner.style.display = 'none';
+        alert('Network error loading details.');
+      });
+  }
+
+  function renderDetailRows(items) {
+    const tbody = document.getElementById('detailTableBody');
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding: 1.5rem; text-align: center; color: var(--admin-text-muted);">No records found.</td></tr>';
+      return;
+    }
+
+    let html = '';
+    items.forEach(it => {
+      const priceDiff = Math.round((Number(it.new_price) - Number(it.old_price)) * 100) / 100;
+      const isPositive = priceDiff > 0;
+      const diffColor = isPositive ? '#2E7D32' : (priceDiff < 0 ? '#C62828' : '#64748B');
+      const diffSign = isPositive ? '+' : '';
+
+      html += `
+        <tr style="border-bottom: 1px solid var(--admin-border);">
+          <td style="padding: 8px 12px; font-weight: 600; color: var(--admin-text-muted); font-size: 0.8rem;">${it.sku || ('AED-' + it.design_id)}</td>
+          <td style="padding: 8px 12px; font-weight: 600; color: var(--admin-text-dark);">${it.title || 'Design #' + it.design_id}</td>
+          <td style="padding: 8px 12px; color: var(--admin-text-muted);">₹${it.old_mrp}</td>
+          <td style="padding: 8px 12px; color: var(--admin-text-muted);">₹${it.old_price}</td>
+          <td style="padding: 8px 12px; font-weight: 600; color: var(--admin-text-dark);">₹${it.new_mrp}</td>
+          <td style="padding: 8px 12px; font-weight: 700; color: var(--admin-primary);">₹${it.new_price}</td>
+          <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: ${diffColor};">
+            ${diffSign}₹${priceDiff}
+          </td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  }
+
+  function filterDetailRows(query) {
+    const q = (query || '').toLowerCase().trim();
+    if (!q) {
+      renderDetailRows(activeLogItems);
+      return;
+    }
+    const filtered = activeLogItems.filter(it =>
+      (it.sku && it.sku.toLowerCase().includes(q)) ||
+      (it.title && it.title.toLowerCase().includes(q))
+    );
+    renderDetailRows(filtered);
+  }
+
+  function closeLogDetailsModal() {
+    document.getElementById('logDetailModal').style.display = 'none';
+  }
+
+  function confirmUndoUpdate(id, method, count) {
+    pendingUndoLogId = id;
+    document.getElementById('undoLogSub').textContent = `Log #${id}`;
+    document.getElementById('undoModalMessage').innerHTML = `
+      This will rollback <strong>${count} design(s)</strong> updated via "<em>${method}</em>" and restore their exact prior prices.
+    `;
+    document.getElementById('undoConflictBox').style.display = 'none';
+    document.getElementById('forceUndoCheckbox').checked = false;
+    document.getElementById('undoConfirmModal').style.display = 'flex';
+  }
+
+  function closeUndoModal() {
+    pendingUndoLogId = null;
+    document.getElementById('undoConfirmModal').style.display = 'none';
+  }
+
+  function executeUndoUpdate() {
+    if (!pendingUndoLogId) return;
+    const btn = document.getElementById('confirmUndoBtn');
+    btn.disabled = true;
+    btn.textContent = 'Restoring...';
+
+    const force = document.getElementById('forceUndoCheckbox').checked;
+
+    fetch(`/admin/tools/price-history/undo/${pendingUndoLogId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      body: JSON.stringify({ force, _csrf: getCsrfToken() })
+    })
+    .then(res => res.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.textContent = 'Restore Old Prices';
+
+      if (data.requiresConfirmation) {
+        // Show conflict warning box
+        const conflictBox = document.getElementById('undoConflictBox');
+        document.getElementById('undoConflictMsg').textContent = data.message;
+        conflictBox.style.display = 'block';
+        return;
+      }
+
+      if (data.success) {
+        closeUndoModal();
+        alert(data.message || 'Prices restored successfully!');
+        window.location.reload();
+      } else {
+        alert(data.message || 'Unable to undo price update.');
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btn.textContent = 'Restore Old Prices';
+      alert('Network error while reverting prices.');
+    });
+  }
+</script>
+
+</body>
+</html>

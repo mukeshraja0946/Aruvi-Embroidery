@@ -45,6 +45,17 @@ function updateSelectedCount() {
   if (btn) {
     btn.style.display = count > 0 ? 'inline-flex' : 'none';
   }
+
+  const priceBtn = document.getElementById('updateSelectedPriceBtn');
+  const priceNumEl = document.getElementById('updateSelectedPriceCountNum');
+  if (priceNumEl) priceNumEl.textContent = count;
+  if (priceBtn) {
+    priceBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+
+  const modalSelectedCountEl = document.getElementById('modalSelectedCount');
+  if (modalSelectedCountEl) modalSelectedCountEl.textContent = count;
+
   const master = document.getElementById('selectAllCheckbox');
   const all = document.querySelectorAll('.design-checkbox');
   if (master && all.length > 0) {
@@ -110,7 +121,33 @@ function executeDeleteDesign() {
   });
 }
 
+function checkDeleteAllSafety() {
+  const confirmInput = document.getElementById('deleteAllConfirmInput');
+  const passwordInput = document.getElementById('deleteAllPasswordInput');
+  const btn = document.getElementById('confirmDeleteAllBtn');
+  if (!confirmInput || !passwordInput || !btn) return;
+
+  const textMatch = (confirmInput.value || '').trim() === 'DELETE ALL';
+  const hasPass = (passwordInput.value || '').trim().length > 0;
+
+  if (textMatch && hasPass) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  }
+}
+
 function confirmDeleteAllDesigns() {
+  const confirmInput = document.getElementById('deleteAllConfirmInput');
+  const passwordInput = document.getElementById('deleteAllPasswordInput');
+  if (confirmInput) confirmInput.value = '';
+  if (passwordInput) passwordInput.value = '';
+  checkDeleteAllSafety();
+
   const modal = document.getElementById('deleteAllDesignsModal');
   if (modal) modal.style.display = 'flex';
 }
@@ -121,8 +158,19 @@ function closeDeleteAllModal() {
 }
 
 function executeDeleteAllDesigns() {
+  const confirmInput = document.getElementById('deleteAllConfirmInput');
+  const passwordInput = document.getElementById('deleteAllPasswordInput');
   const btn = document.getElementById('confirmDeleteAllBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Deleting All...'; }
+
+  const confirmationText = confirmInput ? confirmInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value.trim() : '';
+
+  if (confirmationText !== 'DELETE ALL' || !password) {
+    alert('Please type "DELETE ALL" and enter your admin password.');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Archiving & Backing up...'; }
 
   const csrf = getCsrfToken();
 
@@ -134,15 +182,15 @@ function executeDeleteAllDesigns() {
       'X-Requested-With': 'XMLHttpRequest',
       'X-CSRF-Token': csrf
     },
-    body: JSON.stringify({ _csrf: csrf })
+    body: JSON.stringify({ confirmationText, password, _csrf: csrf })
   })
   .then(res => res.json())
   .then(data => {
     closeDeleteAllModal();
-    if (btn) { btn.disabled = false; btn.textContent = 'Yes, Delete All Designs'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Delete All Designs'; }
     if (data.success) {
-      showAdminToast(data.message || 'All designs permanently removed.');
-      setTimeout(() => window.location.reload(), 600);
+      showAdminToast(data.message || 'All designs safely moved to trash (recoverable for 30 days).');
+      setTimeout(() => window.location.reload(), 1000);
     } else {
       alert(data.message || 'Unable to delete all designs. Please try again.');
     }
@@ -150,7 +198,7 @@ function executeDeleteAllDesigns() {
   .catch(err => {
     console.error(err);
     closeDeleteAllModal();
-    if (btn) { btn.disabled = false; btn.textContent = 'Yes, Delete All Designs'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Delete All Designs'; }
     alert('Unable to delete all designs. Please try again.');
   });
 }
@@ -3031,6 +3079,717 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// =============================================================================
+// INLINE PRICE EDITING IN DESIGNS TABLE
+// =============================================================================
+
+function startInlinePriceEdit(id) {
+  const cell = document.getElementById(`priceCell-${id}`);
+  if (!cell) return;
+
+  const displayWrapper = cell.querySelector('.price-display-wrapper');
+  const editWrapper = document.getElementById(`priceEditBox-${id}`);
+  const input = document.getElementById(`priceInput-${id}`);
+
+  if (displayWrapper) displayWrapper.style.display = 'none';
+  if (editWrapper) editWrapper.style.display = 'inline-flex';
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function cancelInlinePriceEdit(id) {
+  const cell = document.getElementById(`priceCell-${id}`);
+  if (!cell) return;
+
+  const currentPrice = cell.dataset.price || '0';
+  const displayWrapper = cell.querySelector('.price-display-wrapper');
+  const editWrapper = document.getElementById(`priceEditBox-${id}`);
+  const input = document.getElementById(`priceInput-${id}`);
+
+  if (input) input.value = currentPrice;
+  if (editWrapper) editWrapper.style.display = 'none';
+  if (displayWrapper) displayWrapper.style.display = 'inline-flex';
+}
+
+function handleInlinePriceKey(event, id) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    saveInlinePrice(id);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelInlinePriceEdit(id);
+  }
+}
+
+function saveInlinePrice(id) {
+  const cell = document.getElementById(`priceCell-${id}`);
+  const input = document.getElementById(`priceInput-${id}`);
+  if (!cell || !input) return;
+
+  const val = parseFloat(input.value);
+  if (isNaN(val) || val <= 0) {
+    alert('Please enter a valid price greater than 0.');
+    input.focus();
+    return;
+  }
+
+  const currentPrice = parseFloat(cell.dataset.price || '0');
+  if (val === currentPrice) {
+    cancelInlinePriceEdit(id);
+    return;
+  }
+
+  const csrf = getCsrfToken();
+  input.disabled = true;
+
+  fetch(`/admin/api/designs/${id}/inline-price`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-CSRF-Token': csrf
+    },
+    body: JSON.stringify({ sale_price: val, _csrf: csrf })
+  })
+  .then(res => res.json())
+  .then(data => {
+    input.disabled = false;
+    if (data.success) {
+      // Update cell DOM
+      cell.dataset.price = data.new_price;
+      cell.dataset.mrp = data.new_mrp;
+
+      const priceValEl = document.getElementById(`priceVal-${id}`);
+      if (priceValEl) priceValEl.textContent = data.new_price;
+
+      const mrpLineEl = document.getElementById(`mrpLine-${id}`);
+      const discountBadgeEl = document.getElementById(`discountBadge-${id}`);
+
+      if (data.new_mrp > data.new_price) {
+        if (mrpLineEl) {
+          mrpLineEl.textContent = `₹${data.new_mrp}`;
+          mrpLineEl.style.display = 'inline';
+        }
+        if (discountBadgeEl) {
+          discountBadgeEl.textContent = `${data.discount_percent}% OFF`;
+          discountBadgeEl.style.color = '#C62828';
+          discountBadgeEl.style.fontWeight = '600';
+        }
+      } else {
+        if (mrpLineEl) mrpLineEl.style.display = 'none';
+        if (discountBadgeEl) {
+          discountBadgeEl.textContent = 'Regular';
+          discountBadgeEl.style.color = 'var(--admin-text-muted)';
+          discountBadgeEl.style.fontWeight = '500';
+        }
+      }
+
+      cancelInlinePriceEdit(id);
+      showAdminToast(data.message || `Price updated to ₹${data.new_price}`);
+    } else {
+      alert(data.message || 'Unable to update price.');
+      input.focus();
+    }
+  })
+  .catch(err => {
+    input.disabled = false;
+    alert('Network error while saving price.');
+  });
+}
+
+// =============================================================================
+// BULK UPDATE PRICE MULTI-STEP ENGINE
+// =============================================================================
+
+let bulkPriceCurrentStep = 1;
+let bulkPriceLiveDebounceTimer = null;
+let bulkPricePreviewData = null;
+let bulkPricePreviewItems = [];
+let bulkPriceExcludedIds = new Set();
+let bulkPriceFilterSummary = '';
+let bulkPriceMethodSummary = '';
+
+function openBulkPriceModal() {
+  const modal = document.getElementById('bulkPriceModal');
+  if (!modal) return;
+
+  bulkPriceCurrentStep = 1;
+  bulkPriceExcludedIds.clear();
+  setBulkPriceStep(1);
+
+  // Update selected count
+  const checkedRows = document.querySelectorAll('.design-checkbox:checked');
+  const countEl = document.getElementById('modalSelectedCount');
+  if (countEl) countEl.textContent = checkedRows.length;
+
+  fetchLiveTargetCount();
+  modal.style.display = 'flex';
+}
+
+function openBulkPriceModalForSelected() {
+  openBulkPriceModal();
+  const selectedRadio = document.querySelector('input[name="priceScope"][value="selected"]');
+  if (selectedRadio) {
+    selectedRadio.checked = true;
+    handlePriceScopeChange();
+  }
+}
+
+function closeBulkPriceModal() {
+  const modal = document.getElementById('bulkPriceModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function setBulkPriceStep(step) {
+  bulkPriceCurrentStep = step;
+
+  // Tabs
+  const tab1 = document.getElementById('stepPriceTab1');
+  const tab2 = document.getElementById('stepPriceTab2');
+  const tab3 = document.getElementById('stepPriceTab3');
+
+  const step1 = document.getElementById('bulkPriceStep1');
+  const step2 = document.getElementById('bulkPriceStep2');
+  const step3 = document.getElementById('bulkPriceStep3');
+  const step4 = document.getElementById('bulkPriceStep4');
+
+  const backBtn = document.getElementById('bulkPriceBackBtn');
+  const nextBtn = document.getElementById('bulkPriceNextBtn');
+  const applyBtn = document.getElementById('bulkPriceApplyBtn');
+  const footer = document.getElementById('bulkPriceFooter');
+
+  [tab1, tab2, tab3].forEach(t => {
+    if (t) {
+      t.style.background = '#ECEFF1';
+      t.style.color = '#546E7A';
+    }
+  });
+
+  if (step === 1) {
+    if (tab1) { tab1.style.background = '#D97706'; tab1.style.color = '#FFF'; }
+    if (step1) step1.style.display = 'block';
+    if (step2) step2.style.display = 'none';
+    if (step3) step3.style.display = 'none';
+    if (step4) step4.style.display = 'none';
+
+    if (backBtn) backBtn.style.display = 'none';
+    if (nextBtn) {
+      nextBtn.style.display = 'inline-flex';
+      nextBtn.innerHTML = 'Next: Choose Update Rule <i class="fa-solid fa-arrow-right"></i>';
+    }
+    if (applyBtn) applyBtn.style.display = 'none';
+    if (footer) footer.style.display = 'flex';
+  } else if (step === 2) {
+    if (tab2) { tab2.style.background = '#D97706'; tab2.style.color = '#FFF'; }
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'block';
+    if (step3) step3.style.display = 'none';
+    if (step4) step4.style.display = 'none';
+
+    if (backBtn) backBtn.style.display = 'inline-flex';
+    if (nextBtn) {
+      nextBtn.style.display = 'inline-flex';
+      nextBtn.innerHTML = 'Next: Preview Changes <i class="fa-solid fa-arrow-right"></i>';
+    }
+    if (applyBtn) applyBtn.style.display = 'none';
+    if (footer) footer.style.display = 'flex';
+  } else if (step === 3) {
+    if (tab3) { tab3.style.background = '#D97706'; tab3.style.color = '#FFF'; }
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'none';
+    if (step3) step3.style.display = 'block';
+    if (step4) step4.style.display = 'none';
+
+    if (backBtn) backBtn.style.display = 'inline-flex';
+    if (nextBtn) nextBtn.style.display = 'none';
+    if (applyBtn) applyBtn.style.display = 'inline-flex';
+    if (footer) footer.style.display = 'flex';
+  } else if (step === 4) {
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'none';
+    if (step3) step3.style.display = 'none';
+    if (step4) step4.style.display = 'block';
+    if (footer) footer.style.display = 'none';
+  }
+}
+
+function nextBulkPriceStep() {
+  if (bulkPriceCurrentStep === 1) {
+    setBulkPriceStep(2);
+  } else if (bulkPriceCurrentStep === 2) {
+    generatePricePreview();
+  }
+}
+
+function prevBulkPriceStep() {
+  if (bulkPriceCurrentStep === 3) {
+    setBulkPriceStep(2);
+  } else if (bulkPriceCurrentStep === 2) {
+    setBulkPriceStep(1);
+  }
+}
+
+function handlePriceScopeChange() {
+  const scope = document.querySelector('input[name="priceScope"]:checked')?.value || 'all';
+  const customBox = document.getElementById('priceCustomFiltersBox');
+  if (customBox) {
+    customBox.style.display = scope === 'custom' ? 'block' : 'none';
+  }
+  fetchLiveTargetCount();
+}
+
+function toggleAllCategoryCheckboxes(checked) {
+  const cbs = document.querySelectorAll('.price-cat-check');
+  cbs.forEach(cb => cb.checked = checked);
+  debouncedFetchLiveCount();
+}
+
+function debouncedFetchLiveCount() {
+  if (bulkPriceLiveDebounceTimer) clearTimeout(bulkPriceLiveDebounceTimer);
+  bulkPriceLiveDebounceTimer = setTimeout(fetchLiveTargetCount, 250);
+}
+
+function getSelectedTableDesignIds() {
+  const checked = document.querySelectorAll('.design-checkbox:checked');
+  return Array.from(checked).map(cb => parseInt(cb.value, 10)).filter(id => !isNaN(id));
+}
+
+function collectStep1Filters() {
+  const scope = document.querySelector('input[name="priceScope"]:checked')?.value || 'all';
+  const selectedIds = getSelectedTableDesignIds();
+
+  const categoryIds = Array.from(document.querySelectorAll('.price-cat-check:checked'))
+    .map(cb => parseInt(cb.value, 10))
+    .filter(id => !isNaN(id));
+
+  const status = document.getElementById('priceFilterStatus')?.value || 'all';
+
+  const formats = Array.from(document.querySelectorAll('.price-fmt-check:checked'))
+    .map(cb => cb.value.trim());
+
+  const minPrice = document.getElementById('priceFilterMin')?.value || '';
+  const maxPrice = document.getElementById('priceFilterMax')?.value || '';
+  const skuRange = document.getElementById('priceFilterSkuText')?.value || '';
+
+  return {
+    scope,
+    selectedIds,
+    categoryIds,
+    status,
+    formats,
+    minPrice,
+    maxPrice,
+    skuRange
+  };
+}
+
+function fetchLiveTargetCount() {
+  const filters = collectStep1Filters();
+  const label = document.getElementById('bulkPriceLiveCountLabel');
+  const numEl = document.getElementById('bulkPriceLiveCountNum');
+
+  if (filters.scope === 'selected' && filters.selectedIds.length === 0) {
+    if (label) label.innerHTML = '<span style="color: #C62828;">No rows selected in table yet. Tick rows or choose "All Designs".</span>';
+    return;
+  }
+
+  fetch('/admin/api/bulk-price/count', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': getCsrfToken()
+    },
+    body: JSON.stringify({ filters, selectedIds: filters.selectedIds, _csrf: getCsrfToken() })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      if (label) label.innerHTML = `This will update <strong>${data.count}</strong> designs.`;
+    }
+  })
+  .catch(() => {
+    if (label) label.innerHTML = 'This will update <strong>...</strong> designs.';
+  });
+}
+
+function handleTargetFieldChange() {
+  const targetField = document.querySelector('input[name="priceTargetField"]:checked')?.value || 'sale_price';
+  const discountLabel = document.getElementById('methodDiscountLabel');
+  if (discountLabel) {
+    // Discount off MRP only applies to selling price
+    if (targetField === 'price') {
+      discountLabel.style.opacity = '0.5';
+      discountLabel.style.pointerEvents = 'none';
+      const discRadio = document.querySelector('input[name="priceMethod"][value="discount_off_mrp"]');
+      if (discRadio && discRadio.checked) {
+        document.querySelector('input[name="priceMethod"][value="percentage"]').checked = true;
+        handlePriceMethodChange();
+      }
+    } else {
+      discountLabel.style.opacity = '1';
+      discountLabel.style.pointerEvents = 'auto';
+    }
+  }
+}
+
+function handlePriceMethodChange() {
+  const method = document.querySelector('input[name="priceMethod"]:checked')?.value || 'fixed';
+
+  const fixedBox = document.getElementById('methodInputBoxFixed');
+  const pctBox = document.getElementById('methodInputBoxPercentage');
+  const amtBox = document.getElementById('methodInputBoxAmount');
+  const discBox = document.getElementById('methodInputBoxDiscount');
+  const fileBox = document.getElementById('methodInputBoxFile');
+
+  if (fixedBox) fixedBox.style.display = method === 'fixed' ? 'flex' : 'none';
+  if (pctBox) pctBox.style.display = method === 'percentage' ? 'flex' : 'none';
+  if (amtBox) amtBox.style.display = method === 'amount' ? 'flex' : 'none';
+  if (discBox) discBox.style.display = method === 'discount_off_mrp' ? 'flex' : 'none';
+  if (fileBox) fileBox.style.display = method === 'file' ? 'flex' : 'none';
+}
+
+function togglePriceGuardInputs() {
+  const enabled = document.getElementById('enablePriceGuardOption')?.checked;
+  const row = document.getElementById('priceGuardInputsRow');
+  if (row) row.style.display = enabled ? 'flex' : 'none';
+}
+
+function generatePricePreview() {
+  const nextBtn = document.getElementById('bulkPriceNextBtn');
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calculating Preview...';
+  }
+
+  const filters = collectStep1Filters();
+  const targetField = document.querySelector('input[name="priceTargetField"]:checked')?.value || 'sale_price';
+  const method = document.querySelector('input[name="priceMethod"]:checked')?.value || 'fixed';
+  const rounding = document.getElementById('priceRoundingOption')?.value || 'none';
+  const autoCapMrp = document.getElementById('autoCapMrpOption')?.checked;
+
+  let value = 0;
+  if (method === 'fixed') {
+    value = parseFloat(document.getElementById('fixedValInput')?.value || 0);
+  } else if (method === 'percentage') {
+    value = parseFloat(document.getElementById('percentageValInput')?.value || 0);
+  } else if (method === 'amount') {
+    value = parseFloat(document.getElementById('amountValInput')?.value || 0);
+  } else if (method === 'discount_off_mrp') {
+    value = parseFloat(document.getElementById('discountValInput')?.value || 0);
+  }
+
+  const enableGuard = document.getElementById('enablePriceGuardOption')?.checked;
+  const minGuard = enableGuard ? document.getElementById('guardMinVal')?.value : null;
+  const maxGuard = enableGuard ? document.getElementById('guardMaxVal')?.value : null;
+
+  // Summaries
+  let fSum = filters.scope === 'all' ? 'All designs' : (filters.scope === 'selected' ? `${filters.selectedIds.length} selected row(s)` : 'Filtered designs');
+  let mSum = '';
+  if (method === 'fixed') mSum = `Fixed ₹${value} on ${targetField}`;
+  else if (method === 'percentage') mSum = `${value >= 0 ? '+' : ''}${value}% on ${targetField}`;
+  else if (method === 'amount') mSum = `${value >= 0 ? '+₹' : '-₹'}${Math.abs(value)} on ${targetField}`;
+  else if (method === 'discount_off_mrp') mSum = `${value}% off MRP`;
+  else if (method === 'file') mSum = 'Spreadsheet per-SKU pricing';
+
+  bulkPriceFilterSummary = fSum;
+  bulkPriceMethodSummary = mSum;
+
+  const csrf = getCsrfToken();
+
+  let fetchPromise;
+  if (method === 'file') {
+    const fileInput = document.getElementById('priceSpreadsheetFile');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      alert('Please choose a CSV or XLSX file to upload.');
+      if (nextBtn) { nextBtn.disabled = false; nextBtn.innerHTML = 'Next: Preview Changes <i class="fa-solid fa-arrow-right"></i>'; }
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('method', 'file');
+    formData.append('targetField', targetField);
+    formData.append('rounding', rounding);
+    formData.append('autoCapMrp', autoCapMrp);
+    formData.append('_csrf', csrf);
+
+    fetchPromise = fetch('/admin/api/bulk-price/preview', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrf },
+      body: formData
+    });
+  } else {
+    fetchPromise = fetch('/admin/api/bulk-price/preview', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrf
+      },
+      body: JSON.stringify({
+        ...filters,
+        targetField,
+        method,
+        value,
+        rounding,
+        autoCapMrp,
+        minGuard,
+        maxGuard,
+        _csrf: csrf
+      })
+    });
+  }
+
+  fetchPromise
+    .then(res => res.json())
+    .then(data => {
+      if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.innerHTML = 'Next: Preview Changes <i class="fa-solid fa-arrow-right"></i>';
+      }
+
+      if (!data.success) {
+        alert(data.message || 'Unable to generate preview.');
+        return;
+      }
+
+      bulkPricePreviewData = data;
+      bulkPricePreviewItems = data.items || [];
+      bulkPriceExcludedIds.clear();
+
+      renderPreviewUI(data);
+      setBulkPriceStep(3);
+    })
+    .catch(err => {
+      if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.innerHTML = 'Next: Preview Changes <i class="fa-solid fa-arrow-right"></i>';
+      }
+      alert('Error calculating price preview.');
+    });
+}
+
+function renderPreviewUI(data) {
+  const sum = data.summary || {};
+  document.getElementById('previewTotalCount').textContent = sum.totalDesigns || 0;
+  document.getElementById('previewOldAvgPrice').textContent = `₹${sum.avgOldPrice || 0}`;
+  document.getElementById('previewNewAvgPrice').textContent = `₹${sum.avgNewPrice || 0}`;
+
+  const pctBadge = document.getElementById('previewPctChangeBadge');
+  if (pctBadge) {
+    const pct = sum.priceChangePct || 0;
+    pctBadge.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
+    pctBadge.style.background = pct >= 0 ? '#E8F5E9' : '#FFEBEE';
+    pctBadge.style.color = pct >= 0 ? '#2E7D32' : '#C62828';
+  }
+
+  document.getElementById('previewValidCount').textContent = sum.validCount || 0;
+
+  const errCard = document.getElementById('previewErrorCard');
+  const errBtn = document.getElementById('excludeErrorsBtn');
+  if (sum.errorCount > 0) {
+    if (errCard) { errCard.style.display = 'block'; document.getElementById('previewErrorCount').textContent = sum.errorCount; }
+    if (errBtn) errBtn.style.display = 'inline-flex';
+  } else {
+    if (errCard) errCard.style.display = 'none';
+    if (errBtn) errBtn.style.display = 'none';
+  }
+
+  renderPreviewRows(bulkPricePreviewItems);
+  updatePreviewIncludedCount();
+}
+
+function renderPreviewRows(items) {
+  const tbody = document.getElementById('previewTableBody');
+  if (!tbody) return;
+
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="padding: 2rem; text-align: center; color: var(--admin-text-muted);">No design records found.</td></tr>';
+    return;
+  }
+
+  let html = '';
+  items.forEach(it => {
+    const isExcluded = bulkPriceExcludedIds.has(it.design_id);
+    const checked = !isExcluded && it.status !== 'error';
+
+    let badgeClass = 'background: #E8F5E9; color: #2E7D32;';
+    let badgeText = 'Valid';
+    if (it.status === 'warning') {
+      badgeClass = 'background: #FEF3C7; color: #B45309;';
+      badgeText = 'Capped to MRP';
+    } else if (it.status === 'error') {
+      badgeClass = 'background: #FFEBEE; color: #C62828;';
+      badgeText = it.error_message || 'Invalid';
+    } else if (it.status === 'unchanged') {
+      badgeClass = 'background: #F1F5F9; color: #64748B;';
+      badgeText = 'Unchanged';
+    }
+
+    const priceDiff = it.price_change_diff || 0;
+    const isPos = priceDiff > 0;
+    const diffColor = isPos ? '#2E7D32' : (priceDiff < 0 ? '#C62828' : '#64748B');
+    const diffSign = isPos ? '+' : '';
+
+    const rowBg = it.status === 'error' ? 'background: #FFF5F5;' : (it.is_changed ? 'background: #FEFCE8;' : '');
+
+    html += `
+      <tr style="border-bottom: 1px solid var(--admin-border); ${rowBg}">
+        <td style="padding: 8px 10px; text-align: center;">
+          <input type="checkbox" class="preview-item-check" data-id="${it.design_id}" ${checked ? 'checked' : ''} onchange="togglePreviewRow(this, ${it.design_id})">
+        </td>
+        <td style="padding: 8px 10px; font-weight: 600; color: var(--admin-text-muted); font-size: 0.78rem;">${it.sku}</td>
+        <td style="padding: 8px 10px; font-weight: 600; color: var(--admin-text-dark);">${it.title}</td>
+        <td style="padding: 8px 10px; color: var(--admin-text-muted); font-size: 0.76rem;">${it.category_name}</td>
+        <td style="padding: 8px 10px; text-align: right; color: var(--admin-text-muted);">₹${it.old_mrp !== null ? it.old_mrp : '-'}</td>
+        <td style="padding: 8px 10px; text-align: right; color: var(--admin-text-muted);">₹${it.old_price !== null ? it.old_price : '-'}</td>
+        <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: var(--admin-text-dark);">₹${it.new_mrp !== null ? it.new_mrp : '-'}</td>
+        <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: var(--admin-primary);">₹${it.new_price !== null ? it.new_price : '-'}</td>
+        <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${diffColor};">
+          ${diffSign}₹${priceDiff} (${it.price_change_pct}%)
+        </td>
+        <td style="padding: 8px 10px; text-align: center;">
+          <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; ${badgeClass}">
+            ${badgeText}
+          </span>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function togglePreviewRow(checkbox, designId) {
+  if (checkbox.checked) {
+    bulkPriceExcludedIds.delete(designId);
+  } else {
+    bulkPriceExcludedIds.add(designId);
+  }
+  updatePreviewIncludedCount();
+}
+
+function toggleSelectAllPreviewRows(masterCheckbox) {
+  const cbs = document.querySelectorAll('.preview-item-check');
+  cbs.forEach(cb => {
+    cb.checked = masterCheckbox.checked;
+    const dId = parseInt(cb.dataset.id, 10);
+    if (masterCheckbox.checked) {
+      bulkPriceExcludedIds.delete(dId);
+    } else {
+      bulkPriceExcludedIds.add(dId);
+    }
+  });
+  updatePreviewIncludedCount();
+}
+
+function excludeAllErrors() {
+  if (!bulkPricePreviewItems) return;
+  bulkPricePreviewItems.forEach(it => {
+    if (it.status === 'error') {
+      bulkPriceExcludedIds.add(it.design_id);
+    }
+  });
+  renderPreviewRows(bulkPricePreviewItems);
+  updatePreviewIncludedCount();
+}
+
+function handlePreviewFilter(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderPreviewRows(bulkPricePreviewItems);
+    return;
+  }
+  const filtered = bulkPricePreviewItems.filter(it =>
+    (it.sku && it.sku.toLowerCase().includes(q)) ||
+    (it.title && it.title.toLowerCase().includes(q))
+  );
+  renderPreviewRows(filtered);
+}
+
+function updatePreviewIncludedCount() {
+  const includedCount = bulkPricePreviewItems.filter(it =>
+    it.design_id &&
+    !bulkPriceExcludedIds.has(it.design_id) &&
+    it.status !== 'error' &&
+    it.is_changed
+  ).length;
+
+  const countEl = document.getElementById('previewSelectedCount');
+  if (countEl) countEl.textContent = includedCount;
+
+  const applyBtn = document.getElementById('bulkPriceApplyBtn');
+  if (applyBtn) {
+    applyBtn.disabled = includedCount === 0;
+    applyBtn.style.opacity = includedCount === 0 ? '0.5' : '1';
+  }
+}
+
+function executeApplyPriceUpdate() {
+  if (!bulkPricePreviewItems || bulkPricePreviewItems.length === 0) return;
+
+  const includedItems = bulkPricePreviewItems.filter(it =>
+    it.design_id &&
+    !bulkPriceExcludedIds.has(it.design_id) &&
+    it.status !== 'error' &&
+    it.is_changed
+  );
+
+  if (includedItems.length === 0) {
+    alert('No changed designs to update. Please select at least one design.');
+    return;
+  }
+
+  const applyBtn = document.getElementById('bulkPriceApplyBtn');
+  if (applyBtn) {
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Applying...';
+  }
+
+  setBulkPriceStep(4);
+  const progressBar = document.getElementById('bulkPriceProgressBar');
+  if (progressBar) progressBar.style.width = '60%';
+
+  const csrf = getCsrfToken();
+
+  fetch('/admin/api/bulk-price/apply', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': csrf
+    },
+    body: JSON.stringify({
+      items: includedItems,
+      excludedIds: Array.from(bulkPriceExcludedIds),
+      filterSummary: bulkPriceFilterSummary,
+      methodSummary: bulkPriceMethodSummary,
+      _csrf: csrf
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (progressBar) progressBar.style.width = '100%';
+
+    setTimeout(() => {
+      document.getElementById('bulkPriceProgressBox').style.display = 'none';
+      const successBox = document.getElementById('bulkPriceSuccessBox');
+      successBox.style.display = 'block';
+
+      if (data.success) {
+        document.getElementById('bulkPriceSuccessText').textContent =
+          `Successfully updated ${data.totalAffected || includedItems.length} designs in transaction audit log #${data.logId}.`;
+      } else {
+        alert(data.message || 'Error occurred during price update.');
+      }
+    }, 400);
+  })
+  .catch(err => {
+    alert('Network error while committing price update.');
+    setBulkPriceStep(3);
+  });
+}
+
 
 
 

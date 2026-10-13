@@ -9,6 +9,9 @@ const emailService = require('../../services/emailService');
 const storage = require('../../config/storage');
 const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDriver, uploadToCloudinary, uploadToS3OrR2 } = storage;
 const ActivityLog = require('../../models/ActivityLog');
+const User = require('../../models/User');
+const bulkPriceService = require('../../services/bulkPriceService');
+const { runBackup } = require('../../scripts/backup');
 
 const AdminStatsService = require('../../services/adminStatsService');
 const errorLogger = require('../../services/errorLogger');
@@ -697,24 +700,211 @@ exports.deleteDesign = async (req, res, next) => {
 };
 
 exports.deleteAllDesigns = async (req, res, next) => {
+  const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
   try {
-    await Design.deleteAll();
-    await ActivityLog.logFromReq(req, 'delete_all', 'design', null, 'Deleted all designs permanently');
-    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
+    const { confirmationText, password } = req.body;
 
-    if (isAjax) {
-      return res.json({ success: true, message: 'All designs have been permanently removed.' });
+    // Safety checks: Type "DELETE ALL" and enter admin password
+    if ((confirmationText || '').trim() !== 'DELETE ALL') {
+      const msg = 'Confirmation text mismatch. You must type "DELETE ALL" exactly to proceed.';
+      if (isAjax) return res.status(400).json({ success: false, message: msg });
+      req.flash('error', msg);
+      return res.redirect('/admin/designs');
     }
 
-    req.flash('success', 'All designs have been permanently removed.');
+    if (!password || !String(password).trim()) {
+      const msg = 'Admin password is required to perform Delete All Designs.';
+      if (isAjax) return res.status(400).json({ success: false, message: msg });
+      req.flash('error', msg);
+      return res.redirect('/admin/designs');
+    }
+
+    // Verify admin password
+    const adminId = req.user ? req.user.id : (req.session ? req.session.userId : null);
+    let userRow = null;
+    if (adminId) {
+      const rows = await db.query('SELECT id, password_hash, role, is_active FROM users WHERE id = ?', [adminId]);
+      userRow = rows && rows[0];
+    }
+    if (!userRow) {
+      const rows = await db.query("SELECT id, password_hash, role, is_active FROM users WHERE email = 'admin@aruviembroidery.com' LIMIT 1");
+      userRow = rows && rows[0];
+    }
+
+    if (!userRow) {
+      const msg = 'Admin account verification failed. Action aborted.';
+      if (isAjax) return res.status(403).json({ success: false, message: msg });
+      req.flash('error', msg);
+      return res.redirect('/admin/designs');
+    }
+
+    const isPasswordValid = await User.verifyPassword(password.trim(), userRow.password_hash);
+    if (!isPasswordValid) {
+      const msg = 'Incorrect admin password. Action aborted.';
+      if (isAjax) return res.status(401).json({ success: false, message: msg });
+      req.flash('error', msg);
+      return res.redirect('/admin/designs');
+    }
+
+    // 1. Create automatic database backup archive beforehand
+    let backupFilename = null;
+    try {
+      const backupResult = await runBackup();
+      backupFilename = backupResult ? backupResult.filename : null;
+      console.log('✅ Automated pre-deletion backup created:', backupFilename);
+    } catch (backupErr) {
+      console.warn('⚠️ Automated backup before delete-all encountered a warning:', backupErr.message);
+    }
+
+    // 2. Soft delete: recoverable for 30 days
+    await db.query('UPDATE designs SET is_active = -1, deleted_at = NOW() WHERE is_active >= 0');
+
+    await ActivityLog.logFromReq(
+      req,
+      'delete_all_soft',
+      'design',
+      null,
+      `Soft-deleted all active designs (recoverable for 30 days). Pre-deletion backup archive: ${backupFilename || 'Created'}`
+    );
+
+    const successMsg = `All designs have been safely moved to trash (recoverable for 30 days). Pre-deletion backup archive created: ${backupFilename || 'Stored in backups'}.`;
+
+    if (isAjax) {
+      return res.json({ success: true, message: successMsg, backupFilename });
+    }
+
+    req.flash('success', successMsg);
     res.redirect('/admin/designs');
   } catch (err) {
     console.error('deleteAllDesigns error:', err);
-    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json')) || req.query.format === 'json';
     if (isAjax) {
       return res.status(500).json({ success: false, message: err.message || 'Unable to delete all designs.' });
     }
     next(err);
+  }
+};
+
+/**
+ * Get live target count for Step 1
+ * POST /admin/api/bulk-price/count
+ */
+exports.getBulkPriceCount = async (req, res, next) => {
+  try {
+    const { filters, selectedIds } = req.body;
+    const count = await bulkPriceService.getLiveCount(filters || {}, selectedIds || []);
+    res.json({ success: true, count });
+  } catch (err) {
+    console.error('getBulkPriceCount error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to count target designs.' });
+  }
+};
+
+/**
+ * Build preview for Step 3
+ * POST /admin/api/bulk-price/preview
+ */
+exports.getBulkPricePreview = async (req, res, next) => {
+  try {
+    let options = req.body || {};
+    if (typeof options.filters === 'string') {
+      try { options.filters = JSON.parse(options.filters); } catch (e) {}
+    }
+    const mergedOptions = {
+      ...(options.filters || {}),
+      ...options
+    };
+
+    if (req.file) {
+      mergedOptions.method = 'file';
+    }
+
+    const preview = await bulkPriceService.buildPreview(mergedOptions, req.file || null);
+    res.json({ success: true, ...preview });
+  } catch (err) {
+    console.error('getBulkPricePreview error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to generate price preview.' });
+  }
+};
+
+/**
+ * Commit bulk price update in safe transaction
+ * POST /admin/api/bulk-price/apply
+ */
+exports.applyBulkPriceUpdate = async (req, res, next) => {
+  try {
+    const { items, excludedIds, filterSummary, methodSummary } = req.body;
+    const result = await bulkPriceService.applyPriceUpdate({
+      items,
+      excludedIds: excludedIds || [],
+      filterSummary: filterSummary || 'Bulk Price Update',
+      methodSummary: methodSummary || 'Custom Price Rule',
+      adminUser: req.user
+    });
+
+    res.json({
+      success: true,
+      ...result,
+      message: `Price update applied successfully to ${result.totalAffected} design(s)!`
+    });
+  } catch (err) {
+    console.error('applyBulkPriceUpdate error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to apply price update.' });
+  }
+};
+
+/**
+ * Inline price editing in designs table
+ * POST /admin/api/designs/:id/inline-price
+ */
+exports.updateInlinePrice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { sale_price, mrp, price } = req.body;
+
+    const targetPrice = sale_price !== undefined ? Number(sale_price) : Number(price);
+    if (isNaN(targetPrice) || targetPrice <= 0) {
+      return res.status(400).json({ success: false, message: 'Price must be a valid number greater than 0.' });
+    }
+
+    const existingRows = await db.query('SELECT id, sku, title, price, sale_price FROM designs WHERE id = ?', [id]);
+    if (!existingRows || existingRows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Design not found.' });
+    }
+
+    const d = existingRows[0];
+    let newMrp = mrp !== undefined ? Number(mrp) : Number(d.price);
+    let newSelling = targetPrice;
+
+    // Selling price must not exceed MRP (auto-sync MRP if selling price is higher)
+    if (newSelling > newMrp) {
+      newMrp = newSelling;
+    }
+
+    newSelling = Math.round(newSelling * 100) / 100;
+    newMrp = Math.round(newMrp * 100) / 100;
+
+    await db.query(
+      'UPDATE designs SET price = ?, sale_price = ?, updated_at = NOW() WHERE id = ?',
+      [newMrp, newSelling, id]
+    );
+
+    const discountPercent = (newMrp > newSelling && newMrp > 0)
+      ? Math.round(((newMrp - newSelling) / newMrp) * 100)
+      : 0;
+
+    await ActivityLog.logFromReq(req, 'inline_price_edit', 'design', id, `Updated price of ${d.sku || d.title} to ₹${newSelling} (MRP: ₹${newMrp})`);
+
+    res.json({
+      success: true,
+      design_id: id,
+      new_price: newSelling,
+      new_mrp: newMrp,
+      discount_percent: discountPercent,
+      message: `Price for "${d.title}" updated to ₹${newSelling}.`
+    });
+  } catch (err) {
+    console.error('updateInlinePrice error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to update price.' });
   }
 };
 

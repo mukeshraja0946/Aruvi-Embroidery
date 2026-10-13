@@ -88,6 +88,12 @@ router.post('/admin/designs/duplicate/:id', adminDesignController.duplicateDesig
 router.post('/admin/designs/delete-all', adminDesignController.deleteAllDesigns);
 router.post('/admin/designs/delete-bulk', adminDesignController.deleteBulkDesigns);
 
+// Bulk Price Updates & Inline Price Editing
+router.post('/admin/api/bulk-price/count', adminDesignController.getBulkPriceCount);
+router.post('/admin/api/bulk-price/preview', upload.single('file'), adminDesignController.getBulkPricePreview);
+router.post('/admin/api/bulk-price/apply', adminDesignController.applyBulkPriceUpdate);
+router.post('/admin/api/designs/:id/inline-price', adminDesignController.updateInlinePrice);
+
 // Categories Management
 router.get('/admin/categories', adminCategoryController.getCategories);
 router.post('/admin/categories/create', upload.single('image'), adminCategoryController.postCreate);
@@ -182,5 +188,11 @@ router.get('/admin/tools/backup/download/:filename', adminToolsController.downlo
 router.get('/admin/tools/system-health', adminToolsController.getSystemHealth);
 router.post('/admin/tools/system-health/migrate', adminToolsController.postRunMigrations);
 router.get('/admin/tools/system-health/download-sync-sql', adminToolsController.downloadProductionSyncSql);
+
+// Price Update History & Audit
+router.get('/admin/tools/price-history', adminToolsController.getPriceHistory);
+router.get('/admin/tools/price-history/:id', adminToolsController.getPriceHistoryDetail);
+router.post('/admin/tools/price-history/undo/:id', adminToolsController.undoPriceHistory);
+router.get('/admin/tools/price-history/download/:id', adminToolsController.downloadPriceHistoryCsv);
 
 module.exports = router;
