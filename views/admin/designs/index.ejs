@@ -190,6 +190,9 @@
           <button type="button" onclick="openBulkImageUploadModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #795548; color: #5D4037; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk upload/restore product images">
             <i class="fa-solid fa-images"></i> Bulk Images
           </button>
+          <button type="button" onclick="openBulkZipUploadModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #2E7D32; color: #1B5E20; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk upload/restore machine embroidery ZIP files">
+            <i class="fa-solid fa-file-zipper"></i> Bulk Upload ZIP Files
+          </button>
           <button type="button" id="deleteSelectedBtn" onclick="confirmDeleteSelectedDesigns()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #C62828; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
             <i class="fa-regular fa-trash-can"></i> Delete Selected (<span id="selectedCountNum">0</span>)
           </button>
@@ -314,6 +317,13 @@
             <option value="inactive" <%= (typeof selectedStatus !== 'undefined' && selectedStatus === 'inactive') ? 'selected' : '' %>>Inactive / Draft</option>
           </select>
 
+          <!-- Files Filter (Missing ZIP / Has ZIP) -->
+          <select name="fileFilter" onchange="this.form.submit()" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
+            <option value="">All Files</option>
+            <option value="missing_zip" <%= (typeof selectedFileFilter !== 'undefined' && selectedFileFilter === 'missing_zip') ? 'selected' : '' %>>Missing ZIP</option>
+            <option value="has_zip" <%= (typeof selectedFileFilter !== 'undefined' && selectedFileFilter === 'has_zip') ? 'selected' : '' %>>Has ZIP ✓</option>
+          </select>
+
           <!-- Standardized Sort Filter -->
           <%- include('../../partials/sort-dropdown', {
             id: 'admin_designs_sort_dd',
@@ -348,6 +358,7 @@
               <th>Design Name</th>
               <th>Category</th>
               <th>Format</th>
+              <th>Files</th>
               <th>Price (₹)</th>
               <th>Status</th>
               <th>Downloads</th>
@@ -404,6 +415,23 @@
                     <% } %>
                   </td>
                   <td>
+                    <% if (d.machine_file_name || d.machine_file_path) { %>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="badge" style="background: #E8F5E9; color: #2E7D32; font-size: 0.74rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;" title="<%= d.machine_file_name || 'Machine file attached' %>">
+                          <i class="fa-solid fa-check"></i> ZIP <%= d.machine_file_size_formatted ? '(' + d.machine_file_size_formatted + ')' : '' %>
+                        </span>
+                        <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" style="width: 22px; height: 22px; font-size: 0.65rem;" title="Replace ZIP"><i class="fa-solid fa-rotate"></i></button>
+                      </div>
+                    <% } else { %>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="badge" style="background: #FFEBEE; color: #C62828; font-size: 0.74rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fa-solid fa-xmark"></i> No file
+                        </span>
+                        <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" style="width: 22px; height: 22px; font-size: 0.65rem; color: var(--admin-primary);" title="Upload ZIP"><i class="fa-solid fa-upload"></i></button>
+                      </div>
+                    <% } %>
+                  </td>
+                  <td>
                     <strong style="display: inline-block; font-size: 0.88rem; color: var(--admin-text-dark);">₹<%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %></strong>
                     <% if (d.sale_price && d.price > d.sale_price) { %>
                       <span style="font-size: 0.75rem; color: var(--admin-text-muted); text-decoration: line-through; margin-left: 4px;">₹<%= d.price %></span>
@@ -430,6 +458,7 @@
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
                       <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceImageModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" title="Replace Image"><i class="fa-solid fa-image"></i></button>
+                      <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" title="Replace ZIP"><i class="fa-solid fa-file-zipper"></i></button>
                       <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="duplicateDesign(this.dataset.id, this.dataset.title)" class="action-icon-btn" title="Duplicate Design"><i class="fa-regular fa-copy"></i></button>
                       <a href="/admin/designs/edit/<%= d.id %>" class="action-icon-btn" title="Edit Design"><i class="fa-regular fa-pen-to-square"></i></a>
                       <a href="/design/<%= d.slug %>" target="_blank" class="action-icon-btn" title="View on Site"><i class="fa-regular fa-eye"></i></a>
@@ -440,7 +469,7 @@
               <% }) %>
             <% } else { %>
               <tr>
-                <td colspan="11" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                <td colspan="12" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
                   No embroidery designs found. Click "Add New Design" to create one.
                 </td>
               </tr>
@@ -457,15 +486,15 @@
           <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
             <div style="display: flex; gap: 6px;">
               <% if (currentPage > 1) { %>
-                <a href="?page=<%= currentPage - 1 %>&search=<%= search %>&category=<%= selectedCategory %>&status=<%= selectedStatus %>&sort=<%= selectedSort %>" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-left" style="font-size: 0.7rem;"></i></a>
+                <a href="?page=<%= currentPage - 1 %>&search=<%= search %>&category=<%= selectedCategory %>&status=<%= selectedStatus %>&sort=<%= selectedSort %>&fileFilter=<%= typeof selectedFileFilter !== 'undefined' ? selectedFileFilter : '' %>" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-left" style="font-size: 0.7rem;"></i></a>
               <% } %>
 
               <% for (let p = 1; p <= totalPages; p++) { %>
-                <a href="?page=<%= p %>&search=<%= search %>&category=<%= selectedCategory %>&status=<%= selectedStatus %>&sort=<%= selectedSort %>" class="action-icon-btn" style="width: 32px; height: 32px; <%= p === currentPage ? 'background: var(--admin-primary); color: #FFFFFF; border-color: var(--admin-primary); font-weight: 700;' : '' %>"><%= p %></a>
+                <a href="?page=<%= p %>&search=<%= search %>&category=<%= selectedCategory %>&status=<%= selectedStatus %>&sort=<%= selectedSort %>&fileFilter=<%= typeof selectedFileFilter !== 'undefined' ? selectedFileFilter : '' %>" class="action-icon-btn" style="width: 32px; height: 32px; <%= p === currentPage ? 'background: var(--admin-primary); color: #FFFFFF; border-color: var(--admin-primary); font-weight: 700;' : '' %>"><%= p %></a>
               <% } %>
 
               <% if (currentPage < totalPages) { %>
-                <a href="?page=<%= currentPage + 1 %>&search=<%= search %>&category=<%= selectedCategory %>&status=<%= selectedStatus %>&sort=<%= selectedSort %>" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i></a>
+                <a href="?page=<%= currentPage + 1 %>&search=<%= search %>&category=<%= selectedCategory %>&status=<%= selectedStatus %>&sort=<%= selectedSort %>&fileFilter=<%= typeof selectedFileFilter !== 'undefined' ? selectedFileFilter : '' %>" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i></a>
               <% } %>
             </div>
           <% } %>
@@ -673,6 +702,16 @@
           <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 10px;">
             Import Options & Safety Controls
           </h4>
+
+          <!-- Pre-confirm Matched Assets Summary Card -->
+          <div id="step3AssetPreConfirmSummary" style="background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.82rem;">
+            <div style="font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-layer-group" style="color: var(--admin-primary);"></i> Matched Assets Status Before Confirming:
+            </div>
+            <div id="step3AssetPreConfirmContent" style="display: flex; gap: 14px; flex-wrap: wrap;">
+              <span style="color: var(--admin-text-muted);">No assets uploaded yet in Step 2. You can still import designs now and upload images later.</span>
+            </div>
+          </div>
           <div style="display: flex; flex-direction: column; gap: 10px;">
             <label style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); cursor: pointer; display: flex; align-items: center; gap: 8px;">
               <input type="checkbox" id="skipErrorsCheckbox" checked>
@@ -815,6 +854,18 @@
         </div>
       </div>
 
+      <!-- Empty Database Warning Banner -->
+      <div id="bulkImageEmptyDbWarning" style="display: none; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 10px; padding: 14px 16px; font-size: 0.85rem; color: #C62828; line-height: 1.45;">
+        <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem;"></i> No Designs Found in Database
+        </div>
+        <p style="margin: 0 0 8px 0;">
+          Your product catalog has 0 designs. Please import your spreadsheet first via 
+          <a href="javascript:void(0)" onclick="closeBulkImageUploadModal(); openBulkImportModal();" style="color: var(--admin-primary); font-weight: 700; text-decoration: underline;">Bulk Import</a>, 
+          then return here to re-upload product images.
+        </p>
+      </div>
+
       <!-- File Picker & Dropzone -->
       <div id="bulkImageFileSelectSection">
         <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
@@ -875,6 +926,10 @@
             <span style="color: #F57F17; font-weight: 600;"><i class="fa-solid fa-question"></i> Unmatched</span>
             <strong id="bulkUnmatchedCount" style="color: #E65100; font-size: 0.95rem;">0</strong>
           </div>
+          <div style="flex: 1; min-width: 110px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #E65100; font-weight: 600;"><i class="fa-solid fa-code-compare"></i> Ambiguous</span>
+            <strong id="bulkAmbiguousCount" style="color: #BF360C; font-size: 0.95rem;">0</strong>
+          </div>
           <div style="flex: 1; min-width: 110px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
             <span style="color: #C62828; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>
             <strong id="bulkFailedCount" style="color: #B71C1C; font-size: 0.95rem;">0</strong>
@@ -905,10 +960,20 @@
           All batches finished processing.
         </p>
 
-        <!-- Unmatched list details if any -->
-        <div id="bulkUnmatchedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 8px; padding: 10px; font-size: 0.78rem;">
-          <strong><i class="fa-solid fa-circle-info"></i> Unmatched Files:</strong>
-          <div id="bulkUnmatchedNamesList" style="max-height: 90px; overflow-y: auto; margin-top: 4px; font-family: monospace; color: #5D4037;"></div>
+        <!-- Ambiguous Matches Section -->
+        <div id="bulkAmbiguousDetailsBox" style="display: none; margin-bottom: 12px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; padding: 10px 12px; font-size: 0.78rem;">
+          <div style="font-weight: 700; color: #BF360C; margin-bottom: 6px;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Ambiguous Files (Multiple products matched — pick the right one):
+          </div>
+          <div id="bulkAmbiguousList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <!-- Unmatched Files & Suggestions Section -->
+        <div id="bulkUnmatchedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 8px; padding: 10px 12px; font-size: 0.78rem;">
+          <div style="font-weight: 700; color: #E65100; margin-bottom: 6px;">
+            <i class="fa-solid fa-circle-question"></i> Unmatched Files & Quick Link Suggestions:
+          </div>
+          <div id="bulkUnmatchedNamesList" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
         </div>
 
         <!-- Failed list details if any -->
@@ -945,6 +1010,259 @@
           <i class="fa-solid fa-cloud-arrow-up"></i> Start Chunked Upload
         </button>
         <button type="button" id="bulkImageFinishRefreshBtn" onclick="finishBulkUploadAndRefresh()" style="display: none; padding: 8px 20px; border-radius: 8px; border: none; background: #2E7D32; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-check"></i> Done & Refresh Designs
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- Single Replace ZIP Modal Component -->
+<!-- ======================================================================= -->
+<div id="replaceZipModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 90%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
+    <div style="padding: 1.25rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
+      <h3 style="margin: 0; font-size: 1.05rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-file-zipper" style="color: #2E7D32;"></i> Replace Machine File (ZIP)
+      </h3>
+      <button type="button" onclick="closeReplaceZipModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+    </div>
+    <form id="replaceZipForm" onsubmit="submitReplaceZip(event)" enctype="multipart/form-data" style="padding: 1.5rem;">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" id="replaceZipDesignId" name="designId">
+      
+      <p id="replaceZipTitle" style="font-size: 0.88rem; color: var(--admin-text-dark); font-weight: 600; margin-bottom: 1.2rem;"></p>
+      
+      <div style="margin-bottom: 1.2rem;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
+          Select Machine File (.ZIP, .RAR, .DST, .PES, .JEF, .EXP)
+        </label>
+        <input type="file" id="replaceZipFileInput" name="file" accept=".zip,.rar,.dst,.pes,.jef,.exp" required style="display: block; width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; font-size: 0.85rem;">
+        <span style="font-size: 0.74rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">
+          Must contain valid machine embroidery formats. Stored in private paid storage.
+        </span>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" onclick="closeReplaceZipModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">Cancel</button>
+        <button type="submit" id="replaceZipSubmitBtn" style="padding: 8px 20px; border-radius: 8px; border: none; background: #2E7D32; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload & Replace ZIP
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- Bulk Machine Files (ZIP) Upload Modal Component (Reliable Chunked Upload Engine) -->
+<!-- ======================================================================= -->
+<div id="bulkZipUploadModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px); padding: 1rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 720px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.25); overflow: hidden; border: 1px solid var(--admin-border);">
+    
+    <!-- Modal Header -->
+    <div style="padding: 1.1rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+      <h3 style="margin: 0; font-size: 1.1rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 10px; font-weight: 700;">
+        <i class="fa-solid fa-file-zipper" style="color: #2E7D32;"></i> Bulk Restore / Re-upload Machine Files (ZIP)
+      </h3>
+      <button type="button" onclick="closeBulkZipUploadModal()" style="background: none; border: none; font-size: 1.5rem; color: var(--admin-text-muted); cursor: pointer; line-height: 1; padding: 0 4px;" title="Close Modal">&times;</button>
+    </div>
+
+    <!-- Modal Body (Scrollable) -->
+    <div style="padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.2rem;">
+      
+      <!-- Matching Rules Guide Banner -->
+      <div style="background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; color: #1B5E20; line-height: 1.45;">
+        <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-circle-info"></i> How Automatic Matching Works:
+        </div>
+        <div>
+          Name files after product <strong>SKU</strong> (e.g. <code>AED-BLO-01.zip</code>), <strong>Product ID</strong> (e.g. <code>1.zip</code>), or <strong>Title</strong> (e.g. <code>AED 1.zip</code>). Files are uploaded in reliable <strong>chunks</strong> (max 2 parallel streams) to prevent Hostinger server timeouts.
+        </div>
+      </div>
+
+      <!-- Empty Database Warning Banner -->
+      <div id="bulkZipEmptyDbWarning" style="display: none; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 10px; padding: 14px 16px; font-size: 0.85rem; color: #C62828; line-height: 1.45;">
+        <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem;"></i> No Designs Found in Database
+        </div>
+        <p style="margin: 0 0 8px 0;">
+          Your product catalog has 0 designs. Please <strong>import your spreadsheet first</strong> via 
+          <a href="javascript:void(0)" onclick="closeBulkZipUploadModal(); openBulkImportModal();" style="color: var(--admin-primary); font-weight: 700; text-decoration: underline;">Bulk Import</a>, 
+          then return here to upload machine files.
+        </p>
+      </div>
+
+      <!-- File Picker & Dropzone -->
+      <div id="bulkZipFileSelectSection">
+        <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
+          Select Machine Files (.ZIP, .RAR, .DST, .PES, .JEF, .EXP — configured limit: <span id="bulkZipMaxSizeLabel">100 MB</span> per file)
+        </label>
+        <div style="border: 2px dashed #81C784; border-radius: 12px; padding: 1.4rem; text-align: center; background: #F1F8E9; transition: border-color 0.2s;" id="bulkZipDropArea">
+          <i class="fa-solid fa-file-zipper" style="font-size: 2.2rem; color: #2E7D32; margin-bottom: 8px;"></i>
+          <p style="margin: 0 0 8px 0; font-size: 0.88rem; color: var(--admin-text-dark); font-weight: 600;">
+            Click to browse or drag & drop machine files/archives here
+          </p>
+          <p style="margin: 0 0 12px 0; font-size: 0.78rem; color: var(--admin-text-muted);">
+            Multiple files supported (e.g. 5, 50, or 102 ZIP packages)
+          </p>
+          <input type="file" id="bulkZipFilesInput" name="files" accept=".zip,.rar,.dst,.pes,.jef,.exp" multiple onchange="handleBulkZipFilesSelected(this)" style="display: inline-block; font-size: 0.85rem; max-width: 340px;">
+        </div>
+      </div>
+
+      <!-- Pre-upload File Summary & Dry-Run Preview -->
+      <div id="bulkZipPreUploadSummary" style="display: none; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 12px 14px; font-size: 0.83rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 700; color: var(--admin-text-dark);">
+            <i class="fa-solid fa-boxes-stacked" style="color: #2E7D32;"></i> Selected: <span id="bulkZipPreSelectedCount">0</span> files (<span id="bulkZipPreSelectedSize">0 MB</span>)
+          </span>
+          <span id="bulkZipPreChunkingPlan" style="color: var(--admin-text-muted); font-size: 0.78rem;">Chunking planned for files > 5MB</span>
+        </div>
+
+        <!-- Dry Run Match Preview Card -->
+        <div id="bulkZipDryRunCard" style="background: #F9FBE7; border: 1px solid #E6EE9C; border-radius: 8px; padding: 10px 12px; margin-top: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: #33691E; font-size: 0.82rem;">
+              <i class="fa-solid fa-calculator"></i> Dry-Run Match Preview (Filename Check):
+            </strong>
+            <span id="bulkZipDryRunStatusText" style="font-size: 0.75rem; color: var(--admin-text-muted);">Checking names...</span>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.78rem;">
+            <span style="background: #E8F5E9; color: #1B5E20; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+              <i class="fa-solid fa-check"></i> Will Link: <strong id="bulkZipDryMatchedCount">0</strong>
+            </span>
+            <span style="background: #FFF8E1; color: #E65100; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+              <i class="fa-solid fa-question"></i> Unmatched: <strong id="bulkZipDryUnmatchedCount">0</strong>
+            </span>
+            <span style="background: #FFF3E0; color: #BF360C; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+              <i class="fa-solid fa-code-compare"></i> Ambiguous: <strong id="bulkZipDryAmbiguousCount">0</strong>
+            </span>
+          </div>
+          <div id="bulkZipDryRunWarning" style="display: none; margin-top: 6px; font-size: 0.75rem; color: #E65100;">
+            <i class="fa-solid fa-circle-exclamation"></i> Tip: You can fix unmatched filenames now before initiating upload of large files.
+          </div>
+        </div>
+
+        <div id="bulkZipPreValidationWarnings" style="display: none; margin-top: 8px; padding: 8px 10px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 6px; color: #C62828; font-size: 0.78rem;"></div>
+      </div>
+
+      <!-- Live Progress & Batch Status Section -->
+      <div id="bulkZipProgressSection" style="display: none; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
+        
+        <!-- Overall Progress Counter & Status Badge -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark);">
+          <span id="bulkZipOverallProgressCounter">0 / 0 uploaded (0%)</span>
+          <span id="bulkZipStatusBadge" style="font-size: 0.78rem; font-weight: 600; color: #2E7D32;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Uploading...
+          </span>
+        </div>
+
+        <!-- Overall Progress Bar -->
+        <div style="height: 12px; background: #ECEFF1; border-radius: 6px; overflow: hidden; margin-bottom: 8px; position: relative;">
+          <div id="bulkZipProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #2E7D32, #43A047); border-radius: 6px; transition: width 0.25s ease;"></div>
+        </div>
+
+        <!-- Speed & ETA Estimate Indicator -->
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--admin-text-muted); margin-bottom: 12px;">
+          <span id="bulkZipSpeedEtaText">Calculating speed & time remaining...</span>
+          <span id="bulkZipActiveStreamsText">Streams: 0 / 2</span>
+        </div>
+
+        <!-- Metric Counter Badges -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-size: 0.8rem;">
+          <div style="flex: 1; min-width: 110px; background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #2E7D32; font-weight: 600;"><i class="fa-solid fa-link"></i> Linked</span>
+            <strong id="bulkZipLinkedCount" style="color: #1B5E20; font-size: 0.95rem;">0</strong>
+          </div>
+          <div style="flex: 1; min-width: 110px; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #F57F17; font-weight: 600;"><i class="fa-solid fa-question"></i> Unmatched</span>
+            <strong id="bulkZipUnmatchedCount" style="color: #E65100; font-size: 0.95rem;">0</strong>
+          </div>
+          <div style="flex: 1; min-width: 110px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #E65100; font-weight: 600;"><i class="fa-solid fa-code-compare"></i> Ambiguous</span>
+            <strong id="bulkZipAmbiguousCount" style="color: #BF360C; font-size: 0.95rem;">0</strong>
+          </div>
+          <div style="flex: 1; min-width: 110px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #C62828; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>
+            <strong id="bulkZipFailedCount" style="color: #B71C1C; font-size: 0.95rem;">0</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark);">
+            Per-File Status Log
+          </span>
+          <span id="bulkZipCurrentActiveFileText" style="font-size: 0.74rem; color: #2E7D32;">
+            Idle
+          </span>
+        </div>
+
+        <!-- Scrollable Per-File Live Status List -->
+        <div id="bulkZipLiveList" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 8px; background: #FAFAFA; padding: 6px 8px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Completion Report Card -->
+      <div id="bulkZipReportCard" style="display: none; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
+        <div id="bulkZipReportHeader" style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-check" style="color: #2E7D32; font-size: 1.2rem;"></i> Upload Complete
+        </div>
+        <p id="bulkZipReportSummaryText" style="margin: 0 0 12px 0; font-size: 0.84rem; color: var(--admin-text-dark); line-height: 1.45;">
+          All machine files finished processing.
+        </p>
+
+        <!-- Ambiguous Matches Section -->
+        <div id="bulkZipAmbiguousDetailsBox" style="display: none; margin-bottom: 12px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 8px; padding: 10px 12px; font-size: 0.78rem;">
+          <div style="font-weight: 700; color: #BF360C; margin-bottom: 6px;">
+            <i class="fa-solid fa-triangle-exclamation"></i> Ambiguous Files (Multiple products matched — pick the right one):
+          </div>
+          <div id="bulkZipAmbiguousList" style="max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <!-- Unmatched Files & Manual Linking Section -->
+        <div id="bulkZipUnmatchedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 8px; padding: 10px 12px; font-size: 0.78rem;">
+          <div style="font-weight: 700; color: #E65100; margin-bottom: 6px;">
+            <i class="fa-solid fa-circle-question"></i> Unmatched Files & Quick Link Suggestions:
+          </div>
+          <div id="bulkZipUnmatchedNamesList" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <!-- Failed list details if any -->
+        <div id="bulkZipFailedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 8px; padding: 10px; font-size: 0.78rem;">
+          <strong><i class="fa-solid fa-circle-exclamation"></i> Failed Files (with error reasons):</strong>
+          <div id="bulkZipFailedReasonsList" style="max-height: 90px; overflow-y: auto; margin-top: 4px; font-family: monospace; color: #B71C1C;"></div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" onclick="downloadBulkZipUploadReportCsv()" class="btn btn-outline" style="height: 38px; padding: 0 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid #1E88E5; color: #1E88E5; background: #FFF;">
+            <i class="fa-solid fa-file-csv"></i> Download Report CSV
+          </button>
+          <button type="button" id="bulkZipRetryFailedBtn" onclick="retryFailedBulkZips()" class="btn" style="display: none; height: 38px; padding: 0 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #C62828; color: #FFF; border: none;">
+            <i class="fa-solid fa-rotate-right"></i> Retry Failed (<span id="bulkZipRetryBtnCount">0</span>)
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer Controls -->
+    <div style="padding: 1.1rem 1.5rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 10px;">
+      <div>
+        <button type="button" id="bulkZipAbortBtn" onclick="abortBulkZipUpload()" style="display: none; padding: 8px 16px; border-radius: 8px; border: 1px solid #FFCDD2; background: #FFEBEE; color: #C62828; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-ban"></i> Cancel Upload
+        </button>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" id="bulkZipCancelCloseBtn" onclick="closeBulkZipUploadModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          Cancel
+        </button>
+        <button type="button" id="bulkZipSubmitBtn" onclick="startChunkedBulkZipUpload()" style="padding: 8px 20px; border-radius: 8px; border: none; background: #2E7D32; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Start Chunked Upload
+        </button>
+        <button type="button" id="bulkZipFinishRefreshBtn" onclick="finishBulkZipUploadAndRefresh()" style="display: none; padding: 8px 20px; border-radius: 8px; border: none; background: #1B5E20; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
           <i class="fa-solid fa-check"></i> Done & Refresh Designs
         </button>
       </div>

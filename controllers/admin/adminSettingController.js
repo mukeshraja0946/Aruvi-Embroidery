@@ -145,7 +145,9 @@ exports.postSettings = async (req, res, next) => {
       pinterest_url: pinCheck.cleanUrl,
       youtube_url: ytCheck.cleanUrl,
       upi_id: cleanUpiId,
-      upi_name: upi_name.trim()
+      upi_name: upi_name.trim(),
+      max_upload_zip_size_mb: b.max_upload_zip_size_mb ? String(Math.max(1, parseInt(b.max_upload_zip_size_mb, 10))) : '100',
+      auto_detect_formats_policy: b.auto_detect_formats_policy === 'overwrite' ? 'overwrite' : 'fill_if_empty'
     };
 
     if (logo_url) updates.logo_url = logo_url;

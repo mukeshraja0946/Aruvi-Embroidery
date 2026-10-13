@@ -338,6 +338,36 @@
               <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Leave blank to hide YouTube icon from footer.</small>
             </div>
           </div>
+        <!-- Card 5: Machine Files & ZIP Upload Settings -->
+        <div id="zip-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">Machine Files & ZIP Upload Settings</h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Configure upload thresholds and automatic format detection policies for machine embroidery ZIP packages.</span>
+            </div>
+            <span style="background: #E3F2FD; color: #1565C0; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-file-zipper"></i> ZIP Engine</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
+                <i class="fa-solid fa-hard-drive" style="color: var(--admin-primary); margin-right: 4px;"></i> Max Allowed ZIP File Size (MB)
+              </label>
+              <input type="number" name="max_upload_zip_size_mb" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.max_upload_zip_size_mb) ? settings.max_upload_zip_size_mb : '100' %>" min="5" max="500" required>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Configures maximum allowed file size per ZIP package in bulk upload (default: 100 MB).</small>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color: #5E35B1; margin-right: 4px;"></i> Format Auto-Detection Policy
+              </label>
+              <select name="auto_detect_formats_policy" class="form-control" style="height: 42px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.85rem; width: 100%; background: #FFF;">
+                <option value="fill_if_empty" <%= (typeof settings !== 'undefined' && settings.auto_detect_formats_policy === 'overwrite') ? '' : 'selected' %>>Only fill when empty (Preserve manual formats)</option>
+                <option value="overwrite" <%= (typeof settings !== 'undefined' && settings.auto_detect_formats_policy === 'overwrite') ? 'selected' : '' %>>Overwrite design formats with detected ZIP formats</option>
+              </select>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Controls whether detected formats (.DST, .PES, .JEF, .EXP) overwrite existing design formats.</small>
+            </div>
+          </div>
         </div>
 
         <div style="display: flex; justify-content: flex-end;">

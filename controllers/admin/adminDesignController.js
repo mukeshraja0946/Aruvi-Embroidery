@@ -1,7 +1,9 @@
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const Design = require('../../models/Design');
 const Category = require('../../models/Category');
+const Setting = require('../../models/Setting');
 const db = require('../../config/db');
 const emailService = require('../../services/emailService');
 const storage = require('../../config/storage');
@@ -14,7 +16,7 @@ const errorLogger = require('../../services/errorLogger');
 exports.getDesigns = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { search, category, status, sort } = req.query;
+    const { search, category, status, sort, fileFilter } = req.query;
 
     let categoryId = null;
     let categorySlug = null;
@@ -30,6 +32,7 @@ exports.getDesigns = async (req, res, next) => {
       category_id: categoryId,
       category_slug: categorySlug,
       status: status || null,
+      fileFilter: fileFilter || null,
       sort: sort || 'newest',
       page,
       limit: 15
@@ -42,7 +45,7 @@ exports.getDesigns = async (req, res, next) => {
       title: 'Manage Embroidery Designs - Admin',
       designs,
       categories,
-      total: (search || category || status) ? total : stats.totalDesigns,
+      total: (search || category || status || fileFilter) ? total : stats.totalDesigns,
       activeCount: stats.activeDesigns,
       inactiveCount: stats.inactiveDesigns,
       categoryCount: stats.totalCategories,
@@ -52,7 +55,8 @@ exports.getDesigns = async (req, res, next) => {
       search: search || '',
       selectedCategory: category || '',
       selectedStatus: status || '',
-      selectedSort: sort || 'newest'
+      selectedSort: sort || 'newest',
+      selectedFileFilter: fileFilter || ''
     });
   } catch (err) {
     next(err);
@@ -1064,73 +1068,317 @@ exports.replaceImage = async (req, res) => {
 };
 
 /**
- * Helper to match an image filename to a design in the database.
- * Matches by:
- * 1. SKU (e.g. "AED-BLO-01", "AED 1", "AED-01", "aed_blo_01")
- * 2. Product ID (e.g. "1", "01", "102")
- * 3. Exact Title or Slug (e.g. "Rose Floral Design", "rose-floral-design")
- * Case-insensitive, ignoring extension, spaces, underscores, and dashes.
- * Supports filenames with spaces like "AED 1.png".
+ * Helper to calculate string similarity for closest suggestions
  */
-async function findMatchingDesign(rawBaseName) {
-  if (!rawBaseName || !db.isConnected()) return null;
+function calculateSimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  const s1 = String(str1).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const s2 = String(str2).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (s1 === s2) return 1;
+  if (!s1 || !s2) return 0;
+  if (s1.includes(s2) || s2.includes(s1)) {
+    return Math.min(s1.length, s2.length) / Math.max(s1.length, s2.length);
+  }
 
-  const trimmed = rawBaseName.trim();
+  // Bigram Dice coefficient
+  const getBigrams = str => {
+    const set = new Set();
+    for (let i = 0; i < str.length - 1; i++) set.add(str.slice(i, i + 2));
+    return set;
+  };
+  const b1 = getBigrams(s1);
+  const b2 = getBigrams(s2);
+  let intersection = 0;
+  b1.forEach(b => { if (b2.has(b)) intersection++; });
+  return parseFloat(((2 * intersection) / (b1.size + b2.size || 1)).toFixed(2));
+}
 
-  // 1. Direct exact match by SKU, Title, or Slug (case-insensitive in MySQL/MariaDB utf8mb4)
-  const exactRows = await db.query(
-    'SELECT id, title, sku, slug FROM designs WHERE sku = ? OR title = ? OR slug = ? LIMIT 1',
-    [trimmed, trimmed, trimmed]
+/**
+ * Robust Multi-Tier Image Matching Engine
+ * Priority Order (First Match Wins):
+ *   a) Exact SKU, case-insensitive (AED-BLO-01.png, AED 1.PNG)
+ *   b) Product ID (1.png)
+ *   c) Exact Title after normalization (lowercase, trimmed, extension removed case-insensitively, spaces/hyphens/underscores collapsed)
+ *   d) Preview Image Filename column stored from bulk import (designs.import_image_filename)
+ *   e) Slug
+ *   f) Fallback AED numeric prefix (e.g. AED 1 -> ID 1)
+ *
+ * Excludes only permanently deleted designs (matches active, draft, inactive).
+ * Flags ambiguous files if multiple designs match.
+ */
+async function findMatchingDesign(filename, allDesignsCache = null) {
+  if (!filename || !db.isConnected()) {
+    return { status: 'unmatched', reason: 'Database is offline or filename is empty', suggestions: [] };
+  }
+
+  // 1. Case-insensitive extension extraction
+  const rawExt = path.extname(filename || '');
+  const ext = rawExt.toLowerCase();
+  const rawBaseName = (rawExt ? filename.slice(0, -rawExt.length) : filename).trim();
+
+  if (!rawBaseName) {
+    return { status: 'unmatched', reason: 'Invalid or empty filename', suggestions: [] };
+  }
+
+  const cleanLower = rawBaseName.toLowerCase();
+  const cleanAlphaNum = rawBaseName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const cleanCollapsed = rawBaseName.replace(/[\s\-_]+/g, ' ').trim().toLowerCase();
+  const numericId = /^\d+$/.test(rawBaseName) ? parseInt(rawBaseName, 10) : null;
+  const aedMatch = rawBaseName.match(/^AED[\s\-_]*0*(\d+)$/i);
+  const aedNumericId = aedMatch ? parseInt(aedMatch[1], 10) : null;
+
+  console.log(`[Bulk Image Matcher] Checking "${filename}": Base="${rawBaseName}", AlphaNum="${cleanAlphaNum}", NumericID=${numericId}`);
+
+  // Helper to query and evaluate single vs ambiguous match
+  async function checkCandidates(querySql, params, matchedBy) {
+    const rows = await db.query(querySql, params);
+    if (!rows || rows.length === 0) return null;
+    if (rows.length === 1) {
+      return { status: 'matched', design: rows[0], matchedBy };
+    }
+    return { status: 'ambiguous', candidates: rows, matchedBy };
+  }
+
+  // --------------------------------------------------------------------------
+  // a) Exact SKU, case-insensitive (AED-BLO-01.png, AED 1.PNG)
+  // --------------------------------------------------------------------------
+  const matchSku = await checkCandidates(
+    `SELECT id, title, sku, slug, import_image_filename, is_active 
+     FROM designs 
+     WHERE LOWER(sku) = ? 
+        OR REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') = ?`,
+    [cleanLower, cleanAlphaNum],
+    'sku'
   );
-  if (exactRows && exactRows.length > 0) return exactRows[0];
+  if (matchSku) {
+    console.log(`[Bulk Image Matcher] Matched by SKU (${matchSku.matchedBy}): "${filename}" -> ID=${matchSku.design?.id || 'Ambiguous'}`);
+    return matchSku;
+  }
 
-  // 2. Numeric Product ID check (e.g. "1", "01", "102")
-  if (/^\d+$/.test(trimmed)) {
-    const idNum = parseInt(trimmed, 10);
-    if (!isNaN(idNum) && idNum > 0) {
-      const idRows = await db.query(
-        'SELECT id, title, sku, slug FROM designs WHERE id = ? LIMIT 1',
-        [idNum]
-      );
-      if (idRows && idRows.length > 0) return idRows[0];
+  // --------------------------------------------------------------------------
+  // b) Product ID (1.png, 042.png)
+  // --------------------------------------------------------------------------
+  if (numericId !== null && numericId > 0) {
+    const matchId = await checkCandidates(
+      `SELECT id, title, sku, slug, import_image_filename, is_active 
+       FROM designs 
+       WHERE id = ?`,
+      [numericId],
+      'id'
+    );
+    if (matchId) {
+      console.log(`[Bulk Image Matcher] Matched by Product ID: "${filename}" -> ID=${matchId.design?.id || 'Ambiguous'}`);
+      return matchId;
     }
   }
 
-  // 3. Cleaned / normalized comparison: remove all spaces, underscores, and dashes, lowercase
-  const normalized = trimmed.replace(/[\s\-_]+/g, '').toLowerCase();
-  if (normalized.length > 0) {
-    const normRows = await db.query(
-      `SELECT id, title, sku, slug FROM designs 
-       WHERE REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') = ?
-          OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?
-          OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?
-       LIMIT 1`,
-      [normalized, normalized, normalized]
-    );
-    if (normRows && normRows.length > 0) return normRows[0];
+  // --------------------------------------------------------------------------
+  // c) Exact Title after normalization (lowercase, trimmed, spaces/hyphens/underscores collapsed)
+  // "AED 1.PNG" = title "AED 1"
+  // --------------------------------------------------------------------------
+  const matchTitle = await checkCandidates(
+    `SELECT id, title, sku, slug, import_image_filename, is_active 
+     FROM designs 
+     WHERE LOWER(TRIM(title)) = ? 
+        OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?`,
+    [cleanLower, cleanAlphaNum],
+    'title'
+  );
+  if (matchTitle) {
+    console.log(`[Bulk Image Matcher] Matched by Title: "${filename}" -> ID=${matchTitle.design?.id || 'Ambiguous'}`);
+    return matchTitle;
   }
 
-  // 4. Pattern check: "AED" or "AED-" followed by digits (e.g. "AED 1", "AED-1", "AED_01")
-  const aedMatch = trimmed.match(/^AED[\s\-_]*0*(\d+)$/i);
-  if (aedMatch) {
-    const numericPart = parseInt(aedMatch[1], 10);
-    // Check if ID matches
-    const idFallback = await db.query(
-      'SELECT id, title, sku, slug FROM designs WHERE id = ? LIMIT 1',
-      [numericPart]
-    );
-    if (idFallback && idFallback.length > 0) return idFallback[0];
-
-    // Check if SKU like 'AED 1' or 'AED 01' matches
-    const skuFallback = await db.query(
-      'SELECT id, title, sku, slug FROM designs WHERE sku LIKE ? LIMIT 1',
-      [`%${numericPart}%`]
-    );
-    if (skuFallback && skuFallback.length > 0) return skuFallback[0];
+  // --------------------------------------------------------------------------
+  // d) Preview Image Filename column stored from bulk import (designs.import_image_filename)
+  // --------------------------------------------------------------------------
+  const matchImportFilename = await checkCandidates(
+    `SELECT id, title, sku, slug, import_image_filename, is_active 
+     FROM designs 
+     WHERE import_image_filename IS NOT NULL 
+       AND (
+         LOWER(import_image_filename) = ?
+         OR LOWER(import_image_filename) = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(import_image_filename), ' ', ''), '_', ''), '-', '') = ?
+       )`,
+    [filename.toLowerCase(), cleanLower, cleanAlphaNum],
+    'import_image_filename'
+  );
+  if (matchImportFilename) {
+    console.log(`[Bulk Image Matcher] Matched by import_image_filename: "${filename}" -> ID=${matchImportFilename.design?.id || 'Ambiguous'}`);
+    return matchImportFilename;
   }
 
-  return null;
+  // --------------------------------------------------------------------------
+  // e) Slug
+  // --------------------------------------------------------------------------
+  const matchSlug = await checkCandidates(
+    `SELECT id, title, sku, slug, import_image_filename, is_active 
+     FROM designs 
+     WHERE LOWER(slug) = ? 
+        OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?`,
+    [cleanLower, cleanAlphaNum],
+    'slug'
+  );
+  if (matchSlug) {
+    console.log(`[Bulk Image Matcher] Matched by Slug: "${filename}" -> ID=${matchSlug.design?.id || 'Ambiguous'}`);
+    return matchSlug;
+  }
+
+  // --------------------------------------------------------------------------
+  // Fallback: AED Number prefix (e.g. "AED 1.png" -> ID 1)
+  // --------------------------------------------------------------------------
+  if (aedNumericId !== null && aedNumericId > 0) {
+    const matchAedId = await checkCandidates(
+      `SELECT id, title, sku, slug, import_image_filename, is_active 
+       FROM designs 
+       WHERE id = ?`,
+      [aedNumericId],
+      'aed_id_fallback'
+    );
+    if (matchAedId) {
+      console.log(`[Bulk Image Matcher] Matched by AED ID fallback: "${filename}" -> ID=${matchAedId.design?.id || 'Ambiguous'}`);
+      return matchAedId;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Unmatched: Compute Top 3 Closest Suggestions
+  // --------------------------------------------------------------------------
+  let suggestions = [];
+  try {
+    let designsList = allDesignsCache;
+    if (!designsList) {
+      designsList = await db.query('SELECT id, title, sku FROM designs LIMIT 500');
+    }
+
+    if (designsList && designsList.length > 0) {
+      const scored = designsList.map(d => {
+        const skuSim = calculateSimilarity(cleanAlphaNum, d.sku);
+        const titleSim = calculateSimilarity(cleanAlphaNum, d.title);
+        const maxSim = Math.max(skuSim, titleSim);
+        return {
+          id: d.id,
+          sku: d.sku,
+          title: d.title,
+          similarity: parseFloat(maxSim.toFixed(2))
+        };
+      });
+
+      scored.sort((a, b) => b.similarity - a.similarity);
+      suggestions = scored.slice(0, 3).filter(s => s.similarity > 0.1);
+    }
+  } catch (sugErr) {
+    console.warn('[Suggestions warning]:', sugErr.message);
+  }
+
+  console.log(`[Bulk Image Matcher] UNMATCHED: "${filename}". Top suggestions: ${JSON.stringify(suggestions)}`);
+
+  return {
+    status: 'unmatched',
+    reason: 'No matching product found by SKU, Product ID, Title, Import Image Filename, or Slug.',
+    suggestions
+  };
 }
+
+/**
+ * Temporary directory cleanup: Removes temp files older than 24 hours.
+ */
+function cleanupTempUnmatchedFiles() {
+  try {
+    const tempDir = path.join(storage.getUploadsDir(), 'temp_unmatched');
+    if (!fs.existsSync(tempDir)) return;
+    const now = Date.now();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+    const files = fs.readdirSync(tempDir);
+    for (const f of files) {
+      const p = path.join(tempDir, f);
+      const stat = fs.statSync(p);
+      if (now - stat.mtimeMs > maxAge) {
+        fs.unlinkSync(p);
+      }
+    }
+  } catch (e) {
+    // Non-blocking cleanup
+  }
+}
+
+/**
+ * Endpoint to check if database has designs before starting bulk upload
+ */
+exports.bulkUploadCheck = async (req, res) => {
+  try {
+    if (!db.isConnected()) await db.initPool();
+    const rows = await db.query('SELECT COUNT(*) as count FROM designs');
+    const totalCount = rows && rows[0] ? rows[0].count : 0;
+
+    const designs = await db.query('SELECT id, sku, title FROM designs ORDER BY id ASC LIMIT 2000');
+
+    return res.json({
+      success: true,
+      count: totalCount,
+      isEmpty: totalCount === 0,
+      designs: designs || []
+    });
+  } catch (err) {
+    console.error('[Bulk Upload Check Error]:', err);
+    return res.status(500).json({ success: false, message: err.message, isEmpty: false, count: 0, designs: [] });
+  }
+};
+
+/**
+ * Endpoint to manually link an unmatched or ambiguous image to a specific design
+ */
+exports.linkSingleImage = async (req, res) => {
+  try {
+    const { designId, tempToken, originalName } = req.body;
+    if (!designId || !tempToken) {
+      return res.status(400).json({ success: false, message: 'Design ID and file token are required.' });
+    }
+
+    const design = await Design.getById(designId);
+    if (!design) {
+      return res.status(404).json({ success: false, message: `Design #${designId} not found.` });
+    }
+
+    const tempDir = path.join(storage.getUploadsDir(), 'temp_unmatched');
+    const safeToken = path.basename(tempToken);
+    const tempPath = path.join(tempDir, safeToken);
+
+    if (!fs.existsSync(tempPath)) {
+      return res.status(404).json({ success: false, message: 'Temporary file expired or not found. Please re-upload.' });
+    }
+
+    const finalName = originalName || safeToken;
+    const ext = path.extname(finalName).toLowerCase();
+    const mimeType = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+
+    // Save to persistent storage and generate 300px WebP thumbnail
+    const savedUrl = await storage.savePublicFile(tempPath, finalName, mimeType);
+
+    // Idempotently set as primary image
+    const stats = fs.statSync(tempPath);
+    await Design.replacePrimaryImage(design.id, savedUrl, finalName, stats.size);
+
+    // Delete temp file
+    try { fs.unlinkSync(tempPath); } catch (e) {}
+
+    await ActivityLog.logFromReq(req, 'link_bulk_image_manual', 'design', design.id, `Manually linked image "${finalName}" to design #${design.id} (${design.title})`);
+
+    return res.json({
+      success: true,
+      message: `Successfully linked "${finalName}" to design #${design.id} (${design.sku || design.title})!`,
+      designId: design.id,
+      sku: design.sku,
+      title: design.title,
+      imageUrl: savedUrl
+    });
+  } catch (err) {
+    console.error('[Manual Image Link Error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 exports.bulkUploadImages = async (req, res) => {
   try {
@@ -1141,34 +1389,52 @@ exports.bulkUploadImages = async (req, res) => {
         message: 'No images were uploaded in this batch.',
         matched: [],
         unmatched: [],
+        ambiguous: [],
         failed: []
       });
     }
 
+    // Run temp file cleanup
+    cleanupTempUnmatchedFiles();
+
+    // Cache design list for suggestions in this batch
+    let allDesignsCache = null;
+    try {
+      allDesignsCache = await db.query('SELECT id, title, sku FROM designs LIMIT 500');
+    } catch (cErr) {}
+
+    const tempUnmatchedDir = path.join(storage.getUploadsDir(), 'temp_unmatched');
+    if (!fs.existsSync(tempUnmatchedDir)) {
+      fs.mkdirSync(tempUnmatchedDir, { recursive: true });
+    }
+
     const matched = [];
     const unmatched = [];
+    const ambiguous = [];
     const failed = [];
 
     for (const file of files) {
       const originalName = file.originalname;
       try {
-        const ext = path.extname(originalName).toLowerCase();
+        const rawExt = path.extname(originalName || '');
+        const ext = rawExt.toLowerCase();
         if (!['.jpg', '.jpeg', '.png', '.webp', '.avif'].includes(ext)) {
           if (file.path && fs.existsSync(file.path)) {
             try { fs.unlinkSync(file.path); } catch (e) {}
           }
           unmatched.push({
             filename: originalName,
-            reason: `Unsupported image format (${ext || 'none'}). Only JPG, PNG, WEBP, and AVIF are allowed.`
+            reason: `Unsupported image format (${rawExt || 'none'}). Only JPG, PNG, WEBP, and AVIF are allowed.`,
+            suggestions: []
           });
           continue;
         }
 
-        // Base filename without extension
-        const baseName = path.basename(originalName, ext).trim();
-        const matchedDesign = await findMatchingDesign(baseName);
+        const matchResult = await findMatchingDesign(originalName, allDesignsCache);
 
-        if (matchedDesign) {
+        if (matchResult.status === 'matched') {
+          const matchedDesign = matchResult.design;
+
           // Save to persistent storage (generates 300px WebP thumbnail inside savePublicFile)
           const savedUrl = await storage.savePublicFile(file.path, originalName, file.mimetype);
 
@@ -1185,17 +1451,43 @@ exports.bulkUploadImages = async (req, res) => {
             designId: matchedDesign.id,
             title: matchedDesign.title,
             sku: matchedDesign.sku,
-            imageUrl: savedUrl
+            imageUrl: savedUrl,
+            matchedBy: matchResult.matchedBy
           });
-        } else {
-          // Clean up temp file
+
+        } else if (matchResult.status === 'ambiguous') {
+          // File matches multiple designs: move to temp_unmatched folder and list candidates
+          const randomHex = crypto.randomBytes(6).toString('hex');
+          const tempFilename = `ambiguous-${Date.now()}-${randomHex}${ext}`;
+          const destTempPath = path.join(tempUnmatchedDir, tempFilename);
+
           if (file.path && fs.existsSync(file.path)) {
-            try { fs.unlinkSync(file.path); } catch (e) {}
+            try { fs.renameSync(file.path, destTempPath); } catch (e) { fs.copyFileSync(file.path, destTempPath); fs.unlinkSync(file.path); }
+          }
+
+          ambiguous.push({
+            filename: originalName,
+            tempToken: tempFilename,
+            reason: `Ambiguous match: multiple products share SKU or Title (${matchResult.candidates.length} candidates).`,
+            candidates: matchResult.candidates.map(c => ({ id: c.id, sku: c.sku, title: c.title })),
+            matchedBy: matchResult.matchedBy
+          });
+
+        } else {
+          // Unmatched: move to temp_unmatched folder for 24h manual linking (avoid permanent storage clutter)
+          const randomHex = crypto.randomBytes(6).toString('hex');
+          const tempFilename = `unmatched-${Date.now()}-${randomHex}${ext}`;
+          const destTempPath = path.join(tempUnmatchedDir, tempFilename);
+
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.renameSync(file.path, destTempPath); } catch (e) { fs.copyFileSync(file.path, destTempPath); fs.unlinkSync(file.path); }
           }
 
           unmatched.push({
             filename: originalName,
-            reason: 'No matching product found by SKU, Product ID, or Title.'
+            tempToken: tempFilename,
+            reason: matchResult.reason || 'No matching product found.',
+            suggestions: matchResult.suggestions || []
           });
         }
       } catch (fileErr) {
@@ -1226,15 +1518,16 @@ exports.bulkUploadImages = async (req, res) => {
         'bulk_upload_images_batch',
         'design',
         null,
-        `Bulk image batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${failed.length} failed`
+        `Bulk image batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${ambiguous.length} ambiguous, ${failed.length} failed`
       );
     }
 
     return res.json({
       success: true,
-      message: `Batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${failed.length} failed.`,
+      message: `Batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${ambiguous.length} ambiguous, ${failed.length} failed.`,
       matched,
       unmatched,
+      ambiguous,
       failed,
       processedCount: files.length
     });
@@ -1251,9 +1544,994 @@ exports.bulkUploadImages = async (req, res) => {
       referenceId: refId,
       matched: [],
       unmatched: [],
+      ambiguous: [],
       failed: [{ filename: 'batch', error: err.message, referenceId: refId }]
     });
   }
 };
 
+/**
+ * ============================================================================
+ * BULK MACHINE FILES (ZIP) UPLOAD & MATCHING ENGINE
+ * ============================================================================
+ */
+
+/**
+ * Validates a machine file or archive:
+ * - Direct machine formats: .dst, .pes, .jef, .exp (accepted)
+ * - Archives: .zip, .rar
+ * - Strict ZIP validation:
+ *    - Must open without errors
+ *    - No Zip Slip paths (entry starts with / or \ or contains ..)
+ *    - No dangerous executables (.exe, .js, .php, .sh, .bat, .cmd, .vbs, .py, .bin, .msi, .dll)
+ *    - Must contain at least one machine file (.dst, .pes, .jef, .exp)
+ *    - Auto-detects distinct machine formats
+ */
+function validateMachineFileOrZip(filePath, originalName) {
+  const rawExt = path.extname(originalName || '');
+  const ext = rawExt.toLowerCase();
+  const directMachineFormats = ['.dst', '.pes', '.jef', '.exp'];
+
+  if (directMachineFormats.includes(ext)) {
+    return {
+      isValid: true,
+      detectedFormats: [ext.slice(1).toUpperCase()],
+      isArchive: false
+    };
+  }
+
+  if (ext === '.rar') {
+    return {
+      isValid: true,
+      detectedFormats: ['DST', 'PES', 'JEF', 'EXP'],
+      isArchive: true
+    };
+  }
+
+  if (ext === '.zip') {
+    let zip;
+    try {
+      zip = new AdmZip(filePath);
+    } catch (err) {
+      return {
+        isValid: false,
+        reason: `Corrupt ZIP file: ${err.message}`
+      };
+    }
+
+    const dangerousExts = ['.exe', '.js', '.php', '.sh', '.bat', '.cmd', '.vbs', '.py', '.msi', '.dll', '.com', '.bin'];
+    const machineExts = ['.dst', '.pes', '.jef', '.exp'];
+    const detectedFormats = new Set();
+    let hasMachineFile = false;
+
+    let entries;
+    try {
+      entries = zip.getEntries();
+    } catch (err) {
+      return {
+        isValid: false,
+        reason: `Corrupted ZIP archive: ${err.message}`
+      };
+    }
+
+    if (!entries || entries.length === 0) {
+      return {
+        isValid: false,
+        reason: 'ZIP archive is empty.'
+      };
+    }
+
+    for (const entry of entries) {
+      const entryName = entry.entryName;
+
+      // 1. Zip Slip check
+      if (entryName.includes('..') || entryName.startsWith('/') || entryName.startsWith('\\') || /^[a-zA-Z]:/.test(entryName)) {
+        return {
+          isValid: false,
+          reason: 'Security violation: Zip Slip path traversal detected in archive.'
+        };
+      }
+
+      if (entry.isDirectory) continue;
+
+      const fileExt = path.extname(entryName).toLowerCase();
+
+      // 2. Executables check
+      if (dangerousExts.includes(fileExt)) {
+        return {
+          isValid: false,
+          reason: `Security violation: Prohibited executable or script "${fileExt}" detected inside ZIP.`
+        };
+      }
+
+      // 3. Machine file format check
+      if (machineExts.includes(fileExt)) {
+        hasMachineFile = true;
+        detectedFormats.add(fileExt.slice(1).toUpperCase());
+      }
+    }
+
+    if (!hasMachineFile) {
+      return {
+        isValid: false,
+        reason: 'Invalid ZIP: Archive does not contain any machine embroidery format files (.dst, .pes, .jef, .exp).'
+      };
+    }
+
+    return {
+      isValid: true,
+      detectedFormats: Array.from(detectedFormats),
+      isArchive: true
+    };
+  }
+
+  return {
+    isValid: false,
+    reason: `Unsupported file extension (${rawExt || 'none'}). Allowed: .zip, .rar, .dst, .pes, .jef, .exp.`
+  };
+}
+
+/**
+ * Robust Multi-Tier Machine ZIP Matching Engine
+ * Priority Order:
+ *   a) Exact SKU, case-insensitive (AED-BLO-01.zip, AED 1.ZIP)
+ *   b) Product ID (1.zip, 042.zip)
+ *   c) Normalized Title ("AED 1.ZIP" = "AED 1")
+ *   d) Machine ZIP Filename stored from bulk import (designs.import_zip_filename)
+ *   e) Slug
+ *   f) Fallback AED numeric ID (AED 1 -> ID 1)
+ */
+async function findMatchingDesignForZip(filename, allDesignsCache = null) {
+  if (!filename || !db.isConnected()) {
+    return { status: 'unmatched', reason: 'Database is offline or filename is empty', suggestions: [] };
+  }
+
+  const rawExt = path.extname(filename || '');
+  const rawBaseName = (rawExt ? filename.slice(0, -rawExt.length) : filename).trim();
+
+  if (!rawBaseName) {
+    return { status: 'unmatched', reason: 'Invalid or empty filename', suggestions: [] };
+  }
+
+  const cleanLower = rawBaseName.toLowerCase();
+  const cleanAlphaNum = rawBaseName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const numericId = /^\d+$/.test(rawBaseName) ? parseInt(rawBaseName, 10) : null;
+  const aedMatch = rawBaseName.match(/^AED[\s\-_]*0*(\d+)$/i);
+  const aedNumericId = aedMatch ? parseInt(aedMatch[1], 10) : null;
+
+  async function checkCandidates(querySql, params, matchedBy) {
+    const rows = await db.query(querySql, params);
+    if (!rows || rows.length === 0) return null;
+    if (rows.length === 1) {
+      return { status: 'matched', design: rows[0], matchedBy };
+    }
+    return { status: 'ambiguous', candidates: rows, matchedBy };
+  }
+
+  // a) Exact SKU (case-insensitive)
+  const matchSku = await checkCandidates(
+    `SELECT id, title, sku, slug, import_zip_filename, is_active 
+     FROM designs 
+     WHERE is_active >= 0 AND (
+       LOWER(sku) = ? 
+       OR REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') = ?
+     )`,
+    [cleanLower, cleanAlphaNum],
+    'sku'
+  );
+  if (matchSku) return matchSku;
+
+  // b) Product ID (1.zip, 042.zip)
+  if (numericId !== null && numericId > 0) {
+    const matchId = await checkCandidates(
+      `SELECT id, title, sku, slug, import_zip_filename, is_active 
+       FROM designs 
+       WHERE is_active >= 0 AND id = ?`,
+      [numericId],
+      'id'
+    );
+    if (matchId) return matchId;
+  }
+
+  // c) Normalized Title ("AED 1.ZIP" = "AED 1")
+  const matchTitle = await checkCandidates(
+    `SELECT id, title, sku, slug, import_zip_filename, is_active 
+     FROM designs 
+     WHERE is_active >= 0 AND (
+       LOWER(TRIM(title)) = ? 
+       OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?
+     )`,
+    [cleanLower, cleanAlphaNum],
+    'title'
+  );
+  if (matchTitle) return matchTitle;
+
+  // d) Machine ZIP Filename stored from bulk import (designs.import_zip_filename)
+  const matchImportZip = await checkCandidates(
+    `SELECT id, title, sku, slug, import_zip_filename, is_active 
+     FROM designs 
+     WHERE is_active >= 0 AND import_zip_filename IS NOT NULL AND (
+       LOWER(import_zip_filename) = ? 
+       OR LOWER(import_zip_filename) = ?
+       OR REPLACE(REPLACE(REPLACE(LOWER(import_zip_filename), ' ', ''), '_', ''), '-', '') = ?
+     )`,
+    [filename.toLowerCase(), cleanLower, cleanAlphaNum],
+    'import_zip_filename'
+  );
+  if (matchImportZip) return matchImportZip;
+
+  // e) Slug
+  const matchSlug = await checkCandidates(
+    `SELECT id, title, sku, slug, import_zip_filename, is_active 
+     FROM designs 
+     WHERE is_active >= 0 AND (
+       LOWER(slug) = ? 
+       OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?
+     )`,
+    [cleanLower, cleanAlphaNum],
+    'slug'
+  );
+  if (matchSlug) return matchSlug;
+
+  // f) AED Number prefix fallback (e.g. "AED 1.zip" -> ID 1)
+  if (aedNumericId !== null && aedNumericId > 0) {
+    const matchAedId = await checkCandidates(
+      `SELECT id, title, sku, slug, import_zip_filename, is_active 
+       FROM designs 
+       WHERE is_active >= 0 AND id = ?`,
+      [aedNumericId],
+      'aed_id_fallback'
+    );
+    if (matchAedId) return matchAedId;
+  }
+
+  // g) Unmatched: Top 3 suggestions
+  let suggestions = [];
+  try {
+    let designsList = allDesignsCache;
+    if (!designsList) {
+      designsList = await db.query('SELECT id, title, sku FROM designs WHERE is_active >= 0 LIMIT 500');
+    }
+    if (designsList && designsList.length > 0) {
+      const scored = designsList.map(d => {
+        const skuSim = calculateSimilarity(cleanAlphaNum, d.sku);
+        const titleSim = calculateSimilarity(cleanAlphaNum, d.title);
+        const maxSim = Math.max(skuSim, titleSim);
+        return {
+          id: d.id,
+          sku: d.sku,
+          title: d.title,
+          similarity: parseFloat(maxSim.toFixed(2))
+        };
+      });
+      scored.sort((a, b) => b.similarity - a.similarity);
+      suggestions = scored.slice(0, 3).filter(s => s.similarity > 0.1);
+    }
+  } catch (sugErr) {
+    console.warn('[ZIP Suggestions warning]:', sugErr.message);
+  }
+
+  return {
+    status: 'unmatched',
+    reason: 'No matching product found by SKU, Product ID, Title, Import ZIP Filename, or Slug.',
+    suggestions
+  };
+}
+
+/**
+ * Temporary directory cleanup for ZIP chunks & unmatched archives:
+ * - Removes unmatched files older than 24 hours.
+ * - Removes abandoned chunk sessions older than 2 hours.
+ */
+function cleanupTempUnmatchedZips() {
+  try {
+    const tempDir = path.join(storage.getUploadsDir(), 'temp_unmatched_zips');
+    if (fs.existsSync(tempDir)) {
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      const files = fs.readdirSync(tempDir);
+      for (const f of files) {
+        const p = path.join(tempDir, f);
+        const stat = fs.statSync(p);
+        if (now - stat.mtimeMs > maxAge) {
+          try { fs.unlinkSync(p); } catch (_) {}
+        }
+      }
+    }
+
+    const chunkDir = path.join(storage.getUploadsDir(), 'temp_chunks');
+    if (fs.existsSync(chunkDir)) {
+      const now = Date.now();
+      const maxChunkAge = 2 * 60 * 60 * 1000; // 2 hours
+      const chunkFolders = fs.readdirSync(chunkDir);
+      for (const folder of chunkFolders) {
+        const folderPath = path.join(chunkDir, folder);
+        try {
+          const stat = fs.statSync(folderPath);
+          if (now - stat.mtimeMs > maxChunkAge) {
+            fs.rmSync(folderPath, { recursive: true, force: true });
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    // Non-blocking cleanup
+  }
+}
+
+/**
+ * Pre-upload check: Ensures database has designs and returns max upload size setting
+ */
+exports.bulkZipCheck = async (req, res) => {
+  try {
+    if (!db.isConnected()) await db.initPool();
+    const rows = await db.query('SELECT COUNT(*) as count FROM designs WHERE is_active >= 0');
+    const totalCount = rows && rows[0] ? rows[0].count : 0;
+
+    const maxMb = await Setting.get('max_upload_zip_size_mb', '100');
+    const designs = await db.query('SELECT id, sku, title FROM designs WHERE is_active >= 0 ORDER BY id ASC LIMIT 2000');
+
+    return res.json({
+      success: true,
+      count: totalCount,
+      isEmpty: totalCount === 0,
+      maxUploadSizeMb: parseInt(maxMb, 10) || 100,
+      designs: designs || []
+    });
+  } catch (err) {
+    console.error('[Bulk ZIP Check Error]:', err);
+    return res.status(500).json({ success: false, message: err.message, isEmpty: false, count: 0, designs: [] });
+  }
+};
+
+/**
+ * Pre-upload Dry-Run Matcher:
+ * Matches filenames before large file transfer starts.
+ * Returns matched, unmatched, and ambiguous counts and previews.
+ */
+exports.bulkZipDryRun = async (req, res) => {
+  try {
+    const { filenames } = req.body;
+    if (!filenames || !Array.isArray(filenames) || filenames.length === 0) {
+      return res.status(400).json({ success: false, message: 'No filenames provided for dry run.' });
+    }
+
+    if (!db.isConnected()) await db.initPool();
+    const countRows = await db.query('SELECT COUNT(*) as count FROM designs WHERE is_active >= 0');
+    const totalCount = countRows && countRows[0] ? countRows[0].count : 0;
+
+    if (totalCount === 0) {
+      return res.json({
+        success: true,
+        isEmpty: true,
+        message: 'Import your spreadsheet first. Product catalog has 0 designs.',
+        matchedCount: 0,
+        unmatchedCount: filenames.length,
+        ambiguousCount: 0,
+        results: []
+      });
+    }
+
+    const allDesignsCache = await db.query('SELECT id, title, sku FROM designs WHERE is_active >= 0 LIMIT 1000');
+
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+    let ambiguousCount = 0;
+    const results = [];
+
+    for (const name of filenames) {
+      const match = await findMatchingDesignForZip(name, allDesignsCache);
+      if (match.status === 'matched') {
+        matchedCount++;
+        results.push({
+          filename: name,
+          status: 'matched',
+          design: { id: match.design.id, sku: match.design.sku, title: match.design.title },
+          matchedBy: match.matchedBy
+        });
+      } else if (match.status === 'ambiguous') {
+        ambiguousCount++;
+        results.push({
+          filename: name,
+          status: 'ambiguous',
+          candidates: (match.candidates || []).map(c => ({ id: c.id, sku: c.sku, title: c.title })),
+          matchedBy: match.matchedBy
+        });
+      } else {
+        unmatchedCount++;
+        results.push({
+          filename: name,
+          status: 'unmatched',
+          suggestions: match.suggestions || [],
+          reason: match.reason
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      isEmpty: false,
+      total: filenames.length,
+      matchedCount,
+      unmatchedCount,
+      ambiguousCount,
+      results
+    });
+  } catch (err) {
+    console.error('[Bulk ZIP Dry-Run Error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Handles individual chunk uploads for files > 5MB.
+ * Writes chunk to temp_chunks/<uploadId>/chunk_<chunkIndex>
+ */
+exports.bulkZipChunk = async (req, res) => {
+  try {
+    const uploadId = (req.body.uploadId || '').replace(/[^a-zA-Z0-9_\-]/g, '');
+    const chunkIndex = parseInt(req.body.chunkIndex, 10);
+    const totalChunks = parseInt(req.body.totalChunks, 10);
+
+    if (!uploadId || isNaN(chunkIndex) || !req.file) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({ success: false, message: 'Invalid chunk parameters or missing chunk file.' });
+    }
+
+    const chunkDir = path.join(storage.getUploadsDir(), 'temp_chunks', uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      fs.mkdirSync(chunkDir, { recursive: true });
+    }
+
+    const targetChunkPath = path.join(chunkDir, `chunk_${chunkIndex}`);
+    try {
+      fs.renameSync(req.file.path, targetChunkPath);
+    } catch (_) {
+      fs.copyFileSync(req.file.path, targetChunkPath);
+      fs.unlinkSync(req.file.path);
+    }
+
+    return res.json({
+      success: true,
+      uploadId,
+      chunkIndex,
+      totalChunks
+    });
+  } catch (err) {
+    console.error('[Bulk ZIP Chunk Error]:', err);
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Merges chunks, verifies SHA-256 checksum, validates ZIP, runs matcher,
+ * saves to private storage, calls replaceMachineFile.
+ */
+exports.bulkZipComplete = async (req, res) => {
+  const uploadId = (req.body.uploadId || '').replace(/[^a-zA-Z0-9_\-]/g, '');
+  const totalChunks = parseInt(req.body.totalChunks, 10);
+  const originalName = (req.body.originalName || 'file.zip').trim();
+
+  const chunkDir = path.join(storage.getUploadsDir(), 'temp_chunks', uploadId);
+  const tempCombinedDir = path.join(storage.getUploadsDir(), 'temp_combined');
+  const tempUnmatchedDir = path.join(storage.getUploadsDir(), 'temp_unmatched_zips');
+
+  if (!fs.existsSync(tempCombinedDir)) fs.mkdirSync(tempCombinedDir, { recursive: true });
+  if (!fs.existsSync(tempUnmatchedDir)) fs.mkdirSync(tempUnmatchedDir, { recursive: true });
+
+  const safeName = path.basename(originalName).replace(/[/\\?%*:|"<>]/g, '_');
+  const combinedPath = path.join(tempCombinedDir, `${uploadId}_${safeName}`);
+
+  try {
+    if (!uploadId || isNaN(totalChunks) || totalChunks <= 0 || !fs.existsSync(chunkDir)) {
+      return res.status(400).json({
+        status: 'failed',
+        filename: originalName,
+        error: 'Upload session not found or chunks missing.'
+      });
+    }
+
+    // Verify all chunks exist
+    for (let i = 0; i < totalChunks; i++) {
+      const cPath = path.join(chunkDir, `chunk_${i}`);
+      if (!fs.existsSync(cPath)) {
+        return res.status(400).json({
+          status: 'failed',
+          filename: originalName,
+          error: `Missing chunk ${i} of ${totalChunks}. Please retry upload.`
+        });
+      }
+    }
+
+    // Combine chunks sequentially
+    const writeStream = fs.createWriteStream(combinedPath);
+    for (let i = 0; i < totalChunks; i++) {
+      const cPath = path.join(chunkDir, `chunk_${i}`);
+      const data = fs.readFileSync(cPath);
+      writeStream.write(data);
+    }
+    writeStream.end();
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    // Check file size limit from Settings
+    const fileStats = fs.statSync(combinedPath);
+    const finalSize = fileStats.size;
+    const maxMb = parseInt(await Setting.get('max_upload_zip_size_mb', '100'), 10) || 100;
+    if (finalSize > maxMb * 1024 * 1024) {
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+      return res.json({
+        status: 'failed',
+        filename: originalName,
+        error: `File size (${(finalSize / (1024 * 1024)).toFixed(1)} MB) exceeds maximum allowed limit (${maxMb} MB).`
+      });
+    }
+
+    // Calculate SHA-256 Checksum
+    const hash = crypto.createHash('sha256');
+    const fileBuffer = fs.readFileSync(combinedPath);
+    hash.update(fileBuffer);
+    const checksum = hash.digest('hex');
+
+    // Validate ZIP contents & check for Zip Slip and executables
+    const validation = validateMachineFileOrZip(combinedPath, originalName);
+    if (!validation.isValid) {
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+      return res.json({
+        status: 'failed',
+        filename: originalName,
+        error: validation.reason
+      });
+    }
+
+    // Run Matcher
+    let allDesignsCache = null;
+    try {
+      allDesignsCache = await db.query('SELECT id, title, sku FROM designs WHERE is_active >= 0 LIMIT 500');
+    } catch (_) {}
+
+    const matchResult = await findMatchingDesignForZip(originalName, allDesignsCache);
+
+    if (matchResult.status === 'matched') {
+      const matchedDesign = matchResult.design;
+
+      // Save to private persistent design storage (outside public web root)
+      const savedKey = await storage.savePrivateFile(combinedPath, originalName, 'application/zip', matchedDesign.id);
+
+      // Atomically replace file in DB without modifying download_count
+      await Design.replaceMachineFile(
+        matchedDesign.id,
+        savedKey,
+        originalName,
+        finalSize,
+        checksum,
+        validation.detectedFormats
+      );
+
+      // Clean up temp files & chunks
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+
+      await ActivityLog.logFromReq(
+        req,
+        'bulk_upload_zip_linked',
+        'design',
+        matchedDesign.id,
+        `Bulk linked machine file "${originalName}" to design #${matchedDesign.id} (${matchedDesign.sku || matchedDesign.title})`
+      );
+
+      return res.json({
+        status: 'matched',
+        filename: originalName,
+        designId: matchedDesign.id,
+        title: matchedDesign.title,
+        sku: matchedDesign.sku,
+        formats: validation.detectedFormats,
+        size: finalSize,
+        checksum,
+        matchedBy: matchResult.matchedBy
+      });
+
+    } else if (matchResult.status === 'ambiguous') {
+      const ext = path.extname(originalName).toLowerCase();
+      const randomHex = crypto.randomBytes(6).toString('hex');
+      const tempFilename = `ambiguous-${Date.now()}-${randomHex}${ext}`;
+      const destTempPath = path.join(tempUnmatchedDir, tempFilename);
+
+      try {
+        fs.renameSync(combinedPath, destTempPath);
+      } catch (_) {
+        fs.copyFileSync(combinedPath, destTempPath);
+        fs.unlinkSync(combinedPath);
+      }
+      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+
+      return res.json({
+        status: 'ambiguous',
+        filename: originalName,
+        tempToken: tempFilename,
+        candidates: matchResult.candidates.map(c => ({ id: c.id, sku: c.sku, title: c.title })),
+        detectedFormats: validation.detectedFormats,
+        size: finalSize,
+        checksum,
+        reason: `Ambiguous match: multiple products share SKU or Title (${matchResult.candidates.length} candidates).`,
+        matchedBy: matchResult.matchedBy
+      });
+
+    } else {
+      const ext = path.extname(originalName).toLowerCase();
+      const randomHex = crypto.randomBytes(6).toString('hex');
+      const tempFilename = `unmatched-${Date.now()}-${randomHex}${ext}`;
+      const destTempPath = path.join(tempUnmatchedDir, tempFilename);
+
+      try {
+        fs.renameSync(combinedPath, destTempPath);
+      } catch (_) {
+        fs.copyFileSync(combinedPath, destTempPath);
+        fs.unlinkSync(combinedPath);
+      }
+      try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+
+      return res.json({
+        status: 'unmatched',
+        filename: originalName,
+        tempToken: tempFilename,
+        suggestions: matchResult.suggestions || [],
+        detectedFormats: validation.detectedFormats,
+        size: finalSize,
+        checksum,
+        reason: matchResult.reason || 'No matching product found by SKU, Product ID, Title, or Import Filename.'
+      });
+    }
+
+  } catch (err) {
+    console.error('[Bulk ZIP Complete Error]:', err);
+    try { if (fs.existsSync(combinedPath)) fs.unlinkSync(combinedPath); } catch (_) {}
+    try { if (fs.existsSync(chunkDir)) fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+    return res.status(500).json({
+      status: 'failed',
+      filename: originalName,
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Direct Upload for Small Files (<= 5MB, 1-2 files per batch)
+ */
+exports.bulkUploadZipsDirect = async (req, res) => {
+  try {
+    const files = req.files ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat()) : [];
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files were uploaded in this batch.',
+        matched: [],
+        unmatched: [],
+        ambiguous: [],
+        failed: []
+      });
+    }
+
+    cleanupTempUnmatchedZips();
+
+    let allDesignsCache = null;
+    try {
+      allDesignsCache = await db.query('SELECT id, title, sku FROM designs WHERE is_active >= 0 LIMIT 500');
+    } catch (_) {}
+
+    const tempUnmatchedDir = path.join(storage.getUploadsDir(), 'temp_unmatched_zips');
+    if (!fs.existsSync(tempUnmatchedDir)) fs.mkdirSync(tempUnmatchedDir, { recursive: true });
+
+    const matched = [];
+    const unmatched = [];
+    const ambiguous = [];
+    const failed = [];
+
+    for (const file of files) {
+      const originalName = file.originalname;
+      try {
+        // Validate file
+        const validation = validateMachineFileOrZip(file.path, originalName);
+        if (!validation.isValid) {
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (_) {}
+          }
+          failed.push({
+            filename: originalName,
+            error: validation.reason
+          });
+          continue;
+        }
+
+        // Checksum
+        const fileBuffer = fs.readFileSync(file.path);
+        const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+        // Matcher
+        const matchResult = await findMatchingDesignForZip(originalName, allDesignsCache);
+
+        if (matchResult.status === 'matched') {
+          const matchedDesign = matchResult.design;
+
+          // Save to private storage
+          const savedKey = await storage.savePrivateFile(file.path, originalName, 'application/zip', matchedDesign.id);
+
+          // Atomic replacement
+          await Design.replaceMachineFile(
+            matchedDesign.id,
+            savedKey,
+            originalName,
+            file.size,
+            checksum,
+            validation.detectedFormats
+          );
+
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (_) {}
+          }
+
+          matched.push({
+            filename: originalName,
+            designId: matchedDesign.id,
+            title: matchedDesign.title,
+            sku: matchedDesign.sku,
+            formats: validation.detectedFormats,
+            size: file.size,
+            checksum,
+            matchedBy: matchResult.matchedBy
+          });
+
+        } else if (matchResult.status === 'ambiguous') {
+          const ext = path.extname(originalName).toLowerCase();
+          const randomHex = crypto.randomBytes(6).toString('hex');
+          const tempFilename = `ambiguous-${Date.now()}-${randomHex}${ext}`;
+          const destTempPath = path.join(tempUnmatchedDir, tempFilename);
+
+          try {
+            fs.renameSync(file.path, destTempPath);
+          } catch (_) {
+            fs.copyFileSync(file.path, destTempPath);
+            fs.unlinkSync(file.path);
+          }
+
+          ambiguous.push({
+            filename: originalName,
+            tempToken: tempFilename,
+            candidates: matchResult.candidates.map(c => ({ id: c.id, sku: c.sku, title: c.title })),
+            detectedFormats: validation.detectedFormats,
+            size: file.size,
+            checksum,
+            reason: `Ambiguous match: multiple products share SKU or Title (${matchResult.candidates.length} candidates).`,
+            matchedBy: matchResult.matchedBy
+          });
+
+        } else {
+          const ext = path.extname(originalName).toLowerCase();
+          const randomHex = crypto.randomBytes(6).toString('hex');
+          const tempFilename = `unmatched-${Date.now()}-${randomHex}${ext}`;
+          const destTempPath = path.join(tempUnmatchedDir, tempFilename);
+
+          try {
+            fs.renameSync(file.path, destTempPath);
+          } catch (_) {
+            fs.copyFileSync(file.path, destTempPath);
+            fs.unlinkSync(file.path);
+          }
+
+          unmatched.push({
+            filename: originalName,
+            tempToken: tempFilename,
+            suggestions: matchResult.suggestions || [],
+            detectedFormats: validation.detectedFormats,
+            size: file.size,
+            checksum,
+            reason: matchResult.reason || 'No matching product found.'
+          });
+        }
+
+      } catch (fErr) {
+        if (file.path && fs.existsSync(file.path)) {
+          try { fs.unlinkSync(file.path); } catch (_) {}
+        }
+        failed.push({
+          filename: originalName,
+          error: fErr.message
+        });
+      }
+    }
+
+    if (matched.length > 0) {
+      await ActivityLog.logFromReq(
+        req,
+        'bulk_zip_upload_batch',
+        'design',
+        null,
+        `Bulk ZIP direct batch: ${matched.length} linked, ${unmatched.length} unmatched, ${ambiguous.length} ambiguous, ${failed.length} failed`
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: `Batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${ambiguous.length} ambiguous, ${failed.length} failed.`,
+      matched,
+      unmatched,
+      ambiguous,
+      failed,
+      processedCount: files.length
+    });
+
+  } catch (err) {
+    console.error('[Bulk ZIP Direct Fatal Error]:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+      matched: [],
+      unmatched: [],
+      ambiguous: [],
+      failed: [{ filename: 'batch', error: err.message }]
+    });
+  }
+};
+
+/**
+ * Manually links an unmatched or ambiguous machine file to a specific design
+ */
+exports.linkSingleZip = async (req, res) => {
+  try {
+    const { designId, tempToken, originalName, checksum, detectedFormats } = req.body;
+    if (!designId || !tempToken) {
+      return res.status(400).json({ success: false, message: 'Design ID and file token are required.' });
+    }
+
+    const design = await Design.getById(designId);
+    if (!design) {
+      return res.status(404).json({ success: false, message: `Design #${designId} not found.` });
+    }
+
+    const tempDir = path.join(storage.getUploadsDir(), 'temp_unmatched_zips');
+    const safeToken = path.basename(tempToken);
+    const tempPath = path.join(tempDir, safeToken);
+
+    if (!fs.existsSync(tempPath)) {
+      return res.status(404).json({ success: false, message: 'Temporary file expired or not found. Please re-upload.' });
+    }
+
+    const finalName = originalName || safeToken;
+    const stats = fs.statSync(tempPath);
+
+    let finalFormats = detectedFormats;
+    if (!finalFormats || !Array.isArray(finalFormats) || finalFormats.length === 0) {
+      const val = validateMachineFileOrZip(tempPath, finalName);
+      finalFormats = val.detectedFormats || [];
+    }
+
+    let finalChecksum = checksum;
+    if (!finalChecksum) {
+      finalChecksum = crypto.createHash('sha256').update(fs.readFileSync(tempPath)).digest('hex');
+    }
+
+    // Save to private persistent storage (outside public web root)
+    const savedKey = await storage.savePrivateFile(tempPath, finalName, 'application/zip', design.id);
+
+    // Atomically replace file in DB without touching download_count
+    await Design.replaceMachineFile(design.id, savedKey, finalName, stats.size, finalChecksum, finalFormats);
+
+    // Delete temp file
+    try { fs.unlinkSync(tempPath); } catch (_) {}
+
+    await ActivityLog.logFromReq(
+      req,
+      'link_bulk_zip_manual',
+      'design',
+      design.id,
+      `Manually linked machine file "${finalName}" to design #${design.id} (${design.title})`
+    );
+
+    return res.json({
+      success: true,
+      message: `Successfully linked "${finalName}" to design #${design.id} (${design.sku || design.title})!`,
+      designId: design.id,
+      sku: design.sku,
+      title: design.title,
+      formats: finalFormats
+    });
+
+  } catch (err) {
+    console.error('[Manual ZIP Link Error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Endpoint to replace the ZIP file for a single design (Edit page & table row action)
+ */
+exports.replaceZipSingle = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+      if (isAjax) return res.status(400).json({ success: false, message: 'No machine file was uploaded.' });
+      req.flash('error', 'No machine file was uploaded.');
+      return res.redirect('back');
+    }
+
+    const design = await Design.getById(id);
+    if (!design) {
+      if (file.path && fs.existsSync(file.path)) try { fs.unlinkSync(file.path); } catch (_) {}
+      const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+      if (isAjax) return res.status(404).json({ success: false, message: 'Design not found.' });
+      req.flash('error', 'Design not found.');
+      return res.redirect('back');
+    }
+
+    // Validate
+    const validation = validateMachineFileOrZip(file.path, file.originalname);
+    if (!validation.isValid) {
+      if (file.path && fs.existsSync(file.path)) try { fs.unlinkSync(file.path); } catch (_) {}
+      const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+      if (isAjax) return res.status(400).json({ success: false, message: validation.reason });
+      req.flash('error', validation.reason);
+      return res.redirect('back');
+    }
+
+    // Checksum
+    const fileBuffer = fs.readFileSync(file.path);
+    const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+    // Save to private storage
+    const savedKey = await storage.savePrivateFile(file.path, file.originalname, 'application/zip', design.id);
+
+    // Atomically replace file in DB without touching download_count
+    await Design.replaceMachineFile(design.id, savedKey, file.originalname, file.size, checksum, validation.detectedFormats);
+
+    if (file.path && fs.existsSync(file.path)) try { fs.unlinkSync(file.path); } catch (_) {}
+
+    await ActivityLog.logFromReq(
+      req,
+      'replace_machine_file',
+      'design',
+      design.id,
+      `Replaced machine file for design #${design.id} with "${file.originalname}"`
+    );
+
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+    if (isAjax) {
+      return res.json({
+        success: true,
+        message: `Machine file for "${design.title}" updated successfully!`,
+        designId: design.id,
+        formats: validation.detectedFormats,
+        fileName: file.originalname,
+        fileSize: file.size
+      });
+    }
+
+    req.flash('success', `Machine file for "${design.title}" updated successfully!`);
+    return res.redirect('back');
+
+  } catch (err) {
+    console.error('[replaceZipSingle error]:', err);
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
+    if (isAjax) return res.status(500).json({ success: false, message: err.message });
+    req.flash('error', `Failed to replace machine file: ${err.message}`);
+  }
+};
+
+exports.validateMachineFileOrZip = validateMachineFileOrZip;
+exports.findMatchingDesignForZip = findMatchingDesignForZip;
 

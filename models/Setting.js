@@ -21,7 +21,9 @@ const fallbackSettings = {
   upi_name: 'ARUVI EMBROIDERY STUDIO',
   upiName: 'ARUVI EMBROIDERY STUDIO',
   upiMerchantName: 'ARUVI EMBROIDERY STUDIO',
-  twitter_url: ''
+  twitter_url: '',
+  max_upload_zip_size_mb: '100',
+  auto_detect_formats_policy: 'fill_if_empty'
 };
 
 class Setting {
@@ -41,6 +43,23 @@ class Setting {
       fallbackSettings['upiName'] = String(value);
       fallbackSettings['upiMerchantName'] = String(value);
     }
+  }
+
+  static async get(key, defaultValue = null) {
+    try {
+      if (db.isConnected()) {
+        const rows = await db.query('SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1', [key]);
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].setting_value !== null && rows[0].setting_value !== undefined) {
+          return rows[0].setting_value;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Setting.get error for ${key}]:`, err.message);
+    }
+    if (fallbackSettings[key] !== undefined) {
+      return fallbackSettings[key];
+    }
+    return defaultValue;
   }
 
   static async getAll() {

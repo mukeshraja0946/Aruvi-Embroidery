@@ -287,6 +287,9 @@
           <a href="/admin/tools/bulk-file-relink" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-file-zipper"></i> Bulk File Relink
           </a>
+          <a href="/admin/designs?fileFilter=missing_zip" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border-color: #2E7D32; color: #1B5E20; background: #E8F5E9;" title="Bulk upload machine files for designs missing a ZIP">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Bulk Upload Missing ZIPs
+          </a>
         </div>
       </div>
 
@@ -316,11 +319,11 @@
           </div>
         </div>
 
-        <div class="tools-stat-card">
+        <div class="tools-stat-card" style="cursor: pointer;" onclick="window.location.href='/admin/designs?fileFilter=missing_zip'" title="Click to view designs missing a ZIP">
           <div class="tools-stat-icon red"><i class="fa-solid fa-file-circle-xmark"></i></div>
           <div class="tools-stat-data">
             <strong><%= (typeof summary !== 'undefined' && summary.missingFiles) || 0 %></strong>
-            <span>Missing Machine Files</span>
+            <span>Missing Machine Files <i class="fa-solid fa-arrow-right" style="font-size: 0.7rem; color: #C62828;"></i></span>
           </div>
         </div>
       </div>

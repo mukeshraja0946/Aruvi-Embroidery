@@ -22,8 +22,11 @@ class Design {
     is_active_only = true,
     is_featured = null,
     is_trending = null,
-    status = null
+    status = null,
+    fileFilter = null,
+    file_filter = null
   } = {}) {
+    const activeFileFilter = fileFilter || file_filter;
     if (db.isConnected()) {
       try {
         let whereClause = [];
@@ -37,6 +40,12 @@ class Design {
           whereClause.push('d.is_active = 0');
         } else {
           whereClause.push('d.is_active >= 0');
+        }
+
+        if (activeFileFilter === 'missing_zip') {
+          whereClause.push('NOT EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
+        } else if (activeFileFilter === 'has_zip') {
+          whereClause.push('EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
         }
 
         if (is_featured !== null && is_featured !== undefined) {
@@ -102,7 +111,11 @@ class Design {
                    (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
                    (SELECT file_path FROM design_files WHERE design_id = d.id AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
                    (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
-                 ) as primary_image
+                 ) as primary_image,
+                 (SELECT df.file_name FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_name,
+                 (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_path,
+                 (SELECT df.file_size FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_size,
+                 (SELECT df.checksum FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_checksum
           FROM designs d
           LEFT JOIN categories c ON d.category_id = c.id
           ${whereSql}
@@ -115,9 +128,18 @@ class Design {
         const countRes = await db.query(countSql, params);
 
         if (designs && Array.isArray(designs)) {
-          // Post-process designs to derive formats 100% dynamically from design_files table
+          // Post-process designs to derive formats and human file sizes
           for (const d of designs) {
             this.normalizePrimaryImage(d);
+            if (d.machine_file_size) {
+              const b = parseInt(d.machine_file_size, 10);
+              if (b >= 1024 * 1024) d.machine_file_size_formatted = (b / (1024 * 1024)).toFixed(1) + ' MB';
+              else if (b >= 1024) d.machine_file_size_formatted = Math.round(b / 1024) + ' KB';
+              else d.machine_file_size_formatted = b + ' B';
+            } else {
+              d.machine_file_size_formatted = null;
+            }
+
             try {
               const mFiles = await db.query(
                 'SELECT file_format, file_name FROM design_files WHERE design_id = ? AND is_preview = 0 AND UPPER(file_format) IN ("DST","PES","JEF","EXP")',
@@ -772,7 +794,7 @@ class Design {
     const {
       title, sku, slug, price, sale_price, category_id,
       hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
-      average_rating, reviews_count
+      average_rating, reviews_count, import_image_filename, import_zip_filename
     } = data;
 
     // Ensure slug is non-empty and unique
@@ -796,8 +818,8 @@ class Design {
     if (db.isConnected()) {
       try {
         const res = await db.query(
-          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             title,
             finalSku,
@@ -815,7 +837,9 @@ class Design {
             download_count ? parseInt(download_count) : 0,
             tags || null,
             avgRatingVal,
-            revCountVal
+            revCountVal,
+            import_image_filename || null,
+            import_zip_filename || null
           ]
         );
         if (res && res.insertId) insertedId = res.insertId;
@@ -825,8 +849,8 @@ class Design {
           try {
             finalSku = await this.getNextSkuForCategory(category_id);
             const retryRes = await db.query(
-              `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 title,
                 finalSku,
@@ -844,7 +868,9 @@ class Design {
                 download_count ? parseInt(download_count) : 0,
                 tags || null,
                 avgRatingVal,
-                revCountVal
+                revCountVal,
+                import_image_filename || null,
+                import_zip_filename || null
               ]
             );
             if (retryRes && retryRes.insertId) insertedId = retryRes.insertId;
@@ -900,7 +926,7 @@ class Design {
     const {
       title, sku, slug, price, sale_price, category_id,
       hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
-      average_rating, reviews_count
+      average_rating, reviews_count, import_image_filename, import_zip_filename
     } = data;
 
     // Ensure slug is valid & unique excluding current design ID
@@ -935,6 +961,16 @@ class Design {
           download_count ? parseInt(download_count) : 0,
           tags || null
         ];
+
+        if (import_image_filename !== undefined) {
+          updateFields.push('import_image_filename=?');
+          updateParams.push(import_image_filename || null);
+        }
+
+        if (import_zip_filename !== undefined) {
+          updateFields.push('import_zip_filename=?');
+          updateParams.push(import_zip_filename || null);
+        }
 
         if (avgRatingVal !== undefined) {
           updateFields.push('average_rating=?');
@@ -1186,6 +1222,109 @@ class Design {
       d.files = d.files.filter(f => f.is_preview || ['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase()));
       d.formats = '';
     }
+    return true;
+  }
+
+  static async replaceMachineFile(designId, filePath, fileName, fileSize, checksum, detectedFormats = []) {
+    if (!designId) throw new Error('designId is required');
+
+    let oldFiles = [];
+    if (db.isConnected()) {
+      try {
+        oldFiles = await db.query(
+          'SELECT * FROM design_files WHERE design_id = ? AND is_preview = 0',
+          [designId]
+        ) || [];
+
+        const ext = (path.extname(fileName).replace('.', '') || 'ZIP').toUpperCase();
+
+        // 1. Insert new machine file record FIRST (safe atomic replacement)
+        const insertRes = await db.query(
+          'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, checksum, is_preview) VALUES (?, ?, ?, ?, ?, ?, 0)',
+          [designId, fileName, filePath, ext, fileSize || 0, checksum || null]
+        );
+        const newFileId = insertRes.insertId;
+
+        // 2. Remove old machine file records from database (excluding new row)
+        if (oldFiles.length > 0) {
+          const oldIds = oldFiles.map(f => f.id).filter(id => id !== newFileId);
+          if (oldIds.length > 0) {
+            await db.query(`DELETE FROM design_files WHERE id IN (${oldIds.map(() => '?').join(',')})`, oldIds);
+          }
+        }
+
+        // 3. Delete old physical files from disk safely (only if not pointing to the same file)
+        for (const old of oldFiles) {
+          if (old.file_path && old.file_path !== filePath) {
+            const oldFullPath = storage.resolveFilePath(old.file_path);
+            if (oldFullPath && fs.existsSync(oldFullPath)) {
+              if (
+                !oldFullPath.includes('/public/images/') &&
+                !oldFullPath.includes('\\public\\images\\') &&
+                !oldFullPath.includes('hero_embroidery.jpg') &&
+                !oldFullPath.includes('logo.jpg')
+              ) {
+                try {
+                  fs.unlinkSync(oldFullPath);
+                } catch (delErr) {
+                  console.warn('[replaceMachineFile] Could not delete old file from disk:', oldFullPath, delErr.message);
+                }
+              }
+            }
+          }
+        }
+
+        // 4. Update formats on design according to Setting auto_detect_formats_policy (DO NOT TOUCH download_count)
+        if (detectedFormats && Array.isArray(detectedFormats) && detectedFormats.length > 0) {
+          try {
+            const Setting = require('./Setting');
+            const policy = await Setting.get('auto_detect_formats_policy', 'fill_if_empty');
+            const dRows = await db.query('SELECT formats FROM designs WHERE id = ?', [designId]);
+            const currentFormats = (dRows && dRows[0] && dRows[0].formats) ? dRows[0].formats.trim() : '';
+            const newFormatsStr = detectedFormats.join(', ');
+
+            if (policy === 'overwrite' || !currentFormats) {
+              await db.query('UPDATE designs SET formats = ? WHERE id = ?', [newFormatsStr, designId]);
+            }
+          } catch (fmtErr) {
+            console.warn('[replaceMachineFile] Format update warning:', fmtErr.message);
+          }
+        }
+
+        // 5. Update import_zip_filename if null
+        await db.query(
+          'UPDATE designs SET import_zip_filename = COALESCE(import_zip_filename, ?) WHERE id = ?',
+          [fileName, designId]
+        );
+
+      } catch (err) {
+        console.error('Design.replaceMachineFile DB error:', err.message);
+        throw err;
+      }
+    }
+
+    // Maintain fallback store
+    const target = fallbackDesigns.find(d => d.id == designId);
+    if (target) {
+      if (!target.files) target.files = [];
+      target.files = target.files.filter(f => f.is_preview);
+      const ext = (path.extname(fileName).replace('.', '') || 'ZIP').toUpperCase();
+      target.files.unshift({
+        id: Date.now(),
+        design_id: designId,
+        file_name: fileName,
+        file_path: filePath,
+        file_format: ext,
+        file_size: fileSize || 0,
+        checksum: checksum || null,
+        is_preview: 0
+      });
+      if (detectedFormats && detectedFormats.length > 0) {
+        target.formats = detectedFormats.join(', ');
+      }
+      this.attachZipPackage(target);
+    }
+
     return true;
   }
 

@@ -23,3 +23,9 @@ uploads/*
 private_uploads/*
 !private_uploads/.gitkeep
 !private_uploads/**/.gitkeep
+
+storage_private/*
+!storage_private/.gitkeep
+!storage_private/**/.gitkeep
+
+temp_chunks/*

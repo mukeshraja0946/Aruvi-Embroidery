@@ -74,7 +74,7 @@ storage.validateStorageConfiguration();
 
 // Strict Security: Block unauthenticated static access to paid design archives & private uploads
 // Paid design files must be downloaded ONLY through authenticated customer/user download routes
-app.use(['/public/uploads/designs', '/uploads/designs', '/private_uploads', '/public/uploads/private_designs'], (req, res) => {
+app.use(['/public/uploads/designs', '/uploads/designs', '/private_uploads', '/public/uploads/private_designs', '/storage_private', '/public/storage_private', '/design-files', '/public/design-files'], (req, res) => {
   res.status(403).json({ error: 'Access forbidden. Paid design archives can only be downloaded via authenticated routes.' });
 });
 

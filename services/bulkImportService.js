@@ -443,7 +443,10 @@ class BulkImportService {
       throw new Error('Import session not found or expired.');
     }
 
-    const items = await db.query('SELECT `id`, `sku`, `image_filename`, `file_filename` FROM `import_job_items` WHERE `job_id` = ?', [job.id]);
+    const items = await db.query(
+      'SELECT `id`, `sku`, `title`, `row_no`, `image_filename`, `file_filename` FROM `import_job_items` WHERE `job_id` = ?',
+      [job.id]
+    );
 
     let matchedImages = 0;
     let matchedFiles = 0;
@@ -453,10 +456,14 @@ class BulkImportService {
     const allowedMachine = ['.zip', '.dst', '.pes', '.jef', '.exp', '.rar', '.7z'];
 
     for (const file of files) {
-      const ext = path.extname(file.originalname).toLowerCase();
+      const rawExt = path.extname(file.originalname || '');
+      const ext = rawExt.toLowerCase();
       const uploadOrigName = file.originalname.trim();
-      const uploadBase = path.basename(uploadOrigName, ext).trim();
+      const uploadBase = (rawExt ? uploadOrigName.slice(0, -rawExt.length) : uploadOrigName).trim();
       const normUploadBase = this.normalizeKey(uploadBase);
+      const numericId = /^\d+$/.test(uploadBase) ? parseInt(uploadBase, 10) : null;
+      const aedMatch = uploadBase.match(/^AED[\s\-_]*0*(\d+)$/i);
+      const aedNum = aedMatch ? parseInt(aedMatch[1], 10) : null;
 
       const isImage = allowedImg.includes(ext);
       const isMachine = allowedMachine.includes(ext);
@@ -470,20 +477,26 @@ class BulkImportService {
         // Save to persistent public preview storage
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
 
-        // Multi-tier matching:
-        // 1. Exact filename match (e.g. "AED 1.png" === "AED 1.png")
-        // 2. Basename match (e.g. "AED 1" === "AED 1")
-        // 3. Normalized key match
-        // 4. Fallback SKU match
+        // Robust multi-tier matching for preview image:
+        // 1. Exact or case-insensitive image_filename
+        // 2. Base filename without extension
+        // 3. Normalized key of image_filename
+        // 4. SKU match
+        // 5. Title match
+        // 6. Row number or AED sequence match
         let matchedItem = items.find(it => {
           if (it.image_filename) {
             const targetOrig = it.image_filename.trim();
-            const targetBase = path.basename(targetOrig, path.extname(targetOrig)).trim();
+            const targetRawExt = path.extname(targetOrig);
+            const targetBase = (targetRawExt ? targetOrig.slice(0, -targetRawExt.length) : targetOrig).trim();
             if (targetOrig.toLowerCase() === uploadOrigName.toLowerCase()) return true;
             if (targetBase.toLowerCase() === uploadBase.toLowerCase()) return true;
             if (this.normalizeKey(targetBase) === normUploadBase) return true;
           }
           if (it.sku && this.normalizeKey(it.sku) === normUploadBase) return true;
+          if (it.title && this.normalizeKey(it.title) === normUploadBase) return true;
+          if (numericId !== null && it.row_no === numericId) return true;
+          if (aedNum !== null && (it.row_no === aedNum || this.normalizeKey(it.sku) === `aed${aedNum}`)) return true;
           return false;
         });
 
@@ -494,7 +507,7 @@ class BulkImportService {
           );
           matchedItem.image_matched = 1;
           matchedImages++;
-          uploadedAssetResults.push({ filename: file.originalname, status: 'matched', type: 'image', sku: matchedItem.sku });
+          uploadedAssetResults.push({ filename: file.originalname, status: 'matched', type: 'image', sku: matchedItem.sku, rowNo: matchedItem.row_no });
         } else {
           uploadedAssetResults.push({ filename: file.originalname, status: 'unmatched', type: 'image' });
         }
@@ -518,16 +531,26 @@ class BulkImportService {
         // Save to private persistent design storage
         const savedPath = await storage.savePrivateFile(file.path, file.originalname, file.mimetype);
 
-        // Multi-tier matching for machine file
+        // Robust multi-tier matching for machine file:
+        // 1. Exact or case-insensitive file_filename
+        // 2. Base filename without extension
+        // 3. Normalized key of file_filename
+        // 4. SKU match
+        // 5. Title match
+        // 6. Row number or AED sequence match
         let matchedItem = items.find(it => {
           if (it.file_filename) {
             const targetOrig = it.file_filename.trim();
-            const targetBase = path.basename(targetOrig, path.extname(targetOrig)).trim();
+            const targetRawExt = path.extname(targetOrig);
+            const targetBase = (targetRawExt ? targetOrig.slice(0, -targetRawExt.length) : targetOrig).trim();
             if (targetOrig.toLowerCase() === uploadOrigName.toLowerCase()) return true;
             if (targetBase.toLowerCase() === uploadBase.toLowerCase()) return true;
             if (this.normalizeKey(targetBase) === normUploadBase) return true;
           }
           if (it.sku && this.normalizeKey(it.sku) === normUploadBase) return true;
+          if (it.title && this.normalizeKey(it.title) === normUploadBase) return true;
+          if (numericId !== null && it.row_no === numericId) return true;
+          if (aedNum !== null && (it.row_no === aedNum || this.normalizeKey(it.sku) === `aed${aedNum}`)) return true;
           return false;
         });
 
@@ -538,7 +561,7 @@ class BulkImportService {
           );
           matchedItem.file_matched = 1;
           matchedFiles++;
-          uploadedAssetResults.push({ filename: file.originalname, status: 'matched', type: 'machine', sku: matchedItem.sku });
+          uploadedAssetResults.push({ filename: file.originalname, status: 'matched', type: 'machine', sku: matchedItem.sku, rowNo: matchedItem.row_no });
         } else {
           uploadedAssetResults.push({ filename: file.originalname, status: 'unmatched', type: 'machine' });
         }
@@ -691,7 +714,9 @@ class BulkImportService {
               formats: item.formats,
               description: item.description,
               tags: item.tags,
-              is_active: item.status === 'Active' ? 1 : 0
+              is_active: item.status === 'Active' ? 1 : 0,
+              import_image_filename: item.image_filename || null,
+              import_zip_filename: item.file_filename || null
             });
           } else {
             // Create new design product
@@ -707,7 +732,9 @@ class BulkImportService {
               description: item.description,
               tags: item.tags,
               is_active: item.status === 'Active' ? 1 : 0,
-              download_count: 0 // strictly 0
+              download_count: 0, // strictly 0
+              import_image_filename: item.image_filename || null,
+              import_zip_filename: item.file_filename || null
             });
           }
 

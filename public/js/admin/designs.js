@@ -330,14 +330,26 @@ let bulkUploadState = {
   batchTimeoutMs: 60000,
   isUploading: false,
   isCancelled: false,
+  catalogDesigns: [],     // Cached designs for manual link dropdown
   stats: {
     total: 0,
     processed: 0,
     linked: 0,
     unmatched: 0,
+    ambiguous: 0,
     failed: 0
   }
 };
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[m]));
+}
 
 function formatBytes(bytes, decimals = 1) {
   if (!bytes || bytes === 0) return '0 B';
@@ -348,7 +360,7 @@ function formatBytes(bytes, decimals = 1) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-function openBulkImageUploadModal() {
+async function openBulkImageUploadModal() {
   const modal = document.getElementById('bulkImageUploadModal');
   if (!modal) return;
 
@@ -363,7 +375,8 @@ function openBulkImageUploadModal() {
     batchTimeoutMs: 60000,
     isUploading: false,
     isCancelled: false,
-    stats: { total: 0, processed: 0, linked: 0, unmatched: 0, failed: 0 }
+    catalogDesigns: bulkUploadState.catalogDesigns || [],
+    stats: { total: 0, processed: 0, linked: 0, unmatched: 0, ambiguous: 0, failed: 0 }
   };
 
   // Reset DOM inputs
@@ -379,8 +392,21 @@ function openBulkImageUploadModal() {
   const reportCard = document.getElementById('bulkImageReportCard');
   if (reportCard) reportCard.style.display = 'none';
 
+  const emptyWarn = document.getElementById('bulkImageEmptyDbWarning');
+  if (emptyWarn) emptyWarn.style.display = 'none';
+
   const selectSection = document.getElementById('bulkImageFileSelectSection');
   if (selectSection) selectSection.style.display = 'block';
+
+  // Reset counters
+  const linkedEl = document.getElementById('bulkLinkedCount');
+  if (linkedEl) linkedEl.textContent = '0';
+  const unmatchedEl = document.getElementById('bulkUnmatchedCount');
+  if (unmatchedEl) unmatchedEl.textContent = '0';
+  const ambiguousEl = document.getElementById('bulkAmbiguousCount');
+  if (ambiguousEl) ambiguousEl.textContent = '0';
+  const failedEl = document.getElementById('bulkFailedCount');
+  if (failedEl) failedEl.textContent = '0';
 
   // Reset buttons
   const submitBtn = document.getElementById('bulkImageSubmitBtn');
@@ -399,6 +425,32 @@ function openBulkImageUploadModal() {
   if (finishBtn) finishBtn.style.display = 'none';
 
   modal.style.display = 'flex';
+
+  // Check if database has zero designs before allowing uploads
+  try {
+    const res = await fetch('/admin/designs/bulk-upload-check', {
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    if (res.ok) {
+      const checkData = await res.json();
+      if (checkData.success) {
+        bulkUploadState.catalogDesigns = checkData.designs || [];
+        if (checkData.isEmpty) {
+          if (emptyWarn) emptyWarn.style.display = 'block';
+          if (selectSection) selectSection.style.display = 'none';
+          if (submitBtn) submitBtn.disabled = true;
+        } else {
+          if (emptyWarn) emptyWarn.style.display = 'none';
+          if (selectSection) selectSection.style.display = 'block';
+        }
+      }
+    }
+  } catch (checkErr) {
+    console.warn('[Bulk Upload Check Notice]:', checkErr.message);
+  }
 }
 
 function closeBulkImageUploadModal(force = false) {
@@ -569,10 +621,15 @@ function renderLiveFileList() {
       icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
       badgeColor = '#E8F5E9';
       borderColor = '#C8E6C9';
+    } else if (item.status === 'ambiguous') {
+      icon = '<i class="fa-solid fa-code-compare" style="color: #BF360C;"></i>';
+      badgeColor = '#FFF3E0';
+      borderColor = '#FFCCBC';
+      statusText = 'Ambiguous match';
     } else if (item.status === 'unmatched') {
       icon = '<i class="fa-solid fa-circle-question" style="color: #E65100;"></i>';
-      badgeColor = '#FFF3E0';
-      borderColor = '#FFE0B2';
+      badgeColor = '#FFF8E1';
+      borderColor = '#FFE082';
     } else if (item.status === 'failed') {
       icon = '<i class="fa-solid fa-circle-xmark" style="color: #C62828;"></i>';
       badgeColor = '#FFEBEE';
@@ -583,11 +640,11 @@ function renderLiveFileList() {
       <div id="bulk-file-item-${item.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;">
         <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
           ${icon}
-          <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.originalName}</strong>
+          <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
           <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
         </div>
         <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          <span>${statusText}</span>
+          <span>${escapeHtml(statusText)}</span>
         </div>
       </div>
     `;
@@ -617,10 +674,15 @@ function updateLiveItemRow(item) {
     icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
     badgeColor = '#E8F5E9';
     borderColor = '#C8E6C9';
+  } else if (item.status === 'ambiguous') {
+    icon = '<i class="fa-solid fa-code-compare" style="color: #BF360C;"></i>';
+    badgeColor = '#FFF3E0';
+    borderColor = '#FFCCBC';
+    statusText = 'Ambiguous match';
   } else if (item.status === 'unmatched') {
     icon = '<i class="fa-solid fa-circle-question" style="color: #E65100;"></i>';
-    badgeColor = '#FFF3E0';
-    borderColor = '#FFE0B2';
+    badgeColor = '#FFF8E1';
+    borderColor = '#FFE082';
   } else if (item.status === 'failed') {
     icon = '<i class="fa-solid fa-circle-xmark" style="color: #C62828;"></i>';
     badgeColor = '#FFEBEE';
@@ -632,17 +694,17 @@ function updateLiveItemRow(item) {
   el.innerHTML = `
     <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
       ${icon}
-      <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.originalName}</strong>
+      <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
       <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
     </div>
     <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-      <span>${statusText}</span>
+      <span>${escapeHtml(statusText)}</span>
     </div>
   `;
 }
 
 function updateProgressCounters() {
-  const { total, processed, linked, unmatched, failed } = bulkUploadState.stats;
+  const { total, processed, linked, unmatched, ambiguous, failed } = bulkUploadState.stats;
   const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
 
   const bar = document.getElementById('bulkImageProgressBar');
@@ -657,6 +719,9 @@ function updateProgressCounters() {
   const unmatchedEl = document.getElementById('bulkUnmatchedCount');
   if (unmatchedEl) unmatchedEl.textContent = unmatched;
 
+  const ambiguousEl = document.getElementById('bulkAmbiguousCount');
+  if (ambiguousEl) ambiguousEl.textContent = ambiguous || 0;
+
   const failedEl = document.getElementById('bulkFailedCount');
   if (failedEl) failedEl.textContent = failed;
 
@@ -667,6 +732,13 @@ function updateProgressCounters() {
 async function startChunkedBulkImageUpload() {
   if (bulkUploadState.items.length === 0) {
     alert('Please select images first.');
+    return;
+  }
+
+  // Guard against uploading if database has zero designs
+  const emptyWarn = document.getElementById('bulkImageEmptyDbWarning');
+  if (emptyWarn && emptyWarn.style.display !== 'none') {
+    alert('No designs found. Import your spreadsheet first (Bulk Import), then re-upload images.');
     return;
   }
 
@@ -681,9 +753,10 @@ async function startChunkedBulkImageUpload() {
   bulkUploadState.isCancelled = false;
   bulkUploadState.stats = {
     total: bulkUploadState.items.length,
-    processed: bulkUploadState.items.filter(it => it.status === 'linked' || it.status === 'unmatched' || (!it.isValid && it.status === 'failed')).length,
+    processed: bulkUploadState.items.filter(it => it.status === 'linked' || it.status === 'ambiguous' || it.status === 'unmatched' || (!it.isValid && it.status === 'failed')).length,
     linked: bulkUploadState.items.filter(it => it.status === 'linked').length,
     unmatched: bulkUploadState.items.filter(it => it.status === 'unmatched').length,
+    ambiguous: bulkUploadState.items.filter(it => it.status === 'ambiguous').length,
     failed: bulkUploadState.items.filter(it => it.status === 'failed').length
   };
 
@@ -795,11 +868,13 @@ async function processSingleBatch(batch) {
 
     // Map response to batch items
     const matchedList = data.matched || [];
+    const ambiguousList = data.ambiguous || [];
     const unmatchedList = data.unmatched || [];
     const failedList = data.failed || [];
 
     batch.items.forEach(item => {
       const matched = matchedList.find(m => m.filename.toLowerCase() === item.originalName.toLowerCase());
+      const ambiguous = ambiguousList.find(a => a.filename.toLowerCase() === item.originalName.toLowerCase());
       const unmatched = unmatchedList.find(u => u.filename.toLowerCase() === item.originalName.toLowerCase());
       const failed = failedList.find(f => f.filename.toLowerCase() === item.originalName.toLowerCase());
 
@@ -808,8 +883,16 @@ async function processSingleBatch(batch) {
         item.details = `Linked to #${matched.designId} (${matched.sku || matched.title})`;
         item.matchedDesign = matched;
         bulkUploadState.stats.linked++;
+      } else if (ambiguous) {
+        item.status = 'ambiguous';
+        item.tempToken = ambiguous.tempToken;
+        item.candidates = ambiguous.candidates || [];
+        item.details = ambiguous.reason || 'Multiple candidate designs found';
+        bulkUploadState.stats.ambiguous++;
       } else if (unmatched) {
         item.status = 'unmatched';
+        item.tempToken = unmatched.tempToken;
+        item.suggestions = unmatched.suggestions || [];
         item.details = unmatched.reason || 'No matching product found';
         bulkUploadState.stats.unmatched++;
       } else if (failed) {
@@ -818,7 +901,6 @@ async function processSingleBatch(batch) {
         item.referenceId = failed.referenceId;
         bulkUploadState.stats.failed++;
       } else {
-        // Fallback: If returned in general matched/unmatched
         item.status = 'unmatched';
         item.details = 'No product matched';
         bulkUploadState.stats.unmatched++;
@@ -932,6 +1014,7 @@ function onBulkUploadFinished() {
   const reportSummaryText = document.getElementById('bulkImageReportSummaryText');
 
   const linkedCount = bulkUploadState.items.filter(it => it.status === 'linked').length;
+  const ambiguousCount = bulkUploadState.items.filter(it => it.status === 'ambiguous').length;
   const unmatchedCount = bulkUploadState.items.filter(it => it.status === 'unmatched').length;
   const failedCount = bulkUploadState.items.filter(it => it.status === 'failed').length;
 
@@ -939,17 +1022,88 @@ function onBulkUploadFinished() {
     reportSummaryText.innerHTML = `
       <strong>Processed ${bulkUploadState.items.length} images:</strong>
       <span style="color: #2E7D32; font-weight: 600;">${linkedCount} successfully linked</span>,
+      <span style="color: #BF360C; font-weight: 600;">${ambiguousCount} ambiguous</span>,
       <span style="color: #E65100; font-weight: 600;">${unmatchedCount} unmatched</span>,
       <span style="color: #C62828; font-weight: 600;">${failedCount} failed</span>.
     `;
   }
 
-  // Unmatched names list
+  // Ambiguous candidates list
+  const ambiguousBox = document.getElementById('bulkAmbiguousDetailsBox');
+  const ambiguousList = document.getElementById('bulkAmbiguousList');
+  const ambiguousItems = bulkUploadState.items.filter(it => it.status === 'ambiguous');
+
+  if (ambiguousItems.length > 0 && ambiguousBox && ambiguousList) {
+    ambiguousList.innerHTML = ambiguousItems.map(it => {
+      const candidates = it.candidates || [];
+      const candidatesHtml = candidates.map(cand => `
+        <button type="button" 
+          onclick="linkSingleBulkImage('${it.tempToken}', ${cand.id}, '${escapeHtml(it.originalName)}', '${it.id}', this)"
+          style="padding: 4px 10px; background: #FFF; border: 1px solid #BF360C; color: #BF360C; border-radius: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+          <i class="fa-solid fa-link"></i> Link to #${cand.id} ${escapeHtml(cand.sku || '')} (${escapeHtml(cand.title)})
+        </button>
+      `).join(' ');
+
+      return `
+        <div id="ambiguous-item-box-${it.id}" style="background: #FFF; border: 1px solid #FFE0B2; border-radius: 6px; padding: 8px 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: var(--admin-text-dark);">${escapeHtml(it.originalName)}</strong>
+            <span style="color: #BF360C; font-size: 0.74rem;">${escapeHtml(it.details)}</span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            ${candidatesHtml || '<em>No candidate details available</em>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+    ambiguousBox.style.display = 'block';
+  } else if (ambiguousBox) {
+    ambiguousBox.style.display = 'none';
+  }
+
+  // Unmatched names & suggestions list with manual dropdown
   const unmatchedBox = document.getElementById('bulkUnmatchedDetailsBox');
   const unmatchedList = document.getElementById('bulkUnmatchedNamesList');
   const unmatchedItems = bulkUploadState.items.filter(it => it.status === 'unmatched');
+
   if (unmatchedItems.length > 0 && unmatchedBox && unmatchedList) {
-    unmatchedList.innerHTML = unmatchedItems.map(it => `<div>• ${it.originalName} (${it.details})</div>`).join('');
+    const catalogDesigns = bulkUploadState.catalogDesigns || [];
+    const optionsHtml = catalogDesigns.map(d => `<option value="${d.id}">#${d.id} - ${escapeHtml(d.sku || '')} (${escapeHtml(d.title)})</option>`).join('');
+
+    unmatchedList.innerHTML = unmatchedItems.map(it => {
+      const suggestions = it.suggestions || [];
+      const suggestionsHtml = suggestions.length > 0 ? `
+        <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+          <span style="font-size: 0.74rem; font-weight: 600; color: #E65100;">Suggestions:</span>
+          ${suggestions.map(s => `
+            <button type="button" 
+              onclick="linkSingleBulkImage('${it.tempToken}', ${s.id}, '${escapeHtml(it.originalName)}', '${it.id}', this)"
+              style="padding: 3px 8px; background: #FFF; border: 1px solid #E65100; color: #E65100; border-radius: 6px; font-size: 0.74rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-link"></i> #${s.id} ${escapeHtml(s.sku || '')} (${escapeHtml(s.title)}) [${Math.round((s.similarity || 0) * 100)}%]
+            </button>
+          `).join('')}
+        </div>
+      ` : '';
+
+      return `
+        <div id="unmatched-item-box-${it.id}" style="background: #FFF; border: 1px solid #FFE082; border-radius: 6px; padding: 8px 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="color: var(--admin-text-dark);">${escapeHtml(it.originalName)}</strong>
+            <span style="color: #E65100; font-size: 0.74rem;">${escapeHtml(it.details)}</span>
+          </div>
+          ${suggestionsHtml}
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+            <select id="manual-select-${it.id}" style="flex: 1; padding: 5px 8px; font-size: 0.78rem; border: 1px solid var(--admin-border); border-radius: 6px; background: #FAFAFA;">
+              <option value="">-- Manually select design to link --</option>
+              ${optionsHtml}
+            </select>
+            <button type="button" onclick="handleManualLinkDropdown('${it.id}', '${it.tempToken}', '${escapeHtml(it.originalName)}', this)" style="padding: 5px 12px; background: var(--admin-primary); color: #FFF; border: none; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-link"></i> Link
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
     unmatchedBox.style.display = 'block';
   } else if (unmatchedBox) {
     unmatchedBox.style.display = 'none';
@@ -960,7 +1114,7 @@ function onBulkUploadFinished() {
   const failedList = document.getElementById('bulkFailedReasonsList');
   const failedItems = bulkUploadState.items.filter(it => it.status === 'failed');
   if (failedItems.length > 0 && failedBox && failedList) {
-    failedList.innerHTML = failedItems.map(it => `<div>• ${it.originalName}: ${it.details}${it.referenceId ? ` [Ref: ${it.referenceId}]` : ''}</div>`).join('');
+    failedList.innerHTML = failedItems.map(it => `<div>• ${escapeHtml(it.originalName)}: ${escapeHtml(it.details)}${it.referenceId ? ` [Ref: ${escapeHtml(it.referenceId)}]` : ''}</div>`).join('');
     failedBox.style.display = 'block';
   } else if (failedBox) {
     failedBox.style.display = 'none';
@@ -977,6 +1131,115 @@ function onBulkUploadFinished() {
   }
 
   if (reportCard) reportCard.style.display = 'block';
+}
+
+/**
+ * Manually link an unmatched or ambiguous image to a selected product design
+ */
+async function linkSingleBulkImage(tempToken, designId, originalName, itemId, triggerBtn) {
+  if (!designId || !tempToken) {
+    alert('Please select a valid design and image token.');
+    return;
+  }
+
+  const prevBtnHtml = triggerBtn ? triggerBtn.innerHTML : '';
+  if (triggerBtn) {
+    triggerBtn.disabled = true;
+    triggerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Linking...';
+  }
+
+  try {
+    const res = await fetch('/admin/designs/bulk-link-single-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      body: JSON.stringify({ designId, tempToken, originalName })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to link image');
+    }
+
+    // Update item in state
+    const item = bulkUploadState.items.find(it => String(it.id) === String(itemId));
+    if (item) {
+      const prevStatus = item.status;
+      item.status = 'linked';
+      item.details = `Linked to #${data.designId} (${data.sku || data.title})`;
+      item.matchedDesign = { designId: data.designId, sku: data.sku, title: data.title, imageUrl: data.imageUrl };
+
+      if (prevStatus === 'unmatched') {
+        bulkUploadState.stats.unmatched = Math.max(0, bulkUploadState.stats.unmatched - 1);
+      } else if (prevStatus === 'ambiguous') {
+        bulkUploadState.stats.ambiguous = Math.max(0, bulkUploadState.stats.ambiguous - 1);
+      }
+      bulkUploadState.stats.linked++;
+
+      updateLiveItemRow(item);
+      updateProgressCounters();
+    }
+
+    // Replace the box with a success badge
+    const unmatchedBox = document.getElementById(`unmatched-item-box-${itemId}`);
+    if (unmatchedBox) {
+      unmatchedBox.style.background = '#E8F5E9';
+      unmatchedBox.style.border = '1px solid #C8E6C9';
+      unmatchedBox.innerHTML = `
+        <div style="color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-circle-check"></i> Linked "${escapeHtml(originalName)}" to #${data.designId} (${escapeHtml(data.sku || data.title)})!
+        </div>
+      `;
+    }
+
+    const ambiguousBox = document.getElementById(`ambiguous-item-box-${itemId}`);
+    if (ambiguousBox) {
+      ambiguousBox.style.background = '#E8F5E9';
+      ambiguousBox.style.border = '1px solid #C8E6C9';
+      ambiguousBox.innerHTML = `
+        <div style="color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-circle-check"></i> Linked "${escapeHtml(originalName)}" to #${data.designId} (${escapeHtml(data.sku || data.title)})!
+        </div>
+      `;
+    }
+
+    // Update Report Summary Text counts
+    const linkedCount = bulkUploadState.items.filter(it => it.status === 'linked').length;
+    const ambiguousCount = bulkUploadState.items.filter(it => it.status === 'ambiguous').length;
+    const unmatchedCount = bulkUploadState.items.filter(it => it.status === 'unmatched').length;
+    const failedCount = bulkUploadState.items.filter(it => it.status === 'failed').length;
+
+    const reportSummaryText = document.getElementById('bulkImageReportSummaryText');
+    if (reportSummaryText) {
+      reportSummaryText.innerHTML = `
+        <strong>Processed ${bulkUploadState.items.length} images:</strong>
+        <span style="color: #2E7D32; font-weight: 600;">${linkedCount} successfully linked</span>,
+        <span style="color: #BF360C; font-weight: 600;">${ambiguousCount} ambiguous</span>,
+        <span style="color: #E65100; font-weight: 600;">${unmatchedCount} unmatched</span>,
+        <span style="color: #C62828; font-weight: 600;">${failedCount} failed</span>.
+      `;
+    }
+
+  } catch (err) {
+    alert(`Could not link image: ${err.message}`);
+    if (triggerBtn) {
+      triggerBtn.disabled = false;
+      triggerBtn.innerHTML = prevBtnHtml;
+    }
+  }
+}
+
+function handleManualLinkDropdown(itemId, tempToken, originalName, triggerBtn) {
+  const sel = document.getElementById(`manual-select-${itemId}`);
+  if (!sel || !sel.value) {
+    alert('Please select a product design from the dropdown first.');
+    return;
+  }
+  linkSingleBulkImage(tempToken, sel.value, originalName, itemId, triggerBtn);
 }
 
 function retryFailedBulkImages() {
@@ -1406,6 +1669,22 @@ function goToStep3() {
 
   document.getElementById('step2NextBtn').style.display = 'none';
   document.getElementById('step3StartBtn').style.display = 'inline-flex';
+
+  const preConfirmEl = document.getElementById('step3AssetPreConfirmContent');
+  if (preConfirmEl) {
+    const matchedImgs = parseInt(document.getElementById('matchedImagesCount')?.textContent || '0', 10);
+    const matchedZips = parseInt(document.getElementById('matchedFilesCount')?.textContent || '0', 10);
+    const unmatched = parseInt(document.getElementById('unmatchedCount')?.textContent || '0', 10);
+    if (matchedImgs > 0 || matchedZips > 0 || unmatched > 0) {
+      preConfirmEl.innerHTML = `
+        <span style="color:#2E7D32; font-weight:700;"><i class="fa-solid fa-circle-check"></i> Matched Preview Images: <strong>${matchedImgs}</strong></span>
+        <span style="color:#1565C0; font-weight:700;"><i class="fa-solid fa-file-zipper"></i> Matched Machine Files / ZIPs: <strong>${matchedZips}</strong></span>
+        ${unmatched > 0 ? `<span style="color:#E65100; font-weight:700;"><i class="fa-solid fa-triangle-exclamation"></i> Unmatched Files: <strong>${unmatched}</strong></span>` : ''}
+      `;
+    } else {
+      preConfirmEl.innerHTML = `<span style="color: var(--admin-text-muted);">No assets uploaded in Step 2. Designs will be imported and you can upload preview images and machine ZIP files later via "Bulk Image Upload" or "Bulk Upload ZIP Files".</span>`;
+    }
+  }
 }
 
 async function submitStep3StartJob() {
@@ -1664,6 +1943,1094 @@ async function submitReplaceImage(event) {
     alert('Network error while replacing image: ' + e.message);
   }
 }
+
+/**
+ * ============================================================================
+ * BULK MACHINE FILES (ZIP) UPLOAD & RELIABLE CHUNKED ENGINE
+ * ============================================================================
+ */
+
+const bulkZipUploadState = {
+  isUploading: false,
+  isCancelled: false,
+  chunkSize: 2 * 1024 * 1024, // 2MB chunk size for reliable upload on Hostinger
+  chunkThreshold: 5 * 1024 * 1024, // Files > 5MB use chunked upload
+  maxConcurrency: 2, // Max 2 parallel file streams
+  activeStreams: 0,
+  maxUploadSizeMb: 100, // Dynamically loaded from Settings
+  items: [],
+  activeControllers: new Set(),
+  stats: {
+    total: 0,
+    processed: 0,
+    linked: 0,
+    unmatched: 0,
+    ambiguous: 0,
+    failed: 0,
+    totalBytes: 0,
+    uploadedBytes: 0
+  },
+  catalogDesigns: [],
+  startTime: null,
+  speedInterval: null
+};
+
+// Open the Bulk ZIP Upload Modal
+async function openBulkZipUploadModal() {
+  const modal = document.getElementById('bulkZipUploadModal');
+  if (!modal) return;
+
+  // Reset UI components
+  resetBulkZipModalUI();
+
+  modal.style.display = 'flex';
+
+  try {
+    const res = await fetch('/admin/designs/bulk-zip-check');
+    const data = await res.json();
+
+    if (data.success) {
+      bulkZipUploadState.catalogDesigns = data.designs || [];
+      if (data.maxUploadSizeMb) {
+        bulkZipUploadState.maxUploadSizeMb = data.maxUploadSizeMb;
+        const lbl = document.getElementById('bulkZipMaxSizeLabel');
+        if (lbl) lbl.textContent = `${data.maxUploadSizeMb} MB`;
+      }
+
+      const emptyWarning = document.getElementById('bulkZipEmptyDbWarning');
+      const fileSection = document.getElementById('bulkZipFileSelectSection');
+      const submitBtn = document.getElementById('bulkZipSubmitBtn');
+
+      if (data.isEmpty) {
+        if (emptyWarning) emptyWarning.style.display = 'block';
+        if (fileSection) fileSection.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = true;
+      } else {
+        if (emptyWarning) emptyWarning.style.display = 'none';
+        if (fileSection) fileSection.style.display = 'block';
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+  } catch (err) {
+    console.warn('[Bulk ZIP Pre-check Error]:', err);
+  }
+}
+
+function closeBulkZipUploadModal() {
+  const modal = document.getElementById('bulkZipUploadModal');
+  if (!modal) return;
+
+  if (bulkZipUploadState.isUploading) {
+    if (!confirm('An upload is currently in progress. Do you really want to close and cancel the upload?')) {
+      return;
+    }
+    abortBulkZipUpload();
+  }
+
+  modal.style.display = 'none';
+}
+
+function resetBulkZipModalUI() {
+  bulkZipUploadState.isUploading = false;
+  bulkZipUploadState.isCancelled = false;
+  bulkZipUploadState.items = [];
+  bulkZipUploadState.activeControllers.clear();
+  bulkZipUploadState.stats = { total: 0, processed: 0, linked: 0, unmatched: 0, ambiguous: 0, failed: 0, totalBytes: 0, uploadedBytes: 0 };
+  bulkZipUploadState.startTime = null;
+  if (bulkZipUploadState.speedInterval) {
+    clearInterval(bulkZipUploadState.speedInterval);
+    bulkZipUploadState.speedInterval = null;
+  }
+
+  const fileInput = document.getElementById('bulkZipFilesInput');
+  if (fileInput) fileInput.value = '';
+
+  const preSummary = document.getElementById('bulkZipPreUploadSummary');
+  if (preSummary) preSummary.style.display = 'none';
+
+  const progressSection = document.getElementById('bulkZipProgressSection');
+  if (progressSection) progressSection.style.display = 'none';
+
+  const reportCard = document.getElementById('bulkZipReportCard');
+  if (reportCard) reportCard.style.display = 'none';
+
+  const abortBtn = document.getElementById('bulkZipAbortBtn');
+  if (abortBtn) abortBtn.style.display = 'none';
+
+  const cancelCloseBtn = document.getElementById('bulkZipCancelCloseBtn');
+  if (cancelCloseBtn) cancelCloseBtn.style.display = 'inline-block';
+
+  const submitBtn = document.getElementById('bulkZipSubmitBtn');
+  if (submitBtn) {
+    submitBtn.style.display = 'inline-flex';
+    submitBtn.disabled = true;
+  }
+
+  const finishRefreshBtn = document.getElementById('bulkZipFinishRefreshBtn');
+  if (finishRefreshBtn) finishRefreshBtn.style.display = 'none';
+
+  const fileSection = document.getElementById('bulkZipFileSelectSection');
+  if (fileSection) fileSection.style.display = 'block';
+
+  const liveList = document.getElementById('bulkZipLiveList');
+  if (liveList) liveList.innerHTML = '';
+}
+
+// Handle file selection and perform pre-upload Dry-Run matching
+async function handleBulkZipFilesSelected(input) {
+  const files = input.files ? Array.from(input.files) : [];
+  if (files.length === 0) return;
+
+  const allowedExts = ['.zip', '.rar', '.dst', '.pes', '.jef', '.exp'];
+  const maxBytes = bulkZipUploadState.maxUploadSizeMb * 1024 * 1024;
+
+  let totalBytes = 0;
+  const warnings = [];
+  const items = [];
+
+  files.forEach((file, idx) => {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    const isValidExt = allowedExts.includes(ext);
+    const isOversized = file.size > maxBytes;
+
+    if (!isValidExt) {
+      warnings.push(`"${file.name}": Unsupported format. Allowed: .zip, .rar, .dst, .pes, .jef, .exp`);
+    } else if (isOversized) {
+      warnings.push(`"${file.name}" exceeds ${bulkZipUploadState.maxUploadSizeMb} MB limit (${formatBytes(file.size)}).`);
+    }
+
+    const isValid = isValidExt && !isOversized;
+    if (isValid) totalBytes += file.size;
+
+    items.push({
+      id: idx + 1,
+      file,
+      originalName: file.name,
+      size: file.size,
+      formattedSize: formatBytes(file.size),
+      isValid,
+      isChunked: file.size > bulkZipUploadState.chunkThreshold,
+      status: isValid ? 'pending' : 'failed',
+      details: isValid ? 'Pending upload' : (isOversized ? 'File oversized' : 'Unsupported format'),
+      error: isValid ? null : 'Validation failed'
+    });
+  });
+
+  bulkZipUploadState.items = items;
+  bulkZipUploadState.stats.total = items.filter(it => it.isValid).length;
+  bulkZipUploadState.stats.totalBytes = totalBytes;
+
+  const preSummary = document.getElementById('bulkZipPreUploadSummary');
+  const preCount = document.getElementById('bulkZipPreSelectedCount');
+  const preSize = document.getElementById('bulkZipPreSelectedSize');
+  const preChunkPlan = document.getElementById('bulkZipPreChunkingPlan');
+  const preWarnings = document.getElementById('bulkZipPreValidationWarnings');
+  const submitBtn = document.getElementById('bulkZipSubmitBtn');
+
+  const validCount = items.filter(it => it.isValid).length;
+  const chunkedCount = items.filter(it => it.isValid && it.isChunked).length;
+
+  if (preCount) preCount.textContent = `${validCount} / ${files.length}`;
+  if (preSize) preSize.textContent = formatBytes(totalBytes);
+  if (preChunkPlan) preChunkPlan.textContent = `${chunkedCount} large files (> 5MB) will be chunked in 2MB slices`;
+
+  if (warnings.length > 0 && preWarnings) {
+    preWarnings.innerHTML = `<strong><i class="fa-solid fa-triangle-exclamation"></i> Warnings:</strong><ul style="margin: 4px 0 0 16px; padding: 0;">` +
+      warnings.slice(0, 5).map(w => `<li>${w}</li>`).join('') +
+      (warnings.length > 5 ? `<li>...and ${warnings.length - 5} more</li>` : '') +
+      `</ul>`;
+    preWarnings.style.display = 'block';
+  } else if (preWarnings) {
+    preWarnings.style.display = 'none';
+  }
+
+  if (preSummary) preSummary.style.display = 'block';
+  if (submitBtn) submitBtn.disabled = validCount === 0;
+
+  // Run Dry-Run Match on Server
+  await runBulkZipDryRun(items.filter(it => it.isValid).map(it => it.originalName));
+}
+
+// Dry-run match call
+async function runBulkZipDryRun(filenames) {
+  const dryCard = document.getElementById('bulkZipDryRunCard');
+  const statusText = document.getElementById('bulkZipDryRunStatusText');
+  const matchedBadge = document.getElementById('bulkZipDryMatchedCount');
+  const unmatchedBadge = document.getElementById('bulkZipDryUnmatchedCount');
+  const ambiguousBadge = document.getElementById('bulkZipDryAmbiguousCount');
+  const dryWarn = document.getElementById('bulkZipDryRunWarning');
+
+  if (!dryCard || filenames.length === 0) return;
+
+  if (statusText) statusText.textContent = 'Running dry-run match...';
+
+  try {
+    const res = await fetch('/admin/designs/bulk-zip-dry-run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      body: JSON.stringify({ filenames, _csrf: getCsrfToken() })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      if (statusText) statusText.textContent = 'Dry-run check complete';
+      if (matchedBadge) matchedBadge.textContent = data.matchedCount;
+      if (unmatchedBadge) unmatchedBadge.textContent = data.unmatchedCount;
+      if (ambiguousBadge) ambiguousBadge.textContent = data.ambiguousCount;
+
+      if (dryWarn) {
+        dryWarn.style.display = (data.unmatchedCount > 0 || data.ambiguousCount > 0) ? 'block' : 'none';
+      }
+    } else {
+      if (statusText) statusText.textContent = data.message || 'Check failed';
+    }
+  } catch (err) {
+    console.warn('[Dry-Run Match Network Error]:', err);
+    if (statusText) statusText.textContent = 'Network check skipped';
+  }
+}
+
+// Initialize and start parallel stream workers
+async function startChunkedBulkZipUpload() {
+  const pendingItems = bulkZipUploadState.items.filter(it => it.isValid && it.status === 'pending');
+  if (pendingItems.length === 0) {
+    alert('No valid files selected for upload.');
+    return;
+  }
+
+  bulkZipUploadState.isUploading = true;
+  bulkZipUploadState.isCancelled = false;
+  bulkZipUploadState.startTime = Date.now();
+
+  // Switch UI to Progress Mode
+  const fileSection = document.getElementById('bulkZipFileSelectSection');
+  const preSummary = document.getElementById('bulkZipPreUploadSummary');
+  const progressSection = document.getElementById('bulkZipProgressSection');
+  const abortBtn = document.getElementById('bulkZipAbortBtn');
+  const submitBtn = document.getElementById('bulkZipSubmitBtn');
+  const cancelCloseBtn = document.getElementById('bulkZipCancelCloseBtn');
+
+  if (fileSection) fileSection.style.display = 'none';
+  if (preSummary) preSummary.style.display = 'none';
+  if (progressSection) progressSection.style.display = 'block';
+  if (abortBtn) abortBtn.style.display = 'inline-flex';
+  if (submitBtn) submitBtn.style.display = 'none';
+  if (cancelCloseBtn) cancelCloseBtn.style.display = 'none';
+
+  renderBulkZipLiveList();
+  updateBulkZipProgressCounters();
+
+  // Speed and ETA calculation timer
+  bulkZipUploadState.speedInterval = setInterval(updateBulkZipSpeedAndEta, 1000);
+
+  // Worker Queue
+  const queue = [...pendingItems];
+  const workers = [];
+
+  for (let i = 0; i < bulkZipUploadState.maxConcurrency; i++) {
+    workers.push(runBulkZipWorker(queue));
+  }
+
+  await Promise.all(workers);
+
+  if (bulkZipUploadState.speedInterval) {
+    clearInterval(bulkZipUploadState.speedInterval);
+    bulkZipUploadState.speedInterval = null;
+  }
+
+  onBulkZipUploadFinished();
+}
+
+async function runBulkZipWorker(queue) {
+  while (queue.length > 0 && !bulkZipUploadState.isCancelled) {
+    const item = queue.shift();
+    if (!item) break;
+
+    bulkZipUploadState.activeStreams++;
+    updateBulkZipProgressCounters();
+
+    try {
+      if (item.isChunked) {
+        await processSingleZipItemChunked(item);
+      } else {
+        await processSingleZipItemDirect(item);
+      }
+    } catch (err) {
+      item.status = 'failed';
+      item.details = err.message || 'Upload error';
+      bulkZipUploadState.stats.failed++;
+      bulkZipUploadState.stats.processed++;
+      updateBulkZipLiveItemRow(item);
+    } finally {
+      bulkZipUploadState.activeStreams--;
+      updateBulkZipProgressCounters();
+    }
+  }
+}
+
+// Upload file using chunked slices
+async function processSingleZipItemChunked(item) {
+  const file = item.file;
+  const totalChunks = Math.ceil(file.size / bulkZipUploadState.chunkSize);
+  const uploadId = `zip_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+
+  item.status = 'uploading';
+  item.details = `Starting chunked upload (${totalChunks} chunks)...`;
+  updateBulkZipLiveItemRow(item);
+
+  for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+    if (bulkZipUploadState.isCancelled) {
+      item.status = 'failed';
+      item.details = 'Cancelled by user';
+      bulkZipUploadState.stats.failed++;
+      bulkZipUploadState.stats.processed++;
+      updateBulkZipLiveItemRow(item);
+      return;
+    }
+
+    const start = chunkIdx * bulkZipUploadState.chunkSize;
+    const end = Math.min(file.size, start + bulkZipUploadState.chunkSize);
+    const chunkBlob = file.slice(start, end);
+
+    let success = false;
+    let attempt = 0;
+    let lastErr = null;
+
+    while (attempt < 3 && !success && !bulkZipUploadState.isCancelled) {
+      attempt++;
+      try {
+        item.details = `Chunk ${chunkIdx + 1}/${totalChunks} (attempt ${attempt})...`;
+        updateBulkZipLiveItemRow(item);
+
+        await uploadChunkWithTimeout(chunkBlob, uploadId, chunkIdx, totalChunks, file.name);
+        success = true;
+        bulkZipUploadState.stats.uploadedBytes += chunkBlob.size;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+    }
+
+    if (!success) {
+      throw new Error(`Chunk ${chunkIdx + 1}/${totalChunks} failed: ${lastErr ? lastErr.message : 'Timeout'}`);
+    }
+  }
+
+  if (bulkZipUploadState.isCancelled) return;
+
+  // Complete & Assemble on server
+  item.details = 'Assembling chunks and validating archive...';
+  updateBulkZipLiveItemRow(item);
+
+  const controller = new AbortController();
+  bulkZipUploadState.activeControllers.add(controller);
+
+  try {
+    const res = await fetch('/admin/designs/bulk-zip-complete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        uploadId,
+        totalChunks,
+        originalName: file.name,
+        fileSize: file.size,
+        _csrf: getCsrfToken()
+      })
+    });
+    const result = await res.json();
+    bulkZipUploadState.activeControllers.delete(controller);
+
+    handleZipItemResult(item, result);
+  } catch (err) {
+    bulkZipUploadState.activeControllers.delete(controller);
+    throw err;
+  }
+}
+
+function uploadChunkWithTimeout(chunkBlob, uploadId, chunkIndex, totalChunks, originalName) {
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    bulkZipUploadState.activeControllers.add(controller);
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Chunk upload timed out (60s).'));
+    }, 60000);
+
+    const formData = new FormData();
+    formData.append('chunk', chunkBlob, `chunk_${chunkIndex}`);
+    formData.append('uploadId', uploadId);
+    formData.append('chunkIndex', String(chunkIndex));
+    formData.append('totalChunks', String(totalChunks));
+    formData.append('originalName', originalName);
+    formData.append('_csrf', getCsrfToken());
+
+    fetch('/admin/designs/bulk-zip-chunk', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      signal: controller.signal,
+      body: formData
+    })
+      .then(res => res.json())
+      .then(data => {
+        clearTimeout(timeout);
+        bulkZipUploadState.activeControllers.delete(controller);
+        if (data.success) resolve(data);
+        else reject(new Error(data.message || 'Chunk failed'));
+      })
+      .catch(err => {
+        clearTimeout(timeout);
+        bulkZipUploadState.activeControllers.delete(controller);
+        reject(err);
+      });
+  });
+}
+
+// Upload small file directly
+async function processSingleZipItemDirect(item) {
+  item.status = 'uploading';
+  item.details = 'Uploading...';
+  updateBulkZipLiveItemRow(item);
+
+  const controller = new AbortController();
+  bulkZipUploadState.activeControllers.add(controller);
+
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 60000);
+
+  const formData = new FormData();
+  formData.append('files', item.file);
+  formData.append('_csrf', getCsrfToken());
+
+  try {
+    const res = await fetch('/admin/designs/bulk-upload-zips', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      signal: controller.signal,
+      body: formData
+    });
+    clearTimeout(timeoutId);
+    bulkZipUploadState.activeControllers.delete(controller);
+
+    const data = await res.json();
+    bulkZipUploadState.stats.uploadedBytes += item.file.size;
+
+    if (!res.ok) throw new Error(data.message || `Server error ${res.status}`);
+
+    const matched = (data.matched || []).find(m => m.filename === item.originalName);
+    const ambiguous = (data.ambiguous || []).find(a => a.filename === item.originalName);
+    const unmatched = (data.unmatched || []).find(u => u.filename === item.originalName);
+    const failed = (data.failed || []).find(f => f.filename === item.originalName);
+
+    if (matched) {
+      handleZipItemResult(item, { status: 'matched', ...matched });
+    } else if (ambiguous) {
+      handleZipItemResult(item, { status: 'ambiguous', ...ambiguous });
+    } else if (unmatched) {
+      handleZipItemResult(item, { status: 'unmatched', ...unmatched });
+    } else if (failed) {
+      handleZipItemResult(item, { status: 'failed', error: failed.error });
+    } else {
+      handleZipItemResult(item, { status: 'unmatched', reason: 'No product matched' });
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    bulkZipUploadState.activeControllers.delete(controller);
+    throw err;
+  }
+}
+
+function handleZipItemResult(item, result) {
+  if (result.status === 'matched') {
+    item.status = 'linked';
+    item.matchedDesignId = result.designId;
+    item.matchedSku = result.sku;
+    item.matchedTitle = result.title;
+    item.formats = result.formats || [];
+    item.checksum = result.checksum;
+    item.details = `Linked to #${result.designId} (${result.sku || result.title})`;
+    bulkZipUploadState.stats.linked++;
+  } else if (result.status === 'ambiguous') {
+    item.status = 'ambiguous';
+    item.tempToken = result.tempToken;
+    item.candidates = result.candidates || [];
+    item.checksum = result.checksum;
+    item.formats = result.detectedFormats || [];
+    item.details = `Ambiguous (${item.candidates.length} candidates)`;
+    bulkZipUploadState.stats.ambiguous++;
+  } else if (result.status === 'unmatched') {
+    item.status = 'unmatched';
+    item.tempToken = result.tempToken;
+    item.suggestions = result.suggestions || [];
+    item.checksum = result.checksum;
+    item.formats = result.detectedFormats || [];
+    item.details = 'No matching product';
+    bulkZipUploadState.stats.unmatched++;
+  } else {
+    item.status = 'failed';
+    item.details = result.error || 'Failed';
+    bulkZipUploadState.stats.failed++;
+  }
+
+  bulkZipUploadState.stats.processed++;
+  updateBulkZipLiveItemRow(item);
+  updateBulkZipProgressCounters();
+}
+
+function updateBulkZipProgressCounters() {
+  const { total, processed, linked, unmatched, ambiguous, failed } = bulkZipUploadState.stats;
+  const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+
+  const bar = document.getElementById('bulkZipProgressBar');
+  if (bar) bar.style.width = `${pct}%`;
+
+  const counterText = document.getElementById('bulkZipOverallProgressCounter');
+  if (counterText) counterText.textContent = `${processed} / ${total} uploaded (${pct}%)`;
+
+  const linkedEl = document.getElementById('bulkZipLinkedCount');
+  if (linkedEl) linkedEl.textContent = linked;
+
+  const unmatchedEl = document.getElementById('bulkZipUnmatchedCount');
+  if (unmatchedEl) unmatchedEl.textContent = unmatched;
+
+  const ambiguousEl = document.getElementById('bulkZipAmbiguousCount');
+  if (ambiguousEl) ambiguousEl.textContent = ambiguous;
+
+  const failedEl = document.getElementById('bulkZipFailedCount');
+  if (failedEl) failedEl.textContent = failed;
+
+  const streamsEl = document.getElementById('bulkZipActiveStreamsText');
+  if (streamsEl) streamsEl.textContent = `Streams: ${bulkZipUploadState.activeStreams} / ${bulkZipUploadState.maxConcurrency}`;
+}
+
+function updateBulkZipSpeedAndEta() {
+  if (!bulkZipUploadState.startTime || bulkZipUploadState.stats.totalBytes === 0) return;
+
+  const elapsedSeconds = Math.max(1, (Date.now() - bulkZipUploadState.startTime) / 1000);
+  const bytesPerSec = bulkZipUploadState.stats.uploadedBytes / elapsedSeconds;
+  const remainingBytes = Math.max(0, bulkZipUploadState.stats.totalBytes - bulkZipUploadState.stats.uploadedBytes);
+
+  let etaText = 'Estimating...';
+  if (bytesPerSec > 1024 && remainingBytes > 0) {
+    const remainingSecs = Math.round(remainingBytes / bytesPerSec);
+    if (remainingSecs < 60) etaText = `~${remainingSecs}s remaining`;
+    else etaText = `~${Math.round(remainingSecs / 60)}m remaining`;
+  } else if (remainingBytes === 0) {
+    etaText = 'Finishing...';
+  }
+
+  const speedStr = `${formatBytes(bytesPerSec)}/s`;
+  const speedEtaEl = document.getElementById('bulkZipSpeedEtaText');
+  if (speedEtaEl) {
+    speedEtaEl.textContent = `Speed: ${speedStr} | ${etaText}`;
+  }
+}
+
+function renderBulkZipLiveList() {
+  const listContainer = document.getElementById('bulkZipLiveList');
+  if (!listContainer) return;
+
+  const html = bulkZipUploadState.items.map(item => {
+    let icon = '<i class="fa-regular fa-clock" style="color: #8C7F79;"></i>';
+    let badgeColor = '#FAF9F6';
+    let borderColor = 'var(--admin-border)';
+    let statusText = item.details || 'Pending';
+
+    if (item.status === 'uploading') {
+      icon = '<i class="fa-solid fa-spinner fa-spin" style="color: #2E7D32;"></i>';
+      badgeColor = '#E8F5E9';
+      borderColor = '#C8E6C9';
+    } else if (item.status === 'linked') {
+      icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
+      badgeColor = '#E8F5E9';
+      borderColor = '#C8E6C9';
+    } else if (item.status === 'ambiguous') {
+      icon = '<i class="fa-solid fa-code-compare" style="color: #BF360C;"></i>';
+      badgeColor = '#FFF3E0';
+      borderColor = '#FFCCBC';
+    } else if (item.status === 'unmatched') {
+      icon = '<i class="fa-solid fa-circle-question" style="color: #E65100;"></i>';
+      badgeColor = '#FFF8E1';
+      borderColor = '#FFE082';
+    } else if (item.status === 'failed') {
+      icon = '<i class="fa-solid fa-circle-xmark" style="color: #C62828;"></i>';
+      badgeColor = '#FFEBEE';
+      borderColor = '#FFCDD2';
+    }
+
+    return `
+      <div id="bulk-zip-item-${item.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;">
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+          ${icon}
+          <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
+          <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
+        </div>
+        <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <span>${escapeHtml(statusText)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listContainer.innerHTML = html;
+}
+
+function updateBulkZipLiveItemRow(item) {
+  const el = document.getElementById(`bulk-zip-item-${item.id}`);
+  if (!el) {
+    renderBulkZipLiveList();
+    return;
+  }
+
+  let icon = '<i class="fa-regular fa-clock" style="color: #8C7F79;"></i>';
+  let badgeColor = '#FAF9F6';
+  let borderColor = 'var(--admin-border)';
+  let statusText = item.details || 'Pending';
+
+  if (item.status === 'uploading') {
+    icon = '<i class="fa-solid fa-spinner fa-spin" style="color: #2E7D32;"></i>';
+    badgeColor = '#E8F5E9';
+    borderColor = '#C8E6C9';
+  } else if (item.status === 'linked') {
+    icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
+    badgeColor = '#E8F5E9';
+    borderColor = '#C8E6C9';
+  } else if (item.status === 'ambiguous') {
+    icon = '<i class="fa-solid fa-code-compare" style="color: #BF360C;"></i>';
+    badgeColor = '#FFF3E0';
+    borderColor = '#FFCCBC';
+  } else if (item.status === 'unmatched') {
+    icon = '<i class="fa-solid fa-circle-question" style="color: #E65100;"></i>';
+    badgeColor = '#FFF8E1';
+    borderColor = '#FFE082';
+  } else if (item.status === 'failed') {
+    icon = '<i class="fa-solid fa-circle-xmark" style="color: #C62828;"></i>';
+    badgeColor = '#FFEBEE';
+    borderColor = '#FFCDD2';
+  }
+
+  el.style.background = badgeColor;
+  el.style.border = `1px solid ${borderColor}`;
+  el.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+      ${icon}
+      <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
+      <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
+    </div>
+    <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+      <span>${escapeHtml(statusText)}</span>
+    </div>
+  `;
+}
+
+function abortBulkZipUpload() {
+  bulkZipUploadState.isCancelled = true;
+  bulkZipUploadState.isUploading = false;
+
+  bulkZipUploadState.activeControllers.forEach(ctrl => {
+    try { ctrl.abort(); } catch (_) {}
+  });
+  bulkZipUploadState.activeControllers.clear();
+
+  const statusBadge = document.getElementById('bulkZipStatusBadge');
+  if (statusBadge) {
+    statusBadge.innerHTML = '<i class="fa-solid fa-circle-stop"></i> Upload Cancelled';
+    statusBadge.style.color = '#C62828';
+  }
+
+  bulkZipUploadState.items.forEach(it => {
+    if (it.status === 'uploading' || it.status === 'pending') {
+      it.status = 'failed';
+      it.details = 'Cancelled by user';
+      bulkZipUploadState.stats.failed++;
+      bulkZipUploadState.stats.processed++;
+      updateBulkZipLiveItemRow(it);
+    }
+  });
+
+  updateBulkZipProgressCounters();
+  onBulkZipUploadFinished();
+}
+
+function onBulkZipUploadFinished() {
+  bulkZipUploadState.isUploading = false;
+
+  const statusBadge = document.getElementById('bulkZipStatusBadge');
+  if (statusBadge) {
+    if (bulkZipUploadState.isCancelled) {
+      statusBadge.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelled';
+      statusBadge.style.color = '#C62828';
+    } else {
+      statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Complete';
+      statusBadge.style.color = '#2E7D32';
+    }
+  }
+
+  const abortBtn = document.getElementById('bulkZipAbortBtn');
+  if (abortBtn) abortBtn.style.display = 'none';
+
+  const finishRefreshBtn = document.getElementById('bulkZipFinishRefreshBtn');
+  if (finishRefreshBtn) finishRefreshBtn.style.display = 'inline-flex';
+
+  renderBulkZipCompletionReport();
+}
+
+function renderBulkZipCompletionReport() {
+  const reportCard = document.getElementById('bulkZipReportCard');
+  if (!reportCard) return;
+
+  reportCard.style.display = 'block';
+
+  const { linked, unmatched, ambiguous, failed } = bulkZipUploadState.stats;
+  const summaryText = document.getElementById('bulkZipReportSummaryText');
+  if (summaryText) {
+    summaryText.innerHTML = `Process completed: <strong>${linked}</strong> linked, <strong>${unmatched}</strong> unmatched, <strong>${ambiguous}</strong> ambiguous, <strong>${failed}</strong> failed.`;
+  }
+
+  // 1. Ambiguous list
+  const ambiguousBox = document.getElementById('bulkZipAmbiguousDetailsBox');
+  const ambiguousList = document.getElementById('bulkZipAmbiguousList');
+  const ambiguousItems = bulkZipUploadState.items.filter(it => it.status === 'ambiguous');
+
+  if (ambiguousBox && ambiguousList) {
+    if (ambiguousItems.length > 0) {
+      ambiguousBox.style.display = 'block';
+      ambiguousList.innerHTML = ambiguousItems.map(item => `
+        <div style="background: #FFFFFF; border: 1px solid #FFE0B2; border-radius: 6px; padding: 8px 10px;">
+          <div style="font-weight: 700; color: #BF360C; margin-bottom: 4px;">
+            <i class="fa-solid fa-file-zipper"></i> ${escapeHtml(item.originalName)}
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+            <span style="color: var(--admin-text-muted);">Pick matching product:</span>
+            ${(item.candidates || []).map(c => `
+              <button type="button" onclick="linkSingleBulkZip(${item.id}, ${c.id}, '${item.tempToken}', '${escapeHtml(item.originalName)}', '${item.checksum || ''}')" style="background: #E8F5E9; border: 1px solid #81C784; color: #1B5E20; padding: 2px 8px; border-radius: 4px; font-size: 0.74rem; cursor: pointer; font-weight: 600;">
+                #${c.id} ${escapeHtml(c.sku || c.title)}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    } else {
+      ambiguousBox.style.display = 'none';
+    }
+  }
+
+  // 2. Unmatched list with top 3 suggestions & manual dropdown
+  const unmatchedBox = document.getElementById('bulkZipUnmatchedDetailsBox');
+  const unmatchedList = document.getElementById('bulkZipUnmatchedNamesList');
+  const unmatchedItems = bulkZipUploadState.items.filter(it => it.status === 'unmatched');
+
+  if (unmatchedBox && unmatchedList) {
+    if (unmatchedItems.length > 0) {
+      unmatchedBox.style.display = 'block';
+
+      // Build options from cached designs
+      const optionsHtml = (bulkZipUploadState.catalogDesigns || []).slice(0, 500).map(d =>
+        `<option value="${d.id}">#${d.id} - ${escapeHtml(d.sku || '')} (${escapeHtml(d.title || '')})</option>`
+      ).join('');
+
+      unmatchedList.innerHTML = unmatchedItems.map(item => `
+        <div style="background: #FFFFFF; border: 1px solid #FFE082; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #E65100;">${escapeHtml(item.originalName)}</strong>
+            <span style="font-size: 0.7rem; color: var(--admin-text-muted);">${item.formattedSize}</span>
+          </div>
+
+          <!-- Suggestions -->
+          ${(item.suggestions && item.suggestions.length > 0) ? `
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.72rem; color: var(--admin-text-muted); font-weight: 600;">Top Suggestions:</span>
+              ${item.suggestions.map(s => `
+                <button type="button" onclick="linkSingleBulkZip(${item.id}, ${s.id}, '${item.tempToken}', '${escapeHtml(item.originalName)}', '${item.checksum || ''}')" style="background: #E8F5E9; border: 1px solid #A5D6A7; color: #2E7D32; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; cursor: pointer; font-weight: 600;" title="Link to this design">
+                  ${escapeHtml(s.sku || s.title)} (${Math.round(s.similarity * 100)}%)
+                </button>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          <!-- Manual searchable dropdown selector -->
+          <div style="display: flex; gap: 6px; align-items: center; margin-top: 2px;">
+            <select id="manualLinkSelect-${item.id}" style="flex: 1; height: 30px; font-size: 0.76rem; border: 1px solid var(--admin-border); border-radius: 6px; padding: 0 6px;">
+              <option value="">-- Choose design to link --</option>
+              ${optionsHtml}
+            </select>
+            <button type="button" onclick="linkFromDropdown(${item.id}, '${item.tempToken}', '${escapeHtml(item.originalName)}', '${item.checksum || ''}')" style="background: var(--admin-primary); color: #FFF; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.74rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              <i class="fa-solid fa-link"></i> Link
+            </button>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      unmatchedBox.style.display = 'none';
+    }
+  }
+
+  // 3. Failed details box
+  const failedBox = document.getElementById('bulkZipFailedDetailsBox');
+  const failedList = document.getElementById('bulkZipFailedReasonsList');
+  const failedItems = bulkZipUploadState.items.filter(it => it.status === 'failed');
+
+  if (failedBox && failedList) {
+    if (failedItems.length > 0) {
+      failedBox.style.display = 'block';
+      failedList.innerHTML = failedItems.map(it => `
+        <div style="padding: 2px 0;">• ${escapeHtml(it.originalName)}: ${escapeHtml(it.details || it.error || 'Unknown failure')}</div>
+      `).join('');
+    } else {
+      failedBox.style.display = 'none';
+    }
+  }
+
+  // Retry failed button visibility
+  const retryBtn = document.getElementById('bulkZipRetryFailedBtn');
+  const retryCount = document.getElementById('bulkZipRetryBtnCount');
+  if (retryBtn) {
+    if (failedItems.length > 0) {
+      retryBtn.style.display = 'inline-flex';
+      if (retryCount) retryCount.textContent = failedItems.length;
+    } else {
+      retryBtn.style.display = 'none';
+    }
+  }
+}
+
+// Link unmatched item from dropdown
+function linkFromDropdown(itemId, tempToken, originalName, checksum) {
+  const select = document.getElementById(`manualLinkSelect-${itemId}`);
+  if (!select || !select.value) {
+    alert('Please select a design from the list.');
+    return;
+  }
+  linkSingleBulkZip(itemId, parseInt(select.value, 10), tempToken, originalName, checksum);
+}
+
+// Link single unmatched or ambiguous ZIP manually
+async function linkSingleBulkZip(itemId, designId, tempToken, originalName, checksum) {
+  const item = bulkZipUploadState.items.find(it => it.id === itemId);
+
+  try {
+    const res = await fetch('/admin/designs/bulk-link-single-zip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      body: JSON.stringify({
+        designId,
+        tempToken,
+        originalName,
+        checksum,
+        detectedFormats: item ? item.formats : [],
+        _csrf: getCsrfToken()
+      })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to link file.');
+    }
+
+    if (item) {
+      const prevStatus = item.status;
+      item.status = 'linked';
+      item.matchedDesignId = designId;
+      item.details = `Manually linked to #${designId} (${data.sku || data.title})`;
+
+      if (prevStatus === 'unmatched') bulkZipUploadState.stats.unmatched = Math.max(0, bulkZipUploadState.stats.unmatched - 1);
+      if (prevStatus === 'ambiguous') bulkZipUploadState.stats.ambiguous = Math.max(0, bulkZipUploadState.stats.ambiguous - 1);
+      bulkZipUploadState.stats.linked++;
+
+      updateBulkZipLiveItemRow(item);
+      updateBulkZipProgressCounters();
+      renderBulkZipCompletionReport();
+    }
+
+    alert(data.message || 'Successfully linked!');
+  } catch (err) {
+    alert(`Link Error: ${err.message}`);
+  }
+}
+
+// Retry failed ZIP uploads
+function retryFailedBulkZips() {
+  const failedItems = bulkZipUploadState.items.filter(it => it.status === 'failed');
+  if (failedItems.length === 0) return;
+
+  failedItems.forEach(it => {
+    it.status = 'pending';
+    it.details = 'Pending retry...';
+    bulkZipUploadState.stats.failed--;
+    bulkZipUploadState.stats.processed--;
+  });
+
+  updateBulkZipProgressCounters();
+
+  const reportCard = document.getElementById('bulkZipReportCard');
+  if (reportCard) reportCard.style.display = 'none';
+
+  startChunkedBulkZipUpload();
+}
+
+// Download report CSV
+function downloadBulkZipUploadReportCsv() {
+  const rows = [
+    ['Filename', 'Status', 'Matched Design ID', 'SKU', 'Title', 'File Size', 'Formats', 'Checksum', 'Details / Error']
+  ];
+
+  bulkZipUploadState.items.forEach(it => {
+    rows.push([
+      `"${(it.originalName || '').replace(/"/g, '""')}"`,
+      `"${it.status}"`,
+      `"${it.matchedDesignId || ''}"`,
+      `"${(it.matchedSku || '').replace(/"/g, '""')}"`,
+      `"${(it.matchedTitle || '').replace(/"/g, '""')}"`,
+      `"${it.formattedSize || ''}"`,
+      `"${(it.formats || []).join(', ')}"`,
+      `"${it.checksum || ''}"`,
+      `"${(it.details || it.error || '').replace(/"/g, '""')}"`
+    ]);
+  });
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(r => r.join(',')).join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', `bulk_zip_upload_report_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function finishBulkZipUploadAndRefresh() {
+  closeBulkZipUploadModal();
+  window.location.reload();
+}
+
+/**
+ * Single Replace ZIP Modal functions (For Manage Designs Table & Form Page)
+ */
+function openReplaceZipModal(designId, designTitle) {
+  const modal = document.getElementById('replaceZipModal');
+  const idInput = document.getElementById('replaceZipDesignId');
+  const titleP = document.getElementById('replaceZipTitle');
+  const fileInput = document.getElementById('replaceZipFileInput');
+  if (!modal) return;
+  if (idInput) idInput.value = designId || '';
+  if (titleP) titleP.textContent = designTitle ? `Replace machine file for: "${designTitle}"` : `Replace machine file for Design #${designId}`;
+  if (fileInput) fileInput.value = '';
+  modal.style.display = 'flex';
+}
+
+function closeReplaceZipModal() {
+  const modal = document.getElementById('replaceZipModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitReplaceZip(e) {
+  e.preventDefault();
+  const idInput = document.getElementById('replaceZipDesignId');
+  const fileInput = document.getElementById('replaceZipFileInput');
+  const submitBtn = document.getElementById('replaceZipSubmitBtn');
+  if (!idInput || !fileInput || !fileInput.files || fileInput.files.length === 0) return;
+
+  const file = fileInput.files[0];
+  const designId = idInput.value;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('designId', designId);
+  formData.append('_csrf', getCsrfToken());
+
+  const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+  }
+
+  try {
+    const res = await fetch(`/admin/designs/replace-zip/${designId}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRF-Token': getCsrfToken()
+      },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to replace machine file.');
+    }
+    closeReplaceZipModal();
+    if (typeof showToast === 'function') showToast(data.message || 'Machine file replaced successfully!');
+    else if (typeof showAdminToast === 'function') showAdminToast(data.message || 'Machine file replaced successfully!');
+    else alert(data.message || 'Machine file replaced successfully!');
+    setTimeout(() => { window.location.reload(); }, 800);
+  } catch (err) {
+    alert(`Replace ZIP Error: ${err.message}`);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
+  }
+}
+
+// Drag & drop event listeners for bulk ZIP modal
+document.addEventListener('DOMContentLoaded', () => {
+  const dropArea = document.getElementById('bulkZipDropArea');
+  const fileInput = document.getElementById('bulkZipFilesInput');
+
+  if (dropArea && fileInput) {
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropArea.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropArea.style.borderColor = '#2E7D32';
+        dropArea.style.background = '#E8F5E9';
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropArea.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropArea.style.borderColor = '#81C784';
+        dropArea.style.background = '#F1F8E9';
+      });
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        handleBulkZipFilesSelected(fileInput);
+      }
+    });
+
+    dropArea.addEventListener('click', (e) => {
+      if (e.target !== fileInput) {
+        fileInput.click();
+      }
+    });
+  }
+});
 
 
 

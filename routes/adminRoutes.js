@@ -4,6 +4,7 @@ const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/multerUpload');
 const { spreadsheetUploadMiddleware } = require('../middleware/spreadsheetUpload');
 const { bulkImageUploadMiddleware } = require('../middleware/bulkImageUpload');
+const { bulkZipChunkMiddleware, bulkZipDirectUploadMiddleware, singleZipUploadMiddleware } = require('../middleware/bulkZipUpload');
 
 const adminAuthController = require('../controllers/admin/adminAuthController');
 const adminDashboardController = require('../controllers/admin/adminDashboardController');
@@ -61,6 +62,16 @@ router.post('/admin/designs/delete-file/:fileId', adminDesignController.deleteFi
 router.post('/admin/designs/delete-all-files/:designId', adminDesignController.deleteAllFiles);
 router.post('/admin/designs/replace-image/:id', upload.any(), adminDesignController.replaceImage);
 router.post('/admin/designs/bulk-upload-images', bulkImageUploadMiddleware, adminDesignController.bulkUploadImages);
+router.get('/admin/designs/bulk-upload-check', adminDesignController.bulkUploadCheck);
+router.post('/admin/designs/bulk-link-single-image', adminDesignController.linkSingleImage);
+router.get('/admin/designs/bulk-zip-check', adminDesignController.bulkZipCheck);
+router.post('/admin/designs/bulk-zip-dry-run', adminDesignController.bulkZipDryRun);
+router.post('/admin/designs/bulk-zip-chunk', bulkZipChunkMiddleware, adminDesignController.bulkZipChunk);
+router.post('/admin/designs/bulk-zip-complete', adminDesignController.bulkZipComplete);
+router.post('/admin/designs/bulk-upload-zips', bulkZipDirectUploadMiddleware, adminDesignController.bulkUploadZipsDirect);
+router.post('/admin/designs/bulk-link-single-zip', adminDesignController.linkSingleZip);
+router.post('/admin/designs/replace-zip/:id', singleZipUploadMiddleware, adminDesignController.replaceZipSingle);
+router.post('/admin/designs/:id/replace-zip', singleZipUploadMiddleware, adminDesignController.replaceZipSingle);
 
 router.get('/admin/designs/import-template', adminDesignController.downloadImportTemplate);
 router.post('/admin/designs/import-preview', spreadsheetUploadMiddleware, adminDesignController.postImportPreview);

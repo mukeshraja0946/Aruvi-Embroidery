@@ -17,7 +17,7 @@ module.exports = {
   uploadToCloudinary: (filePath, customPublicId) => storageService.uploadToCloudinary(filePath, customPublicId),
   uploadToS3OrR2: (filePath, destFilename) => storageService.savePrivateFile(filePath, destFilename),
   savePublicFile: (file, originalName, mimeType) => storageService.savePublicFile(file, originalName, mimeType),
-  savePrivateFile: (file, originalName, mimeType) => storageService.savePrivateFile(file, originalName, mimeType),
+  savePrivateFile: (file, originalName, mimeType, designId = null) => storageService.savePrivateFile(file, originalName, mimeType, designId),
   getThumbsDir: () => storageService.getThumbsDir(),
   buildPublicUrl: (keyOrPath) => storageService.buildPublicUrl(keyOrPath),
   buildThumbnailUrl: (keyOrPath) => storageService.buildThumbnailUrl(keyOrPath),

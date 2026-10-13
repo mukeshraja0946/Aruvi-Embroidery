@@ -52,7 +52,12 @@ class StorageService {
     if (custom && custom.trim() !== '') {
       return path.resolve(custom.trim());
     }
-    return path.join(this.getUploadsDir(), 'private_designs');
+    // Strictly outside public web root and not served by express.static
+    const dir = path.join(projectRoot, 'storage_private');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    }
+    return dir;
   }
 
   getPreviewsDir() {
@@ -341,17 +346,22 @@ class StorageService {
 
   /**
    * Saves a PRIVATE paid design file (DST, PES, JEF, EXP, ZIP).
-   * Returns storage key or relative private path.
+   * Returns storage key or relative private path (outside public web root).
    */
-  async savePrivateFile(filePathOrBuffer, originalName, mimeType = 'application/octet-stream') {
+  async savePrivateFile(filePathOrBuffer, originalName, mimeType = 'application/octet-stream', designId = null) {
     const driver = this.getDriver();
-    const uniqueFilename = this.generateUniqueFilename(originalName, 'design');
+    const cleanOrig = path.basename(originalName || 'design.zip').replace(/[/\\?%*:|"<>]/g, '_').trim();
+    const ext = path.extname(cleanOrig).toLowerCase() || '.zip';
+    const baseName = (cleanOrig.slice(0, -ext.length) || 'design').trim();
+    const uniqueFilename = `${baseName}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+    const subFolder = designId ? String(designId) : 'general';
+    const relativeKey = `design-files/${subFolder}/${uniqueFilename}`;
 
     // 1. S3 / R2 driver for private design archives
     if (driver === 's3' && this.s3Client) {
       try {
         const bucket = process.env.S3_BUCKET || process.env.R2_BUCKET;
-        const key = `private_designs/${uniqueFilename}`;
+        const key = `private_designs/${relativeKey}`;
         const fileBuffer = Buffer.isBuffer(filePathOrBuffer) ? filePathOrBuffer : fs.readFileSync(filePathOrBuffer);
 
         await this.s3Client.send(new PutObjectCommand({
@@ -368,15 +378,20 @@ class StorageService {
       }
     }
 
-    // 2. Local private storage
-    const destPath = path.join(this.getDesignsDir(), uniqueFilename);
+    // 2. Local private storage strictly outside public web root
+    const targetFolder = path.join(this.getPrivateUploadsDir(), 'design-files', subFolder);
+    if (!fs.existsSync(targetFolder)) {
+      try { fs.mkdirSync(targetFolder, { recursive: true }); } catch (e) {}
+    }
+
+    const destPath = path.join(targetFolder, uniqueFilename);
     if (Buffer.isBuffer(filePathOrBuffer)) {
       fs.writeFileSync(destPath, filePathOrBuffer);
     } else {
       fs.copyFileSync(filePathOrBuffer, destPath);
     }
 
-    return `/public/uploads/designs/${uniqueFilename}`;
+    return relativeKey;
   }
 
   /**
@@ -474,6 +489,17 @@ class StorageService {
     // 1. Direct path check inside UPLOAD_DIR
     const directUploads = path.join(this.getUploadsDir(), clean);
     if (fs.existsSync(directUploads)) return directUploads;
+
+    // 1b. Direct path check inside private uploads dir (outside web root)
+    const privateDirect = path.join(this.getPrivateUploadsDir(), clean);
+    if (fs.existsSync(privateDirect)) return privateDirect;
+
+    const cleanWithoutPrivate = clean.replace(/^(storage_private\/)+/, '');
+    const privateFromClean = path.join(this.getPrivateUploadsDir(), cleanWithoutPrivate);
+    if (fs.existsSync(privateFromClean)) return privateFromClean;
+
+    const privateFiles = path.join(this.getPrivateUploadsDir(), cleanWithoutPrivate.replace(/^design-files\//, 'design-files/'));
+    if (fs.existsSync(privateFiles)) return privateFiles;
 
     // 2. Direct path check inside projectRoot
     const rootDirect = path.join(projectRoot, clean);

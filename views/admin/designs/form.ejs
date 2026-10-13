@@ -266,7 +266,10 @@
                           </span>
                         </div>
                       </div>
-                      <div>
+                      <div style="display: flex; gap: 8px;">
+                        <button type="button" onclick="openReplaceZipModal('<%= design.id %>', '<%= design.title ? design.title.replace(/'/g, "\\'") : "" %>')" class="btn" style="background: #1976D2; color: #FFFFFF; font-size: 0.82rem; font-weight: 700; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                          <i class="fa-solid fa-rotate"></i> Replace ZIP
+                        </button>
                         <button type="button" onclick="showRemoveZipModal('<%= design.id %>')" class="btn" style="background: #C62828; color: #FFFFFF; font-size: 0.82rem; font-weight: 700; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s ease;">
                           <i class="fa-regular fa-trash-can"></i> Remove
                         </button>
@@ -515,7 +518,100 @@
   </div>
 </div>
 
+<!-- Replace ZIP Modal Component for Edit Page -->
+<div id="replaceZipModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 90%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
+    <div style="padding: 1.25rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
+      <h3 style="margin: 0; font-size: 1.05rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-file-zipper" style="color: #2E7D32;"></i> Replace Machine File (ZIP)
+      </h3>
+      <button type="button" onclick="closeReplaceZipModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+    </div>
+    <form id="replaceZipForm" onsubmit="submitReplaceZip(event)" enctype="multipart/form-data" style="padding: 1.5rem;">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" id="replaceZipDesignId" name="designId">
+      
+      <p id="replaceZipTitle" style="font-size: 0.88rem; color: var(--admin-text-dark); font-weight: 600; margin-bottom: 1.2rem;"></p>
+      
+      <div style="margin-bottom: 1.2rem;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
+          Select Machine File (.ZIP, .RAR, .DST, .PES, .JEF, .EXP)
+        </label>
+        <input type="file" id="replaceZipFileInput" name="file" accept=".zip,.rar,.dst,.pes,.jef,.exp" required style="display: block; width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; font-size: 0.85rem;">
+        <span style="font-size: 0.74rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">
+          Machine formats (.dst, .pes, .jef, .exp) inside ZIP will be auto-detected.
+        </span>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" onclick="closeReplaceZipModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">Cancel</button>
+        <button type="submit" id="replaceZipSubmitBtn" style="padding: 8px 20px; border-radius: 8px; border: none; background: #2E7D32; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload & Replace ZIP
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+  function openReplaceZipModal(designId, designTitle) {
+    const modal = document.getElementById('replaceZipModal');
+    const idInput = document.getElementById('replaceZipDesignId');
+    const titleP = document.getElementById('replaceZipTitle');
+    const fileInput = document.getElementById('replaceZipFileInput');
+    if (!modal) return;
+    if (idInput) idInput.value = designId || '';
+    if (titleP) titleP.textContent = designTitle ? `Replace machine file for: "${designTitle}"` : `Replace machine file for Design #${designId}`;
+    if (fileInput) fileInput.value = '';
+    modal.style.display = 'flex';
+  }
+
+  function closeReplaceZipModal() {
+    const modal = document.getElementById('replaceZipModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function submitReplaceZip(e) {
+    e.preventDefault();
+    const idInput = document.getElementById('replaceZipDesignId');
+    const fileInput = document.getElementById('replaceZipFileInput');
+    const submitBtn = document.getElementById('replaceZipSubmitBtn');
+    if (!idInput || !fileInput || !fileInput.files || fileInput.files.length === 0) return;
+
+    const file = fileInput.files[0];
+    const designId = idInput.value;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('designId', designId);
+    formData.append('_csrf', '<%= csrfToken %>');
+
+    const origBtnHtml = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+    try {
+      const res = await fetch(`/admin/designs/replace-zip/${designId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-CSRF-Token': '<%= csrfToken %>'
+        },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to replace machine file.');
+      }
+      closeReplaceZipModal();
+      window.location.reload();
+    } catch (err) {
+      alert(`Replace ZIP Error: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
+  }
+
   let tagList = [];
 
   function toggleFormatBox(fmt) {
