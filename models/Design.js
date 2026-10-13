@@ -393,6 +393,12 @@ class Design {
     const ext = finalFileName.split('.').pop().toUpperCase();
     if (db.isConnected()) {
       try {
+        // Find existing primary image records to clean up after successful update
+        const oldPrimaries = await db.query(
+          'SELECT id, image_url FROM design_images WHERE design_id = ? AND is_primary = 1',
+          [designId]
+        );
+
         // Demote previous primary flags
         await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [designId]);
         await db.query('UPDATE design_files SET is_preview = 0 WHERE design_id = ?', [designId]);
@@ -412,6 +418,25 @@ class Design {
         } else {
           await db.query('INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview) VALUES (?, ?, ?, ?, ?, 1)', [designId, finalFileName, imageUrl, ext, fileSize]);
         }
+
+        // Clean up previous replaced primary image to avoid duplicate clutter and free disk space
+        if (oldPrimaries && oldPrimaries.length > 0) {
+          for (const old of oldPrimaries) {
+            if (old.image_url && old.image_url !== imageUrl) {
+              await db.query('DELETE FROM design_images WHERE id = ?', [old.id]);
+              await db.query('DELETE FROM design_files WHERE design_id = ? AND file_path = ? AND is_preview = 0', [designId, old.image_url]);
+              try {
+                const oldPhysical = storage.resolveFilePath(old.image_url);
+                if (oldPhysical && fs.existsSync(oldPhysical)) {
+                  fs.unlinkSync(oldPhysical);
+                }
+              } catch (delErr) {
+                // Ignore missing file error
+              }
+            }
+          }
+        }
+
         return true;
       } catch (err) {
         console.error('Design.replacePrimaryImage error:', err.message);

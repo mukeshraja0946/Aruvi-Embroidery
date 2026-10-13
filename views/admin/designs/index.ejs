@@ -790,36 +790,166 @@
 </div>
 
 <!-- Bulk Image Upload Modal Component -->
-<div id="bulkImageUploadModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
-  <div style="background: #FFFFFF; border-radius: 16px; width: 90%; max-width: 540px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
-    <div style="padding: 1.25rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
-      <h3 style="margin: 0; font-size: 1.05rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+<!-- Bulk Image Upload Modal Component (Reliable Chunked Upload Engine) -->
+<div id="bulkImageUploadModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px); padding: 1rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 680px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px rgba(0,0,0,0.25); overflow: hidden; border: 1px solid var(--admin-border);">
+    
+    <!-- Modal Header -->
+    <div style="padding: 1.1rem 1.5rem; background: #FAF6F0; border-bottom: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+      <h3 style="margin: 0; font-size: 1.1rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 10px; font-weight: 700;">
         <i class="fa-solid fa-images" style="color: var(--admin-primary);"></i> Bulk Restore / Re-upload Images
       </h3>
-      <button type="button" onclick="closeBulkImageUploadModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+      <button type="button" onclick="closeBulkImageUploadModal()" style="background: none; border: none; font-size: 1.5rem; color: var(--admin-text-muted); cursor: pointer; line-height: 1; padding: 0 4px;" title="Close Modal">&times;</button>
     </div>
-    <form id="bulkImageForm" onsubmit="submitBulkImageUpload(event)" enctype="multipart/form-data" style="padding: 1.5rem;">
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <!-- Modal Body (Scrollable) -->
+    <div style="padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.2rem;">
       
-      <div style="background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 12px 14px; margin-bottom: 1.2rem; font-size: 0.8rem; color: #2E7D32;">
-        <strong><i class="fa-solid fa-circle-info"></i> How Automatic Matching Works:</strong>
-        <p style="margin: 4px 0 0 0; line-height: 1.4;">Name image files after the product <strong>SKU</strong> (e.g. <code>AED-BLO-01.png</code>), <strong>Product ID</strong> (e.g. <code>1.png</code>), or <strong>Title</strong>. The system will automatically link each image to the corresponding product and set it as primary.</p>
+      <!-- Matching Rules Guide Banner -->
+      <div style="background: #F1F8E9; border: 1px solid #C5E1A5; border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; color: #33691E; line-height: 1.45;">
+        <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-circle-info"></i> How Automatic Matching Works:
+        </div>
+        <div>
+          Name files after product <strong>SKU</strong> (e.g. <code>AED-BLO-01.png</code>, <code>AED 1.png</code>), <strong>Product ID</strong> (e.g. <code>1.png</code>), or <strong>Title/Slug</strong>. Files are uploaded in reliable <strong>5-image chunks</strong> (up to 3 parallel requests) to avoid Hostinger timeouts.
+        </div>
       </div>
 
-      <div style="margin-bottom: 1.2rem;">
-        <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Select Images (Multiple allowed)</label>
-        <input type="file" id="bulkImageFilesInput" name="images" accept=".png,.jpg,.jpeg,.webp,.avif" multiple required style="display: block; width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 8px; font-size: 0.85rem;">
+      <!-- File Picker & Dropzone -->
+      <div id="bulkImageFileSelectSection">
+        <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
+          Select Image Files (JPG, PNG, WEBP, AVIF — max 10MB per file)
+        </label>
+        <div style="border: 2px dashed var(--admin-border); border-radius: 12px; padding: 1.25rem; text-align: center; background: #FAF9F6; transition: border-color 0.2s;" id="bulkImageDropArea">
+          <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: var(--admin-primary); margin-bottom: 8px;"></i>
+          <p style="margin: 0 0 8px 0; font-size: 0.88rem; color: var(--admin-text-dark); font-weight: 600;">
+            Click to browse or drag & drop image files here
+          </p>
+          <p style="margin: 0 0 12px 0; font-size: 0.78rem; color: var(--admin-text-muted);">
+            Multiple files supported (e.g. 5, 102, or 500 images)
+          </p>
+          <input type="file" id="bulkImageFilesInput" name="images" accept=".png,.jpg,.jpeg,.webp,.avif" multiple onchange="handleBulkImageFilesSelected(this)" style="display: inline-block; font-size: 0.85rem; max-width: 320px;">
+        </div>
+
+        <!-- Optional Client Compression Toggle -->
+        <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--admin-text-dark);">
+          <input type="checkbox" id="bulkImageOptimizeToggle" checked style="cursor: pointer; width: 16px; height: 16px;">
+          <label for="bulkImageOptimizeToggle" style="cursor: pointer; user-select: none;">
+            <strong>Optimize images in browser before upload</strong> (resize > 1600px, 85% WebP/JPEG quality)
+          </label>
+        </div>
       </div>
 
-      <div id="bulkImageStatus" style="display: none; margin-bottom: 1rem; font-size: 0.82rem; padding: 10px; border-radius: 8px;"></div>
+      <!-- Pre-upload File Summary -->
+      <div id="bulkImagePreUploadSummary" style="display: none; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 12px 14px; font-size: 0.83rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-weight: 600; color: var(--admin-text-dark);">
+            <i class="fa-solid fa-layer-group" style="color: var(--admin-primary);"></i> Selected: <span id="bulkPreSelectedCount">0</span> files (<span id="bulkPreSelectedSize">0 MB</span>)
+          </span>
+          <span id="bulkPreBatchesCount" style="color: var(--admin-text-muted); font-size: 0.78rem;">0 batches planned</span>
+        </div>
+        <div id="bulkPreValidationWarnings" style="display: none; margin-top: 8px; padding: 8px 10px; background: #FFF3E0; border: 1px solid #FFE0B2; border-radius: 6px; color: #E65100; font-size: 0.78rem;"></div>
+      </div>
 
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button type="button" onclick="closeBulkImageUploadModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">Cancel</button>
-        <button type="submit" id="bulkImageSubmitBtn" style="padding: 8px 20px; border-radius: 8px; border: none; background: var(--admin-primary); color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-          <i class="fa-solid fa-cloud-arrow-up"></i> Upload Images
+      <!-- Live Progress & Batch Status Section -->
+      <div id="bulkImageProgressSection" style="display: none; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
+        <!-- Animated Progress Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark);">
+          <span id="bulkImageProgressCounter">0 / 0 uploaded (0%)</span>
+          <span id="bulkImageStatusBadge" style="font-size: 0.78rem; font-weight: 600; color: var(--admin-primary);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Processing...
+          </span>
+        </div>
+
+        <div style="height: 12px; background: #ECEFF1; border-radius: 6px; overflow: hidden; margin-bottom: 12px; position: relative;">
+          <div id="bulkImageProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #B8402A, #E65100); border-radius: 6px; transition: width 0.25s ease;"></div>
+        </div>
+
+        <!-- Metric Counter Badges -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-size: 0.8rem;">
+          <div style="flex: 1; min-width: 110px; background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #2E7D32; font-weight: 600;"><i class="fa-solid fa-link"></i> Linked</span>
+            <strong id="bulkLinkedCount" style="color: #1B5E20; font-size: 0.95rem;">0</strong>
+          </div>
+          <div style="flex: 1; min-width: 110px; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #F57F17; font-weight: 600;"><i class="fa-solid fa-question"></i> Unmatched</span>
+            <strong id="bulkUnmatchedCount" style="color: #E65100; font-size: 0.95rem;">0</strong>
+          </div>
+          <div style="flex: 1; min-width: 110px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: #C62828; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>
+            <strong id="bulkFailedCount" style="color: #B71C1C; font-size: 0.95rem;">0</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark);">
+            Per-File Status Log
+          </span>
+          <span id="bulkActiveWorkersText" style="font-size: 0.75rem; color: var(--admin-text-muted);">
+            Active streams: 0 / 3
+          </span>
+        </div>
+
+        <!-- Scrollable Per-File Live Status List -->
+        <div id="bulkImageLiveList" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 8px; background: #FAFAFA; padding: 6px 8px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Completion Report Card -->
+      <div id="bulkImageReportCard" style="display: none; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
+        <div id="bulkImageReportHeader" style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-check" style="color: #2E7D32; font-size: 1.2rem;"></i> Upload Complete
+        </div>
+        <p id="bulkImageReportSummaryText" style="margin: 0 0 12px 0; font-size: 0.84rem; color: var(--admin-text-dark); line-height: 1.45;">
+          All batches finished processing.
+        </p>
+
+        <!-- Unmatched list details if any -->
+        <div id="bulkUnmatchedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFF8E1; border: 1px solid #FFE082; border-radius: 8px; padding: 10px; font-size: 0.78rem;">
+          <strong><i class="fa-solid fa-circle-info"></i> Unmatched Files:</strong>
+          <div id="bulkUnmatchedNamesList" style="max-height: 90px; overflow-y: auto; margin-top: 4px; font-family: monospace; color: #5D4037;"></div>
+        </div>
+
+        <!-- Failed list details if any -->
+        <div id="bulkFailedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 8px; padding: 10px; font-size: 0.78rem;">
+          <strong><i class="fa-solid fa-circle-exclamation"></i> Failed Files (with error reasons):</strong>
+          <div id="bulkFailedReasonsList" style="max-height: 90px; overflow-y: auto; margin-top: 4px; font-family: monospace; color: #B71C1C;"></div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" onclick="downloadBulkUploadReportCsv()" class="btn btn-outline" style="height: 38px; padding: 0 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid #1E88E5; color: #1E88E5; background: #FFF;">
+            <i class="fa-solid fa-file-csv"></i> Download Report CSV
+          </button>
+          <button type="button" id="bulkRetryFailedBtn" onclick="retryFailedBulkImages()" class="btn" style="display: none; height: 38px; padding: 0 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #C62828; color: #FFF; border: none;">
+            <i class="fa-solid fa-rotate-right"></i> Retry Failed (<span id="bulkRetryBtnCount">0</span>)
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer Controls -->
+    <div style="padding: 1.1rem 1.5rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 10px;">
+      <div>
+        <button type="button" id="bulkImageAbortBtn" onclick="abortBulkImageUpload()" style="display: none; padding: 8px 16px; border-radius: 8px; border: 1px solid #FFCDD2; background: #FFEBEE; color: #C62828; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-ban"></i> Cancel Upload
         </button>
       </div>
-    </form>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" id="bulkImageCancelCloseBtn" onclick="closeBulkImageUploadModal()" style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          Cancel
+        </button>
+        <button type="button" id="bulkImageSubmitBtn" onclick="startChunkedBulkImageUpload()" style="padding: 8px 20px; border-radius: 8px; border: none; background: var(--admin-primary); color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Start Chunked Upload
+        </button>
+        <button type="button" id="bulkImageFinishRefreshBtn" onclick="finishBulkUploadAndRefresh()" style="display: none; padding: 8px 20px; border-radius: 8px; border: none; background: #2E7D32; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+          <i class="fa-solid fa-check"></i> Done & Refresh Designs
+        </button>
+      </div>
+    </div>
+
   </div>
 </div>
 <script>

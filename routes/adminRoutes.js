@@ -3,6 +3,7 @@ const router = express.Router();
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const upload = require('../middleware/multerUpload');
 const { spreadsheetUploadMiddleware } = require('../middleware/spreadsheetUpload');
+const { bulkImageUploadMiddleware } = require('../middleware/bulkImageUpload');
 
 const adminAuthController = require('../controllers/admin/adminAuthController');
 const adminDashboardController = require('../controllers/admin/adminDashboardController');
@@ -59,7 +60,7 @@ router.post('/admin/designs/set-primary-image/:imageId', adminDesignController.s
 router.post('/admin/designs/delete-file/:fileId', adminDesignController.deleteFile);
 router.post('/admin/designs/delete-all-files/:designId', adminDesignController.deleteAllFiles);
 router.post('/admin/designs/replace-image/:id', upload.any(), adminDesignController.replaceImage);
-router.post('/admin/designs/bulk-upload-images', upload.any(), adminDesignController.bulkUploadImages);
+router.post('/admin/designs/bulk-upload-images', bulkImageUploadMiddleware, adminDesignController.bulkUploadImages);
 
 router.get('/admin/designs/import-template', adminDesignController.downloadImportTemplate);
 router.post('/admin/designs/import-preview', spreadsheetUploadMiddleware, adminDesignController.postImportPreview);

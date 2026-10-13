@@ -318,71 +318,722 @@ async function submitReplaceImage(event) {
 }
 
 // -----------------------------------------------------------------------------
-// Bulk Image Upload Modal
+// Bulk Image Upload Modal (Reliable Chunked Upload Pipeline)
 // -----------------------------------------------------------------------------
+let bulkUploadState = {
+  items: [],              // Array of { id, file, originalName, size, formattedSize, isValid, validationError, status, details, retryCount }
+  batches: [],            // Array of item arrays (5 items per batch)
+  activeControllers: new Set(),
+  activeStreams: 0,
+  maxConcurrency: 3,
+  batchSize: 5,
+  batchTimeoutMs: 60000,
+  isUploading: false,
+  isCancelled: false,
+  stats: {
+    total: 0,
+    processed: 0,
+    linked: 0,
+    unmatched: 0,
+    failed: 0
+  }
+};
+
+function formatBytes(bytes, decimals = 1) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
 function openBulkImageUploadModal() {
-  document.getElementById('bulkImageFilesInput').value = '';
-  document.getElementById('bulkImageStatus').style.display = 'none';
-  document.getElementById('bulkImageUploadModal').style.display = 'flex';
-}
+  const modal = document.getElementById('bulkImageUploadModal');
+  if (!modal) return;
 
-function closeBulkImageUploadModal() {
-  document.getElementById('bulkImageUploadModal').style.display = 'none';
-}
+  // Reset state
+  bulkUploadState = {
+    items: [],
+    batches: [],
+    activeControllers: new Set(),
+    activeStreams: 0,
+    maxConcurrency: 3,
+    batchSize: 5,
+    batchTimeoutMs: 60000,
+    isUploading: false,
+    isCancelled: false,
+    stats: { total: 0, processed: 0, linked: 0, unmatched: 0, failed: 0 }
+  };
 
-async function submitBulkImageUpload(event) {
-  event.preventDefault();
+  // Reset DOM inputs
   const fileInput = document.getElementById('bulkImageFilesInput');
-  if (!fileInput.files || fileInput.files.length === 0) {
-    alert('Please select one or more image files.');
+  if (fileInput) fileInput.value = '';
+
+  const preSummary = document.getElementById('bulkImagePreUploadSummary');
+  if (preSummary) preSummary.style.display = 'none';
+
+  const progressSection = document.getElementById('bulkImageProgressSection');
+  if (progressSection) progressSection.style.display = 'none';
+
+  const reportCard = document.getElementById('bulkImageReportCard');
+  if (reportCard) reportCard.style.display = 'none';
+
+  const selectSection = document.getElementById('bulkImageFileSelectSection');
+  if (selectSection) selectSection.style.display = 'block';
+
+  // Reset buttons
+  const submitBtn = document.getElementById('bulkImageSubmitBtn');
+  if (submitBtn) {
+    submitBtn.style.display = 'inline-flex';
+    submitBtn.disabled = true;
+  }
+
+  const cancelCloseBtn = document.getElementById('bulkImageCancelCloseBtn');
+  if (cancelCloseBtn) cancelCloseBtn.style.display = 'inline-flex';
+
+  const abortBtn = document.getElementById('bulkImageAbortBtn');
+  if (abortBtn) abortBtn.style.display = 'none';
+
+  const finishBtn = document.getElementById('bulkImageFinishRefreshBtn');
+  if (finishBtn) finishBtn.style.display = 'none';
+
+  modal.style.display = 'flex';
+}
+
+function closeBulkImageUploadModal(force = false) {
+  if (bulkUploadState.isUploading && !force) {
+    if (!confirm('Upload is currently in progress. Do you want to cancel and close?')) {
+      return;
+    }
+    abortBulkImageUpload();
+  }
+  const modal = document.getElementById('bulkImageUploadModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleBulkImageFilesSelected(input) {
+  const files = input ? Array.from(input.files || []) : [];
+  if (files.length === 0) return;
+
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
+  const maxBytes = 10 * 1024 * 1024; // 10 MB per file limit
+
+  const items = [];
+  let totalBytes = 0;
+  let invalidCount = 0;
+  const warnings = [];
+
+  files.forEach((file, idx) => {
+    totalBytes += file.size;
+    const ext = (file.name.slice((file.name.lastIndexOf('.') - 1 >>> 0) + 2) || '').toLowerCase();
+    const hasAllowedExt = allowedExts.some(a => a.replace('.', '') === ext);
+    let isValid = true;
+    let validationError = '';
+
+    if (!hasAllowedExt) {
+      isValid = false;
+      validationError = `Unsupported extension (.${ext}). Only JPG, PNG, WEBP, AVIF allowed.`;
+      invalidCount++;
+      warnings.push(`"${file.name}": Unsupported format (.${ext})`);
+    } else if (file.size > maxBytes) {
+      isValid = false;
+      validationError = `File exceeds 10 MB limit (${formatBytes(file.size)}).`;
+      invalidCount++;
+      warnings.push(`"${file.name}": Exceeds 10MB limit (${formatBytes(file.size)})`);
+    }
+
+    items.push({
+      id: idx + 1,
+      file,
+      originalName: file.name,
+      size: file.size,
+      formattedSize: formatBytes(file.size),
+      isValid,
+      validationError,
+      status: isValid ? 'pending' : 'failed',
+      details: isValid ? 'Ready to upload' : validationError,
+      retryCount: 0
+    });
+  });
+
+  bulkUploadState.items = items;
+  const validItems = items.filter(it => it.isValid);
+
+  // Update Pre-upload UI
+  const preSummary = document.getElementById('bulkImagePreUploadSummary');
+  const preCount = document.getElementById('bulkPreSelectedCount');
+  const preSize = document.getElementById('bulkPreSelectedSize');
+  const preBatches = document.getElementById('bulkPreBatchesCount');
+  const preWarnings = document.getElementById('bulkPreValidationWarnings');
+  const submitBtn = document.getElementById('bulkImageSubmitBtn');
+
+  if (preCount) preCount.textContent = validItems.length + (invalidCount > 0 ? ` (and ${invalidCount} invalid)` : '');
+  if (preSize) preSize.textContent = formatBytes(totalBytes);
+  if (preBatches) preBatches.textContent = `${Math.ceil(validItems.length / bulkUploadState.batchSize)} batches planned (5 files/request)`;
+
+  if (warnings.length > 0 && preWarnings) {
+    preWarnings.innerHTML = `<strong><i class="fa-solid fa-triangle-exclamation"></i> Warnings:</strong><ul style="margin: 4px 0 0 16px; padding: 0;">` +
+      warnings.slice(0, 5).map(w => `<li>${w}</li>`).join('') +
+      (warnings.length > 5 ? `<li>...and ${warnings.length - 5} more</li>` : '') +
+      `</ul><div style="margin-top: 4px;">These invalid files will be flagged as failed and not uploaded.</div>`;
+    preWarnings.style.display = 'block';
+  } else if (preWarnings) {
+    preWarnings.style.display = 'none';
+  }
+
+  if (preSummary) preSummary.style.display = 'block';
+  if (submitBtn) submitBtn.disabled = validItems.length === 0;
+}
+
+/**
+ * Optional browser-side compression using HTML5 Canvas.
+ * Resizes images over 1600px and converts to WebP/JPEG quality 0.85.
+ */
+async function compressImageForUpload(file, maxDimension = 1600, quality = 0.85) {
+  const shouldOptimize = document.getElementById('bulkImageOptimizeToggle')?.checked ?? true;
+  if (!shouldOptimize) return file;
+  if (!file.type || !file.type.startsWith('image/')) return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let width = img.width;
+      let height = img.height;
+
+      // If dimensions are within limit and file is small, skip compression
+      if (width <= maxDimension && height <= maxDimension && file.size < 1024 * 1024) {
+        return resolve(file);
+      }
+
+      if (width > height) {
+        if (width > maxDimension) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size < file.size) {
+            const compressedFile = new File([blob], file.name, {
+              type: blob.type || 'image/webp',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        },
+        'image/webp',
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
+function renderLiveFileList() {
+  const listContainer = document.getElementById('bulkImageLiveList');
+  if (!listContainer) return;
+
+  const html = bulkUploadState.items.map(item => {
+    let icon = '<i class="fa-regular fa-clock" style="color: #8C7F79;"></i>';
+    let badgeColor = '#FAF9F6';
+    let borderColor = 'var(--admin-border)';
+    let statusText = item.details || 'Pending';
+
+    if (item.status === 'uploading') {
+      icon = '<i class="fa-solid fa-spinner fa-spin" style="color: var(--admin-primary);"></i>';
+      badgeColor = '#FFF8E1';
+      borderColor = '#FFE082';
+      statusText = 'Uploading...';
+    } else if (item.status === 'linked') {
+      icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
+      badgeColor = '#E8F5E9';
+      borderColor = '#C8E6C9';
+    } else if (item.status === 'unmatched') {
+      icon = '<i class="fa-solid fa-circle-question" style="color: #E65100;"></i>';
+      badgeColor = '#FFF3E0';
+      borderColor = '#FFE0B2';
+    } else if (item.status === 'failed') {
+      icon = '<i class="fa-solid fa-circle-xmark" style="color: #C62828;"></i>';
+      badgeColor = '#FFEBEE';
+      borderColor = '#FFCDD2';
+    }
+
+    return `
+      <div id="bulk-file-item-${item.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;">
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+          ${icon}
+          <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.originalName}</strong>
+          <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
+        </div>
+        <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <span>${statusText}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listContainer.innerHTML = html;
+}
+
+function updateLiveItemRow(item) {
+  const el = document.getElementById(`bulk-file-item-${item.id}`);
+  if (!el) {
+    renderLiveFileList();
     return;
   }
 
-  const btn = document.getElementById('bulkImageSubmitBtn');
-  const statusDiv = document.getElementById('bulkImageStatus');
-  const origHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading & Linking...';
+  let icon = '<i class="fa-regular fa-clock" style="color: #8C7F79;"></i>';
+  let badgeColor = '#FAF9F6';
+  let borderColor = 'var(--admin-border)';
+  let statusText = item.details || 'Pending';
 
-  const formData = new FormData();
-  formData.append('_csrf', getCsrfToken());
-  for (let i = 0; i < fileInput.files.length; i++) {
-    formData.append('images', fileInput.files[i]);
+  if (item.status === 'uploading') {
+    icon = '<i class="fa-solid fa-spinner fa-spin" style="color: var(--admin-primary);"></i>';
+    badgeColor = '#FFF8E1';
+    borderColor = '#FFE082';
+    statusText = 'Uploading...';
+  } else if (item.status === 'linked') {
+    icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
+    badgeColor = '#E8F5E9';
+    borderColor = '#C8E6C9';
+  } else if (item.status === 'unmatched') {
+    icon = '<i class="fa-solid fa-circle-question" style="color: #E65100;"></i>';
+    badgeColor = '#FFF3E0';
+    borderColor = '#FFE0B2';
+  } else if (item.status === 'failed') {
+    icon = '<i class="fa-solid fa-circle-xmark" style="color: #C62828;"></i>';
+    badgeColor = '#FFEBEE';
+    borderColor = '#FFCDD2';
   }
 
+  el.style.background = badgeColor;
+  el.style.border = `1px solid ${borderColor}`;
+  el.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+      ${icon}
+      <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.originalName}</strong>
+      <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
+    </div>
+    <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+      <span>${statusText}</span>
+    </div>
+  `;
+}
+
+function updateProgressCounters() {
+  const { total, processed, linked, unmatched, failed } = bulkUploadState.stats;
+  const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+
+  const bar = document.getElementById('bulkImageProgressBar');
+  if (bar) bar.style.width = `${pct}%`;
+
+  const counterText = document.getElementById('bulkImageProgressCounter');
+  if (counterText) counterText.textContent = `${processed} / ${total} uploaded (${pct}%)`;
+
+  const linkedEl = document.getElementById('bulkLinkedCount');
+  if (linkedEl) linkedEl.textContent = linked;
+
+  const unmatchedEl = document.getElementById('bulkUnmatchedCount');
+  if (unmatchedEl) unmatchedEl.textContent = unmatched;
+
+  const failedEl = document.getElementById('bulkFailedCount');
+  if (failedEl) failedEl.textContent = failed;
+
+  const workersEl = document.getElementById('bulkActiveWorkersText');
+  if (workersEl) workersEl.textContent = `Active streams: ${bulkUploadState.activeStreams} / ${bulkUploadState.maxConcurrency}`;
+}
+
+async function startChunkedBulkImageUpload() {
+  if (bulkUploadState.items.length === 0) {
+    alert('Please select images first.');
+    return;
+  }
+
+  // Filter valid files that are not already linked or processed
+  const pendingItems = bulkUploadState.items.filter(it => it.isValid && it.status !== 'linked');
+  if (pendingItems.length === 0) {
+    alert('No pending valid images to upload.');
+    return;
+  }
+
+  bulkUploadState.isUploading = true;
+  bulkUploadState.isCancelled = false;
+  bulkUploadState.stats = {
+    total: bulkUploadState.items.length,
+    processed: bulkUploadState.items.filter(it => it.status === 'linked' || it.status === 'unmatched' || (!it.isValid && it.status === 'failed')).length,
+    linked: bulkUploadState.items.filter(it => it.status === 'linked').length,
+    unmatched: bulkUploadState.items.filter(it => it.status === 'unmatched').length,
+    failed: bulkUploadState.items.filter(it => it.status === 'failed').length
+  };
+
+  // Build batch queue (5 items per batch)
+  const batches = [];
+  for (let i = 0; i < pendingItems.length; i += bulkUploadState.batchSize) {
+    batches.push({
+      id: Math.floor(i / bulkUploadState.batchSize) + 1,
+      items: pendingItems.slice(i, i + bulkUploadState.batchSize),
+      retries: 0
+    });
+  }
+  bulkUploadState.batches = batches;
+
+  // Toggle UI visibility
+  document.getElementById('bulkImageFileSelectSection').style.display = 'none';
+  document.getElementById('bulkImagePreUploadSummary').style.display = 'none';
+  document.getElementById('bulkImageReportCard').style.display = 'none';
+  document.getElementById('bulkImageProgressSection').style.display = 'block';
+
+  document.getElementById('bulkImageSubmitBtn').style.display = 'none';
+  document.getElementById('bulkImageCancelCloseBtn').style.display = 'none';
+  document.getElementById('bulkImageAbortBtn').style.display = 'inline-flex';
+
+  const statusBadge = document.getElementById('bulkImageStatusBadge');
+  if (statusBadge) {
+    statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading batches...';
+    statusBadge.style.color = 'var(--admin-primary)';
+  }
+
+  renderLiveFileList();
+  updateProgressCounters();
+
+  // Launch worker pool with max 3 concurrent streams
+  const workerCount = Math.min(bulkUploadState.maxConcurrency, batches.length);
+  const workerPromises = [];
+  for (let w = 0; w < workerCount; w++) {
+    workerPromises.push(runBatchWorker());
+  }
+
+  await Promise.all(workerPromises);
+  onBulkUploadFinished();
+}
+
+async function runBatchWorker() {
+  while (bulkUploadState.batches.length > 0 && !bulkUploadState.isCancelled) {
+    const batch = bulkUploadState.batches.shift();
+    if (!batch) break;
+
+    bulkUploadState.activeStreams++;
+    updateProgressCounters();
+
+    await processSingleBatch(batch);
+
+    bulkUploadState.activeStreams--;
+    updateProgressCounters();
+  }
+}
+
+async function processSingleBatch(batch) {
+  if (bulkUploadState.isCancelled) return;
+
+  // Mark all items in this batch as uploading
+  batch.items.forEach(it => {
+    it.status = 'uploading';
+    it.details = `Uploading in batch #${batch.id}...`;
+    updateLiveItemRow(it);
+  });
+
+  const controller = new AbortController();
+  bulkUploadState.activeControllers.add(controller);
+
+  // 60-second request timeout per batch
+  const timeoutId = setTimeout(() => {
+    controller.abort(new Error('Batch request timed out after 60 seconds'));
+  }, bulkUploadState.batchTimeoutMs);
+
   try {
+    const formData = new FormData();
+    formData.append('_csrf', getCsrfToken());
+
+    // Process files through browser compressor before attaching to FormData
+    for (const item of batch.items) {
+      const fileToUpload = await compressImageForUpload(item.file);
+      formData.append('images', fileToUpload, item.originalName);
+    }
+
     const res = await fetch('/admin/designs/bulk-upload-images', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': getCsrfToken()
       },
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
-    const data = await res.json();
-    btn.disabled = false;
-    btn.innerHTML = origHtml;
 
-    if (data.success) {
-      statusDiv.style.display = 'block';
-      statusDiv.style.background = '#E8F5E9';
-      statusDiv.style.color = '#2E7D32';
-      statusDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message}`;
-      setTimeout(() => {
-        closeBulkImageUploadModal();
-        window.location.reload();
-      }, 1200);
-    } else {
-      statusDiv.style.display = 'block';
-      statusDiv.style.background = '#FFEBEE';
-      statusDiv.style.color = '#C62828';
-      statusDiv.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.message || 'Upload failed.'}`;
+    clearTimeout(timeoutId);
+    bulkUploadState.activeControllers.delete(controller);
+
+    if (!res.ok) {
+      let errBody = {};
+      try { errBody = await res.json(); } catch (e) {}
+      throw new Error(errBody.message || `Server returned HTTP ${res.status}`);
     }
-  } catch (e) {
-    btn.disabled = false;
-    btn.innerHTML = origHtml;
-    alert('Network error during bulk upload: ' + e.message);
+
+    const data = await res.json();
+
+    // Map response to batch items
+    const matchedList = data.matched || [];
+    const unmatchedList = data.unmatched || [];
+    const failedList = data.failed || [];
+
+    batch.items.forEach(item => {
+      const matched = matchedList.find(m => m.filename.toLowerCase() === item.originalName.toLowerCase());
+      const unmatched = unmatchedList.find(u => u.filename.toLowerCase() === item.originalName.toLowerCase());
+      const failed = failedList.find(f => f.filename.toLowerCase() === item.originalName.toLowerCase());
+
+      if (matched) {
+        item.status = 'linked';
+        item.details = `Linked to #${matched.designId} (${matched.sku || matched.title})`;
+        item.matchedDesign = matched;
+        bulkUploadState.stats.linked++;
+      } else if (unmatched) {
+        item.status = 'unmatched';
+        item.details = unmatched.reason || 'No matching product found';
+        bulkUploadState.stats.unmatched++;
+      } else if (failed) {
+        item.status = 'failed';
+        item.details = failed.error || 'Upload error';
+        item.referenceId = failed.referenceId;
+        bulkUploadState.stats.failed++;
+      } else {
+        // Fallback: If returned in general matched/unmatched
+        item.status = 'unmatched';
+        item.details = 'No product matched';
+        bulkUploadState.stats.unmatched++;
+      }
+
+      bulkUploadState.stats.processed++;
+      updateLiveItemRow(item);
+    });
+
+  } catch (err) {
+    clearTimeout(timeoutId);
+    bulkUploadState.activeControllers.delete(controller);
+
+    if (bulkUploadState.isCancelled) {
+      batch.items.forEach(item => {
+        item.status = 'failed';
+        item.details = 'Cancelled by user';
+        updateLiveItemRow(item);
+      });
+      return;
+    }
+
+    console.warn(`[Bulk Upload Batch #${batch.id} Failed]:`, err.message);
+
+    // Auto-retry up to 3 times with progressive delay
+    if (batch.retries < 3) {
+      batch.retries++;
+      const delayMs = batch.retries * 1200;
+      batch.items.forEach(item => {
+        item.details = `Retry ${batch.retries}/3 in ${Math.round(delayMs / 1000)}s (${err.message})...`;
+        updateLiveItemRow(item);
+      });
+      await new Promise(r => setTimeout(r, delayMs));
+      bulkUploadState.batches.unshift(batch); // Put back to front of queue
+      return;
+    }
+
+    // Retries exhausted: mark items as failed
+    batch.items.forEach(item => {
+      item.status = 'failed';
+      item.details = `Failed after 3 retries: ${err.message}`;
+      bulkUploadState.stats.failed++;
+      bulkUploadState.stats.processed++;
+      updateLiveItemRow(item);
+    });
   }
+
+  updateProgressCounters();
+}
+
+function abortBulkImageUpload() {
+  bulkUploadState.isCancelled = true;
+  bulkUploadState.isUploading = false;
+
+  // Active cancellation via AbortControllers
+  bulkUploadState.activeControllers.forEach(ctrl => {
+    try { ctrl.abort(); } catch (e) {}
+  });
+  bulkUploadState.activeControllers.clear();
+  bulkUploadState.batches = [];
+
+  const statusBadge = document.getElementById('bulkImageStatusBadge');
+  if (statusBadge) {
+    statusBadge.innerHTML = '<i class="fa-solid fa-circle-stop"></i> Upload Cancelled';
+    statusBadge.style.color = '#C62828';
+  }
+
+  // Update in-progress items
+  bulkUploadState.items.forEach(it => {
+    if (it.status === 'uploading' || it.status === 'pending') {
+      it.status = 'failed';
+      it.details = 'Cancelled by user';
+      bulkUploadState.stats.failed++;
+      bulkUploadState.stats.processed++;
+      updateLiveItemRow(it);
+    }
+  });
+
+  updateProgressCounters();
+  onBulkUploadFinished();
+}
+
+function onBulkUploadFinished() {
+  bulkUploadState.isUploading = false;
+
+  // Update header badge
+  const statusBadge = document.getElementById('bulkImageStatusBadge');
+  if (statusBadge) {
+    if (bulkUploadState.isCancelled) {
+      statusBadge.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelled';
+      statusBadge.style.color = '#C62828';
+    } else {
+      statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Finished';
+      statusBadge.style.color = '#2E7D32';
+    }
+  }
+
+  // Configure action buttons
+  const abortBtn = document.getElementById('bulkImageAbortBtn');
+  if (abortBtn) abortBtn.style.display = 'none';
+
+  const finishBtn = document.getElementById('bulkImageFinishRefreshBtn');
+  if (finishBtn) finishBtn.style.display = 'inline-flex';
+
+  const cancelCloseBtn = document.getElementById('bulkImageCancelCloseBtn');
+  if (cancelCloseBtn) cancelCloseBtn.style.display = 'inline-flex';
+
+  // Build Report Card
+  const reportCard = document.getElementById('bulkImageReportCard');
+  const reportHeader = document.getElementById('bulkImageReportHeader');
+  const reportSummaryText = document.getElementById('bulkImageReportSummaryText');
+
+  const linkedCount = bulkUploadState.items.filter(it => it.status === 'linked').length;
+  const unmatchedCount = bulkUploadState.items.filter(it => it.status === 'unmatched').length;
+  const failedCount = bulkUploadState.items.filter(it => it.status === 'failed').length;
+
+  if (reportSummaryText) {
+    reportSummaryText.innerHTML = `
+      <strong>Processed ${bulkUploadState.items.length} images:</strong>
+      <span style="color: #2E7D32; font-weight: 600;">${linkedCount} successfully linked</span>,
+      <span style="color: #E65100; font-weight: 600;">${unmatchedCount} unmatched</span>,
+      <span style="color: #C62828; font-weight: 600;">${failedCount} failed</span>.
+    `;
+  }
+
+  // Unmatched names list
+  const unmatchedBox = document.getElementById('bulkUnmatchedDetailsBox');
+  const unmatchedList = document.getElementById('bulkUnmatchedNamesList');
+  const unmatchedItems = bulkUploadState.items.filter(it => it.status === 'unmatched');
+  if (unmatchedItems.length > 0 && unmatchedBox && unmatchedList) {
+    unmatchedList.innerHTML = unmatchedItems.map(it => `<div>• ${it.originalName} (${it.details})</div>`).join('');
+    unmatchedBox.style.display = 'block';
+  } else if (unmatchedBox) {
+    unmatchedBox.style.display = 'none';
+  }
+
+  // Failed reasons list
+  const failedBox = document.getElementById('bulkFailedDetailsBox');
+  const failedList = document.getElementById('bulkFailedReasonsList');
+  const failedItems = bulkUploadState.items.filter(it => it.status === 'failed');
+  if (failedItems.length > 0 && failedBox && failedList) {
+    failedList.innerHTML = failedItems.map(it => `<div>• ${it.originalName}: ${it.details}${it.referenceId ? ` [Ref: ${it.referenceId}]` : ''}</div>`).join('');
+    failedBox.style.display = 'block';
+  } else if (failedBox) {
+    failedBox.style.display = 'none';
+  }
+
+  // Retry Failed Button
+  const retryBtn = document.getElementById('bulkRetryFailedBtn');
+  const retryCountSpan = document.getElementById('bulkRetryBtnCount');
+  if (failedItems.length > 0 && retryBtn) {
+    if (retryCountSpan) retryCountSpan.textContent = failedItems.length;
+    retryBtn.style.display = 'inline-flex';
+  } else if (retryBtn) {
+    retryBtn.style.display = 'none';
+  }
+
+  if (reportCard) reportCard.style.display = 'block';
+}
+
+function retryFailedBulkImages() {
+  const failedItems = bulkUploadState.items.filter(it => it.status === 'failed');
+  if (failedItems.length === 0) return;
+
+  failedItems.forEach(it => {
+    it.status = 'pending';
+    it.details = 'Retrying upload...';
+    it.retryCount = 0;
+  });
+
+  const reportCard = document.getElementById('bulkImageReportCard');
+  if (reportCard) reportCard.style.display = 'none';
+
+  startChunkedBulkImageUpload();
+}
+
+function downloadBulkUploadReportCsv() {
+  if (bulkUploadState.items.length === 0) {
+    alert('No upload data available to export.');
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  const rows = [
+    ['Filename', 'Status', 'Matched SKU', 'Matched Product ID', 'Matched Title', 'Details / Error', 'Timestamp']
+  ];
+
+  bulkUploadState.items.forEach(item => {
+    const matched = item.matchedDesign || {};
+    rows.push([
+      item.originalName,
+      item.status.toUpperCase(),
+      matched.sku || '',
+      matched.designId || '',
+      matched.title || '',
+      item.details || '',
+      timestamp
+    ]);
+  });
+
+  const csvContent = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `bulk_image_upload_report_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function finishBulkUploadAndRefresh() {
+  closeBulkImageUploadModal(true);
+  window.location.reload();
 }
 
 // -----------------------------------------------------------------------------
@@ -1014,86 +1665,5 @@ async function submitReplaceImage(event) {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Bulk Image Upload Modal Handlers
-// -----------------------------------------------------------------------------
-function openBulkImageUploadModal() {
-  const fileInput = document.getElementById('bulkImageFilesInput');
-  if (fileInput) fileInput.value = '';
-  const statusDiv = document.getElementById('bulkImageStatus');
-  if (statusDiv) statusDiv.style.display = 'none';
-  const modal = document.getElementById('bulkImageUploadModal');
-  if (modal) modal.style.display = 'flex';
-}
 
-function closeBulkImageUploadModal() {
-  const modal = document.getElementById('bulkImageUploadModal');
-  if (modal) modal.style.display = 'none';
-}
-
-async function submitBulkImageUpload(event) {
-  if (event) event.preventDefault();
-  const fileInput = document.getElementById('bulkImageFilesInput');
-  if (!fileInput.files || fileInput.files.length === 0) {
-    alert('Please select one or more image files.');
-    return;
-  }
-
-  const btn = document.getElementById('bulkImageSubmitBtn');
-  const statusDiv = document.getElementById('bulkImageStatus');
-  const origHtml = btn ? btn.innerHTML : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading & Linking...';
-  }
-
-  const formData = new FormData();
-  formData.append('_csrf', getCsrfToken());
-  for (let i = 0; i < fileInput.files.length; i++) {
-    formData.append('images', fileInput.files[i]);
-  }
-
-  try {
-    const res = await fetch('/admin/designs/bulk-upload-images', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': getCsrfToken()
-      },
-      body: formData
-    });
-    const data = await res.json();
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = origHtml;
-    }
-
-    if (data.success) {
-      if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#E8F5E9';
-        statusDiv.style.color = '#2E7D32';
-        statusDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message}`;
-      }
-      setTimeout(() => {
-        closeBulkImageUploadModal();
-        window.location.reload();
-      }, 1200);
-    } else {
-      if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#FFEBEE';
-        statusDiv.style.color = '#C62828';
-        statusDiv.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.message || 'Upload failed.'}`;
-      }
-    }
-  } catch (e) {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = origHtml;
-    }
-    alert('Network error during bulk upload: ' + e.message);
-  }
-}
 

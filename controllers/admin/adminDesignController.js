@@ -9,6 +9,7 @@ const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDr
 const ActivityLog = require('../../models/ActivityLog');
 
 const AdminStatsService = require('../../services/adminStatsService');
+const errorLogger = require('../../services/errorLogger');
 
 exports.getDesigns = async (req, res, next) => {
   try {
@@ -823,7 +824,6 @@ exports.duplicateDesign = async (req, res, next) => {
 };
 
 const bulkImportService = require('../../services/bulkImportService');
-const errorLogger = require('../../services/errorLogger');
 
 /**
  * Bulk Import Step 1: Download Spreadsheet Template
@@ -1063,62 +1063,196 @@ exports.replaceImage = async (req, res) => {
   }
 };
 
+/**
+ * Helper to match an image filename to a design in the database.
+ * Matches by:
+ * 1. SKU (e.g. "AED-BLO-01", "AED 1", "AED-01", "aed_blo_01")
+ * 2. Product ID (e.g. "1", "01", "102")
+ * 3. Exact Title or Slug (e.g. "Rose Floral Design", "rose-floral-design")
+ * Case-insensitive, ignoring extension, spaces, underscores, and dashes.
+ * Supports filenames with spaces like "AED 1.png".
+ */
+async function findMatchingDesign(rawBaseName) {
+  if (!rawBaseName || !db.isConnected()) return null;
+
+  const trimmed = rawBaseName.trim();
+
+  // 1. Direct exact match by SKU, Title, or Slug (case-insensitive in MySQL/MariaDB utf8mb4)
+  const exactRows = await db.query(
+    'SELECT id, title, sku, slug FROM designs WHERE sku = ? OR title = ? OR slug = ? LIMIT 1',
+    [trimmed, trimmed, trimmed]
+  );
+  if (exactRows && exactRows.length > 0) return exactRows[0];
+
+  // 2. Numeric Product ID check (e.g. "1", "01", "102")
+  if (/^\d+$/.test(trimmed)) {
+    const idNum = parseInt(trimmed, 10);
+    if (!isNaN(idNum) && idNum > 0) {
+      const idRows = await db.query(
+        'SELECT id, title, sku, slug FROM designs WHERE id = ? LIMIT 1',
+        [idNum]
+      );
+      if (idRows && idRows.length > 0) return idRows[0];
+    }
+  }
+
+  // 3. Cleaned / normalized comparison: remove all spaces, underscores, and dashes, lowercase
+  const normalized = trimmed.replace(/[\s\-_]+/g, '').toLowerCase();
+  if (normalized.length > 0) {
+    const normRows = await db.query(
+      `SELECT id, title, sku, slug FROM designs 
+       WHERE REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') = ?
+          OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?
+          OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?
+       LIMIT 1`,
+      [normalized, normalized, normalized]
+    );
+    if (normRows && normRows.length > 0) return normRows[0];
+  }
+
+  // 4. Pattern check: "AED" or "AED-" followed by digits (e.g. "AED 1", "AED-1", "AED_01")
+  const aedMatch = trimmed.match(/^AED[\s\-_]*0*(\d+)$/i);
+  if (aedMatch) {
+    const numericPart = parseInt(aedMatch[1], 10);
+    // Check if ID matches
+    const idFallback = await db.query(
+      'SELECT id, title, sku, slug FROM designs WHERE id = ? LIMIT 1',
+      [numericPart]
+    );
+    if (idFallback && idFallback.length > 0) return idFallback[0];
+
+    // Check if SKU like 'AED 1' or 'AED 01' matches
+    const skuFallback = await db.query(
+      'SELECT id, title, sku, slug FROM designs WHERE sku LIKE ? LIMIT 1',
+      [`%${numericPart}%`]
+    );
+    if (skuFallback && skuFallback.length > 0) return skuFallback[0];
+  }
+
+  return null;
+}
+
 exports.bulkUploadImages = async (req, res) => {
   try {
     const files = req.files ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat()) : [];
     if (!files || files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images were uploaded.' });
+      return res.status(400).json({
+        success: false,
+        message: 'No images were uploaded in this batch.',
+        matched: [],
+        unmatched: [],
+        failed: []
+      });
     }
 
-    let matchedCount = 0;
-    const results = [];
+    const matched = [];
+    const unmatched = [];
+    const failed = [];
 
     for (const file of files) {
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (!['.jpg', '.jpeg', '.png', '.webp', '.svg', '.avif'].includes(ext)) {
-        continue;
-      }
-
-      // Extract filename without extension (e.g. "AED-BLO-01" from "AED-BLO-01.png" or "AED 1" from "AED 1.jpg")
-      const baseName = path.basename(file.originalname, ext).trim();
-      let matchedDesign = null;
-
-      if (db.isConnected()) {
-        const bySku = await db.query('SELECT id, title, sku FROM designs WHERE sku = ? LIMIT 1', [baseName]);
-        if (bySku && bySku.length > 0) {
-          matchedDesign = bySku[0];
-        } else if (!isNaN(baseName)) {
-          const byId = await db.query('SELECT id, title, sku FROM designs WHERE id = ? LIMIT 1', [parseInt(baseName)]);
-          if (byId && byId.length > 0) matchedDesign = byId[0];
-        } else {
-          const byTitle = await db.query('SELECT id, title, sku FROM designs WHERE title = ? OR slug = ? LIMIT 1', [baseName, baseName]);
-          if (byTitle && byTitle.length > 0) matchedDesign = byTitle[0];
+      const originalName = file.originalname;
+      try {
+        const ext = path.extname(originalName).toLowerCase();
+        if (!['.jpg', '.jpeg', '.png', '.webp', '.avif'].includes(ext)) {
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (e) {}
+          }
+          unmatched.push({
+            filename: originalName,
+            reason: `Unsupported image format (${ext || 'none'}). Only JPG, PNG, WEBP, and AVIF are allowed.`
+          });
+          continue;
         }
-      }
 
-      if (matchedDesign) {
-        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
-        await Design.replacePrimaryImage(matchedDesign.id, savedUrl, file.originalname, file.size);
-        matchedCount++;
-        results.push({ designId: matchedDesign.id, title: matchedDesign.title, sku: matchedDesign.sku, filename: file.originalname, status: 'matched' });
-      } else {
-        results.push({ filename: file.originalname, status: 'unmatched' });
+        // Base filename without extension
+        const baseName = path.basename(originalName, ext).trim();
+        const matchedDesign = await findMatchingDesign(baseName);
+
+        if (matchedDesign) {
+          // Save to persistent storage (generates 300px WebP thumbnail inside savePublicFile)
+          const savedUrl = await storage.savePublicFile(file.path, originalName, file.mimetype);
+
+          // Idempotently update DB: set as primary image in design_images and design_files
+          await Design.replacePrimaryImage(matchedDesign.id, savedUrl, originalName, file.size);
+
+          // Clean up multer temporary disk file
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (e) {}
+          }
+
+          matched.push({
+            filename: originalName,
+            designId: matchedDesign.id,
+            title: matchedDesign.title,
+            sku: matchedDesign.sku,
+            imageUrl: savedUrl
+          });
+        } else {
+          // Clean up temp file
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (e) {}
+          }
+
+          unmatched.push({
+            filename: originalName,
+            reason: 'No matching product found by SKU, Product ID, or Title.'
+          });
+        }
+      } catch (fileErr) {
+        // Clean up temp file
+        if (file.path && fs.existsSync(file.path)) {
+          try { fs.unlinkSync(file.path); } catch (e) {}
+        }
+
+        const refId = errorLogger.logSqlError({
+          context: 'Bulk Image Upload',
+          error: fileErr,
+          referenceId: errorLogger.generateReferenceId()
+        });
+
+        console.error(`[Bulk Image Error] [${refId}] File "${originalName}":`, fileErr.message);
+
+        failed.push({
+          filename: originalName,
+          error: fileErr.message,
+          referenceId: refId
+        });
       }
     }
 
-    await ActivityLog.logFromReq(req, 'bulk_upload_images', 'design', null, `Bulk uploaded ${files.length} images (${matchedCount} matched to designs)`);
+    if (matched.length > 0) {
+      await ActivityLog.logFromReq(
+        req,
+        'bulk_upload_images_batch',
+        'design',
+        null,
+        `Bulk image batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${failed.length} failed`
+      );
+    }
 
-    const message = `Bulk image processing complete: ${matchedCount} of ${files.length} images successfully linked to products.`;
     return res.json({
       success: true,
-      message,
-      matchedCount,
-      totalUploaded: files.length,
-      details: results
+      message: `Batch processed: ${matched.length} linked, ${unmatched.length} unmatched, ${failed.length} failed.`,
+      matched,
+      unmatched,
+      failed,
+      processedCount: files.length
     });
   } catch (err) {
-    console.error('bulkUploadImages error:', err);
-    return res.status(500).json({ success: false, message: `Bulk image upload failed: ${err.message}` });
+    const refId = errorLogger.logSqlError({
+      context: 'Bulk Image Upload Batch',
+      error: err,
+      referenceId: errorLogger.generateReferenceId()
+    });
+    console.error(`[Bulk Image Batch Fatal Error] [${refId}]:`, err);
+    return res.status(500).json({
+      success: false,
+      message: `Batch upload failed: ${err.message}`,
+      referenceId: refId,
+      matched: [],
+      unmatched: [],
+      failed: [{ filename: 'batch', error: err.message, referenceId: refId }]
+    });
   }
 };
 
