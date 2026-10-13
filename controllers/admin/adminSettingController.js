@@ -10,12 +10,65 @@ exports.testSmtp = async (req, res, next) => {
   }
 };
 
+exports.testRazorpay = async (req, res, next) => {
+  try {
+    const Razorpay = require('razorpay');
+    let { key_id, key_secret } = req.body || {};
+
+    if (!key_id || !key_secret || key_secret.startsWith('••••')) {
+      const config = await Setting.getRazorpayConfig();
+      key_id = key_id || config.keyId;
+      key_secret = (key_secret && !key_secret.startsWith('••••')) ? key_secret : config.keySecret;
+    }
+
+    key_id = (key_id || '').trim();
+    key_secret = (key_secret || '').trim();
+
+    if (!key_id || !key_secret) {
+      return res.status(400).json({
+        success: false,
+        message: 'Razorpay Key ID and Key Secret are required to test connection.'
+      });
+    }
+
+    const testClient = new Razorpay({
+      key_id,
+      key_secret
+    });
+
+    const testOrder = await testClient.orders.create({
+      amount: 100,
+      currency: 'INR',
+      receipt: 'test_' + Date.now().toString().slice(-10),
+      payment_capture: 1
+    });
+
+    const mode = key_id.startsWith('rzp_live') ? 'LIVE' : 'TEST';
+    return res.json({
+      success: true,
+      mode,
+      orderId: testOrder.id,
+      message: `Connected successfully to Razorpay API in ${mode} mode!`
+    });
+  } catch (err) {
+    const statusCode = err.statusCode || (err.error && err.error.code) || 500;
+    const description = (err.error && err.error.description) || err.message || 'Razorpay authentication failed.';
+    return res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 500).json({
+      success: false,
+      message: `Razorpay connection failed: ${description}`,
+      statusCode
+    });
+  }
+};
+
 exports.getSettings = async (req, res, next) => {
   try {
     const settings = await Setting.getAll();
+    const rzpConfig = await Setting.getRazorpayConfig();
     res.render('admin/settings/index', {
       title: 'Store Settings - Admin',
-      settings
+      settings,
+      rzpConfig
     });
   } catch (err) {
     next(err);
@@ -147,7 +200,12 @@ exports.postSettings = async (req, res, next) => {
       upi_id: cleanUpiId,
       upi_name: upi_name.trim(),
       max_upload_zip_size_mb: b.max_upload_zip_size_mb ? String(Math.max(1, parseInt(b.max_upload_zip_size_mb, 10))) : '100',
-      auto_detect_formats_policy: b.auto_detect_formats_policy === 'overwrite' ? 'overwrite' : 'fill_if_empty'
+      auto_detect_formats_policy: b.auto_detect_formats_policy === 'overwrite' ? 'overwrite' : 'fill_if_empty',
+      razorpay_key_id: b.razorpay_key_id !== undefined ? b.razorpay_key_id.trim() : undefined,
+      razorpay_key_secret: b.razorpay_key_secret !== undefined ? b.razorpay_key_secret.trim() : undefined,
+      razorpay_mode: b.razorpay_mode !== undefined ? b.razorpay_mode.trim() : undefined,
+      razorpay_webhook_secret: b.razorpay_webhook_secret !== undefined ? b.razorpay_webhook_secret.trim() : undefined,
+      hide_empty_categories_in_pills: b.hide_empty_categories_in_pills === 'true' || b.hide_empty_categories_in_pills === '1' ? 'true' : (b.hide_empty_categories_in_pills === 'false' || b.hide_empty_categories_in_pills === '0' ? 'false' : undefined)
     };
 
     if (logo_url) updates.logo_url = logo_url;

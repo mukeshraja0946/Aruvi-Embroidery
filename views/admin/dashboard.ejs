@@ -135,6 +135,27 @@
     <!-- Main Content Body -->
     <main class="admin-content-body">
 
+      <% if (typeof paymentConfig !== 'undefined' && !paymentConfig.isConfigured) { %>
+        <div style="background: #FEE2E2; border: 1px solid #F87171; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 38px; height: 38px; background: #EF4444; color: #FFFFFF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+              <strong style="color: #991B1B; font-size: 0.95rem;">Payment Gateway Warning: Razorpay keys are missing or incomplete</strong>
+              <div style="color: #B91C1C; font-size: 0.82rem; margin-top: 2px;">
+                Customers cannot complete online payments at checkout until Razorpay Key ID and Key Secret are configured.
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="/admin/settings#payment-settings" class="btn btn-primary" style="font-size: 0.82rem; padding: 0.45rem 0.9rem; text-decoration: none; background: #DC2626; border-color: #DC2626; color: #fff; font-weight: 600; border-radius: 6px;">
+              <i class="fa-solid fa-gear" style="margin-right: 5px;"></i> Configure Payments
+            </a>
+          </div>
+        </div>
+      <% } %>
+
       <% if (typeof healthScan !== 'undefined' && !healthScan.healthy && healthScan.totalIssues > 0) { %>
         <div style="background: #FFF8E1; border: 1px solid #FFE082; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">

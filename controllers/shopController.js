@@ -3,6 +3,8 @@ const Category = require('../models/Category');
 const Review = require('../models/Review');
 const Wishlist = require('../models/Wishlist');
 const Order = require('../models/Order');
+const Setting = require('../models/Setting');
+const db = require('../config/db');
 
 exports.getShopPage = async (req, res, next) => {
   try {
@@ -18,6 +20,8 @@ exports.getShopPage = async (req, res, next) => {
       if (selectedCategory) categoryId = selectedCategory.id;
     }
 
+    const normalizedSort = (sort === 'latest') ? 'newest' : (sort || 'newest');
+
     const { designs, total, totalPages } = await Design.getAll({
       search,
       category_id: categoryId,
@@ -26,18 +30,38 @@ exports.getShopPage = async (req, res, next) => {
       min_price,
       max_price,
       min_rating,
-      sort,
+      sort: normalizedSort,
       page: currentPage,
       limit
     });
 
-    const categories = await Category.getAll();
+    const categories = await Category.getAll({ status: 'active' });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
+
+    // Real live total active designs count across entire DB
+    let totalActiveDesigns = 0;
+    if (db.isConnected()) {
+      try {
+        const countRes = await db.query('SELECT COUNT(*) as cnt FROM designs WHERE is_active = 1');
+        if (countRes && countRes[0]) {
+          totalActiveDesigns = parseInt(countRes[0].cnt || 0, 10);
+        }
+      } catch (e) {
+        totalActiveDesigns = total;
+      }
+    } else {
+      totalActiveDesigns = total;
+    }
+
+    const hideEmptySetting = await Setting.get('hide_empty_categories_in_pills', '1');
+    const hideEmptyCategories = hideEmptySetting !== 'false' && hideEmptySetting !== '0';
 
     res.render('shop/index', {
       title: selectedCategory ? `${selectedCategory.name} - ARUVI EMBROIDERY STUDIO` : 'All Embroidery Designs - ARUVI EMBROIDERY STUDIO',
       designs,
       categories,
+      totalActiveDesigns,
+      hideEmptyCategories,
       userPurchasedDesignIds,
       selectedCategory,
       search: search || '',

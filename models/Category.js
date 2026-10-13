@@ -32,9 +32,15 @@ class Category {
         else if (sort === 'count') orderSql = 'ORDER BY design_count DESC';
         else if (sort === 'newest') orderSql = 'ORDER BY c.id DESC';
 
-        const sql = `SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id ${whereClause} GROUP BY c.id ${orderSql}`;
+        // Count ONLY active designs (d.is_active = 1)
+        const sql = `SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id AND d.is_active = 1 ${whereClause} GROUP BY c.id ${orderSql}`;
         const rows = await db.query(sql, params);
-        if (rows && Array.isArray(rows)) return rows;
+        if (rows && Array.isArray(rows)) {
+          return rows.map(r => ({
+            ...r,
+            design_count: parseInt(r.design_count || 0, 10)
+          }));
+        }
       } catch (err) {
         console.error('Category.getAll DB error:', err.message);
       }
@@ -65,15 +71,51 @@ class Category {
   }
 
   static async getBySlug(slug) {
+    if (!slug) return null;
+    const cleanSlug = String(slug).trim().toLowerCase();
     if (db.isConnected()) {
       try {
-        const rows = await db.query('SELECT * FROM categories WHERE slug = ? LIMIT 1', [slug]);
-        if (rows && rows[0]) return rows[0];
+        // 1. Direct exact slug match
+        const exact = await db.query('SELECT * FROM categories WHERE slug = ? LIMIT 1', [cleanSlug]);
+        if (exact && exact[0]) return exact[0];
+
+        // 2. Flexible match for slug variants or category name (e.g. 'kids' matches 'kids-embroidery' or 'Kids Embroidery')
+        const variations = await db.query(`
+          SELECT * FROM categories 
+          WHERE slug = ? 
+             OR slug = ? 
+             OR slug = ?
+             OR slug LIKE ?
+             OR LOWER(name) = ?
+             OR LOWER(name) LIKE ?
+          ORDER BY 
+            (slug = ?) DESC,
+            (slug = ?) DESC,
+            (slug = ?) DESC,
+            display_order ASC
+          LIMIT 1
+        `, [
+          cleanSlug,
+          `${cleanSlug}-embroidery`,
+          `${cleanSlug}-designs`,
+          `${cleanSlug}%`,
+          cleanSlug,
+          `%${cleanSlug}%`,
+          cleanSlug,
+          `${cleanSlug}-embroidery`,
+          `${cleanSlug}-designs`
+        ]);
+        if (variations && variations[0]) return variations[0];
       } catch (err) {
         console.error('Category.getBySlug DB error:', err.message);
       }
     }
-    return fallbackCategories.find(c => c.slug === slug) || null;
+    return fallbackCategories.find(c => 
+      c.slug === cleanSlug || 
+      c.slug === `${cleanSlug}-designs` ||
+      c.slug === `${cleanSlug}-embroidery` ||
+      (c.name && c.name.toLowerCase().includes(cleanSlug))
+    ) || null;
   }
 
   static async create({ name, slug, description, image_url, display_order = 0 }) {

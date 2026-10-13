@@ -300,6 +300,87 @@
               <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">UPI Merchant / Payee Name *</label>
               <input type="text" name="upi_name" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.upi_name) ? settings.upi_name : (settings.upiMerchantName || 'ARUVI EMBROIDERY STUDIO') %>" placeholder="e.g. ARUVI EMBROIDERY STUDIO" required>
             </div>
+        </div>
+
+        <!-- Card: Payment Gateway (Razorpay) -->
+        <div class="admin-card-box" id="payment-settings" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">
+                <i class="fa-solid fa-credit-card" style="color: var(--primary);"></i> Online Payment Gateway (Razorpay)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                Configure official Razorpay API credentials for customer cards, UPI, net banking, and wallets.
+              </span>
+            </div>
+            <div>
+              <% if (typeof rzpConfig !== 'undefined' && rzpConfig.isConfigured) { %>
+                <span id="rzpStatusBadge" style="background: <%= rzpConfig.mode === 'live' ? '#E8F5E9' : '#FFF3E0' %>; color: <%= rzpConfig.mode === 'live' ? '#2E7D32' : '#E65100' %>; padding: 5px 14px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-circle-check"></i> <%= rzpConfig.mode === 'live' ? 'LIVE MODE ACTIVE' : 'TEST / SANDBOX MODE' %>
+                </span>
+              <% } else { %>
+                <span id="rzpStatusBadge" style="background: #FFEBEE; color: #C62828; padding: 5px 14px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-triangle-exclamation"></i> NOT CONFIGURED
+                </span>
+              <% } %>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">
+                Razorpay Key ID *
+              </label>
+              <input type="text" name="razorpay_key_id" id="rzp_key_id" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.razorpay_key_id) ? settings.razorpay_key_id : '' %>" placeholder="e.g. rzp_test_... or rzp_live_...">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">
+                Test Key starts with <code>rzp_test_</code>, Live Key starts with <code>rzp_live_</code>.
+              </small>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">
+                Razorpay Key Secret *
+              </label>
+              <input type="password" name="razorpay_key_secret" id="rzp_key_secret" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.razorpay_key_secret_masked) ? settings.razorpay_key_secret_masked : '' %>" placeholder="•••••••••••• (Leave as is to preserve current secret)">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">
+                Stored securely encrypted with AES-256. Leave masked dots to keep existing secret.
+              </small>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">
+                Payment Environment Mode
+              </label>
+              <select name="razorpay_mode" id="rzp_mode" class="form-control" style="height: 42px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.85rem; width: 100%; background: #FFF;">
+                <option value="test" <%= (typeof settings !== 'undefined' && settings.razorpay_mode === 'test') ? 'selected' : '' %>>Test Mode (Sandbox / Testing)</option>
+                <option value="live" <%= (typeof settings !== 'undefined' && settings.razorpay_mode === 'live') ? 'selected' : '' %>>Live Mode (Real Customer Payments)</option>
+              </select>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">
+                Controls whether test or live checkout is launched.
+              </small>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">
+                Webhook Secret (Optional)
+              </label>
+              <input type="password" name="razorpay_webhook_secret" id="rzp_webhook_secret" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.razorpay_webhook_secret_masked) ? settings.razorpay_webhook_secret_masked : '' %>" placeholder="Webhook Secret for payment.captured">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">
+                Webhook URL: <code>https://aruviembroidery.com/api/payment/webhook</code>
+              </small>
+            </div>
+          </div>
+
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <button type="button" onclick="testRazorpayConnection()" id="testRzpBtn" class="btn btn-outline btn-sm" style="height: 38px; border-radius: 8px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid #2E7D32; color: #1B5E20; background: #FFF; cursor: pointer;">
+                <i class="fa-solid fa-plug-circle-check"></i> Test Connection
+              </button>
+              <span id="testRzpStatusText" style="margin-left: 12px; font-size: 0.84rem; font-weight: 600;"></span>
+            </div>
+            <span style="font-size: 0.76rem; color: var(--admin-text-muted);">
+              Verifies API authorization with Razorpay servers without charging anything.
+            </span>
           </div>
         </div>
 
@@ -390,6 +471,45 @@
         document.getElementById(targetId).src = e.target.result;
       };
       reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  async function testRazorpayConnection() {
+    const btn = document.getElementById('testRzpBtn');
+    const statusText = document.getElementById('testRzpStatusText');
+    const keyId = document.getElementById('rzp_key_id')?.value.trim();
+    const keySecret = document.getElementById('rzp_key_secret')?.value.trim();
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing Connection...';
+    statusText.textContent = '';
+
+    try {
+      const res = await fetch('/admin/api/test-razorpay', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ key_id: keyId, key_secret: keySecret })
+      });
+      const data = await res.json();
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> Test Connection';
+
+      if (data.success) {
+        statusText.style.color = '#2E7D32';
+        statusText.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${data.message}`;
+      } else {
+        statusText.style.color = '#C62828';
+        statusText.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.message || 'Connection failed'}`;
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> Test Connection';
+      statusText.style.color = '#C62828';
+      statusText.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Connection test failed: ${err.message}`;
     }
   }
 </script>

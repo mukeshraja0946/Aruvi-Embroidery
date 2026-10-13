@@ -145,6 +145,8 @@ router.post('/admin/settings', upload.fields([
 ]), adminSettingController.postSettings);
 
 router.all('/admin/api/test-smtp', adminSettingController.testSmtp);
+router.all('/admin/api/test-razorpay', adminSettingController.testRazorpay);
+router.all('/admin/settings/test-razorpay', adminSettingController.testRazorpay);
 
 // Email Campaigns Management
 router.get('/admin/email-campaigns', adminEmailCampaignController.getCampaignsPage);

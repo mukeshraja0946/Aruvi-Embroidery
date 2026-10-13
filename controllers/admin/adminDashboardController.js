@@ -1,6 +1,7 @@
 const AdminStatsService = require('../../services/adminStatsService');
 const ContactMessage = require('../../models/ContactMessage');
 const Category = require('../../models/Category');
+const Setting = require('../../models/Setting');
 
 const healthCheckService = require('../../services/healthCheckService');
 
@@ -10,6 +11,7 @@ exports.getDashboard = async (req, res, next) => {
     const { messages: recentMessages } = await ContactMessage.getAll({ limit: 5 });
     const categories = await Category.getAll();
     const healthScan = await healthCheckService.runHealthScan();
+    const paymentConfig = await Setting.getRazorpayConfig();
 
     res.render('admin/dashboard', {
       title: 'Admin Dashboard - ARUVI EMBROIDERY STUDIO',
@@ -19,7 +21,8 @@ exports.getDashboard = async (req, res, next) => {
       recentMessages,
       categoryLabels: categories.map(c => c.name),
       categoryCounts: categories.map(c => c.design_count || 0),
-      healthScan
+      healthScan,
+      paymentConfig
     });
   } catch (err) {
     next(err);

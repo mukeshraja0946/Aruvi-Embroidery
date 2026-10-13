@@ -68,8 +68,16 @@ class Design {
           whereClause.push('d.category_id = ?');
           params.push(parseInt(category_id));
         } else if (category_slug) {
-          whereClause.push('c.slug = ?');
-          params.push(category_slug);
+          const cleanSlug = String(category_slug).trim().toLowerCase();
+          whereClause.push('(c.slug = ? OR c.slug = ? OR c.slug = ? OR c.slug LIKE ? OR LOWER(c.name) = ? OR LOWER(c.name) LIKE ?)');
+          params.push(
+            cleanSlug,
+            `${cleanSlug}-embroidery`,
+            `${cleanSlug}-designs`,
+            `${cleanSlug}%`,
+            cleanSlug,
+            `%${cleanSlug}%`
+          );
         }
 
         if (format) {
@@ -98,7 +106,7 @@ class Design {
         if (sort === 'price_low' || sort === 'price_asc') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
         else if (sort === 'price_high' || sort === 'price_desc') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
         else if (sort === 'popular' || sort === 'most_popular') orderBy = 'ORDER BY COALESCE(d.download_count, d.reviews_count) DESC, d.id DESC';
-        else if (sort === 'rating') orderBy = 'ORDER BY d.average_rating DESC, d.id DESC';
+        else if (sort === 'rating' || sort === 'top_rated') orderBy = 'ORDER BY d.average_rating DESC, d.id DESC';
         else if (sort === 'oldest') orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
         else if (sort === 'latest' || sort === 'newest') orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
 

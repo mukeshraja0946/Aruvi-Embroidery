@@ -62,13 +62,15 @@
             <div class="category-chips-wrap">
               <label class="cat-chip-label <%= !selectedCategory ? 'active' : '' %>">
                 <input type="radio" name="category" value="" <%= !selectedCategory ? 'checked' : '' %> onchange="handleFilterChange(this)">
-                All Categories (300+)
+                All Categories (<%= typeof totalActiveDesigns !== 'undefined' ? totalActiveDesigns : (total || 0) %>)
               </label>
               <% categories.forEach(cat => { %>
-                <label class="cat-chip-label <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
-                  <input type="radio" name="category" value="<%= cat.slug %>" <%= selectedCategory && selectedCategory.slug === cat.slug ? 'checked' : '' %> onchange="handleFilterChange(this)">
-                  <%= cat.name %> (<%= cat.description ? cat.description.replace(/\D/g, '') || '300' : '300' %>)
-                </label>
+                <% if (typeof hideEmptyCategories === 'undefined' || !hideEmptyCategories || cat.design_count > 0 || (selectedCategory && selectedCategory.slug === cat.slug)) { %>
+                  <label class="cat-chip-label <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
+                    <input type="radio" name="category" value="<%= cat.slug %>" <%= selectedCategory && selectedCategory.slug === cat.slug ? 'checked' : '' %> onchange="handleFilterChange(this)">
+                    <%= cat.name %> (<%= cat.design_count %>)
+                  </label>
+                <% } %>
               <% }) %>
             </div>
           </div>
@@ -216,6 +218,30 @@
           let qs = new URLSearchParams(queryObj).toString();
           return '/designs' + (qs ? '?' + qs : '');
         }
+
+        function getSortLabel(val) {
+          switch(val) {
+            case 'price_low':
+            case 'price_asc':
+              return 'Price: Low to High';
+            case 'price_high':
+            case 'price_desc':
+              return 'Price: High to Low';
+            case 'popular':
+            case 'most_popular':
+              return 'Popular';
+            case 'rating':
+            case 'top_rated':
+              return 'Top Rated';
+            case 'oldest':
+              return 'Oldest';
+            case 'newest':
+            case 'latest':
+            default:
+              return 'Latest';
+          }
+        }
+
         let hasActiveFilters = search || selectedCategory || selectedFormat || (max_price && Number(max_price) < 2000) || min_rating;
       %>
 
@@ -228,27 +254,49 @@
         const totalDisplay = totalCount >= 10 ? (totalCount + '+') : (totalCount || designs.length);
       %>
 
-      <!-- Controls Top Bar matching Reference Screenshot -->
+      <!-- 1. Dedicated Clean Mobile Toolbar (< 768px): One clean row with 44px buttons -->
+      <div class="mobile-shop-toolbar">
+        <button type="button" class="mobile-toolbar-btn mobile-filter-btn" id="openMobileFilterBtn" aria-label="Open Filters">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Filters</span>
+          <% if (hasActiveFilters) { %><span class="mobile-filter-dot"></span><% } %>
+        </button>
+
+        <button type="button" class="mobile-toolbar-btn mobile-sort-btn" id="openMobileSortBtn" aria-haspopup="dialog" aria-expanded="false" aria-label="Sort designs">
+          <span class="mobile-sort-btn-left">
+            <i class="fa-solid fa-arrow-down-short-wide"></i>
+            <span class="mobile-sort-btn-text">Sort: <strong><%= getSortLabel(sort) %></strong></span>
+          </span>
+          <i class="fa-solid fa-chevron-down mobile-sort-chevron"></i>
+        </button>
+      </div>
+
+      <!-- 2. Mobile Results Count Line (< 768px) -->
+      <div class="mobile-results-row">
+        <span class="mobile-results-count"><%= total %> <%= total === 1 ? 'design' : 'designs' %></span>
+      </div>
+
+      <!-- 3. Desktop Controls Top Bar (>= 768px) -->
       <div class="shop-controls-bar">
-        <!-- 1. Filters Button -->
+        <!-- Filters Button -->
         <button type="button" class="mobile-filter-toggle-btn" id="openFilterBtn" aria-label="Open Filters">
           <i class="fa-solid fa-sliders"></i> <span>Filters</span>
           <% if (hasActiveFilters) { %><span class="filter-dot-badge"></span><% } %>
         </button>
 
-        <!-- 2. Vertical Divider -->
+        <!-- Vertical Divider -->
         <div class="toolbar-divider"></div>
 
-        <!-- 3. Exact Two-Line Results Count -->
+        <!-- Exact Two-Line Results Count -->
         <div class="results-count-twoline">
           <span class="rc-line1">Showing</span>
           <span class="rc-line2"><strong><%= fromNum %>–<%= toNum %></strong> of <strong><%= totalDisplay %></strong> designs</span>
         </div>
 
-        <!-- 4. Vertical Divider -->
+        <!-- Vertical Divider -->
         <div class="toolbar-divider"></div>
         
-        <!-- 5. Sort By label and dropdown + Desktop Controls -->
+        <!-- Sort By label and dropdown + Desktop Controls -->
         <div class="controls-right">
           <%- include('../partials/sort-dropdown', {
             id: 'shop_sort_dd',
@@ -260,7 +308,8 @@
               { value: 'oldest', label: 'Oldest', iconType: 'oldest' },
               { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
               { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
-              { value: 'popular', label: 'Most Popular', iconType: 'popular' }
+              { value: 'popular', label: 'Most Popular', iconType: 'popular' },
+              { value: 'rating', label: 'Top Rated', iconType: 'rating' }
             ]
           }) %>
 
@@ -271,13 +320,15 @@
         </div>
       </div>
 
-      <!-- Horizontal Scrollable Category Filter Pills matching Reference -->
+      <!-- 4. Category Filter Pills: Horizontally Scrollable with Scroll-Snap & Real DB Counts -->
       <div class="category-pills-scroll-row">
-        <a href="/designs" class="cat-pill-btn <%= !selectedCategory ? 'active' : '' %>">All (300+)</a>
+        <a href="/designs" class="cat-pill-btn <%= !selectedCategory ? 'active' : '' %>">All (<%= typeof totalActiveDesigns !== 'undefined' ? totalActiveDesigns : (total || 0) %>)</a>
         <% categories.forEach(cat => { %>
-          <a href="/designs?category=<%= cat.slug %>" class="cat-pill-btn <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
-            <%= cat.name %> (<%= cat.description ? cat.description.replace(/\D/g, '') || '300' : '300' %>)
-          </a>
+          <% if (typeof hideEmptyCategories === 'undefined' || !hideEmptyCategories || cat.design_count > 0 || (selectedCategory && selectedCategory.slug === cat.slug)) { %>
+            <a href="/designs?category=<%= cat.slug %>" class="cat-pill-btn <%= selectedCategory && selectedCategory.slug === cat.slug ? 'active' : '' %>">
+              <%= cat.name %> (<%= cat.design_count %>)
+            </a>
+          <% } %>
         <% }) %>
       </div>
 
@@ -320,13 +371,13 @@
         </div>
       <% } %>
 
-      <!-- 4-Column Product Grid matching Reference -->
+      <!-- 5. Product Grid & Friendly Empty State -->
       <% if (designs.length === 0) { %>
-        <div class="no-results-box">
-          <i class="fa-solid fa-folder-open"></i>
-          <h3>No designs found matching your filter criteria</h3>
-          <p>Try adjusting search keywords or resetting price and format filters.</p>
-          <a href="/designs" class="btn btn-primary" style="margin-top: 1rem;">View All Designs</a>
+        <div class="no-results-box empty-state-box">
+          <i class="fa-solid fa-folder-open empty-state-icon"></i>
+          <h3><%= selectedCategory ? ('No designs found in ' + selectedCategory.name) : 'No designs found' %></h3>
+          <p>We couldn't find any designs matching your current filters. Browse all available designs or explore another category.</p>
+          <a href="/designs" class="btn btn-primary browse-all-designs-btn"><i class="fa-solid fa-compass" style="margin-right: 6px;"></i> Browse all designs</a>
         </div>
       <% } else { %>
         <div class="grid-4-strict">
@@ -435,6 +486,49 @@
   </div>
 </div>
 
+<!-- Mobile Sort Bottom Sheet Drawer (< 768px) -->
+<div class="mobile-sort-sheet-overlay" id="sortSheetOverlay" aria-hidden="true"></div>
+<div class="mobile-sort-sheet" id="sortSheet" role="dialog" aria-modal="true" aria-labelledby="sortSheetTitle" aria-hidden="true">
+  <div class="sort-sheet-header">
+    <div class="sort-sheet-title-group">
+      <i class="fa-solid fa-arrow-down-short-wide"></i>
+      <h3 id="sortSheetTitle">Sort Designs</h3>
+    </div>
+    <button type="button" class="sort-sheet-close-btn" id="closeSortSheetBtn" aria-label="Close sort dialog">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  <div class="sort-sheet-body" role="listbox">
+    <%
+      const sortSheetOptions = [
+        { value: 'newest', label: 'Latest', icon: 'fa-regular fa-clock' },
+        { value: 'price_low', label: 'Price: Low to High', icon: 'fa-solid fa-arrow-down-1-9' },
+        { value: 'price_high', label: 'Price: High to Low', icon: 'fa-solid fa-arrow-up-9-1' },
+        { value: 'popular', label: 'Popular', icon: 'fa-solid fa-fire' },
+        { value: 'rating', label: 'Top Rated', icon: 'fa-solid fa-star' }
+      ];
+      const activeSortVal = (sort === 'latest') ? 'newest' : (sort || 'newest');
+    %>
+    <% sortSheetOptions.forEach(opt => {
+      const isSelected = (activeSortVal === opt.value) ||
+                         (opt.value === 'newest' && (activeSortVal === 'latest' || !activeSortVal)) ||
+                         (opt.value === 'price_low' && activeSortVal === 'price_asc') ||
+                         (opt.value === 'price_high' && activeSortVal === 'price_desc') ||
+                         (opt.value === 'rating' && activeSortVal === 'top_rated');
+    %>
+      <button type="button" class="sort-sheet-option <%= isSelected ? 'selected' : '' %>" data-sort-val="<%= opt.value %>" role="option" aria-selected="<%= isSelected ? 'true' : 'false' %>">
+        <span class="sort-option-label-wrap">
+          <i class="<%= opt.icon %> sort-option-icon"></i>
+          <span class="sort-option-text"><%= opt.label %></span>
+        </span>
+        <% if (isSelected) { %>
+          <i class="fa-solid fa-circle-check sort-check-icon"></i>
+        <% } %>
+      </button>
+    <% }) %>
+  </div>
+</div>
+
 <script>
   function toggleAccordion(header) {
     const content = header.nextElementSibling;
@@ -469,6 +563,7 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     const openBtn = document.getElementById('openFilterBtn');
+    const openMobileBtn = document.getElementById('openMobileFilterBtn');
     const closeBtn = document.getElementById('closeFilterBtn');
     const sidebar = document.getElementById('filterSidebar');
     const overlay = document.getElementById('filterOverlay');
@@ -494,6 +589,7 @@
     }
 
     if (openBtn) openBtn.addEventListener('click', openSidebar);
+    if (openMobileBtn) openMobileBtn.addEventListener('click', openSidebar);
     if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
     if (overlay) {
       overlay.addEventListener('click', closeSidebar);
@@ -502,10 +598,66 @@
       }, { passive: false });
     }
 
-    // Escape key closes filter popup
+    // Mobile Sort Bottom Sheet logic
+    const openSortBtn = document.getElementById('openMobileSortBtn');
+    const closeSortBtn = document.getElementById('closeSortSheetBtn');
+    const sortSheet = document.getElementById('sortSheet');
+    const sortOverlay = document.getElementById('sortSheetOverlay');
+
+    function openSortSheet() {
+      if (sortSheet) {
+        sortSheet.classList.add('open');
+        sortSheet.setAttribute('aria-hidden', 'false');
+      }
+      if (sortOverlay) {
+        sortOverlay.classList.add('active');
+        sortOverlay.setAttribute('aria-hidden', 'false');
+      }
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    }
+
+    function closeSortSheet() {
+      if (sortSheet) {
+        sortSheet.classList.remove('open');
+        sortSheet.setAttribute('aria-hidden', 'true');
+      }
+      if (sortOverlay) {
+        sortOverlay.classList.remove('active');
+        sortOverlay.setAttribute('aria-hidden', 'true');
+      }
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+
+    if (openSortBtn) openSortBtn.addEventListener('click', openSortSheet);
+    if (closeSortBtn) closeSortBtn.addEventListener('click', closeSortSheet);
+    if (sortOverlay) {
+      sortOverlay.addEventListener('click', closeSortSheet);
+      sortOverlay.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+    }
+
+    // Sort Option Selection: Navigate immediately preserving existing query params
+    document.querySelectorAll('.sort-sheet-option').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const sortVal = this.getAttribute('data-sort-val');
+        if (sortVal) {
+          const url = new URL(window.location.href);
+          url.searchParams.set('sort', sortVal);
+          url.searchParams.delete('page');
+          closeSortSheet();
+          window.location.href = url.toString();
+        }
+      });
+    });
+
+    // Escape key closes both drawers
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
-        closeSidebar();
+      if (e.key === 'Escape') {
+        if (sidebar && sidebar.classList.contains('open')) closeSidebar();
+        if (sortSheet && sortSheet.classList.contains('open')) closeSortSheet();
       }
     });
   });
