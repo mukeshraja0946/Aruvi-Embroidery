@@ -190,7 +190,10 @@ app.locals.siteSettings = {
     process.env.UPI_NAME || 'ARUVI EMBROIDERY STUDIO',
 
   twitter_url:
-    process.env.TWITTER_URL || ''
+    process.env.TWITTER_URL || '',
+
+  show_design_reviews: '0',
+  show_design_related: '0'
 };
 
 // Global defaults

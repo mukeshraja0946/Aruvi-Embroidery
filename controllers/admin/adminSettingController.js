@@ -208,6 +208,8 @@ exports.postSettings = async (req, res, next) => {
       hide_empty_categories_in_pills: b.hide_empty_categories_in_pills === 'true' || b.hide_empty_categories_in_pills === '1' ? 'true' : (b.hide_empty_categories_in_pills === 'false' || b.hide_empty_categories_in_pills === '0' ? 'false' : undefined),
       show_category_banner_mobile: b.show_category_banner_mobile === '1' ? '1' : '0',
       show_sku_on_cards: b.show_sku_on_cards === '1' ? '1' : '0',
+      show_design_reviews: b.show_design_reviews === '1' ? '1' : '0',
+      show_design_related: b.show_design_related === '1' ? '1' : '0',
       about_hero_title: b.about_hero_title !== undefined ? b.about_hero_title.trim() : undefined,
       about_hero_subtitle: b.about_hero_subtitle !== undefined ? b.about_hero_subtitle.trim() : undefined,
       about_hero_description: b.about_hero_description !== undefined ? b.about_hero_description.trim() : undefined,

@@ -67,10 +67,10 @@
             <span class="old-price">₹<%= origPrice %></span>
           <% } %>
           <span class="current-price">₹<%= curPrice %></span>
+          <% if (hasDisc) { %>
+            <span class="discount-badge"><%= discPct %>% OFF</span>
+          <% } %>
         </div>
-        <% if (hasDisc) { %>
-          <span class="discount-badge"><%= discPct %>% OFF</span>
-        <% } %>
       </div>
 
       <button type="button" class="card-cart-btn-instant" data-id="<%= design.id %>" aria-label="Add to Cart" title="Add to Cart">

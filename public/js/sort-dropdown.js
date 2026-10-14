@@ -32,19 +32,19 @@
     if (!trigger || !panel) return;
     const rect = trigger.getBoundingClientRect();
     const isMobile = window.innerWidth < 768;
-    const panelWidth = Math.min(260, window.innerWidth - 32);
+    const panelWidth = isMobile ? Math.min(220, window.innerWidth - 32) : 260;
 
-    panel.style.width = panelWidth + 'px';
-    panel.style.top = (rect.bottom + 8) + 'px';
+    panel.style.setProperty('width', panelWidth + 'px', 'important');
+    panel.style.setProperty('top', Math.round(rect.bottom + (isMobile ? 6 : 8)) + 'px', 'important');
 
     // Right-align with the trigger button, clamped to screen margins
     const idealLeft = rect.right - panelWidth;
-    const minLeft = 16;
-    const maxLeft = window.innerWidth - panelWidth - 16;
+    const minLeft = isMobile ? 12 : 16;
+    const maxLeft = window.innerWidth - panelWidth - minLeft;
     const clampedLeft = Math.max(minLeft, Math.min(idealLeft, maxLeft));
 
-    panel.style.left = clampedLeft + 'px';
-    panel.style.right = 'auto';
+    panel.style.setProperty('left', Math.round(clampedLeft) + 'px', 'important');
+    panel.style.setProperty('right', 'auto', 'important');
   }
 
   function closeOpenDropdown() {

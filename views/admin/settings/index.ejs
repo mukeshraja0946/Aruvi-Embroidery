@@ -121,8 +121,7 @@
             <ul class="sidebar-nav-list">
               <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
-              <li class="sidebar-nav-item"><a href="/admin/settings#upi-details"><span><i class="fa-solid fa-qrcode"></i> UPI Details</span></a></li>
-              <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
+              <li class="sidebar-nav-item"><a href="/admin/settings#design-settings"><span><i class="fa-solid fa-palette"></i> Design Page</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/settings" class="active"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
             </ul>
           </div>
@@ -559,6 +558,39 @@
               <label class="form-label-custom" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Values Title & Text</label>
               <input type="text" name="about_values_title" class="form-control" value="<%= settings.about_values_title || 'Our Values' %>" style="margin-bottom: 6px;">
               <textarea name="about_values_text" class="form-control" rows="2" style="height: auto; padding: 0.6rem;"><%= settings.about_values_text || 'Quality, Creativity, Customer Satisfaction and Continuous Innovation.' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 7: Design Page Settings -->
+        <div id="design-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">Design Page Settings</h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Configure optional sections on design detail pages. When enabled, only real approved reviews and real database designs are shown (no dummy data).</span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-gem"></i> Detail Page</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">Show Reviews</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Displays verified customer reviews for this specific design (default: OFF).</span>
+                </div>
+                <input type="checkbox" name="show_design_reviews" value="1" <%= (typeof settings !== 'undefined' && settings.show_design_reviews === '1') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
+            </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">Show Related Designs</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Displays real related designs from the same category from the database (default: OFF).</span>
+                </div>
+                <input type="checkbox" name="show_design_related" value="1" <%= (typeof settings !== 'undefined' && settings.show_design_related === '1') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
             </div>
           </div>
         </div>

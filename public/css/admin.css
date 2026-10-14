@@ -768,3 +768,36 @@ body.admin-body {
   color: var(--admin-primary, #B8402A);
   background: #FAF6F0;
 }
+
+/* Mobile Admin Header (< 768px): 56px height, logo 36-40px, action buttons 40px */
+@media (max-width: 768px) {
+  .admin-top-header {
+    height: 56px !important;
+    max-height: 60px !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .admin-header-brand img {
+    height: 38px !important;
+    max-height: 40px !important;
+  }
+
+  .admin-search-bar {
+    display: none !important;
+  }
+
+  .admin-header-right {
+    gap: 8px !important;
+  }
+
+  .admin-icon-btn {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .admin-user-info {
+    display: none !important;
+  }
+}
+

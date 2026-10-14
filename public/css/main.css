@@ -4543,6 +4543,7 @@ textarea.form-control {
 @media (max-width: 767px) {
   html, body {
     overflow-x: hidden !important;
+    scrollbar-gutter: auto !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -4559,8 +4560,8 @@ textarea.form-control {
   .container {
     width: 100% !important;
     max-width: 100% !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     box-sizing: border-box !important;
@@ -4611,16 +4612,25 @@ textarea.form-control {
     display: inline-block !important;
   }
 
-  /* 2. Site Header Navigation - Left aligned logo next to hamburger button, 48px height */
+  /* 2. Site Header Navigation - Left aligned logo next to hamburger button, max 60px height */
   .site-header {
     width: 100% !important;
     max-width: 100% !important;
-    height: 48px !important;
-    min-height: 48px !important;
+    height: 56px !important;
+    min-height: 54px !important;
+    max-height: 60px !important;
     padding: 0 !important;
     display: flex !important;
     align-items: center !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  .site-header .container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
 
@@ -4630,7 +4640,7 @@ textarea.form-control {
     justify-content: flex-start !important;
     width: 100% !important;
     max-width: 100% !important;
-    gap: 4px !important;
+    gap: 0 !important;
     box-sizing: border-box !important;
     padding: 0 !important;
   }
@@ -4639,12 +4649,14 @@ textarea.form-control {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 32px !important;
+    width: 36px !important;
     height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
     padding: 0 !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
-    font-size: 1.05rem !important;
+    font-size: 18px !important;
     color: #2D231E !important;
     background: transparent !important;
     border: none !important;
@@ -4653,14 +4665,15 @@ textarea.form-control {
   .brand-logo {
     display: flex !important;
     align-items: center !important;
-    margin-left: 2px !important;
-    padding-left: 0 !important;
+    margin-left: 8px !important;
+    padding: 0 !important;
     flex-shrink: 0 !important;
   }
 
-  .brand-logo img {
-    height: 32px !important;
-    max-height: 32px !important;
+  .brand-logo img,
+  .brand-logo .header-logo-img {
+    height: 38px !important;
+    max-height: 40px !important;
     width: auto !important;
     margin-left: 0 !important;
     padding-left: 0 !important;
@@ -4676,15 +4689,15 @@ textarea.form-control {
     margin-left: auto !important; /* Push action icons to far right */
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
   }
 
   .header-icon-btn {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    font-size: 0.88rem !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    font-size: 20px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -4692,19 +4705,38 @@ textarea.form-control {
     border-radius: 50% !important;
     background: #FAF6F0 !important;
     color: #2D231E !important;
+    box-sizing: border-box !important;
+  }
+
+  .header-icon-btn i,
+  .header-icon-btn svg {
+    font-size: 20px !important;
+    width: 20px !important;
+    height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .header-icon-btn .cart-badge {
     position: absolute !important;
     top: -2px !important;
     right: -2px !important;
-    font-size: 0.65rem !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
     min-width: 16px !important;
+    width: 16px !important;
     height: 16px !important;
-    border-radius: 9999px !important;
+    min-height: 16px !important;
+    border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    padding: 0 !important;
+    border: 1.5px solid #FFFFFF !important;
+    line-height: 1 !important;
+    background-color: #BB4558 !important;
+    color: #FFFFFF !important;
   }
 
   /* 3. Hero Section Mobile Layout */
@@ -4820,11 +4852,11 @@ textarea.form-control {
     display: block !important;
   }
 
-  /* 4. 2x2 Feature Pills Bar on Mobile */
+  /* 4. 2x2 Feature Pills Bar on Mobile: 32px round icon circles, 16px icons, tighter padding */
   .hero-feature-pills {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 6px !important;
+    gap: 8px !important;
     margin-top: 0.8rem !important;
     padding-top: 0.8rem !important;
     border-top: 1px solid rgba(0,0,0,0.06) !important;
@@ -4836,31 +4868,60 @@ textarea.form-control {
   .hero-pill-item {
     padding: 6px 8px !important;
     background: #FFFFFF !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     border: 1px solid var(--border-light) !important;
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
     box-sizing: border-box !important;
+    min-width: 0 !important;
   }
 
   .hero-pill-item .pill-icon {
-    width: 26px !important;
-    height: 26px !important;
-    font-size: 0.75rem !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    border-radius: 50% !important;
+    background: #FAF0EE !important;
+    color: #BB4558 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 16px !important;
     flex-shrink: 0 !important;
   }
 
+  .hero-pill-item .pill-icon i {
+    font-size: 16px !important;
+    color: #BB4558 !important;
+  }
+
+  .hero-pill-item .pill-text-wrap,
+  .hero-pill-item > div:last-child {
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
   .hero-pill-item strong {
-    font-size: 0.72rem !important;
+    font-size: 0.74rem !important;
+    font-weight: 700 !important;
     display: block !important;
-    line-height: 1.15 !important;
+    line-height: 1.2 !important;
+    color: #2D231E !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .hero-pill-item span {
-    font-size: 0.65rem !important;
+    font-size: 0.67rem !important;
     display: block !important;
-    line-height: 1.15 !important;
+    line-height: 1.2 !important;
+    color: #7D7168 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   /* Custom Design Card Section Mobile Overrides */
@@ -5443,30 +5504,31 @@ textarea.form-control {
   }
 
   /* 3. Unified Filters + Sort + View Toggle Row (< 768px): One clean row */
+  /* 3. Unified Filters + Sort + View Toggle Row (< 768px): One clean row */
   .mobile-shop-toolbar {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
     width: 100% !important;
     box-sizing: border-box !important;
-    margin-bottom: 0.35rem !important;
+    margin-bottom: 0.5rem !important;
   }
 
   .mobile-filter-btn {
     flex: 0 0 auto !important;
     min-width: 0 !important;
-    height: 38px !important;
-    min-height: 38px !important;
+    height: 40px !important;
+    min-height: 40px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 5px !important;
-    padding: 0 10px !important;
+    gap: 3px !important;
+    padding: 0 6px !important;
     background: #FFFFFF !important;
     border: 1px solid #E2D9CF !important;
     border-radius: 8px !important;
     font-family: var(--font-body, 'Poppins', sans-serif) !important;
-    font-size: 0.80rem !important;
+    font-size: 13px !important;
     font-weight: 600 !important;
     color: #2D231E !important;
     cursor: pointer !important;
@@ -5479,10 +5541,11 @@ textarea.form-control {
   }
 
   .mobile-toolbar-count {
-    font-size: 0.76rem !important;
+    font-size: 10.5px !important;
     font-weight: 500 !important;
     color: #8C7F79 !important;
     margin-left: 1px !important;
+    display: inline-block !important;
   }
 
   .mobile-toolbar-btn:active,
@@ -5525,14 +5588,14 @@ textarea.form-control {
   .mobile-shop-toolbar .aruvi-sort-trigger {
     width: 100% !important;
     min-width: 0 !important;
-    height: 38px !important;
-    min-height: 38px !important;
-    padding: 0 10px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 6px !important;
     border-radius: 8px !important;
-    font-size: 0.80rem !important;
+    font-size: 13.5px !important;
     border: 1px solid #E2D9CF !important;
     background: #FFFFFF !important;
-    gap: 4px !important;
+    gap: 3px !important;
     box-sizing: border-box !important;
     display: flex !important;
     align-items: center !important;
@@ -5544,8 +5607,8 @@ textarea.form-control {
     align-items: center !important;
     min-width: 0 !important;
     overflow: hidden !important;
-    gap: 4px !important;
-    flex: 1 !important;
+    gap: 3px !important;
+    flex: 1 1 auto !important;
   }
 
   .mobile-shop-toolbar .aruvi-sort-btn-icon svg {
@@ -5555,19 +5618,22 @@ textarea.form-control {
   }
 
   .mobile-shop-toolbar .aruvi-sort-btn-label {
-    font-size: 0.80rem !important;
+    font-size: 13.5px !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    display: inline-block !important;
   }
 
   .mobile-shop-toolbar .aruvi-sort-val-text,
   .mobile-shop-toolbar .aruvi-sort-value-text {
-    font-size: 0.80rem !important;
+    font-size: 13.5px !important;
+    color: #BB4558 !important;
+    font-weight: 600 !important;
   }
 
   .mobile-shop-toolbar .aruvi-sort-btn-chevron {
-    margin-left: 2px !important;
+    margin-left: 1px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -5580,6 +5646,68 @@ textarea.form-control {
     flex-shrink: 0 !important;
   }
 
+  /* Compact Mobile Sort Dropdown Panel: 220px, 44px rows, 15px font, 18px icon, 12px padding, 14px radius, soft shadow */
+  .aruvi-sort-panel {
+    width: 220px !important;
+    max-width: calc(100vw - 32px) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 18px rgba(45, 35, 30, 0.12), 0 2px 6px rgba(45, 35, 30, 0.06) !important;
+    top: calc(100% + 6px);
+  }
+
+  .aruvi-sort-portal-root .aruvi-sort-panel {
+    position: fixed !important;
+    z-index: 999999 !important;
+    width: 220px !important;
+    max-width: calc(100vw - 32px) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 18px rgba(45, 35, 30, 0.12), 0 2px 6px rgba(45, 35, 30, 0.06) !important;
+  }
+
+  .aruvi-sort-panel-inner {
+    padding: 6px !important;
+    gap: 2px !important;
+  }
+
+  .aruvi-sort-item {
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 12px !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+  }
+
+  .aruvi-sort-item-icon {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .aruvi-sort-item-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .aruvi-sort-item-title {
+    font-size: 15px !important;
+  }
+
+  .aruvi-sort-item-check {
+    width: 16px !important;
+    height: 16px !important;
+    margin-left: 8px !important;
+  }
+
+  .aruvi-sort-item-check svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .aruvi-sort-item.selected {
+    background: #F8E8E2 !important;
+    color: #BB4558 !important;
+    font-weight: 600 !important;
+  }
+
   .mobile-view-toggle {
     display: flex !important;
     gap: 4px !important;
@@ -5587,12 +5715,12 @@ textarea.form-control {
   }
 
   .mobile-view-toggle .view-btn {
-    width: 36px !important;
-    height: 38px !important;
-    min-width: 36px !important;
-    min-height: 38px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
     border-radius: 8px !important;
-    font-size: 0.85rem !important;
+    font-size: 0.9rem !important;
     padding: 0 !important;
     border: 1px solid #E2D9CF !important;
     background: #FFFFFF !important;
@@ -6038,14 +6166,15 @@ textarea.form-control {
     margin-left: 2px !important;
   }
 
-  /* 5. Product Grid (2 Columns, 10px Gap, 10px Side Padding) */
+  /* 5. Product Grid (2 Columns, 12px Gap, 12px Container Padding) */
   .grid-4-strict {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px !important;
-    padding: 0 10px !important;
-    margin: 0 -10px !important;
-    width: calc(100% + 20px) !important;
+    gap: 12px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
   }
 
@@ -6055,20 +6184,22 @@ textarea.form-control {
     border: 1px solid #ECE5DC !important;
     box-shadow: 0 2px 6px rgba(45, 35, 30, 0.04) !important;
     width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
     position: relative !important;
     height: 100% !important;
+    min-height: 0 !important;
   }
 
-  /* Product Card Image Box: Matching Reference UI aspect ratio (16:10.5), edge-to-edge, zero dead space */
+  /* Product Card Image Box: 1:1 Aspect Ratio, object-fit: contain on soft background #F8E8E2, never crop previews */
   .card-image-box {
-    aspect-ratio: 16 / 10.5 !important;
+    aspect-ratio: 1 / 1 !important;
     height: auto !important;
     width: 100% !important;
-    background-color: #FAF6F0 !important;
+    background-color: #F8E8E2 !important;
     overflow: hidden !important;
     position: relative !important;
     border-radius: 14px 14px 0 0 !important;
@@ -6092,9 +6223,11 @@ textarea.form-control {
     height: 100% !important;
     max-width: 100% !important;
     max-height: 100% !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
     object-position: center !important;
     display: block !important;
+    padding: 4px !important;
+    box-sizing: border-box !important;
   }
 
   /* Format Tag Top Left */
@@ -6141,15 +6274,16 @@ textarea.form-control {
     color: #BB4558 !important;
   }
 
-  /* Card Body Content - Compact without dead space */
+  /* Card Body Content - Compact layout: image, name, category, chip row, price row with 6-8px gaps only */
   .card-body-content {
-    padding: 7px 8px 8px 8px !important;
+    padding: 8px !important;
     display: flex !important;
     flex-direction: column !important;
     flex-grow: 1 !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
     box-sizing: border-box !important;
-    gap: 0 !important;
+    gap: 6px !important;
+    min-height: 0 !important;
   }
 
   /* Design Name: Bold Serif */
@@ -6157,14 +6291,14 @@ textarea.form-control {
     font-size: 0.88rem !important;
     font-weight: 700 !important;
     line-height: 1.2 !important;
-    margin: 0 0 2px 0 !important;
+    margin: 0 !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     color: #2D231E !important;
-    min-height: unset !important;
+    min-height: 0 !important;
   }
 
   .card-item-title a {
@@ -6176,7 +6310,7 @@ textarea.form-control {
     font-size: 0.68rem !important;
     color: #8A7D75 !important;
     display: block !important;
-    margin-bottom: 2px !important;
+    margin: 0 !important;
   }
 
   /* Category Name in Grey */
@@ -6184,7 +6318,7 @@ textarea.form-control {
     font-size: 0.72rem !important;
     color: #8A7D75 !important;
     display: block !important;
-    margin-bottom: 3px !important;
+    margin: 0 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -6196,7 +6330,7 @@ textarea.form-control {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 4px !important;
-    margin-bottom: 4px !important;
+    margin: 0 !important;
   }
 
   .fmt-pill {
@@ -6210,13 +6344,13 @@ textarea.form-control {
     line-height: 1.15 !important;
   }
 
-  /* Rating Row: ONLY displayed when real approved reviews exist */
+  /* Rating Row: ONLY displayed when real approved reviews exist (no space reserved otherwise) */
   .card-rating-row {
     display: flex !important;
     align-items: center !important;
     gap: 4px !important;
     font-size: 0.70rem !important;
-    margin-bottom: 3px !important;
+    margin: 0 !important;
   }
 
   .card-rating-row .star-yellow {
@@ -6234,25 +6368,29 @@ textarea.form-control {
     font-size: 0.68rem !important;
   }
 
-  /* Price Row & Action */
+  /* Price Row & Action - Tight 6-8px gap from chip row, no artificial min-height */
   .card-price-action-row {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     width: 100% !important;
-    margin: 4px 0 6px 0 !important;
+    margin: 2px 0 0 0 !important;
+    gap: 4px !important;
   }
 
   .card-price-group {
     display: flex !important;
     flex-direction: column !important;
     gap: 2px !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
   }
 
   .price-numbers-row {
     display: flex !important;
     align-items: baseline !important;
-    gap: 4px !important;
+    gap: 5px !important;
+    flex-wrap: wrap !important;
   }
 
   .price-numbers-row .old-price {
@@ -6267,8 +6405,10 @@ textarea.form-control {
     color: #BB4558 !important;
   }
 
+  /* % OFF badge inline on same row as price (or directly under with 4px gap) */
+  .price-numbers-row .discount-badge,
   .card-price-group .discount-badge {
-    align-self: flex-start !important;
+    align-self: center !important;
     background: #FFEBEE !important;
     color: #C62828 !important;
     font-weight: 700 !important;
@@ -6276,6 +6416,8 @@ textarea.form-control {
     padding: 1px 5px !important;
     border-radius: 4px !important;
     display: inline-block !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
   }
 
   /* Square soft-red instant add to cart button (32px) */
@@ -6297,14 +6439,16 @@ textarea.form-control {
     -webkit-tap-highlight-color: transparent !important;
     padding: 0 !important;
     box-sizing: border-box !important;
+    flex-shrink: 0 !important;
   }
 
   .card-cart-btn-instant:active {
     transform: scale(0.92) !important;
   }
 
-  /* Full-width Buy Now Button (34px height) */
+  /* Full-width Buy Now Button (34px height) placed at bottom of card */
   .card-btn-buynow {
+    margin-top: auto !important;
     width: 100% !important;
     height: 34px !important;
     min-height: 34px !important;
@@ -6674,17 +6818,19 @@ textarea.form-control {
 
   /* Header icons touch targets */
   .header-icon-btn {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    width: 44px !important;
-    height: 44px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 20px !important;
   }
 
   .mobile-menu-toggle {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    width: 44px !important;
-    height: 44px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 18px !important;
   }
 
   .designs-page-container,
@@ -6929,31 +7075,186 @@ textarea.form-control {
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    margin-bottom: 1rem !important;
   }
 
   .product-gallery-box {
     flex-direction: column-reverse !important;
     width: 100% !important;
+    gap: 8px !important;
   }
 
+  /* Main image display: full image visible (object-fit: contain, width: 100%, height: auto, max-height: 70vh) on soft background */
+  .main-image-display {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 70vh !important;
+    min-height: 280px !important;
+    background-color: #F8E8E2 !important;
+    border-radius: 16px !important;
+    padding: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .main-image-display img,
+  .main-image-display #mainDisplayImg {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 70vh !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+  }
+
+  .tap-zoom-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(45, 35, 30, 0.72);
+    color: #FFFFFF;
+    font-size: 0.70rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Thumbnails stack below the main image on mobile */
   .thumbnails-stack {
     flex-direction: row !important;
     width: 100% !important;
     overflow-x: auto !important;
+    gap: 8px !important;
+    padding: 2px 0 6px !important;
+    scrollbar-width: none !important;
+  }
+
+  .thumbnails-stack::-webkit-scrollbar {
+    display: none !important;
   }
 
   .thumb-item {
-    width: 50px !important;
-    height: 50px !important;
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    background-color: #F8E8E2 !important;
+    border: 2px solid transparent !important;
+    box-sizing: border-box !important;
+  }
+
+  .thumb-item.active {
+    border-color: #BB4558 !important;
+  }
+
+  .thumb-item img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
   }
 
   .detail-product-title {
     font-size: clamp(18px, 4.2vw, 21px) !important;
+    margin-bottom: 0.3rem !important;
   }
 
   .tab-main-grid {
     grid-template-columns: 1fr !important;
     width: 100% !important;
+    gap: 1rem !important;
+    margin: 0 !important;
+  }
+
+  .detail-content-section {
+    margin-top: 1rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .detail-info-card {
+    padding: 1rem !important;
+    border-radius: 12px !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .included-files-sidebar {
+    margin-top: 0.5rem !important;
+  }
+
+  /* Fullscreen Pinch / Tap-to-Zoom Lightbox Modal */
+  .image-lightbox-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 10, 8, 0.94);
+    z-index: 9999999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .lightbox-viewport {
+    width: 100%;
+    height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .lightbox-viewport img {
+    max-width: 95vw;
+    max-height: 82vh;
+    object-fit: contain;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: center center;
+    cursor: grab;
+  }
+
+  .lightbox-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.22);
+    border: none;
+    color: #FFFFFF;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: background 0.15s ease;
+  }
+
+  .lightbox-close-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  .lightbox-footer-hint {
+    position: absolute;
+    bottom: 20px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.78rem;
+    text-align: center;
+    pointer-events: none;
   }
 
   /* 10. Cart Page Mobile Layout */
@@ -7499,8 +7800,13 @@ textarea.form-control {
   }
 
   .hero-pill-item .pill-text-wrap span {
-    font-size: 0.7rem !important;
-    display: none !important;
+    font-size: 0.67rem !important;
+    display: block !important;
+    line-height: 1.2 !important;
+    color: #7D7168 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   /* "Our Story" Section: Single column on mobile in exact order: label -> heading -> paragraphs -> image -> stats */
@@ -7911,7 +8217,7 @@ textarea.form-control {
   color: #BB4558;
 }
 
-/* Sort Dropdown Panel: 260px, 16px radius, soft shadow, z-index above cards */
+/* Sort Dropdown Panel: 260px, 16px radius, soft shadow, z-index above cards (Desktop Default) */
 .aruvi-sort-panel {
   display: none;
   position: absolute;
@@ -7941,6 +8247,10 @@ textarea.form-control {
 .aruvi-sort-portal-root .aruvi-sort-panel {
   position: fixed !important;
   z-index: 999999 !important;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(45, 35, 30, 0.12), 0 2px 8px rgba(45, 35, 30, 0.06);
 }
 
 .aruvi-sort-panel-inner {
@@ -7993,20 +8303,22 @@ textarea.form-control {
 .aruvi-sort-item-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .aruvi-sort-item-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: #7D7168;
   flex-shrink: 0;
 }
 
 .aruvi-sort-item-icon svg {
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
@@ -8016,16 +8328,21 @@ textarea.form-control {
 
 .aruvi-sort-item-title {
   white-space: nowrap;
+  font-size: 15px;
 }
 
 .aruvi-sort-item-check {
   display: none;
   color: #BB4558;
   flex-shrink: 0;
-  margin-left: 10px;
+  margin-left: 8px;
+  width: 16px;
+  height: 16px;
 }
 
 .aruvi-sort-item-check svg {
+  width: 16px;
+  height: 16px;
   display: block;
 }
 

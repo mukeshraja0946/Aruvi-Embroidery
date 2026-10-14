@@ -30,11 +30,12 @@
         <% } %>
       </div>
 
-      <div class="main-image-display">
-        <button class="wishlist-round-btn wishlist-btn <%= inWishlist ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist">
+      <div class="main-image-display" id="mainImageDisplayWrapper" style="cursor: zoom-in;" onclick="openLightbox(document.getElementById('mainDisplayImg').src)">
+        <button type="button" class="wishlist-round-btn wishlist-btn <%= inWishlist ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
           <i class="fa-<%= inWishlist ? 'solid' : 'regular' %> fa-heart"></i>
         </button>
-        <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>">
+        <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img">
+        <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass-plus"></i> Tap to zoom</span>
       </div>
     </div>
 
@@ -42,22 +43,23 @@
     <div class="product-summary-box">
       <h1 class="detail-product-title"><%= design.title %></h1>
       
-      <!-- Rating Stars -->
+      <!-- Rating Stars: strictly based on real approved DB reviews -->
       <%
-        const detailRating = parseFloat(design.average_rating || design.rating || 0);
-        const detailReviews = parseInt(design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0);
+        const realReviewsList = (typeof reviews !== 'undefined' && Array.isArray(reviews)) ? reviews : [];
+        const realCount = realReviewsList.length;
+        const realAvg = realCount > 0 ? (realReviewsList.reduce((sum, r) => sum + parseFloat(r.rating || 5), 0) / realCount) : 0;
       %>
-      <% if (detailReviews > 0 || detailRating > 0) { %>
+      <% if (realCount > 0) { %>
         <div class="detail-rating-row">
           <div class="stars-gold">
-            <% const fullStars = Math.floor(detailRating); %>
-            <% const hasHalf = (detailRating - fullStars) >= 0.3; %>
+            <% const fullStars = Math.floor(realAvg); %>
+            <% const hasHalf = (realAvg - fullStars) >= 0.3; %>
             <% for (let i = 0; i < fullStars; i++) { %><i class="fa-solid fa-star"></i><% } %>
             <% if (hasHalf) { %><i class="fa-solid fa-star-half-stroke"></i><% } %>
             <% for (let i = (fullStars + (hasHalf ? 1 : 0)); i < 5; i++) { %><i class="fa-regular fa-star"></i><% } %>
           </div>
-          <span class="rating-number"><%= detailRating.toFixed(1) %></span>
-          <span class="reviews-count">(<%= detailReviews %> <%= detailReviews === 1 ? 'review' : 'reviews' %>)</span>
+          <span class="rating-number"><%= realAvg.toFixed(1) %></span>
+          <span class="reviews-count">(<%= realCount %> <%= realCount === 1 ? 'review' : 'reviews' %>)</span>
         </div>
       <% } else { %>
         <div class="detail-rating-row" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.8rem;">
@@ -204,111 +206,64 @@
     </div>
   </div>
 
-  <!-- Tabs Navigation Header -->
-  <div class="detail-tabs-wrapper">
-    <div class="detail-tabs-nav">
-      <button class="tab-nav-btn active" onclick="switchDetailTab('files', this)">File Details</button>
-      <button class="tab-nav-btn" onclick="switchDetailTab('reviews', this)">Reviews (120)</button>
-      <button class="tab-nav-btn" onclick="switchDetailTab('ideas', this)">Usage Ideas</button>
-    </div>
-
-    <!-- Tab Content Container Grid -->
+  <!-- Detail Content Grid: Technical Details & Information without dummy tabs or dummy related designs -->
+  <div class="detail-content-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
     <div class="tab-main-grid">
-      <!-- Left Tab Pane -->
+      <!-- Left Content Pane -->
       <div class="tab-left-pane">
-        <!-- Related Designs Section matching Reference -->
-        <div class="related-designs-box" style="margin-bottom: 2rem;">
-            <div class="section-heading-box flex-between">
-              <h3 class="tab-heading">Related Designs</h3>
-              <a href="/designs" class="view-all-link">View All Designs <i class="fa-solid fa-arrow-right"></i></a>
-            </div>
-
-            <div class="grid-4-strict">
-              <div class="mini-product-card">
-                <button class="mini-wishlist-btn wishlist-btn" data-id="2"><i class="fa-regular fa-heart"></i></button>
-                <div class="mini-card-img">
-                  <a href="/design/lotus-mandala"><img src="/public/images/cat_traditional.jpg" alt="Lotus Mandala"></a>
-                </div>
-                <div class="mini-card-body">
-                  <h4><a href="/design/lotus-mandala">Lotus Mandala</a></h4>
-                  <div class="mini-bottom-row">
-                    <span class="mini-price">₹349</span>
-                    <button class="mini-cart-btn"><i class="fa-solid fa-cart-shopping"></i></button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mini-product-card">
-                <button class="mini-wishlist-btn wishlist-btn" data-id="3"><i class="fa-regular fa-heart"></i></button>
-                <div class="mini-card-img">
-                  <a href="/design/butterfly-floral"><img src="/public/images/cat_kids.jpg" alt="Butterfly Floral"></a>
-                </div>
-                <div class="mini-card-body">
-                  <h4><a href="/design/butterfly-floral">Butterfly Floral</a></h4>
-                  <div class="mini-bottom-row">
-                    <span class="mini-price">₹249</span>
-                    <button class="mini-cart-btn"><i class="fa-solid fa-cart-shopping"></i></button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mini-product-card">
-                <button class="mini-wishlist-btn wishlist-btn" data-id="4"><i class="fa-regular fa-heart"></i></button>
-                <div class="mini-card-img">
-                  <a href="/design/letter-a-monogram"><img src="/public/images/cat_monogram.jpg" alt="Letter A Monogram"></a>
-                </div>
-                <div class="mini-card-body">
-                  <h4><a href="/design/letter-a-monogram">Letter A Monogram</a></h4>
-                  <div class="mini-bottom-row">
-                    <span class="mini-price">₹199</span>
-                    <button class="mini-cart-btn"><i class="fa-solid fa-cart-shopping"></i></button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mini-product-card">
-                <button class="mini-wishlist-btn wishlist-btn" data-id="5"><i class="fa-regular fa-heart"></i></button>
-                <div class="mini-card-img">
-                  <a href="/design/peacock-design"><img src="/public/images/cat_traditional.jpg" alt="Peacock Design"></a>
-                </div>
-                <div class="mini-card-body">
-                  <h4><a href="/design/peacock-design">Peacock Design</a></h4>
-                  <div class="mini-bottom-row">
-                    <span class="mini-price">₹399</span>
-                    <button class="mini-cart-btn"><i class="fa-solid fa-cart-shopping"></i></button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tab 1: File Details -->
-          <div class="detail-tab-pane active" id="tab-files">
-            <h3 class="tab-heading">Technical File Details</h3>
-            <p class="tab-text-content">
-              This digital download includes precision-engineered machine embroidery files in standard format(s) (<%= design.formats || 'N/A' %>). Tested on Tajima, Brother, Janome, and Singer machines for zero thread breakage and high density coverage.
-            </p>
-          </div>
-
-        <!-- Tab 3: Reviews -->
-        <div class="detail-tab-pane" id="tab-reviews" style="display: none;">
-          <h3 class="tab-heading">Customer Reviews (120)</h3>
-          <div style="background: white; border: 1px solid var(--border-light); border-radius: 12px; padding: 1.2rem; margin-top: 1rem;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-              <strong>Priya L.</strong>
-              <span style="color: #F39C12;">★★★★★ 5.0</span>
-            </div>
-            <p style="font-size: 0.9rem; color: var(--text-dark);">Stitched this rose motif on a silk blouse back. Clean fills and zero thread breaks!</p>
-          </div>
-        </div>
-
-        <!-- Tab 4: Usage Ideas -->
-        <div class="detail-tab-pane" id="tab-ideas" style="display: none;">
-          <h3 class="tab-heading">Styling & Usage Ideas</h3>
-          <p class="tab-text-content">
-            Ideal for bridal blouse backs, saree borders, dupattas, cushion covers, wall art frames, and boutique embroidery collections.
+        <!-- Technical File Details Box -->
+        <div class="detail-info-card" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+          <h3 class="tab-heading" style="margin-bottom: 0.6rem; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--text-dark);">Technical File Details</h3>
+          <p class="tab-text-content" style="color: var(--text-dark); line-height: 1.6; font-size: 0.92rem; margin-bottom: 1rem;">
+            This digital download includes precision-engineered machine embroidery files in standard format(s) (<%= design.formats || 'DST' %>). Tested on Tajima, Brother, Janome, and Singer machines for zero thread breakage and high density coverage.
           </p>
+          <% if (design.description && design.description.trim()) { %>
+            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-dark);">Description</h4>
+            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin: 0;"><%= design.description %></p>
+          <% } %>
         </div>
+
+        <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_reviews === '1') { %>
+          <!-- Real Reviews (Only when toggle is ON in Admin and real reviews exist) -->
+          <div class="real-reviews-container" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+            <h3 class="tab-heading" style="margin-bottom: 0.8rem; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700;">Customer Reviews (<%= (typeof reviews !== 'undefined' && reviews) ? reviews.length : 0 %>)</h3>
+            <% if (typeof reviews !== 'undefined' && reviews && reviews.length > 0) { %>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <% reviews.forEach(r => { %>
+                  <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.9rem 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <strong style="font-size: 0.9rem; color: var(--text-dark);"><%= r.user_name || 'Customer' %></strong>
+                      <span style="color: #F39C12; font-size: 0.85rem; font-weight: 600;">★ <%= r.rating %></span>
+                    </div>
+                    <p style="font-size: 0.88rem; color: var(--text-dark); margin: 0; line-height: 1.5;"><%= r.comment %></p>
+                  </div>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0;">No approved reviews yet for this design.</p>
+            <% } %>
+          </div>
+        <% } %>
+
+        <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_related === '1' && typeof relatedDesigns !== 'undefined' && relatedDesigns && relatedDesigns.length > 0) { %>
+          <!-- Real Database Related Designs (Only when toggle is ON in Admin) -->
+          <div class="real-related-container" style="margin-bottom: 1.5rem;">
+            <div class="section-heading-box flex-between" style="margin-bottom: 0.8rem;">
+              <h3 class="tab-heading" style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; margin: 0;">Related Designs</h3>
+              <a href="/designs?category=<%= design.category_slug %>" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
+            <div class="grid-4-strict">
+              <% relatedDesigns.forEach(relDesign => { %>
+                <%- include('../partials/design-card', {
+                  design: relDesign,
+                  userPurchasedDesignIds: typeof userPurchasedDesignIds !== 'undefined' ? userPurchasedDesignIds : [],
+                  userWishlistDesignIds: typeof userWishlistDesignIds !== 'undefined' ? userWishlistDesignIds : [],
+                  siteSettings: typeof siteSettings !== 'undefined' ? siteSettings : {}
+                }) %>
+              <% }) %>
+            </div>
+          </div>
+        <% } %>
       </div>
 
       <!-- Right Side Box: Included Files & Design Information matching Reference -->
@@ -340,15 +295,15 @@
         <div class="design-info-list">
           <div class="info-row">
             <span>Design Size</span>
-            <strong>120.5 mm × 98.3 mm (Approx)</strong>
+            <strong><%= design.dimensions || '120.5 mm × 98.3 mm' %></strong>
           </div>
           <div class="info-row">
             <span>Stitch Count</span>
-            <strong>28,450 (Approx)</strong>
+            <strong><%= design.stitch_count ? Number(design.stitch_count).toLocaleString() : '28,450' %></strong>
           </div>
           <div class="info-row">
             <span>Colors</span>
-            <strong>8 Colors</strong>
+            <strong><%= design.color_count ? (design.color_count + ' Colors') : '8 Colors' %></strong>
           </div>
           <div class="info-row">
             <span>Formats</span>
@@ -360,6 +315,15 @@
   </div>
 </div>
 
+<!-- Fullscreen Tap-to-Zoom / Pinch-Zoom Lightbox Modal -->
+<div id="imageLightboxModal" class="image-lightbox-modal" style="display: none;" onclick="closeLightbox(event)">
+  <button type="button" class="lightbox-close-btn" onclick="closeLightbox(event)" aria-label="Close Lightbox">&times;</button>
+  <div class="lightbox-viewport" id="lightboxViewport" onclick="event.stopPropagation()">
+    <img id="lightboxImg" src="" alt="Full Preview" draggable="false">
+  </div>
+  <div class="lightbox-footer-hint">Double tap or pinch to zoom • Tap outside to close</div>
+</div>
+
 <script>
   function changeMainImage(src, element) {
     document.getElementById('mainDisplayImg').src = src;
@@ -367,12 +331,93 @@
     element.classList.add('active');
   }
 
-  function switchDetailTab(tabId, btn) {
-    document.querySelectorAll('.tab-nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.detail-tab-pane').forEach(p => p.style.display = 'none');
-    btn.classList.add('active');
-    document.getElementById('tab-' + tabId).style.display = 'block';
+  // Tap-to-Zoom Pinch Lightbox Controller
+  let currentZoomScale = 1;
+  let initialPinchDistance = 0;
+  let initialScale = 1;
+  let isLightboxOpen = false;
+
+  function openLightbox(src) {
+    const modal = document.getElementById('imageLightboxModal');
+    const img = document.getElementById('lightboxImg');
+    if (!modal || !img) return;
+
+    img.src = src;
+    currentZoomScale = 1;
+    img.style.transform = 'scale(1) translate(0px, 0px)';
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    isLightboxOpen = true;
   }
+
+  function closeLightbox(e) {
+    if (e && e.target && e.target.id === 'lightboxImg') return; // Don't close when tapping image
+    const modal = document.getElementById('imageLightboxModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    isLightboxOpen = false;
+  }
+
+  // Pinch & Double-tap Zoom handling
+  document.addEventListener('DOMContentLoaded', () => {
+    const img = document.getElementById('lightboxImg');
+    const viewport = document.getElementById('lightboxViewport');
+    if (!img || !viewport) return;
+
+    let lastTap = 0;
+    img.addEventListener('touchend', function(e) {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        e.preventDefault();
+        // Toggle 1x / 2.5x zoom
+        if (currentZoomScale > 1) {
+          currentZoomScale = 1;
+        } else {
+          currentZoomScale = 2.5;
+        }
+        img.style.transform = `scale(${currentZoomScale})`;
+      }
+      lastTap = currentTime;
+    });
+
+    viewport.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 2) {
+        initialPinchDistance = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+        initialScale = currentZoomScale;
+      }
+    }, { passive: true });
+
+    viewport.addEventListener('touchmove', function(e) {
+      if (e.touches.length === 2 && initialPinchDistance > 0) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+        const scale = (dist / initialPinchDistance) * initialScale;
+        currentZoomScale = Math.min(Math.max(1, scale), 4);
+        img.style.transform = `scale(${currentZoomScale})`;
+      }
+    }, { passive: false });
+
+    // Desktop click-to-zoom
+    img.addEventListener('click', function(e) {
+      e.stopPropagation();
+      currentZoomScale = currentZoomScale > 1 ? 1 : 2.5;
+      img.style.transform = `scale(${currentZoomScale})`;
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && isLightboxOpen) {
+        closeLightbox();
+      }
+    });
+  });
 
   document.addEventListener('DOMContentLoaded', () => {
     const addToCartForm = document.getElementById('addToCartForm');
