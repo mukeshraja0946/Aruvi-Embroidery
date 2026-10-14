@@ -20,6 +20,7 @@
     var _currentUser = (typeof currentUser !== 'undefined') ? currentUser : null;
     var _currentPath = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : ((typeof _currentPath !== 'undefined') ? _currentPath : '');
     var _cartCount = (typeof cartCount !== 'undefined') ? cartCount : 0;
+    var _wishlistCount = (typeof wishlistCount !== 'undefined') ? wishlistCount : 0;
     var _flash = (typeof flash !== 'undefined' && flash && Object.keys(flash).length > 0) ? flash : ((typeof _flash !== 'undefined') ? _flash : {});
   %>
 
@@ -100,7 +101,7 @@
         <div class="header-actions">
           <a href="/user/wishlist" class="header-icon-btn" title="Wishlist">
             <i class="fa-regular fa-heart"></i>
-            <span class="cart-badge">2</span>
+            <span class="cart-badge wishlist-badge"><%= _wishlistCount %></span>
           </a>
           
           <% if (_currentUser && _currentUser.role === 'admin') { %>

@@ -1,78 +1,64 @@
 <%- include('../partials/header') %>
 
-<div class="container category-detail-container" style="margin-top: 1.2rem; margin-bottom: 2.5rem;">
-  <!-- Breadcrumb -->
-  <div class="category-breadcrumb-bar" style="margin-bottom: 0.5rem;">
-    <a href="/" style="color: var(--text-muted);">Home</a> &gt; <a href="/categories" style="color: var(--text-muted);">Categories</a> &gt; <span style="color: var(--text-dark); font-weight: 600;"><%= category.name %></span>
-  </div>
-
-  <!-- Category Header -->
-  <div class="section-heading-box category-header-box" style="margin-bottom: 0.5rem;">
-    <h1 class="category-main-title" style="margin-bottom: 0.2rem;">
-      <%= category.name %>
-    </h1>
-    <div class="category-count-badge-wrap" style="margin-bottom: 0.2rem;">
-      <span class="category-count-badge">
-        Showing <%= designs.length %> of <%= total %> <%= total === 1 ? 'Design' : 'Designs' %>
-      </span>
+<div class="container designs-page-container category-detail-container">
+  <!-- Page Header / Banner: Desktop shows breadcrumbs & description; Mobile shows only centered title unless show_category_banner_mobile === '1' -->
+  <% const showBannerOnMobile = (typeof siteSettings !== 'undefined' && siteSettings.show_category_banner_mobile === '1'); %>
+  <div class="page-banner-card <%= showBannerOnMobile ? 'show-banner-mobile' : 'hide-banner-mobile' %>">
+    <div class="banner-content">
+      <div class="breadcrumb-trail banner-desktop-only">
+        <a href="/">Home</a> <span class="breadcrumb-sep">›</span> <a href="/categories">Categories</a> <span class="breadcrumb-sep">›</span> <span><%= category.name %></span>
+      </div>
+      <h1 class="page-banner-title"><%= category.name %></h1>
+      <p class="page-banner-subtitle banner-desktop-only">
+        <%= category.description || 'Explore our exclusive collection of premium machine embroidery design files.' %>
+      </p>
     </div>
-    <p class="category-desc" style="margin-bottom: 0.2rem;">
-      <%= category.description || 'Explore our exclusive collection of premium machine embroidery design files.' %>
-    </p>
   </div>
 
-  <!-- Filter & Controls Toolbar matching Reference UI -->
   <% 
-    const subVal = typeof currentSub !== 'undefined' ? currentSub : '';
     const sortVal = typeof currentSort !== 'undefined' ? currentSort : 'latest';
     const catPageNum = typeof currentPage !== 'undefined' ? (parseInt(currentPage) || 1) : 1;
-    const catPageLimit = 16;
+    const catPageLimit = typeof limit !== 'undefined' ? limit : 24;
     const catTotalCount = typeof total !== 'undefined' ? parseInt(total) : designs.length;
     const catFromNum = designs.length > 0 ? ((catPageNum - 1) * catPageLimit + 1) : 0;
     const catToNum = designs.length > 0 ? Math.min((catPageNum - 1) * catPageLimit + designs.length, catTotalCount) : 0;
     const catTotalDisplay = catTotalCount >= 10 ? (catTotalCount + '+') : (catTotalCount || designs.length);
-
-    function getSortLabel(val) {
-      switch(val) {
-        case 'price_low':
-        case 'price_asc':
-          return 'Price: Low to High';
-        case 'price_high':
-        case 'price_desc':
-          return 'Price: High to Low';
-        case 'popular':
-        case 'most_popular':
-          return 'Popular';
-        case 'rating':
-        case 'top_rated':
-          return 'Top Rated';
-        case 'oldest':
-          return 'Oldest';
-        case 'newest':
-        case 'latest':
-        default:
-          return 'Latest';
-      }
-    }
   %>
 
-  <!-- 1. Dedicated Mobile Toolbar (< 768px): One clean row with 48px buttons -->
-  <div class="mobile-shop-toolbar">
-    <a href="/designs?category=<%= category.slug %>" class="mobile-toolbar-btn mobile-filter-btn" aria-label="Filters">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-        <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-        <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-        <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
-      </svg>
-      <span>Filters</span>
-    </a>
+  <!-- Mobile Smart Sticky Toolbar Wrapper (< 768px): Contains Search + Filters/Sort row -->
+  <div class="mobile-sticky-toolbar-wrapper" id="mobileStickyToolbar">
+    <!-- Standalone Search Bar: Full width, 48px height, rounded 14px, soft beige -->
+    <div class="designs-search-bar" id="designsSearchBar">
+      <form action="/category/<%= category.slug %>" method="GET" class="designs-search-form" id="shopSearchForm" autocomplete="off">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" name="search" id="shopSearchInput" placeholder="Search in <%= category.name %>..." value="<%= search || '' %>" autocomplete="off" aria-label="Search designs">
+        <button type="button" class="search-clear-btn <%= search ? 'visible' : '' %>" id="searchClearBtn" aria-label="Clear search">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <% if (sortVal && sortVal !== 'latest') { %><input type="hidden" name="sort" value="<%= sortVal %>"><% } %>
+      </form>
+      <!-- Live Suggestions Dropdown Container -->
+      <div class="search-suggestions-dropdown" id="searchSuggestionsDropdown" style="display: none;"></div>
+    </div>
 
-    <%- include('../partials/sort-dropdown', {
-      id: 'cat_mobile_sort_dd',
-      currentSort: sortVal,
-      actionType: 'ajax'
-    }) %>
+    <!-- 1. Dedicated Mobile Toolbar (< 768px): One clean row with 48px buttons, 12px gap, 14px radius -->
+    <div class="mobile-shop-toolbar">
+      <a href="/designs?category=<%= category.slug %>" class="mobile-toolbar-btn mobile-filter-btn" aria-label="Filters">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+        <span>Filters</span>
+      </a>
+
+      <%- include('../partials/sort-dropdown', {
+        id: 'cat_mobile_sort_dd',
+        currentSort: sortVal,
+        actionType: 'ajax'
+      }) %>
+    </div>
   </div>
 
   <!-- 2. Mobile Results Count Line (< 768px) -->
@@ -81,7 +67,7 @@
   </div>
 
   <!-- 3. Desktop Controls Toolbar (>= 768px) -->
-  <div class="shop-controls-bar" style="margin-bottom: 1.5rem;">
+  <div class="shop-controls-bar">
     <!-- Exact Two-Line Results Count -->
     <div class="results-count-twoline">
       <span class="rc-line1">Showing</span>
@@ -101,133 +87,85 @@
     </div>
   </div>
 
+  <!-- 4. Category Filter Pills: Horizontally Scrollable with Scroll-Snap & Real DB Counts -->
+  <% if (typeof categories !== 'undefined' && categories.length > 0) { %>
+    <div class="category-pills-scroll-row" id="categoryPillsRow">
+      <a href="/designs" class="cat-pill-btn">
+        All (<%= typeof totalActiveDesigns !== 'undefined' ? totalActiveDesigns : catTotalCount %>)
+      </a>
+      <% categories.forEach(cat => { %>
+        <% if (typeof hideEmptyCategories === 'undefined' || !hideEmptyCategories || cat.design_count > 0 || cat.id === category.id) { %>
+          <a href="/category/<%= cat.slug %>" class="cat-pill-btn <%= cat.id === category.id ? 'active' : '' %>" data-slug="<%= cat.slug %>">
+            <%= cat.name %> (<%= cat.design_count %>)
+          </a>
+        <% } %>
+      <% }) %>
+    </div>
+  <% } %>
+
   <!-- Dedicated Results Container -->
   <div class="results-container">
     <% if (designs.length === 0) { %>
-      <div class="empty-designs-box empty-state empty-state-box" style="min-height: 350px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3rem 1rem;">
-        <i class="fa-solid fa-folder-open empty-state-icon" style="font-size: 3rem; color: #BD442E; margin-bottom: 1rem;"></i>
-        <h3 style="font-family: var(--font-heading); font-size: 1.5rem; margin-bottom: 0.5rem;">No designs found in <%= category.name %></h3>
-        <p style="color: var(--text-muted); font-size: 0.9rem; max-width: 480px; margin: 0 auto 1.2rem auto;">We haven't added any designs to this category yet. Check back soon or explore our other collections!</p>
-        <a href="/designs" class="btn btn-primary browse-all-designs-btn" style="border-radius: 8px; padding: 0.65rem 1.4rem; font-weight: 600;">
+      <div class="no-results-box empty-state-box">
+        <div class="empty-icon-circle">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+        <h3>No designs found in <%= category.name %></h3>
+        <p>We haven't added any designs to this category matching your search. Check back soon or explore our other collections!</p>
+        <a href="/designs" class="btn btn-primary browse-all-designs-btn">
           <i class="fa-solid fa-compass" style="margin-right: 6px;"></i> Browse all designs
         </a>
       </div>
     <% } else { %>
-    <div class="grid-4-strict">
-      <% designs.forEach(design => { %>
-        <div class="listing-product-card">
-          <!-- Wishlist Heart Button -->
-          <button class="wishlist-round-btn wishlist-btn" data-id="<%= design.id %>" title="Wishlist">
-            <i class="fa-regular fa-heart"></i>
-          </button>
-          
-          <!-- Image Box -->
-          <div class="card-image-box">
-            <a href="/design/<%= design.slug %>" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
-              <% if (design.primary_image) { %>
-                <img src="<%= design.primary_image %>" alt="<%= design.title %>" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
-              <% } else { %>
-                <img src="/public/images/cat_blouse.jpg" alt="<%= design.title %>" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;">
-              <% } %>
-            </a>
-          </div>
-
-          <!-- Card Content Body -->
-          <div class="card-body-content">
-            <h3 class="card-item-title">
-              <a href="/design/<%= design.slug %>"><%= design.title %></a>
-            </h3>
-            <span class="card-item-category"><%= category.name %></span>
-
-            <% const catFmts = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : []; %>
-            <% if (catFmts.length > 0) { %>
-              <div class="format-pill-row">
-                <% catFmts.forEach(fmt => { %>
-                  <span class="fmt-pill"><%= fmt %></span>
-                <% }) %>
-              </div>
-            <% } %>
-
-            <!-- Rating: Real customer reviews only -->
-            <%
-              const hasRealReviews = design.real_reviews_count && parseInt(design.real_reviews_count) > 0;
-              const catRatingScore = hasRealReviews ? parseFloat(design.real_avg_rating).toFixed(1) : null;
-              const catNumReviews = hasRealReviews ? parseInt(design.real_reviews_count) : 0;
-            %>
-            <% if (hasRealReviews) { %>
-              <div style="font-size: 0.78rem; color: #F5A623; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 4px;">
-                <i class="fa-solid fa-star"></i>
-                <span style="font-weight: 700; color: var(--text-dark);"><%= catRatingScore %></span>
-                <span style="color: var(--text-muted);">(<%= catNumReviews %>)</span>
-              </div>
-            <% } else { %>
-              <div style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                <span style="background: #F6F1EC; padding: 2px 7px; border-radius: 4px; font-weight: 500;">New Design</span>
-              </div>
-            <% } %>
-
-            <!-- Price Row -->
-            <%
-              const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
-              const origPrice = parseFloat(design.price || 0);
-              const hasDisc = curPrice < origPrice;
-              const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
-            %>
-            <div class="card-price-row">
-              <span class="current-price">₹<%= curPrice %></span>
-              <% if (hasDisc) { %>
-                <span class="old-price">₹<%= origPrice %></span>
-                <span class="discount-badge"><%= discPct %>% OFF</span>
-              <% } %>
-            </div>
-
-            <!-- Dual Action Buttons: Add to Cart & Buy Now OR Owned Badge -->
-            <% const isOwnedCat = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
-            <% if (isOwnedCat) { %>
-              <div class="card-actions-row">
-                <a href="/design/<%= design.slug %>" class="btn btn-owned" style="display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 38px; border-radius: 8px; font-weight: 600; font-size: 0.88rem; background: #F4EBE0; color: #2E7D32; border: 1px solid #C8E6C9; text-decoration: none;">
-                  <i class="fa-solid fa-circle-check"></i> ✓ Owned
-                </a>
-              </div>
-            <% } else { %>
-              <div class="card-actions-row">
-                <form class="ajax-add-to-cart" style="flex: 1;">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <input type="hidden" name="design_id" value="<%= design.id %>">
-                  <button type="submit" class="btn btn-outline card-btn-add">
-                    <i class="fa-solid fa-cart-plus"></i> Add
-                  </button>
-                </form>
-
-                <form action="/cart/buy-now?_csrf=<%= csrfToken %>" method="POST" style="flex: 1;">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <input type="hidden" name="design_id" value="<%= design.id %>">
-                  <button type="submit" class="btn btn-primary card-btn-buy">
-                    <i class="fa-solid fa-bolt"></i> Buy Now
-                  </button>
-                </form>
-              </div>
-            <% } %>
-
-          </div>
-        </div>
-      <% }) %>
-    </div>
-
-    <!-- Pagination Controls Bar -->
-    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
-      <div class="pagination-wrapper" style="margin-top: 3rem;">
-        <a href="/category/<%= category.slug %>?page=<%= Math.max(1, currentPage - 1) %><%= currentSort ? '&sort=' + currentSort : '' %><%= currentSub ? '&sub=' + currentSub : '' %>" class="page-nav-btn <%= currentPage <= 1 ? 'disabled' : '' %>"><i class="fa-solid fa-chevron-left"></i></a>
-        <% for (let i = 1; i <= totalPages; i++) { %>
-          <a href="/category/<%= category.slug %>?page=<%= i %><%= currentSort ? '&sort=' + currentSort : '' %><%= currentSub ? '&sub=' + currentSub : '' %>" class="page-num-btn <%= currentPage === i ? 'active' : '' %>"><%= i %></a>
-        <% } %>
-        <a href="/category/<%= category.slug %>?page=<%= Math.min(totalPages, currentPage + 1) %><%= currentSort ? '&sort=' + currentSort : '' %><%= currentSub ? '&sub=' + currentSub : '' %>" class="page-nav-btn <%= currentPage >= totalPages ? 'disabled' : '' %>"><i class="fa-solid fa-chevron-right"></i></a>
+      <!-- 2-column mobile grid (<768px), 4-column desktop grid (>=768px) -->
+      <div class="grid-4-strict" id="designsGrid">
+        <% designs.forEach(design => { %>
+          <%- include('../partials/design-card', {
+            design,
+            userPurchasedDesignIds: typeof userPurchasedDesignIds !== 'undefined' ? userPurchasedDesignIds : [],
+            userWishlistDesignIds: typeof userWishlistDesignIds !== 'undefined' ? userWishlistDesignIds : [],
+            siteSettings: typeof siteSettings !== 'undefined' ? siteSettings : {}
+          }) %>
+        <% }) %>
       </div>
-    <% } %>
+
+      <!-- Infinite Scroll / Load More (24 per page) -->
+      <div class="load-more-container" id="loadMoreContainer" style="<%= catPageNum >= totalPages ? 'display: none;' : '' %>">
+        <button type="button" class="load-more-btn" id="loadMoreBtn" data-page="<%= catPageNum %>" data-total-pages="<%= totalPages %>">
+          <span>Load more (<%= Math.max(0, catTotalCount - (catPageNum * catPageLimit)) %> remaining)</span>
+          <i class="fa-solid fa-arrow-down"></i>
+        </button>
+        <div class="load-more-spinner" id="loadMoreSpinner" style="display: none;">
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+          <div class="spinner-dot"></div>
+        </div>
+      </div>
+
+      <!-- Desktop Pagination Controls Bar (>= 768px) -->
+      <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+        <div class="pagination-wrapper desktop-pagination-only">
+          <a href="/category/<%= category.slug %>?page=<%= Math.max(1, catPageNum - 1) %><%= currentSort ? '&sort=' + currentSort : '' %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="page-nav-btn <%= catPageNum <= 1 ? 'disabled' : '' %>"><i class="fa-solid fa-chevron-left"></i></a>
+          <% for (let i = 1; i <= Math.min(5, totalPages); i++) { %>
+            <a href="/category/<%= category.slug %>?page=<%= i %><%= currentSort ? '&sort=' + currentSort : '' %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="page-num-btn <%= catPageNum === i ? 'active' : '' %>"><%= i %></a>
+          <% } %>
+          <% if (totalPages > 5) { %>
+            <span class="page-dots">...</span>
+            <a href="/category/<%= category.slug %>?page=<%= totalPages %><%= currentSort ? '&sort=' + currentSort : '' %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="page-num-btn <%= catPageNum === totalPages ? 'active' : '' %>"><%= totalPages %></a>
+          <% } %>
+          <a href="/category/<%= category.slug %>?page=<%= Math.min(totalPages, catPageNum + 1) %><%= currentSort ? '&sort=' + currentSort : '' %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="page-nav-btn <%= catPageNum >= totalPages ? 'disabled' : '' %>"><i class="fa-solid fa-chevron-right"></i></a>
+        </div>
+      <% } %>
     <% } %>
   </div>
 </div>
 
+<!-- Floating Back to Top Button -->
+<button type="button" class="back-to-top-btn" id="backToTopBtn" aria-label="Back to top" title="Back to top">
+  <i class="fa-solid fa-arrow-up"></i>
+</button>
 
+<!-- Mobile shop interactive behaviors -->
+<script src="/public/js/shop-mobile.js" defer></script>
 
 <%- include('../partials/footer') %>

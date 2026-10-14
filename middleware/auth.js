@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Cart = require('../models/Cart');
 const Setting = require('../models/Setting');
+const Wishlist = require('../models/Wishlist');
 
 async function attachUserAndCart(req, res, next) {
   // Always initialize res.locals defaults to prevent EJS ReferenceError crashes
@@ -8,6 +9,8 @@ async function attachUserAndCart(req, res, next) {
   res.locals.currentPath = req.path || '/';
   res.locals.cartCount = 0;
   res.locals.cart = { items: [], total: 0, count: 0 };
+  res.locals.wishlistCount = 0;
+  res.locals.userWishlistDesignIds = [];
   res.locals.siteSettings = { ...(req.app ? req.app.locals.siteSettings : {}) };
   res.locals.flash = { success: [], error: [], info: [] };
   res.locals.messages = { success: '', error: '', info: '' };
@@ -46,6 +49,17 @@ async function attachUserAndCart(req, res, next) {
       res.locals.cartCount = cart.count || 0;
     } catch (cartErr) {
       console.error('Cart fetch error:', cartErr.message);
+    }
+
+    // 3b. Wishlist Summary
+    try {
+      if (req.user && req.user.id) {
+        const userWishlist = await Wishlist.getByUser(req.user.id);
+        res.locals.userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
+        res.locals.wishlistCount = res.locals.userWishlistDesignIds.length;
+      }
+    } catch (wishErr) {
+      console.error('Wishlist fetch error:', wishErr.message);
     }
 
     // 4. Global Settings & Flash messages

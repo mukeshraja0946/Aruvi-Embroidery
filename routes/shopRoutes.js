@@ -5,6 +5,11 @@ const shopController = require('../controllers/shopController');
 // Designs listing page
 router.get('/shop', shopController.getShopPage);
 router.get('/designs', shopController.getShopPage);
+router.get('/search', shopController.getShopPage);
+
+// API search suggestions & live designs count
+router.get('/api/search/suggestions', shopController.getSearchSuggestions);
+router.get('/api/designs/count', shopController.getDesignsCount);
 
 // Categories listing page & individual category page
 router.get('/categories', shopController.getCategoriesPage);

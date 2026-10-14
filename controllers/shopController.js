@@ -10,7 +10,7 @@ exports.getShopPage = async (req, res, next) => {
   try {
     const { search, category, format, min_price, max_price, min_rating, sort, page } = req.query;
     const currentPage = parseInt(page) || 1;
-    const limit = 12;
+    const limit = parseInt(req.query.limit) || 24;
 
     let selectedCategory = null;
     let categoryId = null;
@@ -37,6 +37,8 @@ exports.getShopPage = async (req, res, next) => {
 
     const categories = await Category.getAll({ status: 'active' });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
+    const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
+    const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
 
     // Real live total active designs count across entire DB
     let totalActiveDesigns = 0;
@@ -56,6 +58,19 @@ exports.getShopPage = async (req, res, next) => {
     const hideEmptySetting = await Setting.get('hide_empty_categories_in_pills', '1');
     const hideEmptyCategories = hideEmptySetting !== 'false' && hideEmptySetting !== '0';
 
+    if (req.query.ajax === '1' || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.json({
+        success: true,
+        designs,
+        total,
+        totalPages,
+        currentPage,
+        hasMore: currentPage < totalPages,
+        userPurchasedDesignIds,
+        userWishlistDesignIds
+      });
+    }
+
     res.render('shop/index', {
       title: selectedCategory ? `${selectedCategory.name} - ARUVI EMBROIDERY STUDIO` : 'All Embroidery Designs - ARUVI EMBROIDERY STUDIO',
       designs,
@@ -63,6 +78,7 @@ exports.getShopPage = async (req, res, next) => {
       totalActiveDesigns,
       hideEmptyCategories,
       userPurchasedDesignIds,
+      userWishlistDesignIds,
       selectedCategory,
       search: search || '',
       selectedFormat: format || '',
@@ -84,11 +100,14 @@ exports.getCategoriesPage = async (req, res, next) => {
     const categories = await Category.getAll();
     const featuredDesigns = await Design.getFeatured(6);
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
+    const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
+    const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
     res.render('shop/categories', {
       title: 'Categories - ARUVI EMBROIDERY STUDIO',
       categories,
       featuredDesigns,
-      userPurchasedDesignIds
+      userPurchasedDesignIds,
+      userWishlistDesignIds
     });
   } catch (err) {
     next(err);
@@ -107,7 +126,7 @@ exports.getCategoryDetailPage = async (req, res, next) => {
     }
 
     const currentPage = parseInt(page) || 1;
-    const limit = 16;
+    const limit = parseInt(req.query.limit) || 24;
 
     const { designs, total, totalPages } = await Design.getAll({
       category_id: category.id,
@@ -117,15 +136,50 @@ exports.getCategoryDetailPage = async (req, res, next) => {
       limit
     });
 
-    const categories = await Category.getAll();
+    const categories = await Category.getAll({ status: 'active' });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
+    const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
+    const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
+
+    let totalActiveDesigns = 0;
+    if (db.isConnected()) {
+      try {
+        const countRes = await db.query('SELECT COUNT(*) as cnt FROM designs WHERE is_active = 1');
+        if (countRes && countRes[0]) {
+          totalActiveDesigns = parseInt(countRes[0].cnt || 0, 10);
+        }
+      } catch (e) {
+        totalActiveDesigns = total;
+      }
+    } else {
+      totalActiveDesigns = total;
+    }
+
+    const hideEmptySetting = await Setting.get('hide_empty_categories_in_pills', '1');
+    const hideEmptyCategories = hideEmptySetting !== 'false' && hideEmptySetting !== '0';
+
+    if (req.query.ajax === '1' || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.json({
+        success: true,
+        designs,
+        total,
+        totalPages,
+        currentPage,
+        hasMore: currentPage < totalPages,
+        userPurchasedDesignIds,
+        userWishlistDesignIds
+      });
+    }
 
     res.render('shop/category-detail', {
       title: `${category.name} - ARUVI EMBROIDERY STUDIO`,
       category,
       designs,
       categories,
+      totalActiveDesigns,
+      hideEmptyCategories,
       userPurchasedDesignIds,
+      userWishlistDesignIds,
       total,
       currentPage,
       totalPages,
@@ -135,6 +189,46 @@ exports.getCategoryDetailPage = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+exports.getSearchSuggestions = async (req, res, next) => {
+  try {
+    const q = (req.query.q || req.query.search || '').trim();
+    if (!q) {
+      return res.json({ success: true, suggestions: [] });
+    }
+    const suggestions = await Design.getSuggestions(q, 8);
+    return res.json({ success: true, suggestions });
+  } catch (err) {
+    console.error('getSearchSuggestions error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.getDesignsCount = async (req, res, next) => {
+  try {
+    const { search, category, format, min_price, max_price, min_rating } = req.query;
+    let categoryId = null;
+    if (category) {
+      const cat = await Category.getBySlug(category);
+      if (cat) categoryId = cat.id;
+    }
+    const { total } = await Design.getAll({
+      search,
+      category_id: categoryId,
+      category_slug: category,
+      format,
+      min_price,
+      max_price,
+      min_rating,
+      page: 1,
+      limit: 1
+    });
+    return res.json({ success: true, count: total });
+  } catch (err) {
+    console.error('getDesignsCount error:', err);
+    return res.json({ success: false, count: 0 });
   }
 };
 

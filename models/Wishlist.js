@@ -72,6 +72,21 @@ class Wishlist {
     const ids = fallbackWishlists.get(userId) || [];
     return ids.includes(parseInt(designId));
   }
+
+  static async getCount(userId) {
+    if (!userId) return 0;
+    if (db.isConnected()) {
+      try {
+        const rows = await db.query('SELECT COUNT(*) as cnt FROM wishlist WHERE user_id = ?', [userId]);
+        return rows && rows[0] ? parseInt(rows[0].cnt || 0, 10) : 0;
+      } catch (err) {
+        console.error('Wishlist.getCount DB error:', err);
+        return 0;
+      }
+    }
+    const ids = fallbackWishlists.get(userId) || [];
+    return ids.length;
+  }
 }
 
 module.exports = Wishlist;

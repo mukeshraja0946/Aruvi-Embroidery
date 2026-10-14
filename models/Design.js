@@ -59,9 +59,9 @@ class Design {
         }
 
         if (search) {
-          whereClause.push('(d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ?)');
+          whereClause.push('(d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ? OR c.name LIKE ?)');
           const searchPattern = `%${search}%`;
-          params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+          params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
         if (category_id) {
@@ -197,9 +197,10 @@ class Design {
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(d => 
-        d.title.toLowerCase().includes(q) || 
+        (d.title && d.title.toLowerCase().includes(q)) || 
         (d.tags && d.tags.toLowerCase().includes(q)) ||
-        (d.sku && d.sku.toLowerCase().includes(q))
+        (d.sku && d.sku.toLowerCase().includes(q)) ||
+        (d.category_name && d.category_name.toLowerCase().includes(q))
       );
     }
 
@@ -1459,6 +1460,51 @@ class Design {
       await this.delete(id);
     }
     return true;
+  }
+
+  static async getSuggestions(query, limit = 8) {
+    if (!query || typeof query !== 'string' || !query.trim()) return [];
+    const q = `%${query.trim()}%`;
+    if (db.isConnected()) {
+      try {
+        const sql = `
+          SELECT d.id, d.title, d.sku, d.slug, d.price, d.sale_price, d.formats,
+                 c.name as category_name, c.slug as category_slug,
+                 COALESCE(
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
+                 ) as primary_image
+          FROM designs d
+          LEFT JOIN categories c ON d.category_id = c.id
+          WHERE d.is_active = 1
+            AND (d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ? OR c.name LIKE ?)
+          ORDER BY d.id DESC
+          LIMIT ?
+        `;
+        const rows = await db.query(sql, [q, q, q, q, q, parseInt(limit)]);
+        for (const item of rows) {
+          this.normalizePrimaryImage(item);
+        }
+        return rows;
+      } catch (err) {
+        console.error('Design.getSuggestions DB error:', err);
+      }
+    }
+    const term = query.trim().toLowerCase();
+    const matches = fallbackDesigns.filter(d => 
+      d.is_active === 1 && (
+        (d.title && d.title.toLowerCase().includes(term)) ||
+        (d.sku && d.sku.toLowerCase().includes(term)) ||
+        (d.tags && d.tags.toLowerCase().includes(term)) ||
+        (d.category_name && d.category_name.toLowerCase().includes(term))
+      )
+    ).slice(0, limit);
+    for (const item of matches) {
+      this.normalizePrimaryImage(item);
+    }
+    return matches;
   }
 }
 

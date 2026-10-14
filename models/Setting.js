@@ -71,7 +71,9 @@ const fallbackSettings = {
   razorpay_key_secret: process.env.RAZORPAY_KEY_SECRET || '',
   razorpay_mode: process.env.RAZORPAY_MODE || (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_ID.startsWith('rzp_live') ? 'live' : 'test'),
   razorpay_webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
-  hide_empty_categories_in_pills: 'true'
+  hide_empty_categories_in_pills: 'true',
+  show_category_banner_mobile: '0',
+  show_sku_on_cards: '0'
 };
 
 class Setting {

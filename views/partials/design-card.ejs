@@ -1,0 +1,91 @@
+<div class="listing-product-card" data-design-id="<%= design.id %>">
+  <!-- Square Image Box (1:1 Aspect Ratio) -->
+  <div class="card-image-box">
+    <a href="/design/<%= design.slug %>" class="card-img-link" aria-label="<%= design.title || design.sku || 'Design' %>">
+      <% const imgSrc = design.primary_image || '/public/images/cat_blouse.jpg'; %>
+      <img src="<%= imgSrc %>" alt="<%= design.title || design.sku || 'Embroidery Design' %>" loading="lazy" class="card-product-img" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
+    </a>
+
+    <!-- Top Left Format Tag -->
+    <% 
+      const fmtsList = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : ['DST'];
+      const primaryFormatTag = fmtsList[0] || 'DST';
+    %>
+    <span class="card-format-tag"><%= primaryFormatTag %></span>
+
+    <!-- Wishlist Heart Button (44px tap area) -->
+    <% const inWishlist = (typeof userWishlistDesignIds !== 'undefined' && userWishlistDesignIds && userWishlistDesignIds.includes(design.id)); %>
+    <button type="button" class="wishlist-round-btn wishlist-btn <%= inWishlist ? 'active' : '' %>" data-id="<%= design.id %>" aria-label="Save to Wishlist" title="Wishlist">
+      <i class="<%= inWishlist ? 'fa-solid fa-heart' : 'fa-regular fa-heart' %>"></i>
+    </button>
+  </div>
+
+  <!-- Card Body Content -->
+  <div class="card-body-content">
+    <%
+      const showSkuSetting = (typeof siteSettings !== 'undefined' && siteSettings.show_sku_on_cards === '1');
+      const hasTitle = design.title && design.title.trim() && design.title.trim().toUpperCase() !== (design.sku || '').toUpperCase();
+      const displayTitle = hasTitle ? design.title : (design.sku || 'Embroidery Design');
+    %>
+    <h3 class="card-item-title">
+      <a href="/design/<%= design.slug %>"><%= displayTitle %></a>
+    </h3>
+    <% if (showSkuSetting && hasTitle && design.sku) { %>
+      <span class="card-item-sku"><%= design.sku %></span>
+    <% } %>
+
+    <span class="card-item-category"><%= design.category_name || 'Blouse Designs' %></span>
+
+    <!-- Format Chips -->
+    <div class="format-pill-row">
+      <% fmtsList.forEach(fmt => { %>
+        <span class="fmt-pill"><%= fmt %></span>
+      <% }) %>
+    </div>
+
+    <!-- Rating Row: ONLY displayed when real approved reviews exist; completely hidden otherwise -->
+    <% const hasRealReviews = design.real_reviews_count && parseInt(design.real_reviews_count, 10) > 0; %>
+    <% if (hasRealReviews) { %>
+      <div class="card-rating-row">
+        <i class="fa-solid fa-star star-yellow"></i>
+        <span class="rating-num"><%= parseFloat(design.real_avg_rating).toFixed(1) %></span>
+        <span class="rating-count">(<%= design.real_reviews_count %>)</span>
+      </div>
+    <% } %>
+
+    <!-- Price Row with Instant Add to Cart -->
+    <%
+      const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
+      const origPrice = parseFloat(design.price || 0);
+      const hasDisc = origPrice > curPrice && origPrice > 0;
+      const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
+    %>
+    <div class="card-price-action-row">
+      <div class="card-price-group">
+        <% if (hasDisc) { %>
+          <span class="old-price">₹<%= origPrice %></span>
+        <% } %>
+        <span class="current-price">₹<%= curPrice %></span>
+        <% if (hasDisc) { %>
+          <span class="discount-badge"><%= discPct %>% OFF</span>
+        <% } %>
+      </div>
+
+      <button type="button" class="card-cart-btn-instant" data-id="<%= design.id %>" aria-label="Add to Cart" title="Add to Cart">
+        <i class="fa-solid fa-cart-shopping"></i>
+      </button>
+    </div>
+
+    <!-- Full-Width Buy Now Button (48px) -->
+    <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+    <% if (isOwned) { %>
+      <a href="/design/<%= design.slug %>" class="card-btn-buynow is-owned" aria-label="Owned - View and Download" title="Owned - Download">
+        <i class="fa-solid fa-circle-check"></i> Owned
+      </a>
+    <% } else { %>
+      <a href="/cart/buy-now?design_id=<%= design.id %>" class="card-btn-buynow" aria-label="Buy Now" title="Buy Now">
+        <i class="fa-solid fa-bag-shopping"></i> Buy Now
+      </a>
+    <% } %>
+  </div>
+</div>
