@@ -675,4 +675,27 @@
     }
   });
 
+  // -------------------------------------------------------------------------
+  // 10. MOBILE & DESKTOP GRID / LIST VIEW TOGGLE
+  // -------------------------------------------------------------------------
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const view = this.getAttribute('data-view') || (this.title && this.title.toLowerCase().includes('list') ? 'list' : 'grid');
+      document.querySelectorAll('.view-btn').forEach(b => {
+        const bView = b.getAttribute('data-view') || (b.title && b.title.toLowerCase().includes('list') ? 'list' : 'grid');
+        if (bView === view) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+
+      const gridEl = document.getElementById('designsGrid') || document.querySelector('.grid-4-strict');
+      if (gridEl) {
+        if (view === 'list') {
+          gridEl.classList.add('list-view-active');
+        } else {
+          gridEl.classList.remove('list-view-active');
+        }
+      }
+    });
+  });
+
 })();

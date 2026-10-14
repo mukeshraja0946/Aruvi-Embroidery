@@ -66,11 +66,8 @@
 
         <!-- Logo -->
         <a href="/" class="brand-logo">
-          <% if (typeof siteSettings !== 'undefined' && siteSettings.logo_url) { %>
-            <img src="<%= siteSettings.logo_url %>" alt="ARUVI EMBROIDERY STUDIO" style="max-height: 48px; width: auto; object-fit: contain;">
-          <% } else { %>
-            <img src="/public/images/logo.jpg" alt="ARUVI EMBROIDERY STUDIO" style="max-height: 48px; width: auto; object-fit: contain;">
-          <% } %>
+          <% const headerLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+          <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" onerror="this.onerror=null;this.src='/public/images/logo.jpg';" style="max-height: 44px; width: auto; object-fit: contain;">
         </a>
 
         <!-- Navigation Links -->
@@ -132,7 +129,7 @@
   <div class="mobile-nav-drawer" id="mobileNavDrawer">
     <div class="mobile-drawer-header">
       <div class="drawer-logo">
-        <img src="<%= (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg' %>" alt="ARUVI EMBROIDERY">
+        <img src="<%= (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg' %>" alt="ARUVI EMBROIDERY" onerror="this.onerror=null;this.src='/public/images/logo.jpg';">
       </div>
       <button class="mobile-drawer-close" id="closeMobileMenu" aria-label="Close Menu">
         <i class="fa-solid fa-xmark"></i>
@@ -300,9 +297,16 @@
     });
   </script>
 
-  <!-- Flash Messages (Excluding /admin/login to prevent duplicate banners) -->
-  <% if (_currentPath !== '/admin/login') { %>
-    <div class="container" style="margin-top: 1rem;">
+  <!-- Flash Messages (Only rendered when flash messages exist) -->
+  <% 
+    const hasFlashMsgs = (_flash && (
+      (_flash.success && _flash.success.length > 0) ||
+      (_flash.error && _flash.error.length > 0) ||
+      (_flash.info && _flash.info.length > 0)
+    ));
+  %>
+  <% if (_currentPath !== '/admin/login' && hasFlashMsgs) { %>
+    <div class="container flash-messages-container" style="margin-top: 0.75rem; margin-bottom: 0.5rem;">
       <% if (_flash.success && _flash.success.length > 0) { %>
         <div class="alert alert-success">
           <i class="fa-solid fa-circle-check"></i> <%= _flash.success[0] %>

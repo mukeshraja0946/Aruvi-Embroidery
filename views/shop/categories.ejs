@@ -1,8 +1,8 @@
 <%- include('../partials/header') %>
 
-<div class="container" style="margin-top: 2rem; margin-bottom: 5rem;">
+<div class="container categories-page-container">
   <!-- Categories Hero Banner matching Reference -->
-  <div class="page-banner-card" style="margin-bottom: 3rem;">
+  <div class="page-banner-card categories-hero-banner">
     <div class="banner-content">
       <div class="breadcrumb-trail">
         <a href="/">Home</a> &nbsp;>&nbsp; <span>Categories</span>
@@ -13,21 +13,33 @@
       </p>
     </div>
     <div class="banner-image-box">
-      <img src="/public/images/hero_embroidery.jpg" alt="Categories Collection">
+      <img src="/public/images/hero_embroidery.jpg" alt="Categories Collection" onerror="this.onerror=null;this.src='/public/images/logo.jpg';">
     </div>
   </div>
 
-  <!-- 8 Category Cards Grid matching Reference (4 Columns x 2 Rows) -->
-  <div class="grid-4-strict" style="margin-bottom: 3.5rem;">
+  <!-- Category Cards Grid matching Reference (4 Columns Desktop x 2 Columns Mobile) -->
+  <div class="grid-4-strict categories-cards-grid">
     <% categories.forEach(cat => { %>
+      <% 
+        let catImg = cat.image_url;
+        if (!catImg) {
+          const s = (cat.slug || '').toLowerCase();
+          if (s.includes('floral')) catImg = '/public/images/cat_floral.jpg';
+          else if (s.includes('border') || s.includes('lace')) catImg = '/public/images/cat_border.jpg';
+          else if (s.includes('kid')) catImg = '/public/images/cat_kids.jpg';
+          else if (s.includes('traditional') || s.includes('temple') || s.includes('saree')) catImg = '/public/images/cat_traditional.jpg';
+          else if (s.includes('logo') || s.includes('shirt') || s.includes('monogram')) catImg = '/public/images/cat_monogram.jpg';
+          else catImg = '/public/images/cat_blouse.jpg';
+        }
+      %>
       <a href="/category/<%= cat.slug %>" class="category-card">
         <div class="category-card-img-box">
-          <img src="<%= cat.image_url || '/public/images/logo.jpg' %>" alt="<%= cat.name %>">
+          <img src="<%= catImg %>" alt="<%= cat.name %>" onerror="this.onerror=null;this.src='/public/images/cat_blouse.jpg';">
         </div>
         <div class="category-card-info">
           <div class="category-card-meta">
             <h3><%= cat.name %></h3>
-            <span class="design-count"><%= cat.description || '300+ Designs' %></span>
+            <span class="design-count"><%= (cat.design_count !== undefined && cat.design_count !== null) ? (cat.design_count + ' Designs') : (cat.description || '300+ Designs') %></span>
           </div>
           <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
         </div>
@@ -36,7 +48,7 @@
   </div>
 
   <!-- Middle Trust Feature Strip matching Reference -->
-  <div class="hero-feature-pills" style="margin-bottom: 4rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
+  <div class="hero-feature-pills categories-trust-pills">
     <div class="hero-pill-item">
       <div class="pill-icon"><i class="fa-solid fa-award"></i></div>
       <div>
