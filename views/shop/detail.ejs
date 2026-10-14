@@ -147,11 +147,11 @@
             </a>
           </div>
         <% } else { %>
-          <button type="submit" form="addToCartForm" class="btn btn-outline btn-block" style="border-radius: 25px; font-weight: 600; padding: 0.8rem; border-color: var(--primary); color: var(--primary);">
-            Add to Cart
+          <button type="submit" form="addToCartForm" class="btn btn-outline btn-block btn-lg" style="border-color: var(--primary); color: var(--primary);">
+            <i class="fa-solid fa-cart-shopping"></i> Add to Cart
           </button>
-          <button type="submit" form="buyNowForm" class="btn btn-primary btn-block" style="border-radius: 25px; font-weight: 600; padding: 0.8rem; background-color: var(--primary);">
-            Buy Now
+          <button type="submit" form="buyNowForm" class="btn btn-primary btn-block btn-lg">
+            <i class="fa-solid fa-bag-shopping"></i> Buy Now
           </button>
           <div style="font-size: 0.82rem; color: #666; margin-top: 0.3rem; text-align: center;">
             <i class="fa-solid fa-lock" style="color: #888;"></i> Formats: <%= design.formats || 'None' %> &bull; Purchase this design to download files

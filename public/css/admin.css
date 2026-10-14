@@ -668,3 +668,103 @@ body.admin-body {
 .social-icon i {
   font-size: 1.6rem;
 }
+
+/* ============================================================
+   ADMIN SHARED BUTTON SIZING SYSTEM
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 1.15rem;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid transparent;
+  outline: none;
+  text-decoration: none;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background-color: var(--admin-primary, #B8402A);
+  color: #FFFFFF;
+}
+
+.btn-primary:hover {
+  background-color: #9E301D;
+  color: #FFFFFF;
+}
+
+.btn-outline {
+  background-color: #FFFFFF;
+  border-color: var(--admin-border, #E8E0D5);
+  color: var(--admin-text-dark, #231815);
+}
+
+.btn-outline:hover {
+  border-color: var(--admin-primary, #B8402A);
+  color: var(--admin-primary, #B8402A);
+  background-color: #FAF4EE;
+}
+
+.btn-danger {
+  background-color: #C62828;
+  color: #FFFFFF;
+  border-color: transparent;
+}
+
+.btn-danger:hover {
+  background-color: #B71C1C;
+  color: #FFFFFF;
+}
+
+.btn-sm {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 0.75rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  gap: 5px;
+}
+
+.btn-lg {
+  height: 42px;
+  min-height: 42px;
+  padding: 0 1.4rem;
+  font-size: 0.90rem;
+  border-radius: 8px;
+}
+
+.action-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border, #E8E0D5);
+  background: #FFFFFF;
+  color: var(--admin-text-dark, #231815);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: 0.82rem;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.action-icon-btn:hover {
+  border-color: var(--admin-primary, #B8402A);
+  color: var(--admin-primary, #B8402A);
+  background: #FAF6F0;
+}

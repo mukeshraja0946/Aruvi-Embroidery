@@ -1,9 +1,8 @@
 <%- include('../partials/header') %>
 
 <div class="container designs-page-container category-detail-container">
-  <!-- Page Header / Banner: Desktop shows breadcrumbs & description; Mobile shows only centered title unless show_category_banner_mobile === '1' -->
-  <% const showBannerOnMobile = (typeof siteSettings !== 'undefined' && siteSettings.show_category_banner_mobile === '1'); %>
-  <div class="page-banner-card <%= showBannerOnMobile ? 'show-banner-mobile' : 'hide-banner-mobile' %>">
+  <!-- Page Header: Title & Breadcrumbs without promotional hero banner -->
+  <div class="page-banner-card clean-banner">
     <div class="banner-content">
       <div class="breadcrumb-trail banner-desktop-only">
         <a href="/">Home</a> <span class="breadcrumb-sep">›</span> <a href="/categories">Categories</a> <span class="breadcrumb-sep">›</span> <span><%= category.name %></span>
