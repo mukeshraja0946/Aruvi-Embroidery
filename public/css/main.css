@@ -4691,7 +4691,7 @@ textarea.form-control {
   }
 
   .hero-title {
-    font-size: 1.65rem !important;
+    font-size: clamp(20px, 4.8vw, 24px) !important;
     line-height: 1.2 !important;
     margin-bottom: 0.4rem !important;
     width: 100% !important;
@@ -4722,11 +4722,11 @@ textarea.form-control {
   .hero-actions .btn {
     width: 100% !important;
     max-width: 100% !important;
-    padding: 0.65rem 0.9rem !important;
-    font-size: 0.85rem !important;
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.82rem !important;
     font-weight: 600 !important;
-    border-radius: 22px !important;
-    min-height: 42px !important;
+    border-radius: 20px !important;
+    min-height: 38px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -4846,7 +4846,7 @@ textarea.form-control {
   }
 
   .custom-left-info h2 {
-    font-size: 1.4rem !important;
+    font-size: clamp(17px, 3.8vw, 19.5px) !important;
     line-height: 1.25 !important;
     margin-bottom: 0.35rem !important;
     text-align: center !important;
@@ -4864,15 +4864,16 @@ textarea.form-control {
   }
 
   .custom-left-info .btn {
-    width: 100 !important;
-    max-width: 280px !important;
-    height: 44px !important;
-    border-radius: 25px !important;
+    width: 100% !important;
+    max-width: 260px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    border-radius: 20px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 8px !important;
-    font-size: 0.85rem !important;
+    gap: 7px !important;
+    font-size: 0.82rem !important;
     font-weight: 600 !important;
     white-space: nowrap !important;
     margin: 0 auto !important;
@@ -4915,8 +4916,8 @@ textarea.form-control {
   }
 
   .section-title {
-    font-size: 1.35rem !important;
-    line-height: 1.2 !important;
+    font-size: clamp(17px, 3.8vw, 19.5px) !important;
+    line-height: 1.25 !important;
     margin-top: 0.1rem !important;
     word-wrap: break-word !important;
     width: 100% !important;
@@ -5118,7 +5119,7 @@ textarea.form-control {
   }
 
   .page-banner-title {
-    font-size: clamp(22px, 5.5vw, 26px) !important;
+    font-size: clamp(20px, 4.8vw, 23px) !important;
     font-family: var(--font-heading), 'Playfair Display', Georgia, serif !important;
     font-weight: 700 !important;
     color: #2D231E !important;
@@ -5634,7 +5635,7 @@ textarea.form-control {
   }
 
   .categories-hero-banner .page-banner-title {
-    font-size: clamp(24px, 5.5vw, 28px) !important;
+    font-size: clamp(20px, 4.8vw, 23px) !important;
     margin: 0 0 0.35rem 0 !important;
     font-weight: 700 !important;
     color: #2D231E !important;
@@ -5782,7 +5783,7 @@ textarea.form-control {
   }
 
   .custom-order-title {
-    font-size: clamp(24px, 5.5vw, 28px) !important;
+    font-size: clamp(20px, 4.8vw, 23px) !important;
     margin: 0 0 0.35rem 0 !important;
     font-weight: 700 !important;
     color: #2D231E !important;
@@ -6208,10 +6209,10 @@ textarea.form-control {
 
   /* Square soft-red instant add to cart button */
   .card-cart-btn-instant {
-    width: 38px !important;
-    height: 38px !important;
-    min-width: 38px !important;
-    min-height: 38px !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
     border-radius: 8px !important;
     background: #FAF0EE !important;
     border: 1px solid #F0D5D0 !important;
@@ -6219,7 +6220,7 @@ textarea.form-control {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 0.95rem !important;
+    font-size: 0.85rem !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
     -webkit-tap-highlight-color: transparent !important;
@@ -6231,20 +6232,20 @@ textarea.form-control {
     transform: scale(0.92) !important;
   }
 
-  /* Full-width 48px Buy Now Button */
+  /* Full-width Buy Now Button */
   .card-btn-buynow {
     width: 100% !important;
-    height: 48px !important;
-    min-height: 48px !important;
-    border-radius: 12px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    border-radius: 10px !important;
     background: #BB4558 !important;
     color: #FFFFFF !important;
     font-weight: 600 !important;
-    font-size: 0.92rem !important;
+    font-size: 0.82rem !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 8px !important;
+    gap: 6px !important;
     border: none !important;
     cursor: pointer !important;
     text-decoration: none !important;
@@ -6429,13 +6430,13 @@ textarea.form-control {
 
   .apply-filters-btn {
     flex: 1 !important;
-    height: 48px !important;
+    height: 42px !important;
     background: #BB4558 !important;
     color: #FFFFFF !important;
     border: none !important;
-    border-radius: 14px !important;
+    border-radius: 12px !important;
     font-weight: 600 !important;
-    font-size: 0.95rem !important;
+    font-size: 0.88rem !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
@@ -6463,18 +6464,18 @@ textarea.form-control {
   .load-more-btn {
     width: 100% !important;
     max-width: 320px !important;
-    height: 48px !important;
-    min-height: 48px !important;
-    border-radius: 14px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    border-radius: 12px !important;
     background: #FFFFFF !important;
     border: 1.5px solid #E2D9CF !important;
     color: #2D231E !important;
     font-weight: 600 !important;
-    font-size: 0.90rem !important;
+    font-size: 0.84rem !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 8px !important;
+    gap: 7px !important;
     cursor: pointer !important;
     box-shadow: 0 2px 6px rgba(45, 35, 30, 0.04) !important;
     transition: all 0.15s ease !important;
@@ -6644,7 +6645,7 @@ textarea.form-control {
   }
 
   .checkout-page-title {
-    font-size: 1.5rem !important;
+    font-size: clamp(18px, 4.2vw, 21px) !important;
     line-height: 1.2 !important;
     margin-bottom: 0.2rem !important;
   }
@@ -6838,9 +6839,10 @@ textarea.form-control {
   }
 
   .place-order-btn {
-    min-height: 42px !important;
-    font-size: 0.88rem !important;
-    border-radius: 22px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    font-size: 0.85rem !important;
+    border-radius: 20px !important;
     width: 100% !important;
   }
 
@@ -6876,7 +6878,7 @@ textarea.form-control {
   }
 
   .detail-product-title {
-    font-size: 1.4rem !important;
+    font-size: clamp(18px, 4.2vw, 21px) !important;
   }
 
   .tab-main-grid {
@@ -6905,7 +6907,7 @@ textarea.form-control {
   }
 
   .cart-page-title {
-    font-size: 1.4rem !important;
+    font-size: clamp(18px, 4.2vw, 21px) !important;
     line-height: 1.2 !important;
     margin-bottom: 0.1rem !important;
   }
@@ -7063,9 +7065,10 @@ textarea.form-control {
   }
 
   .checkout-btn {
-    min-height: 42px !important;
-    font-size: 0.88rem !important;
-    border-radius: 22px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    font-size: 0.85rem !important;
+    border-radius: 20px !important;
     margin-top: 0.8rem !important;
   }
 
@@ -7260,26 +7263,81 @@ textarea.form-control {
     color: var(--text-muted) !important;
   }
 
-  /* 12. Global Responsive Typography & Column Collapse (< 768px) */
+  /* 12. Global Responsive Typography & Headings (< 768px) */
   p, h1, h2, h3, h4, h5, h6, span, a, label, li, td, th {
     overflow-wrap: break-word !important;
     word-break: normal !important;
     hyphens: manual !important;
   }
 
-  h1, .page-banner-title {
-    font-size: clamp(1.75rem, 5vw, 2.25rem) !important;
+  /* Global Headings Scale - Proportionally reduced for mobile */
+  h1, .h1 {
+    font-size: clamp(20px, 4.8vw, 24px) !important;
     line-height: 1.25 !important;
   }
 
-  h2, .section-title {
-    font-size: clamp(1.35rem, 4vw, 1.8rem) !important;
+  h2, .h2 {
+    font-size: clamp(17px, 3.8vw, 20px) !important;
     line-height: 1.3 !important;
   }
 
+  h3, .h3 {
+    font-size: clamp(15px, 3.4vw, 17px) !important;
+    line-height: 1.35 !important;
+  }
+
+  h4, .h4 {
+    font-size: clamp(13px, 2.9vw, 15px) !important;
+    line-height: 1.35 !important;
+  }
+
+  h5, .h5 {
+    font-size: clamp(12px, 2.5vw, 13.5px) !important;
+    line-height: 1.35 !important;
+  }
+
+  h6, .h6 {
+    font-size: clamp(11px, 2.2vw, 12.5px) !important;
+    line-height: 1.35 !important;
+  }
+
   body, p {
-    font-size: 15px !important;
-    line-height: 1.6 !important;
+    font-size: 14.5px !important;
+    line-height: 1.55 !important;
+  }
+
+  /* Global Buttons - Proportionally reduced size across all mobile pages */
+  .btn,
+  button.btn,
+  a.btn {
+    padding: 0.52rem 1.15rem !important;
+    font-size: 0.84rem !important;
+    min-height: 38px !important;
+    gap: 6px !important;
+  }
+
+  .btn-sm {
+    padding: 0.35rem 0.85rem !important;
+    font-size: 0.78rem !important;
+    min-height: 32px !important;
+  }
+
+  .btn-lg {
+    padding: 0.65rem 1.35rem !important;
+    font-size: 0.88rem !important;
+    min-height: 42px !important;
+  }
+
+  .btn-block {
+    width: 100% !important;
+    padding-top: 0.55rem !important;
+    padding-bottom: 0.55rem !important;
+    min-height: 38px !important;
+    font-size: 0.84rem !important;
+  }
+
+  button[type="submit"]:not(.header-search-btn):not(.search-btn):not(.view-btn) {
+    font-size: 0.85rem !important;
   }
 
   /* Every grid/flex row collapses to 1 column below 768px */
@@ -7322,13 +7380,14 @@ textarea.form-control {
 
   .about-hero-btn {
     width: 100% !important;
-    height: 48px !important;
-    min-height: 48px !important;
+    height: 40px !important;
+    min-height: 40px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    border-radius: 14px !important;
+    border-radius: 12px !important;
     font-weight: 600 !important;
+    font-size: 0.84rem !important;
   }
 
   .hero-feature-pills {
@@ -7388,7 +7447,7 @@ textarea.form-control {
   }
 
   .story-text-content .section-title {
-    font-size: clamp(1.45rem, 5vw, 1.85rem) !important;
+    font-size: clamp(17px, 3.8vw, 19.5px) !important;
     margin-bottom: 0.8rem !important;
   }
 
@@ -7502,7 +7561,7 @@ textarea.form-control {
   }
 
   .cta-banner-left h2 {
-    font-size: 28px !important;
+    font-size: clamp(18px, 4.2vw, 21px) !important;
     line-height: 1.25 !important;
     margin-bottom: 0.6rem !important;
     text-align: center !important;
@@ -7512,7 +7571,7 @@ textarea.form-control {
   }
 
   .cta-banner-left p {
-    font-size: 0.92rem !important;
+    font-size: 0.88rem !important;
     line-height: 1.5 !important;
     margin: 0 auto !important;
     text-align: center !important;
@@ -7523,21 +7582,21 @@ textarea.form-control {
   .cta-banner-right {
     display: flex !important;
     flex-direction: column !important;
-    gap: 12px !important;
+    gap: 10px !important;
     width: 100% !important;
   }
 
   .cta-banner-right .btn {
     width: 100% !important;
-    height: 52px !important;
-    min-height: 52px !important;
-    font-size: 0.95rem !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    font-size: 0.85rem !important;
     font-weight: 600 !important;
-    border-radius: 14px !important;
+    border-radius: 12px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 8px !important;
+    gap: 7px !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     text-decoration: none !important;
@@ -7653,7 +7712,7 @@ textarea.form-control {
 /* Extra Small Screens (320px - 380px) */
 @media (max-width: 380px) {
   .hero-title {
-    font-size: 1.45rem !important;
+    font-size: clamp(19px, 4.5vw, 22px) !important;
   }
 
   .hero-actions {
