@@ -205,7 +205,30 @@ exports.postSettings = async (req, res, next) => {
       razorpay_key_secret: b.razorpay_key_secret !== undefined ? b.razorpay_key_secret.trim() : undefined,
       razorpay_mode: b.razorpay_mode !== undefined ? b.razorpay_mode.trim() : undefined,
       razorpay_webhook_secret: b.razorpay_webhook_secret !== undefined ? b.razorpay_webhook_secret.trim() : undefined,
-      hide_empty_categories_in_pills: b.hide_empty_categories_in_pills === 'true' || b.hide_empty_categories_in_pills === '1' ? 'true' : (b.hide_empty_categories_in_pills === 'false' || b.hide_empty_categories_in_pills === '0' ? 'false' : undefined)
+      hide_empty_categories_in_pills: b.hide_empty_categories_in_pills === 'true' || b.hide_empty_categories_in_pills === '1' ? 'true' : (b.hide_empty_categories_in_pills === 'false' || b.hide_empty_categories_in_pills === '0' ? 'false' : undefined),
+      show_category_banner_mobile: b.show_category_banner_mobile === '1' ? '1' : '0',
+      show_sku_on_cards: b.show_sku_on_cards === '1' ? '1' : '0',
+      about_hero_title: b.about_hero_title !== undefined ? b.about_hero_title.trim() : undefined,
+      about_hero_subtitle: b.about_hero_subtitle !== undefined ? b.about_hero_subtitle.trim() : undefined,
+      about_hero_description: b.about_hero_description !== undefined ? b.about_hero_description.trim() : undefined,
+      about_story_title: b.about_story_title !== undefined ? b.about_story_title.trim() : undefined,
+      about_story_p1: b.about_story_p1 !== undefined ? b.about_story_p1.trim() : undefined,
+      about_story_p2: b.about_story_p2 !== undefined ? b.about_story_p2.trim() : undefined,
+      about_stats_mode: b.about_stats_mode !== undefined ? b.about_stats_mode : undefined,
+      about_stat1_num: b.about_stat1_num !== undefined ? b.about_stat1_num.trim() : undefined,
+      about_stat1_label: b.about_stat1_label !== undefined ? b.about_stat1_label.trim() : undefined,
+      about_stat2_num: b.about_stat2_num !== undefined ? b.about_stat2_num.trim() : undefined,
+      about_stat2_label: b.about_stat2_label !== undefined ? b.about_stat2_label.trim() : undefined,
+      about_stat3_num: b.about_stat3_num !== undefined ? b.about_stat3_num.trim() : undefined,
+      about_stat3_label: b.about_stat3_label !== undefined ? b.about_stat3_label.trim() : undefined,
+      about_stat4_num: b.about_stat4_num !== undefined ? b.about_stat4_num.trim() : undefined,
+      about_stat4_label: b.about_stat4_label !== undefined ? b.about_stat4_label.trim() : undefined,
+      about_mission_title: b.about_mission_title !== undefined ? b.about_mission_title.trim() : undefined,
+      about_mission_text: b.about_mission_text !== undefined ? b.about_mission_text.trim() : undefined,
+      about_vision_title: b.about_vision_title !== undefined ? b.about_vision_title.trim() : undefined,
+      about_vision_text: b.about_vision_text !== undefined ? b.about_vision_text.trim() : undefined,
+      about_values_title: b.about_values_title !== undefined ? b.about_values_title.trim() : undefined,
+      about_values_text: b.about_values_text !== undefined ? b.about_values_text.trim() : undefined
     };
 
     if (logo_url) updates.logo_url = logo_url;

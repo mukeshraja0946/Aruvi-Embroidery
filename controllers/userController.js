@@ -311,3 +311,39 @@ exports.toggleWishlist = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { current_password, new_password, confirm_password } = req.body;
+    if (!current_password || !new_password || !confirm_password) {
+      req.flash('error', 'All password fields are required.');
+      return res.redirect('/user/dashboard');
+    }
+    if (new_password !== confirm_password) {
+      req.flash('error', 'New passwords do not match.');
+      return res.redirect('/user/dashboard');
+    }
+    if (new_password.length < 6) {
+      req.flash('error', 'New password must be at least 6 characters long.');
+      return res.redirect('/user/dashboard');
+    }
+
+    const fullUser = await User.findByEmail(req.user.email);
+    if (!fullUser) {
+      req.flash('error', 'User account not found.');
+      return res.redirect('/user/dashboard');
+    }
+
+    const isMatch = await User.verifyPassword(current_password, fullUser.password_hash);
+    if (!isMatch) {
+      req.flash('error', 'Current password is incorrect.');
+      return res.redirect('/user/dashboard');
+    }
+
+    await User.updatePassword(req.user.id, new_password);
+    req.flash('success', 'Your password has been updated successfully!');
+    res.redirect('/user/dashboard');
+  } catch (err) {
+    next(err);
+  }
+};

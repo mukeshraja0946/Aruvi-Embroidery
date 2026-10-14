@@ -619,20 +619,310 @@
     }
   }
 
-  @media (max-width: 860px) {
-    .dash-grid-layout {
-      grid-template-columns: 1fr;
+  /* Mobile Account Menu & Tabs (< 768px) */
+  .dash-mobile-nav-bar {
+    display: none;
+  }
+  .dash-mobile-orders-list {
+    display: none;
+  }
+  .dash-mobile-help-card {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    .dashboard-bg-floral-left,
+    .dashboard-bg-floral-right {
+      display: none !important;
+    }
+
+    .dashboard-wrapper {
+      padding-top: 1rem !important;
+      padding-bottom: 2.5rem !important;
+      overflow-x: clip !important;
     }
 
     .dash-header-bar {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 1rem;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.8rem !important;
+      margin-bottom: 1rem !important;
     }
 
-    .dash-purchased-grid {
-      grid-template-columns: 1fr;
+    .dash-main-title {
+      font-size: clamp(1.65rem, 5vw, 2rem) !important;
     }
+
+    .dash-sub-title {
+      font-size: 0.92rem !important;
+    }
+
+    /* Mobile Nav Tabs Bar */
+    .dash-mobile-nav-bar {
+      display: block !important;
+      margin-bottom: 1.25rem !important;
+      width: 100% !important;
+    }
+
+    .dash-mobile-tabs-scroll {
+      display: flex !important;
+      gap: 8px !important;
+      overflow-x: auto !important;
+      scroll-snap-type: x mandatory !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding: 2px 2px 8px 2px !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
+    }
+
+    .dash-mobile-tabs-scroll::-webkit-scrollbar {
+      display: none !important;
+    }
+
+    .dash-mobile-tab {
+      scroll-snap-align: start !important;
+      flex-shrink: 0 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      height: 44px !important;
+      min-height: 44px !important;
+      padding: 0 16px !important;
+      background: #FFFFFF !important;
+      border: 1px solid var(--dash-border) !important;
+      border-radius: 9999px !important;
+      font-size: 0.88rem !important;
+      font-weight: 600 !important;
+      color: var(--dash-text-dark) !important;
+      text-decoration: none !important;
+      white-space: nowrap !important;
+      cursor: pointer !important;
+      box-shadow: 0 1px 4px rgba(44, 24, 16, 0.04) !important;
+      transition: all 0.15s ease !important;
+      font-family: inherit !important;
+    }
+
+    .dash-mobile-tab:hover,
+    .dash-mobile-tab.active {
+      background: #FAF0EE !important;
+      color: var(--dash-primary) !important;
+      border-color: #F0D5D0 !important;
+    }
+
+    .dash-mobile-tab i {
+      font-size: 0.95rem !important;
+      color: var(--dash-primary) !important;
+    }
+
+    /* Hide desktop sidebar on mobile */
+    .dash-desktop-sidebar {
+      display: none !important;
+    }
+
+    .dash-grid-layout {
+      display: block !important;
+      width: 100% !important;
+    }
+
+    /* Cards & Containers Full Width on Mobile */
+    .dash-section-card {
+      padding: 1.25rem 1rem !important;
+      border-radius: 18px !important;
+      margin-bottom: 1.5rem !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    .dash-card-header {
+      gap: 12px !important;
+      margin-bottom: 1.2rem !important;
+      flex-wrap: wrap !important;
+    }
+
+    .dash-card-title {
+      font-size: 1.35rem !important;
+    }
+
+    .dash-card-subtitle {
+      font-size: 0.84rem !important;
+      line-height: 1.5 !important;
+    }
+
+    /* Purchased Grid - 1 Column on Mobile */
+    .dash-purchased-grid {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 14px !important;
+      width: 100% !important;
+    }
+
+    .dash-purchased-item-card {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      padding: 1rem !important;
+      border-radius: 14px !important;
+    }
+
+    .dash-item-top-flex {
+      gap: 12px !important;
+      margin-bottom: 0.8rem !important;
+    }
+
+    .dash-item-preview-img {
+      width: 80px !important;
+      height: 80px !important;
+      border-radius: 10px !important;
+    }
+
+    .dash-item-title {
+      font-size: 1.05rem !important;
+      white-space: normal !important;
+      line-height: 1.3 !important;
+      word-break: break-word !important;
+    }
+
+    .dash-download-btn {
+      height: 48px !important;
+      min-height: 48px !important;
+      font-size: 0.95rem !important;
+      border-radius: 12px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Convert Orders Table to Stacked Cards on Mobile */
+    .dash-orders-table-wrapper {
+      display: none !important;
+    }
+
+    .dash-mobile-orders-list {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 12px !important;
+      width: 100% !important;
+    }
+
+    .dash-mobile-order-card {
+      background: #FAF6F0 !important;
+      border: 1px solid var(--dash-border) !important;
+      border-radius: 14px !important;
+      padding: 14px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 10px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    .dash-m-order-row {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      width: 100% !important;
+    }
+
+    .dash-m-order-num {
+      font-weight: 700 !important;
+      color: var(--dash-text-dark) !important;
+      font-size: 0.95rem !important;
+    }
+
+    .dash-m-order-date {
+      font-size: 0.80rem !important;
+      color: var(--dash-text-muted) !important;
+    }
+
+    .dash-m-order-price {
+      font-size: 1.05rem !important;
+      font-weight: 700 !important;
+      color: var(--dash-primary) !important;
+    }
+
+    .dash-m-order-btn {
+      width: 100% !important;
+      height: 42px !important;
+      min-height: 42px !important;
+      background: #FFFFFF !important;
+      border: 1px solid var(--dash-border) !important;
+      border-radius: 10px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 6px !important;
+      font-size: 0.86rem !important;
+      font-weight: 600 !important;
+      color: var(--dash-text-dark) !important;
+      text-decoration: none !important;
+      margin-top: 4px !important;
+    }
+
+    /* Mobile Full-Width Help Card */
+    .dash-mobile-help-card {
+      display: block !important;
+      background: var(--dash-help-bg) !important;
+      border: 1px solid var(--dash-help-border) !important;
+      border-radius: 18px !important;
+      padding: 1.4rem 1.2rem !important;
+      margin-bottom: 2rem !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      text-align: center !important;
+    }
+
+    .dash-mobile-help-card .dash-support-btn {
+      height: 48px !important;
+      min-height: 48px !important;
+      border-radius: 12px !important;
+      font-size: 0.95rem !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Modal Mobile Adjustments */
+    .dash-modal-content {
+      width: calc(100% - 24px) !important;
+      max-width: 480px !important;
+      padding: 1.5rem !important;
+      border-radius: 18px !important;
+      margin: 12px !important;
+    }
+
+    .dash-modal-content .form-control {
+      height: 48px !important;
+      min-height: 48px !important;
+      border-radius: 12px !important;
+      font-size: 0.95rem !important;
+    }
+
+    .dash-modal-content .btn {
+      height: 48px !important;
+      min-height: 48px !important;
+      border-radius: 12px !important;
+      font-size: 0.95rem !important;
+    }
+  }
+
+  /* Password Toggle Wrap */
+  .dash-pass-toggle-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  .dash-pass-toggle-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #8C7B72;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
   }
 </style>
 
@@ -648,7 +938,7 @@
         <p class="dash-sub-title">Welcome back, <strong><%= currentUser ? currentUser.full_name : 'Customer' %></strong> 👋</p>
       </div>
 
-      <div style="display: flex; gap: 10px; align-items: center;">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <% if (currentUser && currentUser.role === 'admin') { %>
           <a href="/admin" class="dash-signout-btn" style="background: var(--dash-primary); color: #fff; border-color: var(--dash-primary);"><i class="fa-solid fa-gauge-high"></i> Admin Panel</a>
         <% } %>
@@ -658,11 +948,35 @@
       </div>
     </div>
 
+    <!-- Mobile Account Navigation Tabs Bar (< 768px) -->
+    <div class="dash-mobile-nav-bar">
+      <div class="dash-mobile-tabs-scroll">
+        <a href="#purchased-downloads" class="dash-mobile-tab active" data-tab="downloads">
+          <i class="fa-solid fa-download"></i> Downloads
+        </a>
+        <a href="#order-history" class="dash-mobile-tab" data-tab="orders">
+          <i class="fa-solid fa-box"></i> My Orders
+        </a>
+        <a href="/user/wishlist" class="dash-mobile-tab">
+          <i class="fa-regular fa-heart"></i> Wishlist
+        </a>
+        <button type="button" class="dash-mobile-tab" onclick="openProfileModal()">
+          <i class="fa-regular fa-user"></i> Profile
+        </button>
+        <button type="button" class="dash-mobile-tab" onclick="openPasswordModal()">
+          <i class="fa-solid fa-lock"></i> Password
+        </button>
+        <a href="/auth/logout" class="dash-mobile-tab" style="color: #C62828;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+        </a>
+      </div>
+    </div>
+
     <!-- Main Grid Layout: Left Sidebar + Right Content -->
     <div class="dash-grid-layout">
       
-      <!-- LEFT SIDEBAR -->
-      <aside class="dash-sidebar">
+      <!-- LEFT SIDEBAR (Desktop Only) -->
+      <aside class="dash-sidebar dash-desktop-sidebar">
         <!-- Top Profile Card -->
         <div class="dash-profile-card">
           <div class="dash-profile-user-info">
@@ -674,7 +988,7 @@
               <div class="dash-profile-email"><%= currentUser ? currentUser.email : '' %></div>
             </div>
           </div>
-          <i class="fa-solid fa-chevron-right" style="color: #C2B4A8; cursor: pointer;" onclick="document.getElementById('profileModal').style.display='flex'"></i>
+          <i class="fa-solid fa-chevron-right" style="color: #C2B4A8; cursor: pointer;" onclick="openProfileModal()"></i>
         </div>
 
         <!-- Navigation Menu -->
@@ -691,10 +1005,10 @@
           <a href="/user/wishlist" class="dash-nav-link">
             <i class="fa-regular fa-heart"></i> Saved Wishlist
           </a>
-          <a href="javascript:void(0)" class="dash-nav-link" onclick="document.getElementById('profileModal').style.display='flex'">
+          <a href="javascript:void(0)" class="dash-nav-link" onclick="openProfileModal()">
             <i class="fa-regular fa-user"></i> Profile Information
           </a>
-          <a href="javascript:void(0)" class="dash-nav-link" onclick="document.getElementById('profileModal').style.display='flex'">
+          <a href="javascript:void(0)" class="dash-nav-link" onclick="openPasswordModal()">
             <i class="fa-solid fa-lock"></i> Change Password
           </a>
         </nav>
@@ -730,7 +1044,7 @@
               <i class="fa-solid fa-folder-open" style="font-size: 2.5rem; color: var(--dash-text-muted); opacity: 0.6; margin-bottom: 0.8rem;"></i>
               <h4 style="font-size: 1.1rem; color: var(--dash-text-dark); margin-bottom: 0.4rem;">No Purchased Downloads Found</h4>
               <p style="color: var(--dash-text-muted); font-size: 0.9rem; max-width: 420px; margin: 0 auto 1.2rem auto;">You have not purchased any digital embroidery designs yet. Purchased designs will be instantly downloadable here forever!</p>
-              <a href="/designs" class="btn btn-primary btn-sm" style="border-radius: 20px; padding: 8px 20px;">Explore Designs</a>
+              <a href="/designs" class="btn btn-primary btn-sm" style="border-radius: 20px; padding: 10px 24px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">Explore Designs</a>
             </div>
           <% } else { %>
             <div class="dash-purchased-grid">
@@ -806,7 +1120,8 @@
               <p style="color: var(--dash-text-muted); margin: 0;">No order history found for your account.</p>
             </div>
           <% } else { %>
-            <div style="overflow-x: auto;">
+            <!-- Desktop Table View -->
+            <div class="dash-orders-table-wrapper" style="overflow-x: auto;">
               <table class="dash-orders-table">
                 <thead>
                   <tr>
@@ -845,7 +1160,45 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Mobile Stacked Order Cards View (No horizontal scrolling) -->
+            <div class="dash-mobile-orders-list">
+              <% orders.forEach(ord => { %>
+                <% 
+                  const isDone = (ord.status === 'completed' || ord.status === 'paid');
+                  const ordDate = ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-US') : '';
+                  const itemCount = ord.items ? ord.items.length : 1;
+                %>
+                <div class="dash-mobile-order-card">
+                  <div class="dash-m-order-row">
+                    <span class="dash-m-order-num">#<%= ord.order_number %></span>
+                    <span class="dash-status-badge <%= isDone ? 'success' : (ord.status === 'pending' ? 'warning' : 'danger') %>">
+                      <i class="fa-solid fa-circle"></i> <%= isDone ? 'Completed' : ord.status %>
+                    </span>
+                  </div>
+                  <div class="dash-m-order-row">
+                    <span class="dash-m-order-date"><i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> <%= ordDate %> &bull; <%= itemCount %> Design<%= itemCount !== 1 ? 's' : '' %></span>
+                    <span class="dash-m-order-price">₹<%= Number(ord.final_amount).toFixed(2) %></span>
+                  </div>
+                  <a href="/user/orders/<%= ord.id %>" class="dash-m-order-btn">
+                    View Order Details <i class="fa-solid fa-chevron-right"></i>
+                  </a>
+                </div>
+              <% }) %>
+            </div>
           <% } %>
+        </div>
+
+        <!-- SECTION 3: NEED HELP (Mobile Full Width Card) -->
+        <div class="dash-mobile-help-card">
+          <i class="fa-solid fa-headphones dash-help-icon" style="font-size: 1.6rem; color: var(--dash-primary); margin-bottom: 0.5rem; display: block;"></i>
+          <div class="dash-help-title" style="font-size: 1.15rem; font-weight: 700; color: var(--dash-primary); margin-bottom: 0.4rem;">Need Help?</div>
+          <div class="dash-help-desc" style="font-size: 0.88rem; color: #7C6B63; line-height: 1.5; margin-bottom: 1rem;">
+            If you have any questions regarding your purchases, machine formats or custom digitizing, our team is here to help!
+          </div>
+          <a href="/contact" class="dash-support-btn">
+            <i class="fa-regular fa-envelope"></i> Contact Support
+          </a>
         </div>
 
       </main>
@@ -853,10 +1206,10 @@
   </div>
 </div>
 
-<!-- Modal for Profile Information / Update -->
-<div class="dash-modal-overlay" id="profileModal">
+<!-- Modal 1: Profile Information / Update -->
+<div class="dash-modal-overlay" id="profileModal" onclick="if(event.target===this)closeProfileModal()">
   <div class="dash-modal-content">
-    <button class="dash-modal-close" onclick="document.getElementById('profileModal').style.display='none'">
+    <button class="dash-modal-close" onclick="closeProfileModal()" aria-label="Close profile modal">
       <i class="fa-solid fa-xmark"></i>
     </button>
 
@@ -869,25 +1222,107 @@
       
       <div class="form-group" style="margin-bottom: 1.2rem;">
         <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Full Name</label>
-        <input type="text" name="full_name" class="form-control" value="<%= currentUser ? currentUser.full_name : '' %>" required style="border-radius: 10px;">
+        <input type="text" name="full_name" class="form-control" value="<%= currentUser ? currentUser.full_name : '' %>" required style="border-radius: 12px; height: 48px;">
       </div>
 
       <div class="form-group" style="margin-bottom: 1.2rem;">
         <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Email Address (Read-only)</label>
-        <input type="email" class="form-control" value="<%= currentUser ? currentUser.email : '' %>" disabled style="background: #F4ECE4; border-radius: 10px;">
+        <input type="email" class="form-control" value="<%= currentUser ? currentUser.email : '' %>" disabled style="background: #F4ECE4; border-radius: 12px; height: 48px;">
       </div>
 
       <div class="form-group" style="margin-bottom: 1.5rem;">
         <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Phone Number</label>
-        <input type="tel" name="phone" class="form-control" value="<%= currentUser ? currentUser.phone || '' : '' %>" placeholder="Enter phone number" style="border-radius: 10px;">
+        <input type="tel" name="phone" class="form-control" value="<%= currentUser ? currentUser.phone || '' : '' %>" placeholder="Enter phone number" style="border-radius: 12px; height: 48px;">
       </div>
 
-      <div style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('profileModal').style.display='none'" style="border-radius: 20px;">Cancel</button>
-        <button type="submit" class="btn btn-primary" style="background: var(--dash-primary); border-color: var(--dash-primary); border-radius: 20px;">Save Changes</button>
+      <div style="display: flex; gap: 10px; flex-direction: column;">
+        <button type="submit" class="btn btn-primary" style="background: var(--dash-primary); border-color: var(--dash-primary); border-radius: 12px; height: 48px; width: 100%; font-weight: 600;">Save Profile</button>
+        <button type="button" class="btn btn-outline" onclick="closeProfileModal()" style="border-radius: 12px; height: 48px; width: 100%;">Cancel</button>
       </div>
     </form>
   </div>
 </div>
+
+<!-- Modal 2: Change Password -->
+<div class="dash-modal-overlay" id="passwordModal" onclick="if(event.target===this)closePasswordModal()">
+  <div class="dash-modal-content">
+    <button class="dash-modal-close" onclick="closePasswordModal()" aria-label="Close password modal">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <h3 style="font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--dash-text-dark); margin-bottom: 1.2rem;">
+      Change Password
+    </h3>
+
+    <form action="/user/change-password" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      
+      <div class="form-group" style="margin-bottom: 1.2rem;">
+        <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Current Password</label>
+        <div class="dash-pass-toggle-wrap">
+          <input type="password" name="current_password" id="curPassInput" class="form-control" required style="border-radius: 12px; height: 48px; padding-right: 42px;">
+          <button type="button" class="dash-pass-toggle-btn" onclick="togglePassField('curPassInput', this)" aria-label="Toggle password visibility">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.2rem;">
+        <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">New Password</label>
+        <div class="dash-pass-toggle-wrap">
+          <input type="password" name="new_password" id="newPassInput" class="form-control" minlength="6" required style="border-radius: 12px; height: 48px; padding-right: 42px;">
+          <button type="button" class="dash-pass-toggle-btn" onclick="togglePassField('newPassInput', this)" aria-label="Toggle password visibility">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+        <small style="font-size: 0.75rem; color: var(--dash-text-muted); display: block; margin-top: 4px;">Minimum 6 characters.</small>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label class="form-label" style="font-weight: 600; color: var(--dash-text-dark);">Confirm New Password</label>
+        <div class="dash-pass-toggle-wrap">
+          <input type="password" name="confirm_password" id="confPassInput" class="form-control" minlength="6" required style="border-radius: 12px; height: 48px; padding-right: 42px;">
+          <button type="button" class="dash-pass-toggle-btn" onclick="togglePassField('confPassInput', this)" aria-label="Toggle password visibility">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-direction: column;">
+        <button type="submit" class="btn btn-primary" style="background: var(--dash-primary); border-color: var(--dash-primary); border-radius: 12px; height: 48px; width: 100%; font-weight: 600;">Update Password</button>
+        <button type="button" class="btn btn-outline" onclick="closePasswordModal()" style="border-radius: 12px; height: 48px; width: 100%;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openProfileModal() {
+    const modal = document.getElementById('profileModal');
+    if (modal) modal.style.display = 'flex';
+  }
+  function closeProfileModal() {
+    const modal = document.getElementById('profileModal');
+    if (modal) modal.style.display = 'none';
+  }
+  function openPasswordModal() {
+    const modal = document.getElementById('passwordModal');
+    if (modal) modal.style.display = 'flex';
+  }
+  function closePasswordModal() {
+    const modal = document.getElementById('passwordModal');
+    if (modal) modal.style.display = 'none';
+  }
+  function togglePassField(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isPass = input.type === 'password';
+    input.type = isPass ? 'text' : 'password';
+    const icon = btn.querySelector('i');
+    if (icon) {
+      icon.className = isPass ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+    }
+  }
+</script>
 
 <%- include('../partials/footer') %>

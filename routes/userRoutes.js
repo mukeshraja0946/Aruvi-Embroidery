@@ -16,6 +16,7 @@ router.get('/user/orders/:id', userController.getOrderDetail);
 router.get('/user/download/:fileId', userController.downloadDesignFile);
 router.get('/user/download-format/:designId/:format', userController.downloadDesignFormat);
 router.get('/user/wishlist', userController.getWishlist);
+router.post('/user/change-password', userController.changePassword);
 router.post('/user/wishlist/toggle', userController.toggleWishlist);
 
 module.exports = router;

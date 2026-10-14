@@ -73,7 +73,28 @@ const fallbackSettings = {
   razorpay_webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
   hide_empty_categories_in_pills: 'true',
   show_category_banner_mobile: '0',
-  show_sku_on_cards: '0'
+  show_sku_on_cards: '0',
+  about_hero_title: 'About ARUVI',
+  about_hero_subtitle: 'Crafting Beautiful Designs for Your Creative Journey',
+  about_hero_description: 'At ARUVI Embroidery Studio, we create high-quality machine embroidery designs that bring your ideas to life. Our designs are crafted with precision, creativity, and a passion for embroidery, helping individuals and businesses create beautiful, professional embroidery projects.',
+  about_story_title: 'A Passion for Embroidery',
+  about_story_p1: 'ARUVI Embroidery Studio started with a simple idea — to make high-quality embroidery designs accessible to everyone. What began as a passion for creativity and design has now grown into a trusted platform for thousands of embroidery enthusiasts around the world.',
+  about_story_p2: 'We believe embroidery is more than just a craft — it\'s a way to express creativity, culture, and individuality. Our mission is to provide unique, high-quality, and easy-to-use machine embroidery designs that help you bring your creative ideas to life.',
+  about_stats_mode: 'auto',
+  about_stat1_num: '10,000+',
+  about_stat1_label: 'Happy Customers',
+  about_stat2_num: '5,000+',
+  about_stat2_label: 'Unique Designs',
+  about_stat3_num: '50+',
+  about_stat3_label: 'Countries Worldwide',
+  about_stat4_num: '4.9/5',
+  about_stat4_label: 'Customer Rating',
+  about_mission_title: 'Our Mission',
+  about_mission_text: 'To deliver high-quality, creative, and reliable embroidery designs that inspire and support embroidery creators worldwide.',
+  about_vision_title: 'Our Vision',
+  about_vision_text: 'To become a global leader in machine embroidery designs, known for quality, creativity, and excellent customer support.',
+  about_values_title: 'Our Values',
+  about_values_text: 'Quality, Creativity, Customer Satisfaction and Continuous Innovation.'
 };
 
 class Setting {

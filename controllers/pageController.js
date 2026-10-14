@@ -3,10 +3,63 @@ const CustomOrder = require('../models/CustomOrder');
 const Design = require('../models/Design');
 const Category = require('../models/Category');
 
-exports.getAbout = (req, res) => {
-  res.render('pages/about', {
-    title: 'About Us - ARUVI EMBROIDERY STUDIO'
-  });
+const Setting = require('../models/Setting');
+const db = require('../config/db');
+
+exports.getAbout = async (req, res, next) => {
+  try {
+    const settings = await Setting.getAll();
+    const statsMode = settings.about_stats_mode || 'auto';
+
+    let stats = {
+      stat1: { num: settings.about_stat1_num || '10,000+', label: settings.about_stat1_label || 'Happy Customers' },
+      stat2: { num: settings.about_stat2_num || '5,000+', label: settings.about_stat2_label || 'Unique Designs' },
+      stat3: { num: settings.about_stat3_num || '50+', label: settings.about_stat3_label || 'Countries Worldwide' },
+      stat4: { num: settings.about_stat4_num || '4.9/5', label: settings.about_stat4_label || 'Customer Rating' }
+    };
+
+    if (statsMode === 'auto' && db.isConnected()) {
+      try {
+        // 1. Real Happy Customers
+        let realCustomers = 0;
+        const custRes = await db.query("SELECT COUNT(DISTINCT user_id) as cnt FROM orders WHERE status IN ('completed', 'paid')");
+        realCustomers = parseInt(custRes[0]?.cnt || 0, 10);
+        if (realCustomers === 0) {
+          const userRes = await db.query("SELECT COUNT(*) as cnt FROM users WHERE role = 'customer'");
+          realCustomers = parseInt(userRes[0]?.cnt || 0, 10);
+        }
+        stats.stat1.num = realCustomers > 0 ? (realCustomers >= 10 ? `${realCustomers}+` : `${realCustomers}`) : '100+';
+
+        // 2. Real Active Designs
+        const desRes = await db.query("SELECT COUNT(*) as cnt FROM designs WHERE is_active = 1");
+        const realDesigns = parseInt(desRes[0]?.cnt || 0, 10);
+        stats.stat2.num = realDesigns > 0 ? (realDesigns >= 10 ? `${realDesigns}+` : `${realDesigns}`) : '100+';
+
+        // 3. Real Countries
+        const cRes = await db.query("SELECT COUNT(DISTINCT country) as cnt FROM orders WHERE country IS NOT NULL AND country != ''");
+        const realCountries = Math.max(1, parseInt(cRes[0]?.cnt || 1, 10));
+        stats.stat3.num = `${realCountries}+`;
+
+        // 4. Real Rating from Approved Reviews
+        const revRes = await db.query("SELECT AVG(rating) as avg_r, COUNT(*) as cnt FROM reviews WHERE status = 'approved'");
+        if (revRes[0] && revRes[0].cnt > 0 && revRes[0].avg_r !== null) {
+          stats.stat4.num = `${parseFloat(revRes[0].avg_r).toFixed(1)}/5`;
+        } else {
+          stats.stat4.num = '5.0/5';
+        }
+      } catch (dbErr) {
+        console.warn('Error calculating auto stats for about page:', dbErr.message);
+      }
+    }
+
+    res.render('pages/about', {
+      title: 'About Us - ARUVI EMBROIDERY STUDIO',
+      settings,
+      stats
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.getContact = (req, res) => {

@@ -449,6 +449,118 @@
               <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Controls whether detected formats (.DST, .PES, .JEF, .EXP) overwrite existing design formats.</small>
             </div>
           </div>
+        <!-- Card 6: About Page Content & Statistics Management -->
+        <div id="about-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">About Page Content & Statistics</h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Manage Our Story, Mission/Vision/Values, and choose between live database auto-calculation or manual stat values.</span>
+            </div>
+            <span style="background: #FFF3E0; color: #E65100; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-circle-info"></i> About Page</span>
+          </div>
+
+          <!-- Hero & Story Content -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Hero Title</label>
+              <input type="text" name="about_hero_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.about_hero_title) ? settings.about_hero_title : 'About ARUVI' %>">
+            </div>
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Hero Subtitle</label>
+              <input type="text" name="about_hero_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.about_hero_subtitle) ? settings.about_hero_subtitle : 'Crafting Beautiful Designs for Your Creative Journey' %>">
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.4rem;">
+            <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Hero Description</label>
+            <textarea name="about_hero_description" class="form-control" rows="2" style="height: auto; padding: 0.8rem;"><%= (typeof settings !== 'undefined' && settings.about_hero_description) ? settings.about_hero_description : 'At ARUVI Embroidery Studio, we create high-quality machine embroidery designs that bring your ideas to life. Our designs are crafted with precision, creativity, and a passion for embroidery, helping individuals and businesses create beautiful, professional embroidery projects.' %></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Our Story Heading</label>
+              <input type="text" name="about_story_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.about_story_title) ? settings.about_story_title : 'A Passion for Embroidery' %>">
+            </div>
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Our Story Paragraph 1</label>
+              <textarea name="about_story_p1" class="form-control" rows="2" style="height: auto; padding: 0.8rem;"><%= (typeof settings !== 'undefined' && settings.about_story_p1) ? settings.about_story_p1 : 'ARUVI Embroidery Studio started with a simple idea — to make high-quality embroidery designs accessible to everyone. What began as a passion for creativity and design has now grown into a trusted platform for thousands of embroidery enthusiasts around the world.' %></textarea>
+            </div>
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Our Story Paragraph 2</label>
+              <textarea name="about_story_p2" class="form-control" rows="2" style="height: auto; padding: 0.8rem;"><%= (typeof settings !== 'undefined' && settings.about_story_p2) ? settings.about_story_p2 : 'We believe embroidery is more than just a craft — it\'s a way to express creativity, culture, and individuality. Our mission is to provide unique, high-quality, and easy-to-use machine embroidery designs that help you bring your creative ideas to life.' %></textarea>
+            </div>
+          </div>
+
+          <!-- Stats Calculation Mode -->
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.4rem;">
+            <label class="form-label-custom" style="display: block; font-size: 0.92rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;">
+              <i class="fa-solid fa-chart-simple" style="color: var(--admin-primary); margin-right: 6px;"></i> Statistics Calculation Mode
+            </label>
+            <div style="display: flex; gap: 24px; align-items: center; margin-bottom: 1rem;">
+              <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                <input type="radio" name="about_stats_mode" value="auto" <%= (!settings.about_stats_mode || settings.about_stats_mode === 'auto') ? 'checked' : '' %>>
+                <strong>Auto-calculate from real database data (Recommended)</strong>
+              </label>
+              <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                <input type="radio" name="about_stats_mode" value="manual" <%= (settings.about_stats_mode === 'manual') ? 'checked' : '' %>>
+                <strong>Manual values</strong>
+              </label>
+            </div>
+            <small style="display: block; font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 1rem;">
+              When set to "Auto-calculate", numbers are computed directly from real registered customers, active designs, real approved review ratings, and unique order countries.
+            </small>
+
+            <!-- Manual Stat Inputs -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Stat 1: Number & Label</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" name="about_stat1_num" class="form-control" value="<%= settings.about_stat1_num || '10,000+' %>" placeholder="10,000+">
+                  <input type="text" name="about_stat1_label" class="form-control" value="<%= settings.about_stat1_label || 'Happy Customers' %>" placeholder="Happy Customers">
+                </div>
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Stat 2: Number & Label</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" name="about_stat2_num" class="form-control" value="<%= settings.about_stat2_num || '5,000+' %>" placeholder="5,000+">
+                  <input type="text" name="about_stat2_label" class="form-control" value="<%= settings.about_stat2_label || 'Unique Designs' %>" placeholder="Unique Designs">
+                </div>
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Stat 3: Number & Label</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" name="about_stat3_num" class="form-control" value="<%= settings.about_stat3_num || '50+' %>" placeholder="50+">
+                  <input type="text" name="about_stat3_label" class="form-control" value="<%= settings.about_stat3_label || 'Countries Worldwide' %>" placeholder="Countries Worldwide">
+                </div>
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Stat 4: Number & Label</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" name="about_stat4_num" class="form-control" value="<%= settings.about_stat4_num || '4.9/5' %>" placeholder="4.9/5">
+                  <input type="text" name="about_stat4_label" class="form-control" value="<%= settings.about_stat4_label || 'Customer Rating' %>" placeholder="Customer Rating">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mission, Vision, Values -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Mission Title & Text</label>
+              <input type="text" name="about_mission_title" class="form-control" value="<%= settings.about_mission_title || 'Our Mission' %>" style="margin-bottom: 6px;">
+              <textarea name="about_mission_text" class="form-control" rows="2" style="height: auto; padding: 0.6rem;"><%= settings.about_mission_text || 'To deliver high-quality, creative, and reliable embroidery designs that inspire and support embroidery creators worldwide.' %></textarea>
+            </div>
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Vision Title & Text</label>
+              <input type="text" name="about_vision_title" class="form-control" value="<%= settings.about_vision_title || 'Our Vision' %>" style="margin-bottom: 6px;">
+              <textarea name="about_vision_text" class="form-control" rows="2" style="height: auto; padding: 0.6rem;"><%= settings.about_vision_text || 'To become a global leader in machine embroidery designs, known for quality, creativity, and excellent customer support.' %></textarea>
+            </div>
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Values Title & Text</label>
+              <input type="text" name="about_values_title" class="form-control" value="<%= settings.about_values_title || 'Our Values' %>" style="margin-bottom: 6px;">
+              <textarea name="about_values_text" class="form-control" rows="2" style="height: auto; padding: 0.6rem;"><%= settings.about_values_text || 'Quality, Creativity, Customer Satisfaction and Continuous Innovation.' %></textarea>
+            </div>
+          </div>
         </div>
 
         <div style="display: flex; justify-content: flex-end;">

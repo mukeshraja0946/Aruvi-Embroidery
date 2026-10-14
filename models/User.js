@@ -190,6 +190,18 @@ class User {
     return true;
   }
 
+  static async updatePassword(id, newPassword) {
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(newPassword, salt);
+    if (db.isConnected()) {
+      await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash, id]);
+      return true;
+    }
+    const u = fallbackUsers.find(user => user.id == id);
+    if (u) u.password_hash = password_hash;
+    return true;
+  }
+
   static async count(role = 'customer') {
     if (db.isConnected()) {
       try {

@@ -10,6 +10,7 @@ node_modules/
 *.log
 scratch/
 backups/
+artifacts/
 
 # Uploaded Files & Content (Must NEVER be tracked in Git or overwritten on deploy)
 public/uploads/*

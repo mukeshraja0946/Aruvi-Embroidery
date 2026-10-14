@@ -10,7 +10,8 @@
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "seed:demo": "node scripts/seed-demo.js",
-    "backup": "node scripts/backup.js"
+    "backup": "node scripts/backup.js",
+    "test:mobile": "node scripts/test-mobile-overflow.js"
   },
   "keywords": [
     "embroidery",
@@ -45,6 +46,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "playwright-core": "^1.64.0"
   }
 }
