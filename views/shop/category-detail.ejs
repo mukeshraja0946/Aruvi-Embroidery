@@ -56,20 +56,23 @@
     }
   %>
 
-  <!-- 1. Dedicated Clean Mobile Toolbar (< 768px): One clean row with 44px buttons -->
+  <!-- 1. Dedicated Mobile Toolbar (< 768px): One clean row with 48px buttons -->
   <div class="mobile-shop-toolbar">
     <a href="/designs?category=<%= category.slug %>" class="mobile-toolbar-btn mobile-filter-btn" aria-label="Filters">
-      <i class="fa-solid fa-sliders"></i>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+        <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+        <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+      </svg>
       <span>Filters</span>
     </a>
 
-    <button type="button" class="mobile-toolbar-btn mobile-sort-btn" id="openMobileSortBtn" aria-haspopup="dialog" aria-expanded="false" aria-label="Sort designs">
-      <span class="mobile-sort-btn-left">
-        <i class="fa-solid fa-arrow-down-short-wide"></i>
-        <span class="mobile-sort-btn-text">Sort: <strong><%= getSortLabel(sortVal) %></strong></span>
-      </span>
-      <i class="fa-solid fa-chevron-down mobile-sort-chevron"></i>
-    </button>
+    <%- include('../partials/sort-dropdown', {
+      id: 'cat_mobile_sort_dd',
+      currentSort: sortVal,
+      actionType: 'ajax'
+    }) %>
   </div>
 
   <!-- 2. Mobile Results Count Line (< 768px) -->
@@ -79,14 +82,6 @@
 
   <!-- 3. Desktop Controls Toolbar (>= 768px) -->
   <div class="shop-controls-bar" style="margin-bottom: 1.5rem;">
-    <!-- Filters Button -->
-    <a href="/designs?category=<%= category.slug %>" class="mobile-filter-toggle-btn" aria-label="Filters">
-      <i class="fa-solid fa-sliders"></i> <span>Filters</span>
-    </a>
-
-    <!-- Vertical Divider -->
-    <div class="toolbar-divider"></div>
-
     <!-- Exact Two-Line Results Count -->
     <div class="results-count-twoline">
       <span class="rc-line1">Showing</span>
@@ -96,21 +91,12 @@
     <!-- Vertical Divider -->
     <div class="toolbar-divider"></div>
     
-    <!-- Sort By label and dropdown -->
+    <!-- Sort Dropdown at top right of grid -->
     <div class="controls-right">
       <%- include('../partials/sort-dropdown', {
-        id: 'cat_sort_dd',
-        label: 'Sort by:',
-        actionType: 'url',
+        id: 'cat_desktop_sort_dd',
         currentSort: sortVal,
-        options: [
-          { value: 'latest', label: 'Latest', iconType: 'latest' },
-          { value: 'oldest', label: 'Oldest', iconType: 'oldest' },
-          { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
-          { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
-          { value: 'popular', label: 'Most Popular', iconType: 'popular' },
-          { value: 'rating', label: 'Top Rated', iconType: 'rating' }
-        ]
+        actionType: 'ajax'
       }) %>
     </div>
   </div>
@@ -162,20 +148,21 @@
               </div>
             <% } %>
 
-            <!-- Rating Row -->
+            <!-- Rating: Real customer reviews only -->
             <%
-              const catRatingScore = parseFloat(design.average_rating || design.rating || 0);
-              const catNumReviews = parseInt(design.reviews_count !== undefined && design.reviews_count !== null ? design.reviews_count : 0);
+              const hasRealReviews = design.real_reviews_count && parseInt(design.real_reviews_count) > 0;
+              const catRatingScore = hasRealReviews ? parseFloat(design.real_avg_rating).toFixed(1) : null;
+              const catNumReviews = hasRealReviews ? parseInt(design.real_reviews_count) : 0;
             %>
-            <% if (catNumReviews > 0 || catRatingScore > 0) { %>
+            <% if (hasRealReviews) { %>
               <div style="font-size: 0.78rem; color: #F5A623; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 4px;">
                 <i class="fa-solid fa-star"></i>
-                <span style="font-weight: 700; color: var(--text-dark);"><%= catRatingScore.toFixed(1) %></span>
+                <span style="font-weight: 700; color: var(--text-dark);"><%= catRatingScore %></span>
                 <span style="color: var(--text-muted);">(<%= catNumReviews %>)</span>
               </div>
             <% } else { %>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                <span>No reviews yet</span>
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                <span style="background: #F6F1EC; padding: 2px 7px; border-radius: 4px; font-weight: 500;">New Design</span>
               </div>
             <% } %>
 
@@ -241,112 +228,6 @@
   </div>
 </div>
 
-<!-- Mobile Sort Bottom Sheet Drawer (< 768px) -->
-<div class="mobile-sort-sheet-overlay" id="sortSheetOverlay" aria-hidden="true"></div>
-<div class="mobile-sort-sheet" id="sortSheet" role="dialog" aria-modal="true" aria-labelledby="sortSheetTitle" aria-hidden="true">
-  <div class="sort-sheet-header">
-    <div class="sort-sheet-title-group">
-      <i class="fa-solid fa-arrow-down-short-wide"></i>
-      <h3 id="sortSheetTitle">Sort Designs</h3>
-    </div>
-    <button type="button" class="sort-sheet-close-btn" id="closeSortSheetBtn" aria-label="Close sort dialog">
-      <i class="fa-solid fa-xmark"></i>
-    </button>
-  </div>
-  <div class="sort-sheet-body" role="listbox">
-    <%
-      const catSortOptions = [
-        { value: 'latest', label: 'Latest', icon: 'fa-regular fa-clock' },
-        { value: 'price_low', label: 'Price: Low to High', icon: 'fa-solid fa-arrow-down-1-9' },
-        { value: 'price_high', label: 'Price: High to Low', icon: 'fa-solid fa-arrow-up-9-1' },
-        { value: 'popular', label: 'Popular', icon: 'fa-solid fa-fire' },
-        { value: 'rating', label: 'Top Rated', icon: 'fa-solid fa-star' }
-      ];
-      const curCatSortVal = (typeof sortVal !== 'undefined' && sortVal) ? sortVal : 'latest';
-    %>
-    <% catSortOptions.forEach(opt => {
-      const isSelected = (curCatSortVal === opt.value) ||
-                         (opt.value === 'latest' && (!curCatSortVal || curCatSortVal === 'newest')) ||
-                         (opt.value === 'price_low' && curCatSortVal === 'price_asc') ||
-                         (opt.value === 'price_high' && curCatSortVal === 'price_desc') ||
-                         (opt.value === 'rating' && curCatSortVal === 'top_rated');
-    %>
-      <button type="button" class="sort-sheet-option <%= isSelected ? 'selected' : '' %>" data-sort-val="<%= opt.value %>" role="option" aria-selected="<%= isSelected ? 'true' : 'false' %>">
-        <span class="sort-option-label-wrap">
-          <i class="<%= opt.icon %> sort-option-icon"></i>
-          <span class="sort-option-text"><%= opt.label %></span>
-        </span>
-        <% if (isSelected) { %>
-          <i class="fa-solid fa-circle-check sort-check-icon"></i>
-        <% } %>
-      </button>
-    <% }) %>
-  </div>
-</div>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const openSortBtn = document.getElementById('openMobileSortBtn');
-    const closeSortBtn = document.getElementById('closeSortSheetBtn');
-    const sortSheet = document.getElementById('sortSheet');
-    const sortOverlay = document.getElementById('sortSheetOverlay');
-
-    function openSortSheet() {
-      if (sortSheet) {
-        sortSheet.classList.add('open');
-        sortSheet.setAttribute('aria-hidden', 'false');
-      }
-      if (sortOverlay) {
-        sortOverlay.classList.add('active');
-        sortOverlay.setAttribute('aria-hidden', 'false');
-      }
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-    }
-
-    function closeSortSheet() {
-      if (sortSheet) {
-        sortSheet.classList.remove('open');
-        sortSheet.setAttribute('aria-hidden', 'true');
-      }
-      if (sortOverlay) {
-        sortOverlay.classList.remove('active');
-        sortOverlay.setAttribute('aria-hidden', 'true');
-      }
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    }
-
-    if (openSortBtn) openSortBtn.addEventListener('click', openSortSheet);
-    if (closeSortBtn) closeSortBtn.addEventListener('click', closeSortSheet);
-    if (sortOverlay) {
-      sortOverlay.addEventListener('click', closeSortSheet);
-      sortOverlay.addEventListener('touchmove', function(e) {
-        e.preventDefault();
-      }, { passive: false });
-    }
-
-    // Sort Option Selection: Update URL preserving existing params
-    document.querySelectorAll('.sort-sheet-option').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const sVal = this.getAttribute('data-sort-val');
-        if (sVal) {
-          const url = new URL(window.location.href);
-          url.searchParams.set('sort', sVal);
-          url.searchParams.delete('page');
-          closeSortSheet();
-          window.location.href = url.toString();
-        }
-      });
-    });
-
-    // Escape key closes sort drawer
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') {
-        if (sortSheet && sortSheet.classList.contains('open')) closeSortSheet();
-      }
-    });
-  });
-</script>
 
 <%- include('../partials/footer') %>

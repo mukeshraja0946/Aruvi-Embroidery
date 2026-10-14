@@ -280,10 +280,12 @@ exports.downloadDesignApi = exports.downloadDesignZip;
 
 exports.getWishlist = async (req, res, next) => {
   try {
-    const items = await Wishlist.getByUser(req.user.id);
+    const sort = req.query.sort || 'latest';
+    const items = await Wishlist.getByUser(req.user.id, sort);
     res.render('user/wishlist', {
       title: 'My Wishlist - Aruvi Embroidery',
-      items
+      items,
+      sort
     });
   } catch (err) {
     next(err);

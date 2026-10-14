@@ -3,8 +3,21 @@ const db = require('../config/db');
 const fallbackWishlists = new Map(); // key: userId -> array of designIds
 
 class Wishlist {
-  static async getByUser(userId) {
+  static async getByUser(userId, sort = 'latest') {
     if (db.isConnected()) {
+      let orderBy = 'ORDER BY w.created_at DESC';
+      if (sort === 'price_asc' || sort === 'price_low') {
+        orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
+      } else if (sort === 'price_desc' || sort === 'price_high') {
+        orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
+      } else if (sort === 'popular') {
+        orderBy = 'ORDER BY (COALESCE(d.total_sales, 0) + COALESCE(d.download_count, 0)) DESC, d.id DESC';
+      } else if (sort === 'top_rated') {
+        orderBy = 'ORDER BY d.average_rating DESC, d.id DESC';
+      } else {
+        orderBy = 'ORDER BY w.created_at DESC';
+      }
+
       const sql = `
         SELECT w.id as wishlist_id, d.*, c.name as category_name,
                (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
@@ -12,7 +25,7 @@ class Wishlist {
         JOIN designs d ON w.design_id = d.id
         LEFT JOIN categories c ON d.category_id = c.id
         WHERE w.user_id = ?
-        ORDER BY w.created_at DESC
+        ${orderBy}
       `;
       return await db.query(sql, [userId]);
     }

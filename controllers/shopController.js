@@ -20,7 +20,7 @@ exports.getShopPage = async (req, res, next) => {
       if (selectedCategory) categoryId = selectedCategory.id;
     }
 
-    const normalizedSort = (sort === 'latest') ? 'newest' : (sort || 'newest');
+    const normalizedSort = (sort === 'newest') ? 'latest' : (sort || 'latest');
 
     const { designs, total, totalPages } = await Design.getAll({
       search,
@@ -69,7 +69,7 @@ exports.getShopPage = async (req, res, next) => {
       min_price: min_price || '',
       max_price: max_price || '',
       min_rating: min_rating || '',
-      sort: sort || 'newest',
+      sort: normalizedSort,
       currentPage,
       totalPages,
       total

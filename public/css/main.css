@@ -4508,7 +4508,7 @@ textarea.form-control {
     margin-left: auto !important;
     margin-right: auto !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   section {
@@ -5175,86 +5175,60 @@ textarea.form-control {
   .mobile-shop-toolbar {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 10px !important;
+    gap: 16px !important;
     width: 100% !important;
-    margin-bottom: 0.65rem !important;
+    margin-bottom: 0.85rem !important;
     box-sizing: border-box !important;
+    align-items: stretch !important;
   }
 
   .mobile-toolbar-btn {
-    height: 44px !important;
-    min-height: 44px !important;
+    height: 48px !important;
+    min-height: 48px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 8px !important;
-    padding: 0 12px !important;
+    gap: 10px !important;
+    padding: 0 14px !important;
     background: #FFFFFF !important;
     border: 1.5px solid #E2D9CF !important;
-    border-radius: 12px !important;
+    border-radius: 14px !important;
     font-family: var(--font-body, 'Poppins', sans-serif) !important;
-    font-size: 0.88rem !important;
+    font-size: 0.92rem !important;
     font-weight: 600 !important;
     color: #2D231E !important;
     cursor: pointer !important;
-    box-shadow: 0 1px 3px rgba(45, 35, 30, 0.04) !important;
+    box-shadow: 0 2px 6px rgba(45, 35, 30, 0.04) !important;
     box-sizing: border-box !important;
     text-decoration: none !important;
     transition: all 0.15s ease !important;
     -webkit-tap-highlight-color: transparent !important;
     overflow: visible !important;
+    width: 100% !important;
   }
 
   .mobile-toolbar-btn:active,
   .mobile-toolbar-btn:hover {
     background: #FAF6F0 !important;
-    border-color: #BD442E !important;
-    color: #BD442E !important;
+    border-color: #BB4558 !important;
+    color: #BB4558 !important;
   }
 
-  .mobile-toolbar-btn i {
-    color: #BD442E !important;
-    font-size: 0.92rem !important;
-    flex-shrink: 0 !important;
-  }
-
-  .mobile-sort-btn-left {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    max-width: calc(100% - 18px) !important;
-  }
-
-  .mobile-sort-btn-text {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    font-size: 0.84rem !important;
-    color: #2D231E !important;
-  }
-
-  .mobile-sort-btn-text strong {
-    color: #BD442E !important;
-    font-weight: 600 !important;
-  }
-
-  .mobile-sort-chevron {
-    font-size: 0.72rem !important;
-    color: #8A7D75 !important;
-    margin-left: auto !important;
+  .mobile-toolbar-btn i,
+  .mobile-toolbar-btn svg {
+    color: #BB4558 !important;
+    font-size: 1.05rem !important;
     flex-shrink: 0 !important;
   }
 
   .mobile-filter-dot {
-    width: 7px !important;
-    height: 7px !important;
-    background-color: #BD442E !important;
+    width: 8px !important;
+    height: 8px !important;
+    background-color: #BB4558 !important;
     border-radius: 50% !important;
     display: inline-block !important;
     flex-shrink: 0 !important;
+    margin-left: 2px !important;
   }
 
   .mobile-results-row {
@@ -5262,168 +5236,64 @@ textarea.form-control {
     align-items: center !important;
     justify-content: flex-start !important;
     padding: 0 2px !important;
-    margin-bottom: 0.65rem !important;
+    margin-bottom: 0.75rem !important;
   }
 
   .mobile-results-count {
-    font-size: 0.82rem !important;
+    font-size: 0.84rem !important;
     font-weight: 600 !important;
-    color: #7D7168 !important;
+    color: #6E5D53 !important;
     background: #F4EFEA !important;
-    padding: 3px 10px !important;
+    padding: 4px 14px !important;
     border-radius: 999px !important;
     display: inline-block !important;
   }
 
-  /* Mobile Sort Bottom Sheet */
-  .mobile-sort-sheet-overlay {
-    display: block !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    background: rgba(0, 0, 0, 0.45) !important;
-    backdrop-filter: blur(2px) !important;
-    -webkit-backdrop-filter: blur(2px) !important;
-    z-index: 99998 !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    transition: opacity 0.25s ease, visibility 0.25s ease !important;
-  }
-
-  .mobile-sort-sheet-overlay.active {
-    opacity: 1 !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
-  }
-
-  .mobile-sort-sheet {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    max-height: 80vh !important;
-    background: #FFFFFF !important;
-    border-radius: 20px 20px 0 0 !important;
-    z-index: 99999 !important;
-    box-shadow: 0 -4px 24px rgba(45, 35, 30, 0.15) !important;
-    transform: translateY(100%) !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease !important;
-    overflow: hidden !important;
+  /* Horizontally Scrollable Category Pills (< 768px) */
+  .category-pills-scroll-row {
     display: flex !important;
-    flex-direction: column !important;
-    box-sizing: border-box !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 2px 2px 10px 2px !important;
+    margin-bottom: 0.9rem !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
 
-  .mobile-sort-sheet.open {
-    transform: translateY(0) !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
+  .category-pills-scroll-row::-webkit-scrollbar {
+    display: none !important;
   }
 
-  .sort-sheet-header {
-    display: flex !important;
+  .cat-pill-btn {
+    scroll-snap-align: start !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
     align-items: center !important;
-    justify-content: space-between !important;
-    padding: 1rem 1.25rem !important;
-    background: #FAF6F0 !important;
-    border-bottom: 1px solid #EAE3D9 !important;
-    border-radius: 20px 20px 0 0 !important;
-  }
-
-  .sort-sheet-title-group {
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-  }
-
-  .sort-sheet-title-group i {
-    color: #BD442E !important;
-    font-size: 1.1rem !important;
-  }
-
-  .sort-sheet-title-group h3 {
-    margin: 0 !important;
-    font-family: var(--font-heading, 'Playfair Display', serif) !important;
-    font-size: 1.15rem !important;
-    font-weight: 700 !important;
-    color: #2D231E !important;
-  }
-
-  .sort-sheet-close-btn {
-    background: none !important;
-    border: none !important;
-    font-size: 1.25rem !important;
-    color: #7D7168 !important;
-    cursor: pointer !important;
-    padding: 4px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
-  .sort-sheet-body {
-    padding: 0.75rem 0.6rem 1.5rem 0.6rem !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 4px !important;
-    overflow-y: auto !important;
-  }
-
-  .sort-sheet-option {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    width: 100% !important;
-    min-height: 48px !important;
-    padding: 0.75rem 1rem !important;
-    border-radius: 10px !important;
-    border: none !important;
-    background: transparent !important;
-    color: #2D231E !important;
+    padding: 7px 16px !important;
+    border-radius: 999px !important;
     font-family: var(--font-body, 'Poppins', sans-serif) !important;
-    font-size: 0.95rem !important;
+    font-size: 0.86rem !important;
     font-weight: 500 !important;
-    text-align: left !important;
-    cursor: pointer !important;
-    transition: background 0.15s ease !important;
-    box-sizing: border-box !important;
-    -webkit-tap-highlight-color: transparent !important;
+    text-decoration: none !important;
+    background: #F4EFEA !important;
+    color: #4A3E39 !important;
+    transition: all 0.15s ease !important;
+    border: 1px solid transparent !important;
   }
 
-  .sort-sheet-option:hover,
-  .sort-sheet-option:active {
-    background: #FAF6F0 !important;
-  }
-
-  .sort-sheet-option.selected {
-    background: #FAF2EC !important;
-    color: #BD442E !important;
+  .cat-pill-btn.active {
+    background: #BB4558 !important;
+    color: #FFFFFF !important;
     font-weight: 600 !important;
+    box-shadow: 0 3px 10px rgba(187, 69, 88, 0.3) !important;
   }
 
-  .sort-option-label-wrap {
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-  }
-
-  .sort-option-icon {
-    width: 20px !important;
-    text-align: center !important;
-    color: #BD442E !important;
-    font-size: 0.95rem !important;
-  }
-
-  .sort-check-icon {
-    color: #BD442E !important;
-    font-size: 1.1rem !important;
+  .cat-pill-btn:hover:not(.active) {
+    background: #EAE3D9 !important;
+    color: #2D231E !important;
   }
 
   @media (max-width: 350px) {
@@ -6881,233 +6751,322 @@ textarea.form-control {
 }
 
 /* ==========================================================================
-   ARUVI STANDARDIZED SORT BY DROPDOWN COMPONENT (EXACT UI REFERENCE)
+   ARUVI STANDARDIZED SORT DROPDOWN COMPONENT (UNIFIED DESKTOP & MOBILE)
    ========================================================================== */
 
+.aruvi-sort-wrapper {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-body, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
+  vertical-align: middle;
+}
+
+/* Trigger Button: 48px height, 14px rounded corners, white background */
+.aruvi-sort-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  min-width: 200px;
+  padding: 0 16px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2D9CF;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(45, 35, 30, 0.04);
+  cursor: pointer;
+  color: #2D231E;
+  font-family: var(--font-body, 'Poppins', sans-serif);
+  font-size: 0.92rem;
+  font-weight: 500;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+.aruvi-sort-btn:hover {
+  background: #FAF6F0;
+  border-color: #BB4558;
+}
+
+/* Red 1.5px border when open or active */
+.aruvi-sort-btn.open,
+.aruvi-sort-btn:focus-visible {
+  border-color: #BB4558 !important;
+  border-width: 1.5px !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(187, 69, 88, 0.12) !important;
+  background: #FFFFFF !important;
+}
+
+.aruvi-sort-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aruvi-sort-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #BB4558;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.aruvi-sort-btn-icon svg {
+  display: block;
+}
+
+.aruvi-sort-btn-label {
+  font-size: 0.92rem;
+  color: #2D231E;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Selected value in brand red #BB4558 */
+.aruvi-sort-val-text {
+  color: #BB4558 !important;
+  font-weight: 600 !important;
+}
+
+.aruvi-sort-btn-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8A7D75;
+  margin-left: 10px;
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.aruvi-sort-btn-chevron svg {
+  display: block;
+}
+
+.aruvi-sort-btn.open .aruvi-sort-btn-chevron {
+  transform: rotate(180deg);
+  color: #BB4558;
+}
+
+/* Sort Dropdown Panel: 260px, 16px radius, soft shadow, z-index above cards */
+.aruvi-sort-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  background: #FFFFFF;
+  border: 1px solid #EAE3D9;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(45, 35, 30, 0.12), 0 2px 8px rgba(45, 35, 30, 0.06);
+  z-index: 999999;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  box-sizing: border-box;
+}
+
+.aruvi-sort-panel.open {
+  display: block !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* When rendered inside portal at body level: guaranteed unclipped */
+.aruvi-sort-portal-root .aruvi-sort-panel {
+  position: fixed !important;
+  z-index: 999999 !important;
+}
+
+.aruvi-sort-panel-inner {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-sizing: border-box;
+}
+
+/* Sort Option Items: 52px tap height, accessible, rounded */
+.aruvi-sort-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: #2D231E;
+  font-family: var(--font-body, 'Poppins', sans-serif);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  box-sizing: border-box;
+  outline: none;
+  text-decoration: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.aruvi-sort-item:hover,
+.aruvi-sort-item:focus-visible {
+  background: #FAF5EF;
+  color: #2D231E;
+  outline: none;
+}
+
+/* Selected option: soft blush background #F8E8E2, red text #BB4558, tick check */
+.aruvi-sort-item.selected {
+  background: #F8E8E2 !important;
+  color: #BB4558 !important;
+  font-weight: 600 !important;
+}
+
+.aruvi-sort-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aruvi-sort-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: #7D7168;
+  flex-shrink: 0;
+}
+
+.aruvi-sort-item-icon svg {
+  display: block;
+}
+
+.aruvi-sort-item.selected .aruvi-sort-item-icon {
+  color: #BB4558 !important;
+}
+
+.aruvi-sort-item-title {
+  white-space: nowrap;
+}
+
+.aruvi-sort-item-check {
+  display: none;
+  color: #BB4558;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.aruvi-sort-item-check svg {
+  display: block;
+}
+
+.aruvi-sort-item.selected .aruvi-sort-item-check {
+  display: inline-flex !important;
+}
+
+/* Skeleton Loading Grid during AJAX Sort */
+@keyframes aruviShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.card-skeleton {
+  background: #FFFFFF;
+  border: 1px solid #EAE3D9;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+  box-shadow: 0 2px 8px rgba(45, 35, 30, 0.04);
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #F5EFE6 25%, #FFFDF9 50%, #F5EFE6 75%);
+  background-size: 200% 100%;
+  animation: aruviShimmer 1.4s infinite linear;
+}
+
+.skeleton-image {
+  width: 100%;
+  height: 200px;
+}
+
+.skeleton-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-title {
+  height: 18px;
+  width: 75%;
+  border-radius: 4px;
+}
+
+.skeleton-meta {
+  height: 13px;
+  width: 45%;
+  border-radius: 4px;
+}
+
+.skeleton-rating {
+  height: 13px;
+  width: 55%;
+  border-radius: 4px;
+}
+
+.skeleton-price {
+  height: 20px;
+  width: 35%;
+  border-radius: 4px;
+}
+
+.skeleton-btn {
+  height: 38px;
+  width: 100%;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+
+/* Generic sort container backwards-compatibility */
 .aruvi-sort-container {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   position: relative;
-  font-family: var(--font-body, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
-  vertical-align: middle;
 }
-
-.aruvi-sort-label {
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #796B63; /* Muted brown matching reference */
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-  user-select: none;
-}
-
 .aruvi-sort-dropdown {
   position: relative;
-  min-width: 220px;
-  user-select: none;
+  min-width: 200px;
 }
-
-/* Trigger Button */
 .aruvi-sort-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 44px;
-  min-height: 44px;
-  padding: 0 14px;
+  height: 48px;
+  padding: 0 16px;
   background: #FFFFFF;
-  border: 1.5px solid #BD442E; /* Thin terracotta-red border */
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(189, 68, 46, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  border: 1.5px solid #E2D9CF;
+  border-radius: 14px;
   cursor: pointer;
-  transition: border-radius 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  outline: none;
-  box-sizing: border-box;
-}
-
-.aruvi-sort-trigger:hover {
-  box-shadow: 0 2px 8px rgba(189, 68, 46, 0.14);
-}
-
-.aruvi-sort-trigger:focus-visible {
-  outline: 2px solid rgba(189, 68, 46, 0.4);
-  outline-offset: 1px;
-}
-
-/* When open, smooth connection to dropdown */
-.aruvi-sort-dropdown.open .aruvi-sort-trigger {
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
-  box-shadow: 0 4px 12px rgba(189, 68, 46, 0.12);
-}
-
-.aruvi-sort-trigger-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  overflow: hidden;
-  flex: 1;
-}
-
-.aruvi-sort-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  color: #BD442E; /* Terracotta-red left icon */
-  flex-shrink: 0;
-  font-size: 0.95rem;
-}
-
-.aruvi-sort-icon svg {
-  display: block;
-}
-
-.aruvi-sort-value-text {
-  font-size: 0.92rem;
-  font-weight: 500;
-  color: #2D231E; /* Dark brown selected text */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-
-.aruvi-sort-chevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #2D231E;
-  margin-left: 10px;
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  flex-shrink: 0;
-}
-
-.aruvi-sort-chevron svg {
-  display: block;
-}
-
-.aruvi-sort-dropdown.open .aruvi-sort-chevron {
-  transform: rotate(180deg);
-}
-
-/* Floating Dropdown Panel */
-.aruvi-sort-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  min-width: 100%;
-  margin-top: 2px;
-  background: #FFFFFF;
-  border: 1px solid #EBE4DC; /* Subtle beige border */
-  border-radius: 0 0 14px 14px; /* Rounded bottom corners */
-  box-shadow: 0 12px 28px -4px rgba(45, 35, 30, 0.14), 0 6px 12px -2px rgba(45, 35, 30, 0.06); /* Soft shadow */
-  padding: 6px;
-  display: none;
-  flex-direction: column;
-  gap: 2px;
-  z-index: 100050;
-  max-height: 340px;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
-
-.aruvi-sort-dropdown.open .aruvi-sort-menu {
-  display: flex;
-  animation: aruviSortMenuFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes aruviSortMenuFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Options */
-.aruvi-sort-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 38px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 450;
-  color: #2D231E; /* Dark brown */
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  user-select: none;
-  box-sizing: border-box;
-  text-align: left;
-}
-
-.aruvi-sort-option .aruvi-sort-opt-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  color: #6E625B; /* Unselected option icon */
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.aruvi-sort-option .aruvi-sort-opt-icon svg {
-  display: block;
-}
-
-.aruvi-sort-option-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.aruvi-sort-option:hover:not(.selected) {
-  background: #FAF6F0; /* Soft warm hover */
-  color: #1E1612;
-}
-
-/* Selected Option Highlight */
-.aruvi-sort-option.selected {
-  background: #FDF2EE; /* Pale terracotta background */
-  color: #BD442E;      /* Terracotta text */
-  font-weight: 600;
-}
-
-.aruvi-sort-option.selected .aruvi-sort-opt-icon {
-  color: #BD442E;      /* Terracotta icon */
-}
-
-/* High z-index stacking context safety */
-.aruvi-sort-dropdown.open {
-  z-index: 100050;
-}
-
-/* Responsive adjustment for small screens (Admin/generic standalone filters) */
-@media (max-width: 600px) {
-  .aruvi-sort-container:not(.shop-controls-bar .aruvi-sort-container) {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .aruvi-sort-dropdown:not(.shop-controls-bar .aruvi-sort-dropdown) {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .shop-controls-bar .aruvi-sort-dropdown {
-    min-width: 0 !important;
-    width: auto !important;
-    flex: 0 0 auto !important;
-  }
 }
 

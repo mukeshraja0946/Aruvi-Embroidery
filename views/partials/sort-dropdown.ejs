@@ -1,88 +1,115 @@
 <%
-  // Standardized Sort By Dropdown Component
+  // Standardized Reusable Sort Dropdown Component for Aruvi Embroidery
   const _id = (typeof id !== 'undefined' && id) ? id : ('sort_dd_' + Math.random().toString(36).substring(2, 8));
   const _name = (typeof name !== 'undefined' && name) ? name : 'sort';
-  const _label = (typeof label !== 'undefined' && label) ? label : 'Sort by:';
-  const _actionType = (typeof actionType !== 'undefined' && actionType) ? actionType : 'submit'; // 'url' or 'submit' or 'direct-url'
-  const _currentVal = (typeof currentSort !== 'undefined' && currentSort) ? currentSort : 'newest';
+  const _actionType = (typeof actionType !== 'undefined' && actionType) ? actionType : 'ajax'; // 'ajax' (with live grid reload) or 'url' or 'submit'
+  const _rawSort = (typeof currentSort !== 'undefined' && currentSort) ? currentSort : 'latest';
+  const _extraClass = (typeof containerClass !== 'undefined' && containerClass) ? (' ' + containerClass) : '';
 
-  // Helper to render icon for option
-  function renderSortIcon(type, customSvg, customClass) {
-    if (customSvg) return customSvg;
-    if (customClass) return `<i class="${customClass}"></i>`;
-    switch(type) {
-      case 'oldest':
-        return `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.8v3.4l2.4 1.4"/></svg>`;
-      case 'price_low':
-        return `<svg width="14" height="15" viewBox="0 0 14 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 12.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"/></svg>`;
-      case 'price_high':
-        return `<svg width="14" height="15" viewBox="0 0 14 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2.5V12.5M7 12.5L3 8.5M7 12.5L11 8.5"/></svg>`;
-      case 'popular':
-        return `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="8 1.8 10 6 14.5 6.6 11.2 9.8 12 14.2 8 12.1 4 14.2 4.8 9.8 1.5 6.6 6 6 8 1.8"/></svg>`;
-      case 'rating':
-        return `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><polygon points="8 1.8 10 6 14.5 6.6 11.2 9.8 12 14.2 8 12.1 4 14.2 4.8 9.8 1.5 6.6 6 6 8 1.8"/></svg>`;
-      case 'name':
-        return `<i class="fa-solid fa-arrow-down-a-z"></i>`;
-      case 'amount':
-      case 'amount_high':
-      case 'spent_high':
-        return `<i class="fa-solid fa-indian-rupee-sign" style="font-size: 0.85rem;"></i>`;
-      case 'count':
-        return `<i class="fa-solid fa-layer-group"></i>`;
-      case 'latest':
-      case 'newest':
-      default:
-        return `<svg width="14" height="15" viewBox="0 0 14 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12V3M4 3L1.5 5.5M4 3L6.5 5.5M10 3V12M10 12L7.5 9.5M10 12L12.5 9.5"/></svg>`;
+  // Normalize sort value
+  function normalizeSortValue(val) {
+    if (!val) return 'latest';
+    if (val === 'newest') return 'latest';
+    if (val === 'price_low') return 'price_asc';
+    if (val === 'price_high') return 'price_desc';
+    if (val === 'rating') return 'top_rated';
+    if (val === 'most_popular') return 'popular';
+    return val;
+  }
+
+  const _activeVal = normalizeSortValue(_rawSort);
+
+  // Default 5 standard options if not supplied
+  const _defaultOptions = [
+    {
+      value: 'latest',
+      label: 'Latest',
+      iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+    },
+    {
+      value: 'price_asc',
+      label: 'Price: Low to High',
+      iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`
+    },
+    {
+      value: 'price_desc',
+      label: 'Price: High to Low',
+      iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>`
+    },
+    {
+      value: 'popular',
+      label: 'Popular',
+      iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.38 0 2.5-1.12 2.5-2.5 0-.61-.22-1.18-.58-1.63L12 11.5l-.92 1.37c-.36.45-.58 1.02-.58 1.63z"/><path d="M12 2c1.5 3 4 5.5 4 9.5 0 3.59-2.91 6.5-6.5 6.5S3 15.09 3 11.5c0-4 3.5-7 5.5-9.5C9.5 4.5 11 5 12 2z"/></svg>`
+    },
+    {
+      value: 'top_rated',
+      label: 'Top Rated',
+      iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
     }
-  }
+  ];
 
-  // Find active option
-  let activeOpt = options.find(o => o.value === _currentVal);
-  if (!activeOpt && (_currentVal === 'newest' || _currentVal === 'latest')) {
-    activeOpt = options.find(o => o.value === 'newest' || o.value === 'latest');
-  }
-  if (!activeOpt && options.length > 0) {
-    activeOpt = options[0];
-  }
+  const _opts = (typeof options !== 'undefined' && Array.isArray(options) && options.length > 0) ? options : _defaultOptions;
+  let activeOpt = _opts.find(o => normalizeSortValue(o.value) === _activeVal);
+  if (!activeOpt && _opts.length > 0) activeOpt = _opts[0];
 %>
 
-<div class="aruvi-sort-container" id="<%= _id %>_wrap" data-action-type="<%= _actionType %>">
-  <% if (_label) { %>
-    <span class="aruvi-sort-label"><%= _label %></span>
-  <% } %>
+<div class="aruvi-sort-wrapper<%= _extraClass %>" id="<%= _id %>_wrap" data-action-type="<%= _actionType %>" data-param-name="<%= _name %>">
+  <input type="hidden" name="<%= _name %>" value="<%= activeOpt ? activeOpt.value : 'latest' %>" id="<%= _id %>_input">
 
-  <input type="hidden" name="<%= _name %>" value="<%= activeOpt ? activeOpt.value : '' %>" id="<%= _id %>_input">
-
-  <div class="aruvi-sort-dropdown" id="<%= _id %>">
-    <!-- Trigger Button -->
-    <button type="button" class="aruvi-sort-trigger" aria-haspopup="listbox" aria-expanded="false" id="<%= _id %>_btn">
-      <div class="aruvi-sort-trigger-left">
-        <span class="aruvi-sort-icon">
-          <%- renderSortIcon(activeOpt ? activeOpt.iconType : 'latest', activeOpt ? activeOpt.customSvg : null, activeOpt ? activeOpt.customClass : null) %>
-        </span>
-        <span class="aruvi-sort-value-text"><%= activeOpt ? activeOpt.label : 'Latest' %></span>
-      </div>
-      <span class="aruvi-sort-chevron">
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 5l4 4 4-4"/>
+  <!-- Trigger Button: Exactly 48px height, 14px radius, white bg, sort icon, brand red label -->
+  <button type="button" 
+          class="aruvi-sort-btn" 
+          id="<%= _id %>_btn" 
+          aria-haspopup="listbox" 
+          aria-expanded="false" 
+          aria-controls="<%= _id %>_menu"
+          aria-label="Sort options, current: <%= activeOpt ? activeOpt.label : 'Latest' %>">
+    <div class="aruvi-sort-btn-left">
+      <span class="aruvi-sort-btn-icon" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"></line>
+          <line x1="4" y1="12" x2="14" y2="12"></line>
+          <line x1="4" y1="18" x2="8" y2="18"></line>
         </svg>
       </span>
-    </button>
+      <span class="aruvi-sort-btn-label">
+        Sort: <strong class="aruvi-sort-val-text"><%= activeOpt ? activeOpt.label : 'Latest' %></strong>
+      </span>
+    </div>
+    <span class="aruvi-sort-btn-chevron" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </span>
+  </button>
 
-    <!-- Floating Dropdown Panel -->
-    <div class="aruvi-sort-menu" role="listbox" aria-labelledby="<%= _id %>_btn">
-      <% options.forEach(opt => { 
-        const isSelected = activeOpt && (opt.value === activeOpt.value);
+  <!-- Sort Dropdown Panel: 260px, 16px radius, soft shadow, z-index above cards -->
+  <div class="aruvi-sort-panel" 
+       id="<%= _id %>_menu" 
+       role="listbox" 
+       aria-labelledby="<%= _id %>_btn" 
+       tabindex="-1">
+    <div class="aruvi-sort-panel-inner">
+      <% _opts.forEach((opt, idx) => { 
+        const isSelected = activeOpt && (normalizeSortValue(opt.value) === normalizeSortValue(activeOpt.value));
       %>
-        <div class="aruvi-sort-option <%= isSelected ? 'selected' : '' %>"
+        <div class="aruvi-sort-item <%= isSelected ? 'selected' : '' %>"
              role="option"
+             id="<%= _id %>_opt_<%= idx %>"
              aria-selected="<%= isSelected ? 'true' : 'false' %>"
              data-value="<%= opt.value %>"
-             <% if (opt.url) { %>data-url="<%= opt.url %>"<% } %>>
-          <span class="aruvi-sort-opt-icon">
-            <%- renderSortIcon(opt.iconType, opt.customSvg, opt.customClass) %>
+             tabindex="0">
+          <div class="aruvi-sort-item-left">
+            <span class="aruvi-sort-item-icon" aria-hidden="true">
+              <%- opt.iconSvg || '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>' %>
+            </span>
+            <span class="aruvi-sort-item-title"><%= opt.label %></span>
+          </div>
+          <span class="aruvi-sort-item-check" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
           </span>
-          <span class="aruvi-sort-option-label"><%= opt.label %></span>
         </div>
       <% }) %>
     </div>

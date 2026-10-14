@@ -1,9 +1,20 @@
 <%- include('../partials/header') %>
 
 <div class="container section">
-  <div class="section-header" style="text-align: left; margin-bottom: 2rem;">
-    <h2>My Saved Wishlist</h2>
-    <p>Your saved favorite embroidery designs for quick access and purchasing</p>
+  <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <h2 style="margin: 0 0 0.3rem 0;">My Saved Wishlist</h2>
+      <p style="margin: 0; color: var(--text-muted);">Your saved favorite embroidery designs (<%= items ? items.length : 0 %>)</p>
+    </div>
+    <% if (items && items.length > 1) { %>
+      <div>
+        <%- include('../partials/sort-dropdown', {
+          id: 'wishlist_sort_dd',
+          currentSort: typeof sort !== 'undefined' ? sort : 'latest',
+          actionType: 'url'
+        }) %>
+      </div>
+    <% } %>
   </div>
 
   <% if (!items || items.length === 0) { %>

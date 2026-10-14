@@ -103,17 +103,27 @@ class Design {
         const whereSql = whereClause.length ? 'WHERE ' + whereClause.join(' AND ') : '';
 
         let orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
-        if (sort === 'price_low' || sort === 'price_asc') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
-        else if (sort === 'price_high' || sort === 'price_desc') orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
-        else if (sort === 'popular' || sort === 'most_popular') orderBy = 'ORDER BY COALESCE(d.download_count, d.reviews_count) DESC, d.id DESC';
-        else if (sort === 'rating' || sort === 'top_rated') orderBy = 'ORDER BY d.average_rating DESC, d.id DESC';
-        else if (sort === 'oldest') orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
-        else if (sort === 'latest' || sort === 'newest') orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
+        if (sort === 'price_asc' || sort === 'price_low') {
+          orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
+        } else if (sort === 'price_desc' || sort === 'price_high') {
+          orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
+        } else if (sort === 'popular' || sort === 'most_popular') {
+          orderBy = 'ORDER BY (COALESCE((SELECT COUNT(*) FROM order_items oi WHERE oi.design_id = d.id), 0) + COALESCE(d.download_count, 0) + COALESCE(d.total_sales, 0)) DESC, d.id DESC';
+        } else if (sort === 'top_rated' || sort === 'rating') {
+          orderBy = 'ORDER BY (CASE WHEN (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) > 0 THEN 1 ELSE 0 END) DESC, (SELECT AVG(r.rating) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) DESC, (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) DESC, d.id DESC';
+        } else if (sort === 'oldest') {
+          orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
+        } else {
+          // default: latest
+          orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
+        }
 
         const offset = (page - 1) * limit;
 
         const sql = `
           SELECT d.*, c.name as category_name, c.slug as category_slug,
+                 (SELECT AVG(r.rating) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) as real_avg_rating,
+                 (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) as real_reviews_count,
                  COALESCE(
                    (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
                    (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
