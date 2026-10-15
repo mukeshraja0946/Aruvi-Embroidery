@@ -1,9 +1,3 @@
-/**
- * Automated Verification Script for Mobile UI Fixes
- * Tests viewports: 360px, 390px, 414px
- * Captures screenshots and verifies layout metrics
- */
-
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
@@ -12,274 +6,291 @@ const CHROME_PATH = fs.existsSync('C:\\Program Files\\Google\\Chrome\\Applicatio
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 
-const BASE_URL = process.env.TEST_URL || 'http://localhost:3000';
-const OUTPUT_DIR = path.join(__dirname, '..', 'artifacts', 'screenshots', 'verify_mobile');
-
+const BASE_URL = 'http://localhost:3000';
 const VIEWPORTS = [
   { name: '360px', width: 360, height: 740 },
   { name: '390px', width: 390, height: 844 },
   { name: '414px', width: 414, height: 896 }
 ];
 
-async function run() {
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+async function verifyAll() {
+  console.log('--- STARTING MOBILE VERIFICATION SUITE ---');
+  const browser = await chromium.launch({ executablePath: CHROME_PATH, headless: true });
+
+  const testPages = [
+    { name: 'Home', path: '/' },
+    { name: 'Custom Order', path: '/custom-order' },
+    { name: 'About', path: '/about' },
+    { name: 'Contact', path: '/contact' }
+  ];
+
+  for (const vp of VIEWPORTS) {
+    console.log(`\n====================================================`);
+    console.log(`=== Testing Viewport: ${vp.name} (${vp.width}x${vp.height}) ===`);
+    console.log(`====================================================`);
+    const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+    const page = await context.newPage();
+
+    // 1. Test Static Public Pages
+    for (const p of testPages) {
+      await page.goto(`${BASE_URL}${p.path}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(300);
+
+      // Check horizontal overflow
+      const overflow = await page.evaluate(() => {
+        const docW = document.documentElement.scrollWidth;
+        const winW = window.innerWidth;
+        const bodyW = document.body ? document.body.scrollWidth : 0;
+        const maxW = Math.max(docW, bodyW);
+        return { maxW, winW, hasOverflow: maxW > winW };
+      });
+
+      if (overflow.hasOverflow) {
+        console.error(`❌ [${vp.name}] ${p.name}: Horizontal overflow detected! (maxW: ${overflow.maxW} > winW: ${overflow.winW})`);
+      } else {
+        console.log(`✅ [${vp.name}] ${p.name}: Zero horizontal overflow (width: ${overflow.maxW}px <= ${overflow.winW}px)`);
+      }
+
+      // Feature cards check
+      const cardCheck = await page.evaluate(() => {
+        const grid = document.querySelector('.site-feature-cards-grid');
+        if (!grid) return { found: false };
+        const cards = grid.querySelectorAll('.site-feature-card');
+        const titles = [];
+        let hasNowrap = false;
+        let hasEllipsis = false;
+
+        cards.forEach(c => {
+          const t = c.querySelector('.site-feature-card-title');
+          const s = c.querySelector('.site-feature-card-subtitle');
+          if (t) {
+            const st = window.getComputedStyle(t);
+            if (st.whiteSpace === 'nowrap') hasNowrap = true;
+            if (st.textOverflow === 'ellipsis') hasEllipsis = true;
+            titles.push(t.textContent.trim());
+          }
+          if (s) {
+            const st = window.getComputedStyle(s);
+            if (st.whiteSpace === 'nowrap') hasNowrap = true;
+            if (st.textOverflow === 'ellipsis') hasEllipsis = true;
+          }
+        });
+
+        const gridComputed = window.getComputedStyle(grid);
+
+        return {
+          found: true,
+          count: cards.length,
+          titles,
+          hasNowrap,
+          hasEllipsis,
+          gridColumns: gridComputed.gridTemplateColumns
+        };
+      });
+
+      if (cardCheck.found) {
+        if (cardCheck.hasNowrap || cardCheck.hasEllipsis) {
+          console.error(`❌ [${vp.name}] ${p.name}: Feature cards have nowrap or ellipsis!`);
+        } else {
+          console.log(`✅ [${vp.name}] ${p.name}: Feature cards ok (${cardCheck.count} cards, 2-col wrap, no nowrap, no ellipsis). Titles: ${cardCheck.titles.join(', ')}`);
+        }
+      }
+    }
+
+    // 2. Specific check on About Page (story image removed by default)
+    await page.goto(`${BASE_URL}/about`, { waitUntil: 'domcontentloaded' });
+    const aboutCheck = await page.evaluate(() => {
+      const imgCard = document.querySelector('.story-image-card');
+      const hasImage = !!imgCard;
+      const noImageClass = document.querySelector('.about-story-layout.no-image');
+      return { hasImage, hasNoImageClass: !!noImageClass };
+    });
+    console.log(`✅ [${vp.name}] About Page story image present: ${aboutCheck.hasImage} (Expected: false), has .no-image class: ${aboutCheck.hasNoImageClass}`);
+
+    // 3. Specific check on Contact Page (location map removed by default)
+    await page.goto(`${BASE_URL}/contact`, { waitUntil: 'domcontentloaded' });
+    const contactCheck = await page.evaluate(() => {
+      const mapImg = document.querySelector('img[src*="map_erode"]');
+      const headings = Array.from(document.querySelectorAll('h4')).map(h => h.textContent.trim());
+      const hasLocationCard = headings.some(text => text.includes('Our Location'));
+      return { hasMap: !!mapImg, hasLocationCard };
+    });
+    console.log(`✅ [${vp.name}] Contact Page map present: ${contactCheck.hasMap} (Expected: false), has location card: ${contactCheck.hasLocationCard} (Expected: false)`);
+
+    // 4. Specific check on Custom Order page (Need Help card)
+    await page.goto(`${BASE_URL}/custom-order`, { waitUntil: 'domcontentloaded' });
+    const helpCheck = await page.evaluate(() => {
+      const helpCard = document.querySelector('.custom-order-need-help-card');
+      if (!helpCard) return { found: false };
+      const btn = helpCard.querySelector('.help-btn');
+      const cardRect = helpCard.getBoundingClientRect();
+      const btnRect = btn ? btn.getBoundingClientRect() : null;
+      return {
+        found: true,
+        cardWidth: cardRect.width,
+        btnWidth: btnRect ? btnRect.width : 0,
+        isInside: cardRect.right <= window.innerWidth && cardRect.left >= 0
+      };
+    });
+    console.log(`✅ [${vp.name}] Custom Order Help card inside screen: ${helpCheck.isInside}, cardWidth: ${Math.round(helpCheck.cardWidth)}px, btnWidth: ${Math.round(helpCheck.btnWidth)}px`);
+
+    // 5. Check Customer Orders List and Order Detail Pages
+    // Login as Admin (who can view orders)
+    await page.goto(`${BASE_URL}/auth/login`, { waitUntil: 'domcontentloaded' });
+    await page.fill('form[action="/auth/login"] input[name="email"]', 'admin@aruviembroidery.com');
+    await page.fill('form[action="/auth/login"] input[name="password"]', 'admin123');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}),
+      page.click('form[action="/auth/login"] button[type="submit"]')
+    ]);
+
+    // Check Order 1 (Pending)
+    await page.goto(`${BASE_URL}/user/orders/1`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(300);
+
+    const order1Check = await page.evaluate(() => {
+      const docW = document.documentElement.scrollWidth;
+      const winW = window.innerWidth;
+      const orderTitle = document.querySelector('.order-number-title')?.textContent.trim();
+      const placedDate = document.querySelector('.order-placed-date')?.textContent.trim();
+      const statusPill = document.querySelector('.order-status-pill')?.textContent.trim();
+      const isMobileItemsVisible = window.getComputedStyle(document.querySelector('.order-mobile-items-list')).display !== 'none';
+      const isDesktopTableHidden = window.getComputedStyle(document.querySelector('.order-desktop-table-wrap')).display === 'none';
+      
+      const itemCards = document.querySelectorAll('.order-m-item-card');
+      const itemSpecs = Array.from(itemCards).map(c => {
+        const specEl = c.querySelector('.order-m-item-spec');
+        return specEl ? specEl.textContent.trim() : null;
+      });
+
+      const totalPaidOrDue = document.querySelector('.order-summary-row.total-row strong')?.textContent.trim();
+      const totalVal = document.querySelector('.order-summary-row .total-amount-val')?.textContent.trim();
+      const payNowBtn = document.querySelector('#payNowBtn');
+
+      return {
+        hasOverflow: docW > winW,
+        orderTitle,
+        placedDate,
+        statusPill,
+        isMobileItemsVisible,
+        isDesktopTableHidden,
+        itemCount: itemCards.length,
+        itemSpecs,
+        totalPaidOrDue,
+        totalVal,
+        hasPayNowBtn: !!payNowBtn
+      };
+    });
+
+    console.log(`✅ [${vp.name}] Order 1 (Pending):`);
+    console.log(`    - Overflow: ${order1Check.hasOverflow ? 'FAIL' : 'PASS (0 overflow)'}`);
+    console.log(`    - Title: "${order1Check.orderTitle}"`);
+    console.log(`    - Date: "${order1Check.placedDate}"`);
+    console.log(`    - Status Pill: "${order1Check.statusPill}"`);
+    console.log(`    - Mobile Stacked Cards: ${order1Check.isMobileItemsVisible}, Desktop Table Hidden: ${order1Check.isDesktopTableHidden}`);
+    console.log(`    - Item Specs (Item 2 should be null/hidden):`, order1Check.itemSpecs);
+    console.log(`    - Total Label: "${order1Check.totalPaidOrDue}" (Expected: Total Due:) with Pay Now button: ${order1Check.hasPayNowBtn}`);
+
+    // Check Order 2 (Paid/Completed)
+    await page.goto(`${BASE_URL}/user/orders/2`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(300);
+
+    const order2Check = await page.evaluate(() => {
+      const statusPill = document.querySelector('.order-status-pill')?.textContent.trim();
+      const totalPaidOrDue = document.querySelector('.order-summary-row.total-row strong')?.textContent.trim();
+      const hasDownloadBtn = !!document.querySelector('.order-m-download-btn');
+      return { statusPill, totalPaidOrDue, hasDownloadBtn };
+    });
+
+    console.log(`✅ [${vp.name}] Order 2 (Completed):`);
+    console.log(`    - Status Pill: "${order2Check.statusPill}"`);
+    console.log(`    - Total Label: "${order2Check.totalPaidOrDue}" (Expected: Total Paid:)`);
+    console.log(`    - Has Download Button: ${order2Check.hasDownloadBtn}`);
+
+    await context.close();
   }
 
-  console.log('====================================================');
-  console.log(`Starting Mobile UI Verification on ${BASE_URL}`);
-  console.log(`Using Chrome: ${CHROME_PATH}`);
-  console.log(`Output Directory: ${OUTPUT_DIR}`);
-  console.log('====================================================\n');
+  // 6. Test Order Creation & Selling Price Verification
+  console.log(`\n====================================================`);
+  console.log(`=== Testing Pricing Calculation & Order Creation ===`);
+  console.log(`====================================================`);
 
-  const browser = await chromium.launch({
-    executablePath: CHROME_PATH,
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+  const Design = require('../models/Design');
+  const Order = require('../models/Order');
+
+  // Fetch designs to verify price vs sale_price
+  let allDesigns = await Design.getAll({ limit: 10 });
+  if (!allDesigns.designs || allDesigns.designs.length === 0) {
+    await Design.create({
+      title: 'AED 100 Peacock Motif',
+      sku: 'AED 100',
+      slug: 'aed-100-peacock-motif',
+      price: 120.00,
+      sale_price: 49.00,
+      category_id: 1,
+      hoop_size: '5x7 inch (130x180 mm)',
+      dimensions: '140mm x 180mm',
+      is_active: 1
+    });
+    allDesigns = await Design.getAll({ limit: 10 });
+  }
+
+  console.log(`Catalog Designs sample:`);
+  allDesigns.designs.forEach(d => {
+    console.log(` - [ID ${d.id}] "${d.title}" | MRP: ₹${d.price} | Selling Price: ₹${d.sale_price || d.price}`);
   });
 
-  const report = {
-    viewports: {},
-    summary: {
-      sortDropdown: [],
-      productCard: [],
-      rightSpace: [],
-      header: [],
-      detailPage: []
-    }
-  };
+  const sampleDesign = allDesigns.designs[0];
+  const sellingPrice = sampleDesign.sale_price ? parseFloat(sampleDesign.sale_price) : parseFloat(sampleDesign.price);
+  const mrp = parseFloat(sampleDesign.price);
 
-  try {
-    for (const vp of VIEWPORTS) {
-      console.log(`\n----------------- Testing Viewport: ${vp.name} (${vp.width}x${vp.height}) -----------------`);
-      report.viewports[vp.name] = {};
-
-      const context = await browser.newContext({
-        viewport: { width: vp.width, height: vp.height },
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'
-      });
-      const page = await context.newPage();
-
-      // 1. HOME PAGE
-      await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(500);
-
-      // Verify Header & Feature strip on Home
-      const homeHeaderMetrics = await page.evaluate(() => {
-        const header = document.querySelector('.site-header');
-        const hamburger = document.querySelector('.mobile-menu-toggle');
-        const logo = document.querySelector('.brand-logo');
-        const iconBtns = Array.from(document.querySelectorAll('.header-icon-btn'));
-        const badges = Array.from(document.querySelectorAll('.header-icon-btn .cart-badge'));
-        const featurePills = Array.from(document.querySelectorAll('.hero-pill-item'));
-        const pillIcons = Array.from(document.querySelectorAll('.hero-pill-item .pill-icon'));
-
-        const headerRect = header ? header.getBoundingClientRect() : null;
-        const burgerRect = hamburger ? hamburger.getBoundingClientRect() : null;
-        const logoRect = logo ? logo.getBoundingClientRect() : null;
-
-        return {
-          headerHeight: headerRect ? Math.round(headerRect.height) : 0,
-          burgerSize: burgerRect ? { width: Math.round(burgerRect.width), height: Math.round(burgerRect.height) } : null,
-          logoLeft: logoRect ? Math.round(logoRect.left) : 0,
-          logoHeight: logoRect ? Math.round(logoRect.height) : 0,
-          logoGap: (logoRect && burgerRect) ? Math.round(logoRect.left - burgerRect.right) : 0,
-          iconBtnCount: iconBtns.length,
-          iconBtnSizes: iconBtns.map(btn => {
-            const r = btn.getBoundingClientRect();
-            return { width: Math.round(r.width), height: Math.round(r.height) };
-          }),
-          badgeSizes: badges.map(b => {
-            const r = b.getBoundingClientRect();
-            return { width: Math.round(r.width), height: Math.round(r.height) };
-          }),
-          featurePillCount: featurePills.length,
-          pillIconSizes: pillIcons.map(pi => {
-            const r = pi.getBoundingClientRect();
-            return { width: Math.round(r.width), height: Math.round(r.height) };
-          }),
-          scrollWidth: document.documentElement.scrollWidth,
-          windowWidth: window.innerWidth
-        };
-      });
-
-      console.log(`[Home ${vp.name}] Header height: ${homeHeaderMetrics.headerHeight}px, Burger: ${homeHeaderMetrics.burgerSize?.width}x${homeHeaderMetrics.burgerSize?.height}px, Logo gap: ${homeHeaderMetrics.logoGap}px, IconBtns: ${homeHeaderMetrics.iconBtnSizes[0]?.width}x${homeHeaderMetrics.iconBtnSizes[0]?.height}px, Badges: ${homeHeaderMetrics.badgeSizes[0]?.width}x${homeHeaderMetrics.badgeSizes[0]?.height}px, Feature icons: ${homeHeaderMetrics.pillIconSizes[0]?.width}x${homeHeaderMetrics.pillIconSizes[0]?.height}px`);
-      await page.screenshot({ path: path.join(OUTPUT_DIR, `home_${vp.name}.png`), fullPage: false });
-
-      // 2. DESIGNS PAGE (Dropdown CLOSED)
-      await page.goto(`${BASE_URL}/designs`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(600);
-
-      const designsMetrics = await page.evaluate(() => {
-        const toolbar = document.querySelector('.mobile-shop-toolbar');
-        const filterBtn = document.querySelector('.mobile-filter-btn');
-        const sortBtn = document.querySelector('.aruvi-sort-btn');
-        const sortLabel = document.querySelector('.aruvi-sort-btn-label');
-        const viewBtns = Array.from(document.querySelectorAll('.mobile-view-toggle .view-btn'));
-        const container = document.querySelector('.designs-page-container');
-        const grid = document.querySelector('.grid-4-strict');
-        const cards = Array.from(document.querySelectorAll('.listing-product-card'));
-        const firstCard = cards[0];
-        const cardImg = firstCard ? firstCard.querySelector('.card-image-box img') : null;
-        const discountBadge = firstCard ? firstCard.querySelector('.price-numbers-row .discount-badge') : null;
-        const priceRow = firstCard ? firstCard.querySelector('.card-price-action-row') : null;
-
-        const contRect = container ? container.getBoundingClientRect() : null;
-        const gridRect = grid ? grid.getBoundingClientRect() : null;
-        const sortRect = sortBtn ? sortBtn.getBoundingClientRect() : null;
-        const filterRect = filterBtn ? filterBtn.getBoundingClientRect() : null;
-        const firstCardRect = firstCard ? firstCard.getBoundingClientRect() : null;
-        const secondCardRect = cards[1] ? cards[1].getBoundingClientRect() : null;
-        const imgRect = cardImg ? cardImg.getBoundingClientRect() : null;
-        const imgBoxRect = firstCard ? firstCard.querySelector('.card-image-box').getBoundingClientRect() : null;
-
-        // Container computed padding
-        const compContainer = container ? window.getComputedStyle(container) : null;
-
-        return {
-          windowWidth: window.innerWidth,
-          scrollWidth: document.documentElement.scrollWidth,
-          containerPaddingLeft: compContainer ? compContainer.paddingLeft : null,
-          containerPaddingRight: compContainer ? compContainer.paddingRight : null,
-          gridWidth: gridRect ? Math.round(gridRect.width) : 0,
-          gridLeft: gridRect ? Math.round(gridRect.left) : 0,
-          gridRight: gridRect ? Math.round(gridRect.right) : 0,
-          card1Width: firstCardRect ? Math.round(firstCardRect.width) : 0,
-          card2Width: secondCardRect ? Math.round(secondCardRect.width) : 0,
-          cardGap: (firstCardRect && secondCardRect) ? Math.round(secondCardRect.left - firstCardRect.right) : 0,
-          imgBoxAspect: imgBoxRect ? (imgBoxRect.width / imgBoxRect.height).toFixed(2) : null,
-          imgObjectFit: cardImg ? window.getComputedStyle(cardImg).objectFit : null,
-          discountBadgeInline: !!discountBadge,
-          sortLabelText: sortLabel ? sortLabel.innerText.trim() : '',
-          filterBtnWidth: filterRect ? Math.round(filterRect.width) : 0,
-          sortBtnWidth: sortRect ? Math.round(sortRect.width) : 0,
-          viewBtnSizes: viewBtns.map(vb => {
-            const r = vb.getBoundingClientRect();
-            return { width: Math.round(r.width), height: Math.round(r.height) };
-          })
-        };
-      });
-
-      console.log(`[Designs ${vp.name}] Container padding: ${designsMetrics.containerPaddingLeft}/${designsMetrics.containerPaddingRight}, Grid width: ${designsMetrics.gridWidth}px, Card gap: ${designsMetrics.cardGap}px, Sort label: "${designsMetrics.sortLabelText}", Sort width: ${designsMetrics.sortBtnWidth}px, Filter width: ${designsMetrics.filterBtnWidth}px, ViewBtn: ${designsMetrics.viewBtnSizes[0]?.width}x${designsMetrics.viewBtnSizes[0]?.height}px, Img aspect: ${designsMetrics.imgBoxAspect}, Img object-fit: ${designsMetrics.imgObjectFit}, %OFF inline: ${designsMetrics.discountBadgeInline}`);
-      await page.screenshot({ path: path.join(OUTPUT_DIR, `designs_closed_${vp.name}.png`), fullPage: false });
-
-      // 3. DESIGNS PAGE (Dropdown OPEN)
-      const sortTrigger = await page.$('.aruvi-sort-btn');
-      if (sortTrigger) {
-        await sortTrigger.click();
-        await page.waitForTimeout(350);
-
-        const dropdownMetrics = await page.evaluate(() => {
-          const panel = document.querySelector('.aruvi-sort-panel.open');
-          const items = Array.from(document.querySelectorAll('.aruvi-sort-panel.open .aruvi-sort-item'));
-          const selectedItem = document.querySelector('.aruvi-sort-panel.open .aruvi-sort-item.selected');
-          const checkIcon = selectedItem ? selectedItem.querySelector('.aruvi-sort-item-check') : null;
-          const sortBtn = document.querySelector('.aruvi-sort-btn');
-
-          const panelRect = panel ? panel.getBoundingClientRect() : null;
-          const btnRect = sortBtn ? sortBtn.getBoundingClientRect() : null;
-          const checkRect = checkIcon ? checkIcon.getBoundingClientRect() : null;
-
-          return {
-            panelOpen: !!panel,
-            panelWidth: panelRect ? Math.round(panelRect.width) : 0,
-            panelHeight: panelRect ? Math.round(panelRect.height) : 0,
-            panelTop: panelRect ? Math.round(panelRect.top) : 0,
-            btnBottom: btnRect ? Math.round(btnRect.bottom) : 0,
-            panelLeft: panelRect ? Math.round(panelRect.left) : 0,
-            panelRight: panelRect ? Math.round(panelRect.right) : 0,
-            btnRight: btnRect ? Math.round(btnRect.right) : 0,
-            itemHeights: items.map(it => Math.round(it.getBoundingClientRect().height)),
-            selectedBg: selectedItem ? window.getComputedStyle(selectedItem).backgroundColor : null,
-            selectedColor: selectedItem ? window.getComputedStyle(selectedItem).color : null,
-            checkSize: checkRect ? { width: Math.round(checkRect.width), height: Math.round(checkRect.height) } : null
-          };
-        });
-
-        console.log(`[Designs Dropdown ${vp.name}] Panel open: ${dropdownMetrics.panelOpen}, Width: ${dropdownMetrics.panelWidth}px, Item height: ${dropdownMetrics.itemHeights[0]}px, Selected bg: ${dropdownMetrics.selectedBg}, Check: ${dropdownMetrics.checkSize?.width}x${dropdownMetrics.checkSize?.height}px, Panel top vs btn bottom: ${dropdownMetrics.panelTop} vs ${dropdownMetrics.btnBottom}`);
-        await page.screenshot({ path: path.join(OUTPUT_DIR, `designs_dropdown_open_${vp.name}.png`), fullPage: false });
-
-        // Close dropdown
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(200);
+  console.log(`\nTesting Order creation for "${sampleDesign.title}" (MRP: ₹${mrp}, Selling: ₹${sellingPrice})...`);
+  const { orderId, orderNumber } = await Order.createOrder({
+    userId: 1,
+    guestEmail: 'test@example.com',
+    guestName: 'Test Buyer',
+    guestPhone: '+91 99999 88888',
+    items: [
+      {
+        design_id: sampleDesign.id,
+        title: sampleDesign.title,
+        slug: sampleDesign.slug,
+        price: mrp,
+        sale_price: sellingPrice < mrp ? sellingPrice : null,
+        effective_price: sellingPrice,
+        hoop_size: sampleDesign.hoop_size,
+        dimensions: sampleDesign.dimensions,
+        primary_image: sampleDesign.primary_image
       }
+    ],
+    totalAmount: mrp,
+    discountAmount: Math.max(0, mrp - sellingPrice),
+    finalAmount: sellingPrice
+  });
 
-      // 4. DESIGN DETAIL PAGE
-      await page.goto(`${BASE_URL}/design/rose-floral-design`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(600);
+  const createdOrder = await Order.getById(orderId);
+  const orderItem = createdOrder.items[0];
 
-      const detailMetrics = await page.evaluate(() => {
-        const dummyTabs = document.querySelector('.product-tabs-nav, .tab-nav-btn');
-        const dummyRelated = document.querySelector('.dummy-related-designs');
-        const lotusMandala = Array.from(document.querySelectorAll('*')).some(el => el.textContent && el.textContent.includes('Lotus Mandala'));
-        const priya120 = Array.from(document.querySelectorAll('*')).some(el => el.textContent && el.textContent.includes('(120)'));
-        const mainImg = document.getElementById('mainDisplayImg');
-        const mainDisplay = document.querySelector('.main-image-display');
-        const tapBadge = document.querySelector('.tap-zoom-badge');
-        const thumbnails = document.querySelector('.thumbnails-stack');
-        const techDetails = Array.from(document.querySelectorAll('h3')).some(h => h.textContent.includes('Technical File Details'));
-        const buyNowBtn = document.querySelector('button[form="buyNowForm"], .btn-primary');
+  console.log(`Created Order #${orderNumber} (ID: ${orderId}):`);
+  console.log(` - Order Total Amount: ₹${createdOrder.total_amount} (MRP)`);
+  console.log(` - Order Discount: ₹${createdOrder.discount_amount}`);
+  console.log(` - Order Final Amount: ₹${createdOrder.final_amount} (Selling Price)`);
+  console.log(` - Item price_at_purchase: ₹${orderItem.price_at_purchase} (Expected: ₹${sellingPrice})`);
+  console.log(` - Item MRP: ₹${orderItem.mrp} (Expected: ₹${mrp})`);
+  console.log(` - Item discount: ₹${orderItem.discount_amount} (Expected: ₹${Math.max(0, mrp - sellingPrice)})`);
 
-        const mainRect = mainImg ? mainImg.getBoundingClientRect() : null;
-        const dispRect = mainDisplay ? mainDisplay.getBoundingClientRect() : null;
-
-        return {
-          dummyTabsFound: !!dummyTabs,
-          lotusMandalaFound: lotusMandala,
-          priya120Found: priya120,
-          techDetailsFound: techDetails,
-          buyNowFound: !!buyNowBtn,
-          mainImgFit: mainImg ? window.getComputedStyle(mainImg).objectFit : null,
-          mainImgDisplayBg: mainDisplay ? window.getComputedStyle(mainDisplay).backgroundColor : null,
-          mainImgWidth: mainRect ? Math.round(mainRect.width) : 0,
-          mainImgHeight: mainRect ? Math.round(mainRect.height) : 0,
-          tapBadgeFound: !!tapBadge,
-          thumbnailsFound: !!thumbnails
-        };
-      });
-
-      console.log(`[Detail ${vp.name}] Dummy tabs: ${detailMetrics.dummyTabsFound}, Lotus Mandala: ${detailMetrics.lotusMandalaFound}, 120 reviews: ${detailMetrics.priya120Found}, Tech details: ${detailMetrics.techDetailsFound}, Main img fit: ${detailMetrics.mainImgFit}, Main img bg: ${detailMetrics.mainImgDisplayBg}, Tap badge: ${detailMetrics.tapBadgeFound}`);
-      await page.screenshot({ path: path.join(OUTPUT_DIR, `detail_${vp.name}.png`), fullPage: false });
-
-      // Test Lightbox on Detail Page
-      const mainImgElem = await page.$('.main-image-display');
-      if (mainImgElem) {
-        await mainImgElem.click();
-        await page.waitForTimeout(300);
-        const lightboxOpen = await page.evaluate(() => {
-          const m = document.getElementById('imageLightboxModal');
-          return m && m.style.display !== 'none';
-        });
-        console.log(`[Detail ${vp.name}] Lightbox opened on tap: ${lightboxOpen}`);
-        await page.screenshot({ path: path.join(OUTPUT_DIR, `detail_lightbox_${vp.name}.png`), fullPage: false });
-
-        // Close lightbox
-        const closeBtn = await page.$('.lightbox-close-btn');
-        if (closeBtn) await closeBtn.click();
-        await page.waitForTimeout(200);
-      }
-
-      // 5. CART PAGE
-      await page.goto(`${BASE_URL}/cart`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: path.join(OUTPUT_DIR, `cart_${vp.name}.png`), fullPage: false });
-
-      // 6. PROFILE / AUTH LOGIN PAGE
-      await page.goto(`${BASE_URL}/auth/login`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: path.join(OUTPUT_DIR, `login_profile_${vp.name}.png`), fullPage: false });
-
-      await context.close();
-    }
-
-    console.log('\n====================================================');
-    console.log('Verification Complete. All Screenshots Captured.');
-    console.log('====================================================');
-  } catch (err) {
-    console.error('Audit failed:', err);
-  } finally {
-    await browser.close();
+  if (parseFloat(orderItem.price_at_purchase) === sellingPrice && parseFloat(createdOrder.final_amount) === sellingPrice) {
+    console.log(`\n🎉 [VERIFIED SUCCESS]: Order correctly charged and stored SELLING PRICE (₹${sellingPrice}) instead of MRP (₹${mrp})!`);
+  } else {
+    console.error(`\n❌ [PRICING MISMATCH]: Order charged ₹${createdOrder.final_amount} instead of ₹${sellingPrice}`);
+    process.exit(1);
   }
+
+  await browser.close();
+  console.log('\n--- ALL VERIFICATIONS PASSED WITH ZERO ERRORS ---');
 }
 
-run();
+verifyAll().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

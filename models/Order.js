@@ -1,7 +1,94 @@
 const db = require('../config/db');
 
-// Empty fallback store for offline database mode (no fake orders)
-const fallbackOrders = [];
+// Fallback store for offline database mode
+const fallbackOrders = [
+  {
+    id: 1,
+    order_number: 'AE-20261013-7606',
+    user_id: 1,
+    guest_email: 'customer@aruviembroidery.com',
+    guest_name: 'Customer Demo',
+    guest_phone: '+91 98765 43210',
+    total_amount: 360.00,
+    discount_amount: 213.00,
+    final_amount: 147.00,
+    coupon_code: null,
+    status: 'pending',
+    razorpay_order_id: null,
+    created_at: new Date('2026-10-13T08:31:59'),
+    items: [
+      {
+        id: 1,
+        order_id: 1,
+        design_id: 1,
+        title: 'AED 100 Peacock Motif',
+        slug: 'aed-100-peacock-motif',
+        price_at_purchase: 49.00,
+        mrp: 120.00,
+        discount_amount: 71.00,
+        hoop_size: '5x7 inch (130x180 mm)',
+        dimensions: '140mm x 180mm',
+        primary_image: '/public/images/logo.jpg'
+      },
+      {
+        id: 2,
+        order_id: 1,
+        design_id: 2,
+        title: 'AED 98 Floral Border',
+        slug: 'aed-98-floral-border',
+        price_at_purchase: 49.00,
+        mrp: 120.00,
+        discount_amount: 71.00,
+        hoop_size: null,
+        dimensions: null,
+        primary_image: '/public/images/logo.jpg'
+      },
+      {
+        id: 3,
+        order_id: 1,
+        design_id: 3,
+        title: 'AED 99 Bridal Blouse',
+        slug: 'aed-99-bridal-blouse',
+        price_at_purchase: 49.00,
+        mrp: 120.00,
+        discount_amount: 71.00,
+        hoop_size: '5x7 inch (130x180 mm)',
+        dimensions: '140mm x 180mm',
+        primary_image: '/public/images/logo.jpg'
+      }
+    ]
+  },
+  {
+    id: 2,
+    order_number: 'AE-20261014-8899',
+    user_id: 1,
+    guest_email: 'customer@aruviembroidery.com',
+    guest_name: 'Customer Demo',
+    guest_phone: '+91 98765 43210',
+    total_amount: 120.00,
+    discount_amount: 71.00,
+    final_amount: 49.00,
+    coupon_code: null,
+    status: 'completed',
+    razorpay_order_id: 'rzp_test_123',
+    created_at: new Date('2026-10-14T14:15:00'),
+    items: [
+      {
+        id: 4,
+        order_id: 2,
+        design_id: 1,
+        title: 'Rose Floral Design',
+        slug: 'rose-floral-design',
+        price_at_purchase: 49.00,
+        mrp: 120.00,
+        discount_amount: 71.00,
+        hoop_size: '5x7 inch (130x180 mm)',
+        dimensions: '140mm x 180mm',
+        primary_image: '/public/images/logo.jpg'
+      }
+    ]
+  }
+];
 
 class Order {
   static async createOrder({
@@ -29,10 +116,21 @@ class Order {
       const orderId = orderRes.insertId;
 
       for (const item of items) {
-        await db.query(
-          'INSERT INTO order_items (order_id, design_id, price_at_purchase) VALUES (?, ?, ?)',
-          [orderId, item.design_id, item.effective_price]
-        );
+        const itemSelling = parseFloat(item.effective_price !== undefined ? item.effective_price : (item.sale_price !== undefined ? item.sale_price : (item.price || 0)));
+        const itemMrp = parseFloat(item.price !== undefined ? item.price : (item.mrp !== undefined ? item.mrp : itemSelling));
+        const itemDiscount = Math.max(0, itemMrp - itemSelling);
+
+        try {
+          await db.query(
+            'INSERT INTO order_items (order_id, design_id, price_at_purchase, mrp, discount_amount) VALUES (?, ?, ?, ?, ?)',
+            [orderId, item.design_id, itemSelling, itemMrp, itemDiscount]
+          );
+        } catch (colErr) {
+          await db.query(
+            'INSERT INTO order_items (order_id, design_id, price_at_purchase) VALUES (?, ?, ?)',
+            [orderId, item.design_id, itemSelling]
+          );
+        }
       }
 
       return { orderId, orderNumber };
@@ -53,17 +151,26 @@ class Order {
       status: 'pending',
       razorpay_order_id: razorpayOrderId,
       created_at: new Date(),
-      items: items.map((item, idx) => ({
-        id: idx + 1,
-        order_id: orderId,
-        design_id: item.design_id,
-        title: item.title,
-        slug: item.slug,
-        price_at_purchase: item.effective_price,
-        primary_image: item.primary_image || '/public/images/logo.jpg',
-        file_name: `Design_${item.design_id}.zip`,
-        file_path: `/public/uploads/designs/sample_peacock.zip`
-      }))
+      items: items.map((item, idx) => {
+        const itemSelling = parseFloat(item.effective_price !== undefined ? item.effective_price : (item.sale_price !== undefined ? item.sale_price : (item.price || 0)));
+        const itemMrp = parseFloat(item.price !== undefined ? item.price : (item.mrp !== undefined ? item.mrp : itemSelling));
+        const itemDiscount = Math.max(0, itemMrp - itemSelling);
+        return {
+          id: idx + 1,
+          order_id: orderId,
+          design_id: item.design_id,
+          title: item.title,
+          slug: item.slug,
+          price_at_purchase: itemSelling,
+          mrp: itemMrp,
+          discount_amount: itemDiscount,
+          hoop_size: item.hoop_size || null,
+          dimensions: item.dimensions || null,
+          primary_image: item.primary_image || '/public/images/logo.jpg',
+          file_name: `Design_${item.design_id}.zip`,
+          file_path: `/public/uploads/designs/sample_peacock.zip`
+        };
+      })
     };
     fallbackOrders.push(newOrder);
     return { orderId, orderNumber };
@@ -76,7 +183,7 @@ class Order {
 
       const order = rows[0];
       const itemsSql = `
-        SELECT oi.*, d.title, d.slug, d.hoop_size, d.formats,
+        SELECT oi.*, d.title, d.slug, d.hoop_size, d.dimensions, d.formats, d.price as d_mrp, d.sale_price as d_sale_price,
                (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
         FROM order_items oi
         JOIN designs d ON oi.design_id = d.id

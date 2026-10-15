@@ -107,6 +107,16 @@
             <span style="display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">9:00 AM - 6:00 PM (IST)</span>
           </div>
         </div>
+
+        <% if (typeof siteSettings !== 'undefined' && siteSettings.contact_address_line && siteSettings.contact_address_line.trim()) { %>
+          <div class="contact-info-item" style="display: flex; gap: 12px; align-items: flex-start;">
+            <div class="how-icon-box"><i class="fa-solid fa-location-dot"></i></div>
+            <div>
+              <strong style="display: block; font-size: 0.9rem; color: var(--text-dark); margin-bottom: 1px;">Studio Address</strong>
+              <span style="display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-dark);"><%= siteSettings.contact_address_line.trim() %></span>
+            </div>
+          </div>
+        <% } %>
       </div>
 
       <!-- Follow Us Social Links Row -->
@@ -141,20 +151,22 @@
 
     <!-- Column 3: Location Map & FAQs Accordion Stack -->
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-      <!-- Card 1: Our Location -->
-      <div class="summary-box-card" style="padding: 1.4rem;">
-        <div class="section-box-header" style="margin-bottom: 1rem; padding-bottom: 0.6rem;">
-          <div class="section-icon-badge" style="width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-location-dot"></i></div>
-          <div>
-            <h4 style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700;">Our Location</h4>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">We're based in India and serve customers worldwide.</span>
+      <% if (typeof siteSettings !== 'undefined' && siteSettings.show_contact_map === '1') { %>
+        <!-- Card 1: Our Location (Optional - Default OFF) -->
+        <div class="summary-box-card" style="padding: 1.4rem;">
+          <div class="section-box-header" style="margin-bottom: 1rem; padding-bottom: 0.6rem;">
+            <div class="section-icon-badge" style="width: 34px; height: 34px; font-size: 0.9rem;"><i class="fa-solid fa-location-dot"></i></div>
+            <div>
+              <h4 style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700;">Our Location</h4>
+              <span style="font-size: 0.75rem; color: var(--text-muted);"><%= (siteSettings.contact_address_line && siteSettings.contact_address_line.trim()) ? siteSettings.contact_address_line.trim() : "We're based in India and serve customers worldwide." %></span>
+            </div>
+          </div>
+
+          <div style="border-radius: 12px; overflow: hidden; border: 1px solid var(--border-light); height: 160px; position: relative;">
+            <img src="<%= siteSettings.contact_map_image || '/public/images/map_erode.jpg' %>" alt="ARUVI Embroidery Location Map" style="width: 100%; height: 100%; object-fit: cover;">
           </div>
         </div>
-
-        <div style="border-radius: 12px; overflow: hidden; border: 1px solid var(--border-light); height: 160px; position: relative;">
-          <img src="/public/images/map_erode.jpg" alt="ARUVI Embroidery Location Map" style="width: 100%; height: 100%; object-fit: cover;">
-        </div>
-      </div>
+      <% } %>
 
       <!-- Card 2: Frequently Asked Questions Accordion -->
       <div class="summary-box-card" style="padding: 1.4rem;">
@@ -186,36 +198,9 @@
     </div>
   </div>
 
-  <!-- Bottom Feature Pills Bar matching Reference -->
-  <div class="hero-feature-pills" style="margin-top: 4rem; background: #F6F1EA; border-radius: 16px; padding: 1.5rem 2rem;">
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-regular fa-gem"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">Premium Quality Designs</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">Crafted with precision</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">Instant Download</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">Get files immediately</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">100% Tested Machine Fills</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">Quality assured designs</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
-      </div>
-    </div>
+  <!-- Reusable Trust/Feature Cards Bar -->
+  <div style="margin-top: 3rem;">
+    <%- include('../partials/feature-cards') %>
   </div>
 </div>
 

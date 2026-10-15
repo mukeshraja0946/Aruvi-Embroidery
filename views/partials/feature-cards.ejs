@@ -1,0 +1,39 @@
+<%
+  const _s = (typeof siteSettings !== 'undefined' && siteSettings) ? siteSettings : ((typeof settings !== 'undefined' && settings) ? settings : {});
+  const featureCards = [
+    {
+      icon: _s.feature_card1_icon || 'fa-solid fa-award',
+      title: _s.feature_card1_title || 'Premium Quality',
+      subtitle: _s.feature_card1_subtitle || 'Crafted with precision'
+    },
+    {
+      icon: _s.feature_card2_icon || 'fa-solid fa-download',
+      title: _s.feature_card2_title || 'Instant Download',
+      subtitle: _s.feature_card2_subtitle || 'Get files immediately'
+    },
+    {
+      icon: _s.feature_card3_icon || 'fa-solid fa-shield-halved',
+      title: _s.feature_card3_title || '100% Tested',
+      subtitle: _s.feature_card3_subtitle || 'Quality assured designs'
+    },
+    {
+      icon: _s.feature_card4_icon || 'fa-solid fa-headset',
+      title: _s.feature_card4_title || 'Dedicated Support',
+      subtitle: _s.feature_card4_subtitle || "We're here to help you"
+    }
+  ];
+%>
+
+<div class="site-feature-cards-grid" id="siteFeatureCards">
+  <% featureCards.forEach(card => { %>
+    <div class="site-feature-card">
+      <div class="site-feature-card-icon">
+        <i class="<%= card.icon %>"></i>
+      </div>
+      <div class="site-feature-card-text">
+        <strong class="site-feature-card-title"><%= card.title %></strong>
+        <span class="site-feature-card-subtitle"><%= card.subtitle %></span>
+      </div>
+    </div>
+  <% }) %>
+</div>

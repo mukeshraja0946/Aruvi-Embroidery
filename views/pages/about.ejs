@@ -33,44 +33,18 @@
     </div>
   </div>
 
-  <!-- 4 Hero Feature Pills Bar -->
-  <div class="hero-feature-pills">
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-regular fa-gem"></i></div>
-      <div class="pill-text-wrap">
-        <strong>Premium Quality</strong>
-        <span>Carefully crafted designs</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
-      <div class="pill-text-wrap">
-        <strong>Instant Download</strong>
-        <span>Get files immediately</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
-      <div class="pill-text-wrap">
-        <strong>Tested Designs</strong>
-        <span>100% machine tested</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
-      <div class="pill-text-wrap">
-        <strong>Dedicated Support</strong>
-        <span>We're here to help you</span>
-      </div>
-    </div>
-  </div>
+  <!-- Reusable Trust/Feature Cards Bar -->
+  <%- include('../partials/feature-cards') %>
 
-  <!-- "Our Story" & Statistics Grid: 3-column desktop, stacked single-column on mobile -->
-  <div class="about-story-layout">
-    <!-- Story Image -->
-    <div class="story-image-card">
-      <img src="/public/images/cat_floral.jpg" alt="ARUVI Embroidery Craftsmanship">
-    </div>
+  <!-- "Our Story" & Statistics Grid: 2-column or 3-column depending on whether story image is enabled -->
+  <% const hasStoryImg = _settings.show_about_story_image === '1' && _settings.about_story_image; %>
+  <div class="about-story-layout <%= hasStoryImg ? 'has-image' : 'no-image' %>">
+    <% if (hasStoryImg) { %>
+      <!-- Optional Story Image -->
+      <div class="story-image-card">
+        <img src="<%= _settings.about_story_image %>" alt="ARUVI Embroidery Craftsmanship">
+      </div>
+    <% } %>
 
     <!-- Story Text Content -->
     <div class="story-text-content">

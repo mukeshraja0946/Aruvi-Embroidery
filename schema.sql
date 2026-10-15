@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS `order_items` (
   `design_id` INT NOT NULL,
   `quantity` INT DEFAULT 1,
   `price_at_purchase` DECIMAL(10,2) NOT NULL,
+  `mrp` DECIMAL(10,2) DEFAULT NULL,
+  `discount_amount` DECIMAL(10,2) DEFAULT 0.00,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`design_id`) REFERENCES `designs`(`id`) ON DELETE RESTRICT,

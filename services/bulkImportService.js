@@ -703,13 +703,17 @@ class BulkImportService {
 
           let targetDesignId = null;
 
+          const finalSalePrice = (item.sale_price !== undefined && item.sale_price !== null && item.sale_price !== '') 
+            ? item.sale_price 
+            : (item.salePrice !== undefined && item.salePrice !== null && item.salePrice !== '' ? item.salePrice : null);
+
           if (existingDesign && updateExisting) {
             // Update existing product (Never overwrite ratings or reviews)
             targetDesignId = existingDesign.id;
             await Design.update(targetDesignId, {
               title: item.title,
               price: item.price,
-              sale_price: item.salePrice,
+              sale_price: finalSalePrice,
               category_id: categoryId,
               formats: item.formats,
               description: item.description,
@@ -726,7 +730,7 @@ class BulkImportService {
               sku: finalSku,
               slug: finalSlug,
               price: item.price,
-              sale_price: item.salePrice,
+              sale_price: finalSalePrice,
               category_id: categoryId,
               formats: item.formats,
               description: item.description,

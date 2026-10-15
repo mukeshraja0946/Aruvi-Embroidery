@@ -94,7 +94,24 @@ const fallbackSettings = {
   about_vision_title: 'Our Vision',
   about_vision_text: 'To become a global leader in machine embroidery designs, known for quality, creativity, and excellent customer support.',
   about_values_title: 'Our Values',
-  about_values_text: 'Quality, Creativity, Customer Satisfaction and Continuous Innovation.'
+  about_values_text: 'Quality, Creativity, Customer Satisfaction and Continuous Innovation.',
+  show_about_story_image: '0',
+  about_story_image: '',
+  show_contact_map: '0',
+  contact_address_line: '',
+  contact_map_image: '',
+  feature_card1_title: 'Premium Quality',
+  feature_card1_subtitle: 'Crafted with precision',
+  feature_card1_icon: 'fa-solid fa-award',
+  feature_card2_title: 'Instant Download',
+  feature_card2_subtitle: 'Get files immediately',
+  feature_card2_icon: 'fa-solid fa-download',
+  feature_card3_title: '100% Tested',
+  feature_card3_subtitle: 'Quality assured designs',
+  feature_card3_icon: 'fa-solid fa-shield-halved',
+  feature_card4_title: 'Dedicated Support',
+  feature_card4_subtitle: "We're here to help you",
+  feature_card4_icon: 'fa-solid fa-headset'
 };
 
 class Setting {

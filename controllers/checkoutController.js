@@ -365,6 +365,76 @@ exports.createRazorpayOrder = async (req, res, next) => {
 };
 
 /**
+ * Reopens Razorpay payment for an existing pending order (Pay Now button).
+ */
+exports.reopenRazorpayOrder = async (req, res, next) => {
+  const refId = 'REF-REOPEN-' + Date.now().toString(36).toUpperCase();
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, requireLogin: true, message: 'Please log in to make a payment.', referenceId: refId });
+    }
+
+    const { order_id } = req.body;
+    if (!order_id) {
+      return res.status(400).json({ success: false, message: 'Order ID is required.', referenceId: refId });
+    }
+
+    const order = await Order.getById(order_id);
+    if (!order || (order.user_id !== req.user.id && req.user.role !== 'admin')) {
+      return res.status(404).json({ success: false, message: 'Order not found.', referenceId: refId });
+    }
+
+    if (order.status === 'completed' || order.status === 'paid') {
+      return res.json({ success: true, alreadyPaid: true, redirectUrl: `/user/orders/${order.id}` });
+    }
+
+    const amountInPaise = Math.round(Number(order.final_amount) * 100);
+    if (amountInPaise < 100) {
+      return res.status(400).json({ success: false, message: 'Order total must be at least ₹1 to process online payment.', referenceId: refId });
+    }
+
+    const { client: rzpClient, config: rzpConfig } = await getRazorpayClient();
+
+    const rzpOrder = await rzpClient.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: String(order.order_number).slice(0, 40),
+      notes: {
+        order_id: String(order.id),
+        customer_id: String(req.user.id),
+        order_number: String(order.order_number)
+      },
+      payment_capture: 1
+    });
+
+    if (db.isConnected()) {
+      await db.query('UPDATE orders SET razorpay_order_id = ? WHERE id = ?', [rzpOrder.id, order.id]);
+    }
+
+    res.json({
+      success: true,
+      key: rzpConfig.keyId,
+      amount: rzpOrder.amount,
+      currency: 'INR',
+      orderId: order.id,
+      orderNumber: order.order_number,
+      razorpayOrderId: rzpOrder.id,
+      customerName: req.user.full_name || order.guest_name,
+      customerEmail: req.user.email || order.guest_email,
+      customerPhone: req.user.phone || order.guest_phone,
+      finalTotal: order.final_amount
+    });
+  } catch (err) {
+    console.error(`[Reopen Razorpay Order Error] [${refId}]:`, err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initiate payment. Please contact support.',
+      referenceId: refId
+    });
+  }
+};
+
+/**
  * Verifies Razorpay payment signature via HMAC SHA256 and completes the order.
  */
 exports.verifyPayment = async (req, res, next) => {

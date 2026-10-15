@@ -240,6 +240,87 @@
           </div>
         </div>
 
+        <!-- Card 4: Trust / Feature Cards (Shared across Home, Custom Order & About) -->
+        <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;" id="feature-cards">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">4. Trust & Feature Cards</h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Shared 4-card trust bar across Homepage, Custom Order, and About pages. All text wraps gracefully on mobile without cutting off.</span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-rotate"></i> Synchronized Across Pages</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.2rem;">
+            <!-- Card 1 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-award"></i> Card 1</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card1_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card1_title) ? settings.feature_card1_title : 'Premium Quality' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card1_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card1_subtitle) ? settings.feature_card1_subtitle : 'Crafted with precision' %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card1_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card1_icon) ? settings.feature_card1_icon : 'fa-solid fa-award' %>">
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-download"></i> Card 2</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card2_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card2_title) ? settings.feature_card2_title : 'Instant Download' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card2_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card2_subtitle) ? settings.feature_card2_subtitle : 'Get files immediately' %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card2_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card2_icon) ? settings.feature_card2_icon : 'fa-solid fa-download' %>">
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-shield-halved"></i> Card 3</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card3_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card3_title) ? settings.feature_card3_title : '100% Tested' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card3_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card3_subtitle) ? settings.feature_card3_subtitle : 'Quality assured designs' %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card3_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card3_icon) ? settings.feature_card3_icon : 'fa-solid fa-shield-halved' %>">
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-headset"></i> Card 4</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card4_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card4_title) ? settings.feature_card4_title : 'Dedicated Support' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card4_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card4_subtitle) ? settings.feature_card4_subtitle : "We're here to help you" %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card4_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card4_icon) ? settings.feature_card4_icon : 'fa-solid fa-headset' %>">
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style="display: flex; justify-content: flex-end;">
           <button type="submit" class="btn btn-primary btn-lg" style="height: 48px; border-radius: 10px; font-weight: 600; padding: 0 2rem; display: inline-flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Homepage

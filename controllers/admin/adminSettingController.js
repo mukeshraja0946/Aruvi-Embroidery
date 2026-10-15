@@ -230,8 +230,26 @@ exports.postSettings = async (req, res, next) => {
       about_vision_title: b.about_vision_title !== undefined ? b.about_vision_title.trim() : undefined,
       about_vision_text: b.about_vision_text !== undefined ? b.about_vision_text.trim() : undefined,
       about_values_title: b.about_values_title !== undefined ? b.about_values_title.trim() : undefined,
-      about_values_text: b.about_values_text !== undefined ? b.about_values_text.trim() : undefined
+      about_values_text: b.about_values_text !== undefined ? b.about_values_text.trim() : undefined,
+      show_about_story_image: b.show_about_story_image === '1' ? '1' : '0',
+      show_contact_map: b.show_contact_map === '1' ? '1' : '0',
+      contact_address_line: b.contact_address_line !== undefined ? b.contact_address_line.trim() : undefined,
+      feature_card1_title: b.feature_card1_title !== undefined ? b.feature_card1_title.trim() : undefined,
+      feature_card1_subtitle: b.feature_card1_subtitle !== undefined ? b.feature_card1_subtitle.trim() : undefined,
+      feature_card1_icon: b.feature_card1_icon !== undefined ? b.feature_card1_icon.trim() : undefined,
+      feature_card2_title: b.feature_card2_title !== undefined ? b.feature_card2_title.trim() : undefined,
+      feature_card2_subtitle: b.feature_card2_subtitle !== undefined ? b.feature_card2_subtitle.trim() : undefined,
+      feature_card2_icon: b.feature_card2_icon !== undefined ? b.feature_card2_icon.trim() : undefined,
+      feature_card3_title: b.feature_card3_title !== undefined ? b.feature_card3_title.trim() : undefined,
+      feature_card3_subtitle: b.feature_card3_subtitle !== undefined ? b.feature_card3_subtitle.trim() : undefined,
+      feature_card3_icon: b.feature_card3_icon !== undefined ? b.feature_card3_icon.trim() : undefined,
+      feature_card4_title: b.feature_card4_title !== undefined ? b.feature_card4_title.trim() : undefined,
+      feature_card4_subtitle: b.feature_card4_subtitle !== undefined ? b.feature_card4_subtitle.trim() : undefined,
+      feature_card4_icon: b.feature_card4_icon !== undefined ? b.feature_card4_icon.trim() : undefined
     };
+
+    if (b.remove_about_story_image === '1') updates.about_story_image = '';
+    if (b.remove_contact_map_image === '1') updates.contact_map_image = '';
 
     if (logo_url) updates.logo_url = logo_url;
     if (mobile_logo_url) updates.mobile_logo_url = mobile_logo_url;
@@ -258,6 +276,16 @@ exports.postSettings = async (req, res, next) => {
         const file = req.files.favicon_image[0];
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
         updates.favicon_url = savedUrl;
+      }
+      if (req.files.about_story_image && req.files.about_story_image[0]) {
+        const file = req.files.about_story_image[0];
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        updates.about_story_image = savedUrl;
+      }
+      if (req.files.contact_map_image && req.files.contact_map_image[0]) {
+        const file = req.files.contact_map_image[0];
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        updates.contact_map_image = savedUrl;
       }
     }
 
@@ -310,7 +338,19 @@ exports.postHomepageEditor = async (req, res, next) => {
       hero_subtitle,
       stat_designs_count,
       stat_customers_count,
-      stat_rating
+      stat_rating,
+      feature_card1_title,
+      feature_card1_subtitle,
+      feature_card1_icon,
+      feature_card2_title,
+      feature_card2_subtitle,
+      feature_card2_icon,
+      feature_card3_title,
+      feature_card3_subtitle,
+      feature_card3_icon,
+      feature_card4_title,
+      feature_card4_subtitle,
+      feature_card4_icon
     } = req.body;
 
     const updates = {
@@ -320,7 +360,19 @@ exports.postHomepageEditor = async (req, res, next) => {
       hero_subtitle,
       stat_designs_count,
       stat_customers_count,
-      stat_rating
+      stat_rating,
+      feature_card1_title: feature_card1_title !== undefined ? feature_card1_title.trim() : undefined,
+      feature_card1_subtitle: feature_card1_subtitle !== undefined ? feature_card1_subtitle.trim() : undefined,
+      feature_card1_icon: feature_card1_icon !== undefined ? feature_card1_icon.trim() : undefined,
+      feature_card2_title: feature_card2_title !== undefined ? feature_card2_title.trim() : undefined,
+      feature_card2_subtitle: feature_card2_subtitle !== undefined ? feature_card2_subtitle.trim() : undefined,
+      feature_card2_icon: feature_card2_icon !== undefined ? feature_card2_icon.trim() : undefined,
+      feature_card3_title: feature_card3_title !== undefined ? feature_card3_title.trim() : undefined,
+      feature_card3_subtitle: feature_card3_subtitle !== undefined ? feature_card3_subtitle.trim() : undefined,
+      feature_card3_icon: feature_card3_icon !== undefined ? feature_card3_icon.trim() : undefined,
+      feature_card4_title: feature_card4_title !== undefined ? feature_card4_title.trim() : undefined,
+      feature_card4_subtitle: feature_card4_subtitle !== undefined ? feature_card4_subtitle.trim() : undefined,
+      feature_card4_icon: feature_card4_icon !== undefined ? feature_card4_icon.trim() : undefined
     };
 
     if (req.file) {

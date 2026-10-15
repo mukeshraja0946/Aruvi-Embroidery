@@ -1,26 +1,64 @@
 <%- include('../partials/header') %>
 
-<div class="container section">
+<%
+  function formatOrderDate(dateVal) {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    const day = d.getDate();
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = monthNames[d.getMonth()];
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
+  }
+
+  const isPaid = (order.status === 'completed' || order.status === 'paid' || order.payment_status === 'completed' || order.payment_status === 'PAID');
+  const isFailed = (order.status === 'failed' || order.status === 'cancelled' || order.payment_status === 'FAILED');
+  const isRefunded = (order.status === 'refunded' || order.payment_status === 'REFUNDED');
+  const isPending = !isPaid && !isFailed && !isRefunded;
+
+  let badgeClass = 'status-pending';
+  let badgeLabel = 'Pending';
+  if (isPaid) {
+    badgeClass = 'status-paid';
+    badgeLabel = 'Paid';
+  } else if (isFailed) {
+    badgeClass = 'status-failed';
+    badgeLabel = order.status === 'cancelled' ? 'Cancelled' : 'Failed';
+  } else if (isRefunded) {
+    badgeClass = 'status-refunded';
+    badgeLabel = 'Refunded';
+  }
+%>
+
+<div class="container section order-detail-container">
   <div style="margin-bottom: 1.5rem;">
-    <a href="/user/dashboard" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Back to Dashboard</a>
+    <a href="/user/dashboard#order-history" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Back to Orders</a>
   </div>
 
-  <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 2rem; box-shadow: var(--shadow-sm);">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--border-light); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-      <div>
-        <h2 style="font-size: 1.8rem; margin-bottom: 4px;">Order #<%= order.order_number %></h2>
-        <span style="color: var(--text-muted); font-size: 0.9rem;">Placed on <%= new Date(order.created_at).toLocaleString() %></span>
+  <div class="order-detail-card">
+    <!-- Order Header Card -->
+    <div class="order-header-box">
+      <div class="order-header-info">
+        <h2 class="order-number-title">Order #<%= order.order_number %></h2>
+        <span class="order-placed-date">Placed on <%= formatOrderDate(order.created_at) %></span>
       </div>
-      <div>
-        <span class="badge badge-<%= order.status === 'completed' ? 'success' : (order.status === 'pending' ? 'warning' : 'danger') %>" style="font-size: 0.9rem; padding: 6px 14px;">
-          <%= order.status %>
+      <div class="order-header-badge-wrap">
+        <span class="order-status-pill <%= badgeClass %>">
+          <i class="fa-solid fa-circle"></i> <%= badgeLabel %>
         </span>
       </div>
     </div>
 
-    <!-- Order Items Table -->
-    <h3 style="font-size: 1.15rem; margin-bottom: 1rem;">Items Included</h3>
-    <div class="table-responsive" style="margin-bottom: 2rem;">
+    <!-- Section Heading -->
+    <h3 class="order-items-heading">Items Included</h3>
+
+    <!-- Desktop Table View (>= 768px) -->
+    <div class="order-desktop-table-wrap">
       <table class="admin-table">
         <thead>
           <tr>
@@ -33,22 +71,28 @@
         <tbody>
           <% if (order.items && order.items.length > 0) { %>
             <% order.items.forEach(item => { %>
+              <%
+                const cleanTitle = item.title || item.slug || ('AED ' + (item.design_id || item.id));
+                const specText = item.hoop_size || item.dimensions || '';
+                const unitPrice = item.price_at_purchase !== undefined ? Number(item.price_at_purchase).toFixed(2) : (item.effective_price || item.price);
+              %>
               <tr>
                 <td>
                   <div style="display: flex; align-items: center; gap: 1rem;">
-                    <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= item.title %>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
+                    <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= cleanTitle %>" style="width: 50px; height: 50px; object-fit: contain; background: #FAF6F0; border-radius: 6px; border: 1px solid var(--border-light);">
                     <div>
-                      <strong><a href="/design/<%= item.slug %>" style="color: var(--text-dark);"><%= item.title %></a></strong>
+                      <strong><a href="/design/<%= item.slug %>" style="color: var(--text-dark);"><%= cleanTitle %></a></strong>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <span style="font-size: 0.82rem; color: var(--text-muted);"><%= item.hoop_size %></span>
+                  <% if (specText) { %>
+                    <span style="font-size: 0.82rem; color: var(--text-muted);"><%= specText %></span>
+                  <% } %>
                 </td>
-                <td><strong>₹<%= item.price_at_purchase %></strong></td>
+                <td><strong>₹<%= unitPrice %></strong></td>
                 <td style="text-align: right;">
-                  <% if (order.status === 'completed' || order.status === 'paid' || order.payment_status === 'completed' || order.payment_status === 'PAID') { %>
-                    <% const cleanTitle = item.title || item.slug || ('AED_' + (item.design_id || item.id)); %>
+                  <% if (isPaid) { %>
                     <a href="/user/download/<%= item.design_id || item.id %>" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
                       <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
                     </a>
@@ -63,24 +107,179 @@
       </table>
     </div>
 
+    <!-- Mobile Stacked Item Cards View (< 768px) -->
+    <div class="order-mobile-items-list">
+      <% if (order.items && order.items.length > 0) { %>
+        <% order.items.forEach(item => { %>
+          <%
+            const cleanTitle = item.title || item.slug || ('AED ' + (item.design_id || item.id));
+            const specText = item.hoop_size || item.dimensions || '';
+            const unitPrice = item.price_at_purchase !== undefined ? Number(item.price_at_purchase).toFixed(2) : (item.effective_price || item.price);
+          %>
+          <div class="order-m-item-card">
+            <!-- Row: 64px thumbnail on left, Title/Specs/Price on right -->
+            <div class="order-m-item-row">
+              <div class="order-m-item-thumb">
+                <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= cleanTitle %>">
+              </div>
+              <div class="order-m-item-details">
+                <a href="/design/<%= item.slug %>" class="order-m-item-title"><%= cleanTitle %></a>
+                <% if (specText) { %>
+                  <span class="order-m-item-spec"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> <%= specText %></span>
+                <% } %>
+                <div class="order-m-item-price">₹<%= unitPrice %></div>
+              </div>
+            </div>
+
+            <!-- Download or Unlock Area below -->
+            <div class="order-m-item-action">
+              <% if (isPaid) { %>
+                <a href="/user/download/<%= item.design_id || item.id %>" download class="order-m-download-btn">
+                  <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
+                </a>
+              <% } else { %>
+                <div class="order-m-locked-text">
+                  <i class="fa-solid fa-lock"></i> Unlocks after payment
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+
     <!-- Summary Box -->
-    <div style="max-width: 350px; margin-left: auto; background: var(--bg-soft); padding: 1.2rem; border-radius: var(--radius-sm);">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+    <div class="order-summary-box">
+      <div class="order-summary-row">
         <span>Subtotal Amount:</span>
-        <strong>₹<%= order.total_amount %></strong>
+        <strong>₹<%= Number(order.total_amount).toFixed(2) %></strong>
       </div>
       <% if (order.discount_amount > 0) { %>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; color: var(--success);">
+        <div class="order-summary-row discount-row">
           <span>Discount Applied:</span>
-          <strong>- ₹<%= order.discount_amount %></strong>
+          <strong>- ₹<%= Number(order.discount_amount).toFixed(2) %></strong>
         </div>
       <% } %>
-      <div style="display: flex; justify-content: space-between; padding-top: 0.8rem; border-top: 1px solid var(--border-light); font-size: 1.15rem;">
-        <strong>Total Paid:</strong>
-        <strong style="color: var(--primary);">₹<%= order.final_amount %></strong>
+      <div class="order-summary-row total-row">
+        <strong><%= isPaid ? 'Total Paid:' : 'Total Due:' %></strong>
+        <strong class="total-amount-val">₹<%= Number(order.final_amount).toFixed(2) %></strong>
       </div>
+
+      <% if (isPending) { %>
+        <div class="order-pay-now-wrap">
+          <button type="button" id="payNowBtn" onclick="reopenPayment(<%= order.id %>)" class="btn btn-primary btn-block order-pay-now-btn">
+            <i class="fa-solid fa-credit-card"></i> Pay Now (₹<%= Number(order.final_amount).toFixed(2) %>)
+          </button>
+          <div id="payErrorMsg" style="color: #9B1C1C; font-size: 0.8rem; margin-top: 6px; display: none;"></div>
+        </div>
+      <% } %>
     </div>
   </div>
 </div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  async function reopenPayment(orderId) {
+    const btn = document.getElementById('payNowBtn');
+    const errMsg = document.getElementById('payErrorMsg');
+    if (errMsg) errMsg.style.display = 'none';
+
+    btn.disabled = true;
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing Payment...';
+
+    try {
+      const res = await fetch('/api/payment/reopen-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ order_id: orderId })
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to initialize payment.');
+      }
+
+      if (data.alreadyPaid) {
+        window.location.reload();
+        return;
+      }
+
+      const options = {
+        key: data.key,
+        amount: data.amount,
+        currency: data.currency || 'INR',
+        name: 'ARUVI Embroidery Studio',
+        description: 'Order #' + data.orderNumber,
+        image: '/public/images/logo.jpg',
+        order_id: data.razorpayOrderId,
+        prefill: {
+          name: data.customerName || '',
+          email: data.customerEmail || '',
+          contact: data.customerPhone || ''
+        },
+        theme: {
+          color: '#A93226'
+        },
+        handler: async function(response) {
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying Payment...';
+          try {
+            const verifyRes = await fetch('/checkout/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                order_id: orderId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (verifyData.success) {
+              window.location.reload();
+            } else {
+              throw new Error(verifyData.message || 'Payment verification failed.');
+            }
+          } catch (vErr) {
+            alert('Payment recorded. Updating order...');
+            window.location.reload();
+          }
+        },
+        modal: {
+          ondismiss: function() {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+          }
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.on('payment.failed', function(response) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (errMsg) {
+          errMsg.textContent = 'Payment failed: ' + (response.error.description || 'Transaction cancelled.');
+          errMsg.style.display = 'block';
+        }
+      });
+      rzp.open();
+
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+      if (errMsg) {
+        errMsg.textContent = err.message || 'Could not connect to payment gateway.';
+        errMsg.style.display = 'block';
+      }
+    }
+  }
+</script>
 
 <%- include('../partials/footer') %>

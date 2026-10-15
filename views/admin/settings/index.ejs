@@ -278,6 +278,23 @@
             <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Studio Location Address</label>
             <textarea name="address" rows="3" class="form-control" placeholder="e.g. Erode, Tamil Nadu, 638001, India"><%= (typeof settings !== 'undefined' && settings.address !== undefined) ? settings.address : '' %></textarea>
           </div>
+
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-top: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark);">Contact Page Location Card & Map</strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Enable or disable the "Our Location" card with map on the Contact Us page (Default: OFF).</span>
+              </div>
+              <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; gap: 8px;">
+                <input type="checkbox" name="show_contact_map" value="1" <%= (typeof settings !== 'undefined' && settings.show_contact_map === '1') ? 'checked' : '' %> style="width: 18px; height: 18px;">
+                <span style="font-size: 0.85rem; font-weight: 600;">Show location/map</span>
+              </label>
+            </div>
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Short Address Line (shows only if filled)</label>
+              <input type="text" name="contact_address_line" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.contact_address_line) ? settings.contact_address_line : '' %>" placeholder="e.g. Erode, Tamil Nadu, India">
+            </div>
+          </div>
         </div>
 
         <!-- Card 3: UPI Payment Details for QR Code -->
@@ -488,6 +505,34 @@
               <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Our Story Paragraph 2</label>
               <textarea name="about_story_p2" class="form-control" rows="2" style="height: auto; padding: 0.8rem;"><%= (typeof settings !== 'undefined' && settings.about_story_p2) ? settings.about_story_p2 : 'We believe embroidery is more than just a craft — it\'s a way to express creativity, culture, and individuality. Our mission is to provide unique, high-quality, and easy-to-use machine embroidery designs that help you bring your creative ideas to life.' %></textarea>
             </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-top: 0.5rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark);">About Page Story Image</strong>
+                  <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Enable or disable the story image below the story text (Default: OFF).</span>
+                </div>
+                <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; gap: 8px;">
+                  <input type="checkbox" name="show_about_story_image" value="1" <%= (typeof settings !== 'undefined' && settings.show_about_story_image === '1') ? 'checked' : '' %> style="width: 18px; height: 18px;">
+                  <span style="font-size: 0.85rem; font-weight: 600;">Show story image</span>
+                </label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <% if (typeof settings !== 'undefined' && settings.about_story_image) { %>
+                  <div style="width: 100px; height: 70px; border-radius: 8px; overflow: hidden; border: 1px solid var(--admin-border);">
+                    <img id="aboutStoryPreview" src="<%= settings.about_story_image %>" alt="Story Image" style="width: 100%; height: 100%; object-fit: cover;">
+                  </div>
+                <% } else { %>
+                  <div style="width: 100px; height: 70px; border-radius: 8px; overflow: hidden; border: 1px solid var(--admin-border); background: #eee; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #888;">
+                    No Image
+                  </div>
+                <% } %>
+                <div style="flex: 1; min-width: 200px;">
+                  <input type="file" name="about_story_image" id="aboutStoryInput" accept="image/*" class="form-control" style="padding: 6px;" onchange="previewImg(this, 'aboutStoryPreview')">
+                  <small style="display: block; font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Upload custom story image (JPG, PNG, WEBP).</small>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Stats Calculation Mode -->
@@ -591,6 +636,87 @@
                 </div>
                 <input type="checkbox" name="show_design_related" value="1" <%= (typeof settings !== 'undefined' && settings.show_design_related === '1') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
               </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 8: Trust / Feature Cards (Shared across Home, Custom Order & About) -->
+        <div id="feature-cards-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">Trust & Feature Cards</h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Shared 4-card trust bar across Homepage, Custom Order, and About pages. All text wraps gracefully on mobile without cutting off.</span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-rotate"></i> Synchronized Across Pages</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.2rem;">
+            <!-- Card 1 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-award"></i> Card 1</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card1_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card1_title) ? settings.feature_card1_title : 'Premium Quality' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card1_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card1_subtitle) ? settings.feature_card1_subtitle : 'Crafted with precision' %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card1_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card1_icon) ? settings.feature_card1_icon : 'fa-solid fa-award' %>">
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-download"></i> Card 2</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card2_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card2_title) ? settings.feature_card2_title : 'Instant Download' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card2_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card2_subtitle) ? settings.feature_card2_subtitle : 'Get files immediately' %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card2_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card2_icon) ? settings.feature_card2_icon : 'fa-solid fa-download' %>">
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-shield-halved"></i> Card 3</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card3_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card3_title) ? settings.feature_card3_title : '100% Tested' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card3_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card3_subtitle) ? settings.feature_card3_subtitle : 'Quality assured designs' %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card3_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card3_icon) ? settings.feature_card3_icon : 'fa-solid fa-shield-halved' %>">
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-primary); margin-bottom: 8px;"><i class="fa-solid fa-headset"></i> Card 4</strong>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Title</label>
+                <input type="text" name="feature_card4_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card4_title) ? settings.feature_card4_title : 'Dedicated Support' %>">
+              </div>
+              <div style="margin-bottom: 8px;">
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">Subtitle</label>
+                <input type="text" name="feature_card4_subtitle" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card4_subtitle) ? settings.feature_card4_subtitle : "We're here to help you" %>">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 4px;">FontAwesome Icon Class</label>
+                <input type="text" name="feature_card4_icon" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.feature_card4_icon) ? settings.feature_card4_icon : 'fa-solid fa-headset' %>">
+              </div>
             </div>
           </div>
         </div>

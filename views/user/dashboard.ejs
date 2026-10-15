@@ -1054,7 +1054,7 @@
                   const rawFmts = item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : ['DST'];
                   const formatsList = [...new Set(rawFmts)];
                   const pDate = item.purchase_date ? new Date(item.purchase_date).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US');
-                  const hoopText = item.hoop_size || '5x7 inch (130x180 mm)';
+                  const hoopText = item.hoop_size || item.dimensions || null;
                 %>
                 <div class="dash-purchased-item-card">
                   <div>
@@ -1064,9 +1064,11 @@
                       <div class="dash-item-meta-info">
                         <h3 class="dash-item-title" title="<%= cleanTitle %>"><%= cleanTitle %></h3>
                         <div class="dash-item-order-no">Order #<%= item.order_number || 'AE-2026' %></div>
-                        <div class="dash-item-spec">
-                          <i class="fa-solid fa-up-right-and-down-left-from-center"></i> <%= hoopText %>
-                        </div>
+                        <% if (hoopText) { %>
+                          <div class="dash-item-spec">
+                            <i class="fa-solid fa-up-right-and-down-left-from-center"></i> <%= hoopText %>
+                          </div>
+                        <% } %>
                         <div class="dash-item-spec">
                           <i class="fa-regular fa-calendar"></i> Purchased on <%= pDate %>
                         </div>
