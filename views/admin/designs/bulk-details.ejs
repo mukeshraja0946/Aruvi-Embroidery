@@ -750,6 +750,9 @@ Description: Intricate peacock border embroidery pattern for sarees and lehengas
       const fChanged = item.changes.includes('Front Stitch Count');
       const bChanged = item.changes.includes('Back Stitch Count');
       const sChanged = item.changes.includes('Sleeve Stitch Count');
+      const totalPr = (item.proposed.stitch_count !== null && item.proposed.stitch_count !== undefined) 
+        ? Number(item.proposed.stitch_count).toLocaleString() 
+        : ((fPr !== '—' || bPr !== '—' || sPr !== '—') ? '<span style="color:#C62828; font-style:italic;">Incomplete</span>' : '—');
 
       tr.innerHTML = `
         <td style="color: #888; font-weight: 600;">${item.rowNumber}</td>
@@ -773,6 +776,7 @@ Description: Intricate peacock border embroidery pattern for sarees and lehengas
           <div><strong style="color: #666;">F:</strong> <span style="${fChanged ? 'font-weight: 700; color: #2E7D32;' : ''}">${fPr}</span> ${fChanged ? `<span style="text-decoration: line-through; color: #999; font-size: 0.75rem;">(${fEx})</span>` : ''}</div>
           <div><strong style="color: #666;">B:</strong> <span style="${bChanged ? 'font-weight: 700; color: #2E7D32;' : ''}">${bPr}</span> ${bChanged ? `<span style="text-decoration: line-through; color: #999; font-size: 0.75rem;">(${bEx})</span>` : ''}</div>
           <div><strong style="color: #666;">S:</strong> <span style="${sChanged ? 'font-weight: 700; color: #2E7D32;' : ''}">${sPr}</span> ${sChanged ? `<span style="text-decoration: line-through; color: #999; font-size: 0.75rem;">(${sEx})</span>` : ''}</div>
+          <div style="margin-top: 3px; border-top: 1px dashed #E0D7CD; padding-top: 2px;"><strong style="color: var(--admin-primary);">Total:</strong> <span>${totalPr}</span></div>
         </td>
         <td>
           <div class="desc-preview-text" id="descPreview_${item.rowNumber}">${item.proposed.description || '<span style="color: #999; font-style: italic;">(Empty)</span>'}</div>

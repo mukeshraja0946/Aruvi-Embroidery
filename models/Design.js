@@ -843,7 +843,16 @@ class Design {
     const frontStitchVal = parseStitch(stitch_count_front);
     const backStitchVal = parseStitch(stitch_count_back);
     const sleeveStitchVal = parseStitch(stitch_count_sleeve);
-    const mainStitchVal = parseStitch(stitch_count) || (frontStitchVal || 0) + (backStitchVal || 0) + (sleeveStitchVal || 0) || null;
+    
+    // Strict calculation rule: Total = Front + Back + Sleeve only when all three exist
+    let mainStitchVal = null;
+    if (frontStitchVal !== null && backStitchVal !== null && sleeveStitchVal !== null) {
+      mainStitchVal = frontStitchVal + backStitchVal + sleeveStitchVal;
+    } else if (frontStitchVal === null && backStitchVal === null && sleeveStitchVal === null) {
+      mainStitchVal = parseStitch(stitch_count);
+    } else {
+      mainStitchVal = null;
+    }
 
     let insertedId = null;
 
@@ -991,6 +1000,24 @@ class Design {
     const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : undefined;
     const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : undefined;
 
+    const frontStitchVal = parseStitch(stitch_count_front);
+    const backStitchVal = parseStitch(stitch_count_back);
+    const sleeveStitchVal = parseStitch(stitch_count_sleeve);
+
+    let computedStitchCount = parseStitch(stitch_count);
+    if (computedStitchCount === undefined && (frontStitchVal !== undefined || backStitchVal !== undefined || sleeveStitchVal !== undefined)) {
+      const existing = fallbackDesigns.find(d => d.id == id);
+      const f = frontStitchVal !== undefined ? frontStitchVal : (existing ? existing.stitch_count_front : null);
+      const b = backStitchVal !== undefined ? backStitchVal : (existing ? existing.stitch_count_back : null);
+      const s = sleeveStitchVal !== undefined ? sleeveStitchVal : (existing ? existing.stitch_count_sleeve : null);
+
+      if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
+        computedStitchCount = Number(f) + Number(b) + Number(s);
+      } else {
+        computedStitchCount = null;
+      }
+    }
+
     if (db.isConnected()) {
       try {
         let updateFields = [];
@@ -1024,21 +1051,21 @@ class Design {
           updateFields.push('hoop_size=?');
           updateParams.push(hoop_size || null);
         }
-        if (stitch_count !== undefined) {
+        if (computedStitchCount !== undefined) {
           updateFields.push('stitch_count=?');
-          updateParams.push(parseStitch(stitch_count));
+          updateParams.push(computedStitchCount);
         }
-        if (stitch_count_front !== undefined) {
+        if (frontStitchVal !== undefined) {
           updateFields.push('stitch_count_front=?');
-          updateParams.push(parseStitch(stitch_count_front));
+          updateParams.push(frontStitchVal);
         }
-        if (stitch_count_back !== undefined) {
+        if (backStitchVal !== undefined) {
           updateFields.push('stitch_count_back=?');
-          updateParams.push(parseStitch(stitch_count_back));
+          updateParams.push(backStitchVal);
         }
-        if (stitch_count_sleeve !== undefined) {
+        if (sleeveStitchVal !== undefined) {
           updateFields.push('stitch_count_sleeve=?');
-          updateParams.push(parseStitch(stitch_count_sleeve));
+          updateParams.push(sleeveStitchVal);
         }
         if (description !== undefined) {
           updateFields.push('description=?');
@@ -1110,11 +1137,10 @@ class Design {
       if (price !== undefined) target.price = parseFloat(price);
       if (sale_price !== undefined) target.sale_price = sale_price !== null && sale_price !== '' ? parseFloat(sale_price) : null;
       if (category_id !== undefined) target.category_id = category_id ? parseInt(category_id) : null;
-      if (hoop_size !== undefined) target.hoop_size = hoop_size;
-      if (stitch_count !== undefined) target.stitch_count = parseStitch(stitch_count);
-      if (stitch_count_front !== undefined) target.stitch_count_front = parseStitch(stitch_count_front);
-      if (stitch_count_back !== undefined) target.stitch_count_back = parseStitch(stitch_count_back);
-      if (stitch_count_sleeve !== undefined) target.stitch_count_sleeve = parseStitch(stitch_count_sleeve);
+      if (computedStitchCount !== undefined) target.stitch_count = computedStitchCount;
+      if (frontStitchVal !== undefined) target.stitch_count_front = frontStitchVal;
+      if (backStitchVal !== undefined) target.stitch_count_back = backStitchVal;
+      if (sleeveStitchVal !== undefined) target.stitch_count_sleeve = sleeveStitchVal;
       if (description !== undefined) target.description = description || null;
       if (dimensions !== undefined) target.dimensions = dimensions;
       if (formats !== undefined) target.formats = formats;

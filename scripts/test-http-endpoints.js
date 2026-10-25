@@ -187,10 +187,10 @@ async function runHttpTests() {
       assert(customerPageRes.body.includes('9,600'), 'Must display Back stitch count 9,600');
       assert(customerPageRes.body.includes('5,200'), 'Must display Sleeve stitch count 5,200');
       assert(customerPageRes.body.includes('30,200'), 'Must display auto-calculated Total stitch count 30,200');
-      assert(customerPageRes.body.includes('Stitch Type') && customerPageRes.body.includes('Count'), 'Must display Stitch Type and Count table');
+      assert(!customerPageRes.body.includes('stitch-table-box'), 'Duplicate stitch table must be removed');
       assert(customerPageRes.body.includes('Bespoke bridal embroidery design'), 'Must display Description');
       assert(!customerPageRes.body.includes('included-files-sidebar'), 'Unwanted sidebar card must be removed completely');
-      console.log('✅ Customer Design Details displays 4 stitch counts, Stitch Type / Count table, Details section, and unwanted card removed!');
+      console.log('✅ Customer Design Details displays 4 stitch cards, calculated Total, Details section, duplicate table removed!');
 
       // 4b. Test a design with missing component counts (only Front and explicit Total)
       const seedMissingId = await Design.create({

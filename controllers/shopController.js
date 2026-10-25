@@ -312,9 +312,41 @@ exports.getDesignApi = async (req, res, next) => {
     const discountPrice = design.sale_price !== null && design.sale_price !== undefined ? parseFloat(design.sale_price) : originalPrice;
     const discountPercentage = (originalPrice > 0 && originalPrice > discountPrice) ? Math.round(((originalPrice - discountPrice) / originalPrice) * 100) : 0;
 
+    const parseNum = (val) => {
+      if (val === null || val === undefined) return null;
+      const clean = String(val).replace(/,/g, '').trim();
+      if (clean === '') return null;
+      const n = parseInt(clean, 10);
+      return (!isNaN(n) && n >= 0) ? n : null;
+    };
+
+    const frontStitches = parseNum(design.stitch_count_front);
+    const backStitches = parseNum(design.stitch_count_back);
+    const sleeveStitches = parseNum(design.stitch_count_sleeve);
+
+    const allComponentsValid = frontStitches !== null && backStitches !== null && sleeveStitches !== null;
+    const anyComponentValid = frontStitches !== null || backStitches !== null || sleeveStitches !== null;
+
+    let calculatedTotal = null;
+    let stitchStatus = 'not_available';
+
+    if (allComponentsValid) {
+      calculatedTotal = frontStitches + backStitches + sleeveStitches;
+      stitchStatus = 'complete';
+    } else if (anyComponentValid) {
+      stitchStatus = 'incomplete';
+    } else if (design.stitch_count !== null && design.stitch_count !== undefined) {
+      const legacyTotal = parseNum(design.stitch_count);
+      if (legacyTotal !== null) {
+        calculatedTotal = legacyTotal;
+        stitchStatus = 'complete';
+      }
+    }
+
     return res.json({
       id: design.id,
       name: design.title,
+      title: design.title,
       sku: design.sku,
       category,
       originalPrice,
@@ -323,6 +355,19 @@ exports.getDesignApi = async (req, res, next) => {
       status: design.is_active ? 'active' : 'inactive',
       featured: Boolean(design.is_featured),
       trending: Boolean(design.is_trending),
+      stitch_count: calculatedTotal,
+      stitch_count_front: frontStitches,
+      stitch_count_back: backStitches,
+      stitch_count_sleeve: sleeveStitches,
+      stitchCount: calculatedTotal,
+      stitchCountFront: frontStitches,
+      stitchCountBack: backStitches,
+      stitchCountSleeve: sleeveStitches,
+      stitchCountStatus: stitchStatus,
+      description: design.description || null,
+      dimensions: design.dimensions || design.hoop_size || null,
+      hoop_size: design.hoop_size || null,
+      formats: design.formats || null,
       files,
       previewImage: design.primary_image
     });

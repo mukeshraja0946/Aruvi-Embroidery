@@ -255,23 +255,44 @@
 
           <!-- Stitch Count Breakdown (Front, Back, Sleeve, Total) -->
           <%
-            const frontVal = (design.stitch_count_front !== null && design.stitch_count_front !== undefined && design.stitch_count_front !== '') ? parseInt(design.stitch_count_front) : null;
-            const backVal = (design.stitch_count_back !== null && design.stitch_count_back !== undefined && design.stitch_count_back !== '') ? parseInt(design.stitch_count_back) : null;
-            const sleeveVal = (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined && design.stitch_count_sleeve !== '') ? parseInt(design.stitch_count_sleeve) : null;
-            const savedTotalVal = (design.stitch_count !== null && design.stitch_count !== undefined && design.stitch_count !== '') ? parseInt(design.stitch_count) : null;
+            const parseNum = (val) => {
+              if (val === null || val === undefined) return null;
+              const clean = String(val).replace(/,/g, '').trim();
+              if (clean === '') return null;
+              const n = parseInt(clean, 10);
+              return (!isNaN(n) && n >= 0) ? n : null;
+            };
 
-            const hasFront = frontVal !== null && !isNaN(frontVal);
-            const hasBack = backVal !== null && !isNaN(backVal);
-            const hasSleeve = sleeveVal !== null && !isNaN(sleeveVal);
+            const frontVal = parseNum(design.stitch_count_front);
+            const backVal = parseNum(design.stitch_count_back);
+            const sleeveVal = parseNum(design.stitch_count_sleeve);
+
+            const hasFront = frontVal !== null;
+            const hasBack = backVal !== null;
+            const hasSleeve = sleeveVal !== null;
             const allComponentsAvailable = hasFront && hasBack && hasSleeve;
             const anyComponentAvailable = hasFront || hasBack || hasSleeve;
 
+            // Total Stitch Count = Front + Back + Sleeve
+            // If all three component values are provided, calculate total.
+            // If any component is missing, show as "Incomplete".
+            // Do not use a previously saved total when it conflicts with component counts.
             let finalTotal = null;
-            if (savedTotalVal !== null && !isNaN(savedTotalVal) && savedTotalVal > 0) {
-              finalTotal = savedTotalVal;
-            } else if (allComponentsAvailable) {
+            let totalDisplayState = 'none'; // 'calculated', 'incomplete', 'legacy', 'none'
+
+            if (allComponentsAvailable) {
               finalTotal = frontVal + backVal + sleeveVal;
+              totalDisplayState = 'calculated';
+            } else if (anyComponentAvailable) {
+              totalDisplayState = 'incomplete';
+            } else if (design.stitch_count !== null && design.stitch_count !== undefined) {
+              const legacyTotal = parseNum(design.stitch_count);
+              if (legacyTotal !== null) {
+                finalTotal = legacyTotal;
+                totalDisplayState = 'legacy';
+              }
             }
+
             const hasAnyStitchData = anyComponentAvailable || (finalTotal !== null);
           %>
 
@@ -282,7 +303,7 @@
 
             <% if (hasAnyStitchData) { %>
               <!-- 4-Card Responsive Grid: 4 in row on desktop, 2-col on mobile -->
-              <div class="stitch-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1rem;">
+              <div class="stitch-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 0.5rem;">
                 <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
                   <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Front</span>
                   <% if (hasFront) { %>
@@ -312,42 +333,17 @@
 
                 <div class="stitch-stat-card stitch-total-card" style="background: #F4EBE1; border: 2px solid var(--primary); border-radius: 10px; padding: 0.85rem 1rem;">
                   <span style="font-size: 0.74rem; color: var(--primary); display: block; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;">Total Stitch Count</span>
-                  <% if (finalTotal !== null) { %>
+                  <% if (totalDisplayState === 'calculated' && finalTotal !== null) { %>
+                    <strong style="font-size: 1.2rem; color: var(--primary); display: block; margin-top: 2px;"><%= Number(finalTotal).toLocaleString() %> <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">stitches</span></strong>
+                  <% } else if (totalDisplayState === 'incomplete') { %>
+                    <span style="font-size: 0.95rem; color: #C62828; font-weight: 700; display: block; margin-top: 2px;">Incomplete</span>
+                    <span style="font-size: 0.7rem; color: var(--text-muted); display: block;">Requires all 3 components</span>
+                  <% } else if (totalDisplayState === 'legacy' && finalTotal !== null) { %>
                     <strong style="font-size: 1.2rem; color: var(--primary); display: block; margin-top: 2px;"><%= Number(finalTotal).toLocaleString() %> <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">stitches</span></strong>
                   <% } else { %>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not available</span>
                   <% } %>
                 </div>
-              </div>
-
-              <!-- Suggested Stitch Count Table -->
-              <div class="stitch-table-box" style="max-width: 460px; margin-top: 0.4rem;">
-                <table style="width: 100%; border-collapse: separate; border-spacing: 0; background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; overflow: hidden; font-size: 0.88rem;">
-                  <thead>
-                    <tr style="background: #EFE6D9; border-bottom: 1px solid var(--border-light);">
-                      <th style="padding: 9px 14px; text-align: left; font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dark);">Stitch Type</th>
-                      <th style="padding: 9px 14px; text-align: right; font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dark);">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr style="border-bottom: 1px solid #EFE6D9;">
-                      <td style="padding: 9px 14px; color: var(--text-dark); font-weight: 500;">Front</td>
-                      <td style="padding: 9px 14px; text-align: right; font-weight: 600; color: var(--text-dark);"><%= hasFront ? Number(frontVal).toLocaleString() : '-' %></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EFE6D9;">
-                      <td style="padding: 9px 14px; color: var(--text-dark); font-weight: 500;">Back</td>
-                      <td style="padding: 9px 14px; text-align: right; font-weight: 600; color: var(--text-dark);"><%= hasBack ? Number(backVal).toLocaleString() : '-' %></td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid #EFE6D9;">
-                      <td style="padding: 9px 14px; color: var(--text-dark); font-weight: 500;">Sleeve</td>
-                      <td style="padding: 9px 14px; text-align: right; font-weight: 600; color: var(--text-dark);"><%= hasSleeve ? Number(sleeveVal).toLocaleString() : '-' %></td>
-                    </tr>
-                    <tr style="background: #F4EBE1; font-weight: 700;">
-                      <td style="padding: 10px 14px; color: var(--text-dark); font-weight: 700;">Total</td>
-                      <td style="padding: 10px 14px; text-align: right; color: var(--primary); font-weight: 800; font-size: 1rem;"><%= finalTotal !== null ? Number(finalTotal).toLocaleString() : '-' %></td>
-                    </tr>
-                  </tbody>
-                </table>
               </div>
             <% } else { %>
               <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0; font-style: italic;">Stitch count details not specified for this design.</p>

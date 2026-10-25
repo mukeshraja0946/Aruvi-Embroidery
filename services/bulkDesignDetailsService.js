@@ -519,6 +519,16 @@ class BulkDesignDetailsService {
         }
       }
 
+      // Calculate proposed Total Stitch Count (Front + Back + Sleeve)
+      const effFront = proposed.stitch_count_front !== undefined ? proposed.stitch_count_front : existing.stitch_count_front;
+      const effBack = proposed.stitch_count_back !== undefined ? proposed.stitch_count_back : existing.stitch_count_back;
+      const effSleeve = proposed.stitch_count_sleeve !== undefined ? proposed.stitch_count_sleeve : existing.stitch_count_sleeve;
+      if (effFront !== null && effFront !== undefined && effBack !== null && effBack !== undefined && effSleeve !== null && effSleeve !== undefined) {
+        proposed.stitch_count = Number(effFront) + Number(effBack) + Number(effSleeve);
+      } else {
+        proposed.stitch_count = null;
+      }
+
       // Determine Status
       let status = 'ready';
       if (errors.length > 0) {
@@ -631,6 +641,8 @@ class BulkDesignDetailsService {
         const s = updatePayload.stitch_count_sleeve !== undefined ? updatePayload.stitch_count_sleeve : item.existing.stitch_count_sleeve;
         if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
           updatePayload.stitch_count = Number(f) + Number(b) + Number(s);
+        } else {
+          updatePayload.stitch_count = null;
         }
 
         await Design.update(item.designId, updatePayload);

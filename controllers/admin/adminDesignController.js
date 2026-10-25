@@ -215,7 +215,10 @@ function checkIsAjax(req) {
 }
 
 function validateStitchCount(value, fieldName) {
-  if (value === undefined || value === null || String(value).trim() === '') {
+  if (value === undefined) {
+    return { valid: true, value: undefined };
+  }
+  if (value === null || String(value).trim() === '') {
     return { valid: true, value: null };
   }
   const clean = String(value).replace(/,/g, '').trim();
@@ -291,16 +294,19 @@ exports.postCreate = async (req, res, next) => {
       req.flash('error', sleeveCheck.error);
       return res.redirect('back');
     }
-    const totalCheck = validateStitchCount(stitch_count, 'Total Stitch Count');
-    if (!totalCheck.valid) {
-      if (isAjax) return res.status(400).json({ success: false, message: totalCheck.error });
-      req.flash('error', totalCheck.error);
-      return res.redirect('back');
-    }
 
-    let finalTotalStitches = totalCheck.value;
-    if (finalTotalStitches === undefined && frontCheck.value !== undefined && backCheck.value !== undefined && sleeveCheck.value !== undefined) {
-      finalTotalStitches = (frontCheck.value || 0) + (backCheck.value || 0) + (sleeveCheck.value || 0);
+    // Strict Calculation: Total Stitch Count = Front + Back + Sleeve
+    // If all three component counts are valid non-negative numbers, calculate the exact sum.
+    // If any component count is missing, do not silently treat it as zero. Total is null (incomplete).
+    const hasFront = frontCheck.value !== null && frontCheck.value !== undefined;
+    const hasBack = backCheck.value !== null && backCheck.value !== undefined;
+    const hasSleeve = sleeveCheck.value !== null && sleeveCheck.value !== undefined;
+
+    let finalTotalStitches = null;
+    if (hasFront && hasBack && hasSleeve) {
+      finalTotalStitches = Number(frontCheck.value) + Number(backCheck.value) + Number(sleeveCheck.value);
+    } else {
+      finalTotalStitches = null;
     }
 
     // SKU Auto-generation & Uniqueness Validation
@@ -513,24 +519,32 @@ exports.postEdit = async (req, res, next) => {
       req.flash('error', sleeveCheck.error);
       return res.redirect('back');
     }
-    const totalCheck = validateStitchCount(stitch_count, 'Total Stitch Count');
-    if (!totalCheck.valid) {
-      if (isAjax) return res.status(400).json({ success: false, message: totalCheck.error });
-      req.flash('error', totalCheck.error);
-      return res.redirect('back');
-    }
-
-    let finalTotalVal = totalCheck.value !== undefined ? totalCheck.value : undefined;
-    if (finalTotalVal === undefined && frontCheck.value !== undefined && backCheck.value !== undefined && sleeveCheck.value !== undefined) {
-      finalTotalVal = (frontCheck.value || 0) + (backCheck.value || 0) + (sleeveCheck.value || 0);
-    }
-
     const existingDesign = await Design.getById(id);
     if (!existingDesign) {
       const errMsg = 'Design record not found.';
       if (isAjax) return res.status(404).json({ success: false, message: errMsg });
       req.flash('error', errMsg);
       return res.redirect('/admin/designs');
+    }
+
+    // Determine effective component counts
+    const effectiveFront = frontCheck.value !== undefined ? frontCheck.value : existingDesign.stitch_count_front;
+    const effectiveBack = backCheck.value !== undefined ? backCheck.value : existingDesign.stitch_count_back;
+    const effectiveSleeve = sleeveCheck.value !== undefined ? sleeveCheck.value : existingDesign.stitch_count_sleeve;
+
+    const hasEffFront = effectiveFront !== null && effectiveFront !== undefined;
+    const hasEffBack = effectiveBack !== null && effectiveBack !== undefined;
+    const hasEffSleeve = effectiveSleeve !== null && effectiveSleeve !== undefined;
+
+    // Strict Calculation: Total Stitch Count = Front + Back + Sleeve
+    // If all three component values are present, total is their exact sum.
+    // If any component is missing, do not silently treat it as zero. Total is null (incomplete).
+    // Do not use a previously saved total when it conflicts with current component counts.
+    let finalTotalVal = null;
+    if (hasEffFront && hasEffBack && hasEffSleeve) {
+      finalTotalVal = Number(effectiveFront) + Number(effectiveBack) + Number(effectiveSleeve);
+    } else {
+      finalTotalVal = null;
     }
 
     // SKU Uniqueness Validation
@@ -578,7 +592,7 @@ exports.postEdit = async (req, res, next) => {
       sale_price: sellingPrice,
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || existingDesign.hoop_size || null,
-      stitch_count: finalTotalVal !== undefined ? finalTotalVal : (existingDesign.stitch_count || null),
+      stitch_count: finalTotalVal,
       stitch_count_front: frontCheck.value !== undefined ? frontCheck.value : (existingDesign.stitch_count_front || null),
       stitch_count_back: backCheck.value !== undefined ? backCheck.value : (existingDesign.stitch_count_back || null),
       stitch_count_sleeve: sleeveCheck.value !== undefined ? sleeveCheck.value : (existingDesign.stitch_count_sleeve || null),
