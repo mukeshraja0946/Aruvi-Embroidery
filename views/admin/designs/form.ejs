@@ -263,21 +263,21 @@
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1.2rem;">
                 <div>
                   <label class="form-label-custom">Front Stitch Count</label>
-                  <input type="number" min="0" step="1" name="stitch_count_front" id="stitchFrontInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_front !== null && design.stitch_count_front !== undefined ? design.stitch_count_front : (design.frontStitchCount !== null && design.frontStitchCount !== undefined ? design.frontStitchCount : '')) %>" placeholder="e.g. 12000" oninput="autoCalculateTotalStitches()">
+                  <input type="text" inputmode="numeric" pattern="[0-9,]*" name="stitch_count_front" id="stitchFrontInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_front !== null && design.stitch_count_front !== undefined ? Number(design.stitch_count_front).toLocaleString() : (design.frontStitchCount !== null && design.frontStitchCount !== undefined ? Number(design.frontStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 12,000" oninput="autoCalculateTotalStitches()">
                   <input type="hidden" name="frontStitchCount" id="frontStitchCountHidden" value="<%= design && (design.stitch_count_front !== null && design.stitch_count_front !== undefined ? design.stitch_count_front : (design.frontStitchCount !== null && design.frontStitchCount !== undefined ? design.frontStitchCount : '')) %>">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Front neck / bodice</span>
                 </div>
 
                 <div>
                   <label class="form-label-custom">Back Stitch Count</label>
-                  <input type="number" min="0" step="1" name="stitch_count_back" id="stitchBackInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_back !== null && design.stitch_count_back !== undefined ? design.stitch_count_back : (design.backStitchCount !== null && design.backStitchCount !== undefined ? design.backStitchCount : '')) %>" placeholder="e.g. 7500" oninput="autoCalculateTotalStitches()">
+                  <input type="text" inputmode="numeric" pattern="[0-9,]*" name="stitch_count_back" id="stitchBackInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_back !== null && design.stitch_count_back !== undefined ? Number(design.stitch_count_back).toLocaleString() : (design.backStitchCount !== null && design.backStitchCount !== undefined ? Number(design.backStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 7,500" oninput="autoCalculateTotalStitches()">
                   <input type="hidden" name="backStitchCount" id="backStitchCountHidden" value="<%= design && (design.stitch_count_back !== null && design.stitch_count_back !== undefined ? design.stitch_count_back : (design.backStitchCount !== null && design.backStitchCount !== undefined ? design.backStitchCount : '')) %>">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Back neck pattern</span>
                 </div>
 
                 <div>
                   <label class="form-label-custom">Sleeve Stitch Count</label>
-                  <input type="number" min="0" step="1" name="stitch_count_sleeve" id="stitchSleeveInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : (design.sleeveStitchCount !== null && design.sleeveStitchCount !== undefined ? design.sleeveStitchCount : '')) %>" placeholder="e.g. 5300" oninput="autoCalculateTotalStitches()">
+                  <input type="text" inputmode="numeric" pattern="[0-9,]*" name="stitch_count_sleeve" id="stitchSleeveInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? Number(design.stitch_count_sleeve).toLocaleString() : (design.sleeveStitchCount !== null && design.sleeveStitchCount !== undefined ? Number(design.sleeveStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 5,300" oninput="autoCalculateTotalStitches()">
                   <input type="hidden" name="sleeveStitchCount" id="sleeveStitchCountHidden" value="<%= design && (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : (design.sleeveStitchCount !== null && design.sleeveStitchCount !== undefined ? design.sleeveStitchCount : '')) %>">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Sleeve / arm border</span>
                 </div>
@@ -1214,7 +1214,11 @@
         const formData = new FormData(form);
         formData.append('is_ajax', '1');
         if (isDraft) {
-          formData.append('status_draft', '1');
+          formData.set('status_draft', '1');
+          formData.set('is_active', '0');
+        } else {
+          formData.delete('status_draft');
+          formData.set('is_active', '1');
         }
 
         const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '';
@@ -1262,19 +1266,19 @@
             const sVal = data.design.sleeveStitchCount ?? data.design.stitch_count_sleeve;
             const tVal = data.design.totalStitchCount ?? data.design.stitch_count;
 
-            if (fVal !== undefined && fVal !== null) {
+            if (fVal !== undefined && fVal !== null && fVal !== '') {
               const el = document.getElementById('stitchFrontInput');
-              if (el) el.value = fVal;
+              if (el) el.value = Number(fVal).toLocaleString();
             }
-            if (bVal !== undefined && bVal !== null) {
+            if (bVal !== undefined && bVal !== null && bVal !== '') {
               const el = document.getElementById('stitchBackInput');
-              if (el) el.value = bVal;
+              if (el) el.value = Number(bVal).toLocaleString();
             }
-            if (sVal !== undefined && sVal !== null) {
+            if (sVal !== undefined && sVal !== null && sVal !== '') {
               const el = document.getElementById('stitchSleeveInput');
-              if (el) el.value = sVal;
+              if (el) el.value = Number(sVal).toLocaleString();
             }
-            if (tVal !== undefined && tVal !== null) {
+            if (tVal !== undefined && tVal !== null && tVal !== '') {
               const el = document.getElementById('stitchCountTotalHidden');
               if (el) el.value = tVal;
             }
@@ -1290,9 +1294,34 @@
             flashAlert.style.display = 'flex';
           }
 
-          setTimeout(() => {
-            window.location.href = data.redirectUrl || '/admin/designs';
-          }, 600);
+          // If a new design was created, update action and navigate to edit page
+          if (data.redirectUrl) {
+            form.setAttribute('action', data.redirectUrl + '?_csrf=' + encodeURIComponent(csrfToken));
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, '', data.redirectUrl);
+            }
+
+            if (!window.location.pathname.includes('/edit/')) {
+              setTimeout(() => {
+                window.location.href = data.redirectUrl;
+              }, 800);
+            } else {
+              setTimeout(() => {
+                if (publishBtn) {
+                  publishBtn.disabled = false;
+                  publishBtn.innerHTML = '<i class="fa-regular fa-paper-plane"></i> Publish Design';
+                  publishBtn.style.background = '';
+                  publishBtn.style.borderColor = '';
+                }
+                if (draftBtn) {
+                  draftBtn.disabled = false;
+                  draftBtn.innerHTML = '<i class="fa-regular fa-file"></i> Save as Draft';
+                  draftBtn.style.background = '';
+                  draftBtn.style.borderColor = '';
+                }
+              }, 1500);
+            }
+          }
         } else {
           if (data && data.redirectUrl && (response.status === 401 || response.status === 403 || (data.message && data.message.includes('expired')))) {
             const flashAlert = document.getElementById('formFlashMessage');

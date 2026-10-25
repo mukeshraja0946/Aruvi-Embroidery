@@ -351,7 +351,7 @@ exports.postCreate = async (req, res, next) => {
       return res.redirect('back');
     }
 
-    const finalActiveState = status_draft ? 0 : (is_active ? 1 : 0);
+    const finalActiveState = (status_draft === '1' || status_draft === 1 || status_draft === true) ? 0 : 1;
     
     // Process uploaded ZIP package
     const packageFiles = processUploadedFilesAndArchives(req.files);
@@ -433,6 +433,7 @@ exports.postCreate = async (req, res, next) => {
           id: savedDesign ? savedDesign.id : designId,
           title: savedDesign ? savedDesign.title : title,
           sku: savedDesign ? savedDesign.sku : finalSku,
+          slug: savedDesign ? savedDesign.slug : slug,
           frontStitchCount: savedDesign ? (savedDesign.frontStitchCount ?? savedDesign.stitch_count_front) : frontCheck.value,
           backStitchCount: savedDesign ? (savedDesign.backStitchCount ?? savedDesign.stitch_count_back) : backCheck.value,
           sleeveStitchCount: savedDesign ? (savedDesign.sleeveStitchCount ?? savedDesign.stitch_count_sleeve) : sleeveCheck.value,
@@ -615,7 +616,7 @@ exports.postEdit = async (req, res, next) => {
       return res.redirect('back');
     }
 
-    const finalActiveState = status_draft ? 0 : (is_active ? 1 : 0);
+    const finalActiveState = (status_draft === '1' || status_draft === 1 || status_draft === true) ? 0 : 1;
 
     // Process uploaded ZIP package
     const packageFiles = processUploadedFilesAndArchives(req.files);
@@ -700,6 +701,7 @@ exports.postEdit = async (req, res, next) => {
           id: savedDesign ? savedDesign.id : id,
           title: savedDesign ? savedDesign.title : title,
           sku: savedDesign ? savedDesign.sku : finalSku,
+          slug: savedDesign ? savedDesign.slug : finalSlug,
           frontStitchCount: savedDesign ? (savedDesign.frontStitchCount ?? savedDesign.stitch_count_front) : effectiveFront,
           backStitchCount: savedDesign ? (savedDesign.backStitchCount ?? savedDesign.stitch_count_back) : effectiveBack,
           sleeveStitchCount: savedDesign ? (savedDesign.sleeveStitchCount ?? savedDesign.stitch_count_sleeve) : effectiveSleeve,

@@ -4,8 +4,35 @@ const fs = require('fs');
 const AdmZip = require('adm-zip');
 const storage = require('../config/storage');
 
-// Persistent empty fallback store (no fake dummy products or fake download counts)
-const fallbackDesigns = [];
+const fallbackFilePath = path.join(__dirname, '..', 'public', 'uploads', 'fallback_designs.json');
+
+function loadFallbackDesigns() {
+  try {
+    if (fs.existsSync(fallbackFilePath)) {
+      const raw = fs.readFileSync(fallbackFilePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[FallbackStore Load Warning]:', err.message);
+  }
+  return [];
+}
+
+function saveFallbackDesigns(designs) {
+  try {
+    const dir = path.dirname(fallbackFilePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(fallbackFilePath, JSON.stringify(designs, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[FallbackStore Save Warning]:', err.message);
+  }
+}
+
+// Persistent fallback store (survives restarts in local offline fallback mode)
+const fallbackDesigns = loadFallbackDesigns();
 
 class Design {
   static async getAll({
@@ -597,9 +624,35 @@ class Design {
     return d;
   }
 
+  static async ensureDatabaseColumns() {
+    if (!db.isConnected()) return;
+    try {
+      const [columns] = await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'designs'"
+      );
+      const colNames = (columns || []).map(c => c.column_name ? c.column_name.toLowerCase() : '');
+
+      if (!colNames.includes('stitch_count_front')) {
+        await db.query("ALTER TABLE `designs` ADD COLUMN `stitch_count_front` INT DEFAULT NULL AFTER `stitch_count`").catch(e => console.warn('[DB Col Add Front]:', e.message));
+      }
+      if (!colNames.includes('stitch_count_back')) {
+        await db.query("ALTER TABLE `designs` ADD COLUMN `stitch_count_back` INT DEFAULT NULL AFTER `stitch_count_front`").catch(e => console.warn('[DB Col Add Back]:', e.message));
+      }
+      if (!colNames.includes('stitch_count_sleeve')) {
+        await db.query("ALTER TABLE `designs` ADD COLUMN `stitch_count_sleeve` INT DEFAULT NULL AFTER `stitch_count_back`").catch(e => console.warn('[DB Col Add Sleeve]:', e.message));
+      }
+      if (!colNames.includes('description')) {
+        await db.query("ALTER TABLE `designs` ADD COLUMN `description` TEXT DEFAULT NULL AFTER `slug`").catch(e => console.warn('[DB Col Add Desc]:', e.message));
+      }
+    } catch (err) {
+      console.warn('[Design.ensureDatabaseColumns Warning]:', err.message);
+    }
+  }
+
   static async repairExistingStitchCounts() {
     if (db.isConnected()) {
       try {
+        await this.ensureDatabaseColumns();
         // 1. Recalculate totals where all three component values are present
         await db.query(`
           UPDATE designs 
@@ -637,6 +690,7 @@ class Design {
       }
       this.normalizeStitchCounts(d);
     }
+    saveFallbackDesigns(fallbackDesigns);
   }
 
   static getCategoryAbbreviation(categoryNameOrSlug) {
@@ -1061,6 +1115,7 @@ class Design {
     } else {
       fallbackDesigns.unshift(newDesign);
     }
+    saveFallbackDesigns(fallbackDesigns);
 
     return insertedId;
   }
@@ -1220,6 +1275,7 @@ class Design {
         }
       } catch (err) {
         console.error('[Design.update DB Error]:', err.message);
+        throw err;
       }
     }
 
@@ -1260,6 +1316,7 @@ class Design {
       if (avgRatingVal !== undefined) target.average_rating = avgRatingVal;
       if (revCountVal !== undefined) target.reviews_count = revCountVal;
     }
+    saveFallbackDesigns(fallbackDesigns);
     return true;
   }
 
@@ -1710,6 +1767,7 @@ class Design {
     if (idx !== -1) {
       fallbackDesigns.splice(idx, 1);
     }
+    saveFallbackDesigns(fallbackDesigns);
     return true;
   }
 
@@ -1726,6 +1784,7 @@ class Design {
       }
     }
     fallbackDesigns.length = 0;
+    saveFallbackDesigns(fallbackDesigns);
     return true;
   }
 
