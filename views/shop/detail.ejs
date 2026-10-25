@@ -263,9 +263,9 @@
               return (!isNaN(n) && n >= 0) ? n : null;
             };
 
-            const frontVal = parseNum(design.stitch_count_front);
-            const backVal = parseNum(design.stitch_count_back);
-            const sleeveVal = parseNum(design.stitch_count_sleeve);
+            const frontVal = parseNum(design.stitch_count_front !== undefined ? design.stitch_count_front : design.frontStitchCount);
+            const backVal = parseNum(design.stitch_count_back !== undefined ? design.stitch_count_back : design.backStitchCount);
+            const sleeveVal = parseNum(design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : design.sleeveStitchCount);
 
             const hasFront = frontVal !== null;
             const hasBack = backVal !== null;
@@ -287,6 +287,12 @@
               totalDisplayState = 'incomplete';
             } else if (design.stitch_count !== null && design.stitch_count !== undefined) {
               const legacyTotal = parseNum(design.stitch_count);
+              if (legacyTotal !== null) {
+                finalTotal = legacyTotal;
+                totalDisplayState = 'legacy';
+              }
+            } else if (design.totalStitchCount !== null && design.totalStitchCount !== undefined) {
+              const legacyTotal = parseNum(design.totalStitchCount);
               if (legacyTotal !== null) {
                 finalTotal = legacyTotal;
                 totalDisplayState = 'legacy';

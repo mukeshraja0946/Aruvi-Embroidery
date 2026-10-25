@@ -149,6 +149,7 @@ class Design {
           // Post-process designs to derive formats and human file sizes
           for (const d of designs) {
             this.normalizePrimaryImage(d);
+            this.normalizeStitchCounts(d);
             if (d.machine_file_size) {
               const b = parseInt(d.machine_file_size, 10);
               if (b >= 1024 * 1024) d.machine_file_size_formatted = (b / (1024 * 1024)).toFixed(1) + ' MB';
@@ -210,6 +211,7 @@ class Design {
     // Compute dynamic formats and check images for fallback designs
     for (const d of filtered) {
       this.normalizePrimaryImage(d);
+      this.normalizeStitchCounts(d);
       const mFiles = (d.files || []).filter(f => !f.is_preview && !['PNG','JPG','JPEG','WEBP','IMAGE'].includes((f.file_format||'').toUpperCase()));
       if (mFiles.length > 0) {
         d.formats = [...new Set(mFiles.map(f => (f.file_format || f.file_name.split('.').pop() || '').toUpperCase()).filter(Boolean))].join(', ');
@@ -394,6 +396,7 @@ class Design {
           // Attach zipPackage metadata & sync formats
           this.attachZipPackage(design);
           this.normalizePrimaryImage(design);
+          this.normalizeStitchCounts(design);
 
           return design;
         }
@@ -405,6 +408,7 @@ class Design {
     const d = fallbackDesigns.find(item => item.slug === slug || item.id == slug);
     if (!d) return null;
     this.attachZipPackage(d);
+    this.normalizeStitchCounts(d);
     return d;
   }
 
@@ -557,6 +561,82 @@ class Design {
     }
 
     return d;
+  }
+
+  static normalizeStitchCounts(d) {
+    if (!d) return d;
+    const parseNum = (v) => {
+      if (v === null || v === undefined || v === '') return null;
+      const clean = String(v).replace(/,/g, '').trim();
+      const n = parseInt(clean, 10);
+      return (!isNaN(n) && n >= 0) ? n : null;
+    };
+
+    const f = parseNum(d.stitch_count_front !== undefined ? d.stitch_count_front : d.frontStitchCount);
+    const b = parseNum(d.stitch_count_back !== undefined ? d.stitch_count_back : d.backStitchCount);
+    const s = parseNum(d.stitch_count_sleeve !== undefined ? d.stitch_count_sleeve : d.sleeveStitchCount);
+
+    let t = null;
+    if (f !== null && b !== null && s !== null) {
+      t = f + b + s;
+    } else if (f === null && b === null && s === null) {
+      t = parseNum(d.stitch_count !== undefined ? d.stitch_count : d.totalStitchCount);
+    } else {
+      t = null;
+    }
+
+    d.stitch_count_front = f;
+    d.frontStitchCount = f;
+    d.stitch_count_back = b;
+    d.backStitchCount = b;
+    d.stitch_count_sleeve = s;
+    d.sleeveStitchCount = s;
+    d.stitch_count = t;
+    d.totalStitchCount = t;
+
+    return d;
+  }
+
+  static async repairExistingStitchCounts() {
+    if (db.isConnected()) {
+      try {
+        // 1. Recalculate totals where all three component values are present
+        await db.query(`
+          UPDATE designs 
+          SET stitch_count = (stitch_count_front + stitch_count_back + stitch_count_sleeve)
+          WHERE stitch_count_front IS NOT NULL 
+            AND stitch_count_back IS NOT NULL 
+            AND stitch_count_sleeve IS NOT NULL
+            AND (stitch_count IS NULL OR stitch_count != (stitch_count_front + stitch_count_back + stitch_count_sleeve))
+        `);
+
+        // 2. Set stitch_count to NULL when component counts are incomplete (some present, but not all 3)
+        await db.query(`
+          UPDATE designs 
+          SET stitch_count = NULL 
+          WHERE (stitch_count_front IS NOT NULL OR stitch_count_back IS NOT NULL OR stitch_count_sleeve IS NOT NULL)
+            AND (stitch_count_front IS NULL OR stitch_count_back IS NULL OR stitch_count_sleeve IS NULL)
+            AND stitch_count IS NOT NULL
+        `);
+      } catch (err) {
+        console.warn('[Stitch Count Repair Warning]:', err.message);
+      }
+    }
+
+    // Synchronize in-memory fallback store safely
+    for (const d of fallbackDesigns) {
+      const f = d.stitch_count_front !== undefined ? d.stitch_count_front : d.frontStitchCount;
+      const b = d.stitch_count_back !== undefined ? d.stitch_count_back : d.backStitchCount;
+      const s = d.stitch_count_sleeve !== undefined ? d.stitch_count_sleeve : d.sleeveStitchCount;
+      if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
+        d.stitch_count = Number(f) + Number(b) + Number(s);
+        d.totalStitchCount = d.stitch_count;
+      } else if (f !== null && f !== undefined || b !== null && b !== undefined || s !== null && s !== undefined) {
+        d.stitch_count = null;
+        d.totalStitchCount = null;
+      }
+      this.normalizeStitchCounts(d);
+    }
   }
 
   static getCategoryAbbreviation(categoryNameOrSlug) {
@@ -840,16 +920,21 @@ class Design {
     const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : 4.80;
     const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : 0;
 
-    const frontStitchVal = parseStitch(stitch_count_front);
-    const backStitchVal = parseStitch(stitch_count_back);
-    const sleeveStitchVal = parseStitch(stitch_count_sleeve);
+    const rawFront = data.stitch_count_front !== undefined ? data.stitch_count_front : (data.frontStitchCount !== undefined ? data.frontStitchCount : data.front_stitch_count);
+    const rawBack = data.stitch_count_back !== undefined ? data.stitch_count_back : (data.backStitchCount !== undefined ? data.backStitchCount : data.back_stitch_count);
+    const rawSleeve = data.stitch_count_sleeve !== undefined ? data.stitch_count_sleeve : (data.sleeveStitchCount !== undefined ? data.sleeveStitchCount : data.sleeve_stitch_count);
+    const rawTotal = data.stitch_count !== undefined ? data.stitch_count : (data.totalStitchCount !== undefined ? data.totalStitchCount : data.total_stitch_count);
+
+    const frontStitchVal = parseStitch(rawFront);
+    const backStitchVal = parseStitch(rawBack);
+    const sleeveStitchVal = parseStitch(rawSleeve);
     
     // Strict calculation rule: Total = Front + Back + Sleeve only when all three exist
     let mainStitchVal = null;
     if (frontStitchVal !== null && backStitchVal !== null && sleeveStitchVal !== null) {
       mainStitchVal = frontStitchVal + backStitchVal + sleeveStitchVal;
     } else if (frontStitchVal === null && backStitchVal === null && sleeveStitchVal === null) {
-      mainStitchVal = parseStitch(stitch_count);
+      mainStitchVal = parseStitch(rawTotal);
     } else {
       mainStitchVal = null;
     }
@@ -948,9 +1033,13 @@ class Design {
       category_slug: 'blouse-designs',
       hoop_size: hoop_size || null,
       stitch_count: mainStitchVal,
+      totalStitchCount: mainStitchVal,
       stitch_count_front: frontStitchVal,
+      frontStitchCount: frontStitchVal,
       stitch_count_back: backStitchVal,
+      backStitchCount: backStitchVal,
       stitch_count_sleeve: sleeveStitchVal,
+      sleeveStitchCount: sleeveStitchVal,
       dimensions: dimensions || null,
       formats: formats || 'DST, PES, JEF, EXP',
       is_featured: is_featured ? 1 : 0,
@@ -964,6 +1053,7 @@ class Design {
       images: [],
       files: []
     };
+    this.normalizeStitchCounts(newDesign);
 
     const existingIdx = fallbackDesigns.findIndex(d => d.id == insertedId);
     if (existingIdx !== -1) {
@@ -1000,16 +1090,21 @@ class Design {
     const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : undefined;
     const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : undefined;
 
-    const frontStitchVal = parseStitch(stitch_count_front);
-    const backStitchVal = parseStitch(stitch_count_back);
-    const sleeveStitchVal = parseStitch(stitch_count_sleeve);
+    const rawFront = data.stitch_count_front !== undefined ? data.stitch_count_front : (data.frontStitchCount !== undefined ? data.frontStitchCount : data.front_stitch_count);
+    const rawBack = data.stitch_count_back !== undefined ? data.stitch_count_back : (data.backStitchCount !== undefined ? data.backStitchCount : data.back_stitch_count);
+    const rawSleeve = data.stitch_count_sleeve !== undefined ? data.stitch_count_sleeve : (data.sleeveStitchCount !== undefined ? data.sleeveStitchCount : data.sleeve_stitch_count);
+    const rawTotal = data.stitch_count !== undefined ? data.stitch_count : (data.totalStitchCount !== undefined ? data.totalStitchCount : data.total_stitch_count);
 
-    let computedStitchCount = parseStitch(stitch_count);
+    const frontStitchVal = parseStitch(rawFront);
+    const backStitchVal = parseStitch(rawBack);
+    const sleeveStitchVal = parseStitch(rawSleeve);
+
+    let computedStitchCount = parseStitch(rawTotal);
     if (computedStitchCount === undefined && (frontStitchVal !== undefined || backStitchVal !== undefined || sleeveStitchVal !== undefined)) {
       const existing = fallbackDesigns.find(d => d.id == id);
-      const f = frontStitchVal !== undefined ? frontStitchVal : (existing ? existing.stitch_count_front : null);
-      const b = backStitchVal !== undefined ? backStitchVal : (existing ? existing.stitch_count_back : null);
-      const s = sleeveStitchVal !== undefined ? sleeveStitchVal : (existing ? existing.stitch_count_sleeve : null);
+      const f = frontStitchVal !== undefined ? frontStitchVal : (existing ? (existing.stitch_count_front ?? existing.frontStitchCount) : null);
+      const b = backStitchVal !== undefined ? backStitchVal : (existing ? (existing.stitch_count_back ?? existing.backStitchCount) : null);
+      const s = sleeveStitchVal !== undefined ? sleeveStitchVal : (existing ? (existing.stitch_count_sleeve ?? existing.sleeveStitchCount) : null);
 
       if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
         computedStitchCount = Number(f) + Number(b) + Number(s);
@@ -1137,10 +1232,23 @@ class Design {
       if (price !== undefined) target.price = parseFloat(price);
       if (sale_price !== undefined) target.sale_price = sale_price !== null && sale_price !== '' ? parseFloat(sale_price) : null;
       if (category_id !== undefined) target.category_id = category_id ? parseInt(category_id) : null;
-      if (computedStitchCount !== undefined) target.stitch_count = computedStitchCount;
-      if (frontStitchVal !== undefined) target.stitch_count_front = frontStitchVal;
-      if (backStitchVal !== undefined) target.stitch_count_back = backStitchVal;
-      if (sleeveStitchVal !== undefined) target.stitch_count_sleeve = sleeveStitchVal;
+      if (computedStitchCount !== undefined) {
+        target.stitch_count = computedStitchCount;
+        target.totalStitchCount = computedStitchCount;
+      }
+      if (frontStitchVal !== undefined) {
+        target.stitch_count_front = frontStitchVal;
+        target.frontStitchCount = frontStitchVal;
+      }
+      if (backStitchVal !== undefined) {
+        target.stitch_count_back = backStitchVal;
+        target.backStitchCount = backStitchVal;
+      }
+      if (sleeveStitchVal !== undefined) {
+        target.stitch_count_sleeve = sleeveStitchVal;
+        target.sleeveStitchCount = sleeveStitchVal;
+      }
+      this.normalizeStitchCounts(target);
       if (description !== undefined) target.description = description || null;
       if (dimensions !== undefined) target.dimensions = dimensions;
       if (formats !== undefined) target.formats = formats;
@@ -1167,12 +1275,13 @@ class Design {
            WHERE LOWER(TRIM(d.sku)) = LOWER(TRIM(?)) LIMIT 1`,
           [cleanSku]
         );
-        if (rows && rows[0]) return rows[0];
+        if (rows && rows[0]) return this.normalizeStitchCounts(rows[0]);
       } catch (e) {
         console.warn('[Design.findBySku DB error]:', e.message);
       }
     }
-    return fallbackDesigns.find(d => d.sku && d.sku.trim().toLowerCase() === cleanSku.toLowerCase()) || null;
+    const found = fallbackDesigns.find(d => d.sku && d.sku.trim().toLowerCase() === cleanSku.toLowerCase()) || null;
+    return this.normalizeStitchCounts(found);
   }
 
   static async getAllMapBySku() {

@@ -264,8 +264,9 @@ async function startServer() {
     try {
       const Design = require('./models/Design');
       await Design.repairInvalidDatabaseSlugs();
+      await Design.repairExistingStitchCounts();
     } catch (err) {
-      console.warn('[Startup Repair] Slug repair warning:', err.message);
+      console.warn('[Startup Repair] Repair warning:', err.message);
     }
   });
 }

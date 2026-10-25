@@ -320,9 +320,9 @@ exports.getDesignApi = async (req, res, next) => {
       return (!isNaN(n) && n >= 0) ? n : null;
     };
 
-    const frontStitches = parseNum(design.stitch_count_front);
-    const backStitches = parseNum(design.stitch_count_back);
-    const sleeveStitches = parseNum(design.stitch_count_sleeve);
+    const frontStitches = parseNum(design.stitch_count_front !== undefined ? design.stitch_count_front : design.frontStitchCount);
+    const backStitches = parseNum(design.stitch_count_back !== undefined ? design.stitch_count_back : design.backStitchCount);
+    const sleeveStitches = parseNum(design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : design.sleeveStitchCount);
 
     const allComponentsValid = frontStitches !== null && backStitches !== null && sleeveStitches !== null;
     const anyComponentValid = frontStitches !== null || backStitches !== null || sleeveStitches !== null;
@@ -337,6 +337,12 @@ exports.getDesignApi = async (req, res, next) => {
       stitchStatus = 'incomplete';
     } else if (design.stitch_count !== null && design.stitch_count !== undefined) {
       const legacyTotal = parseNum(design.stitch_count);
+      if (legacyTotal !== null) {
+        calculatedTotal = legacyTotal;
+        stitchStatus = 'complete';
+      }
+    } else if (design.totalStitchCount !== null && design.totalStitchCount !== undefined) {
+      const legacyTotal = parseNum(design.totalStitchCount);
       if (legacyTotal !== null) {
         calculatedTotal = legacyTotal;
         stitchStatus = 'complete';
@@ -359,6 +365,10 @@ exports.getDesignApi = async (req, res, next) => {
       stitch_count_front: frontStitches,
       stitch_count_back: backStitches,
       stitch_count_sleeve: sleeveStitches,
+      frontStitchCount: frontStitches,
+      backStitchCount: backStitches,
+      sleeveStitchCount: sleeveStitches,
+      totalStitchCount: calculatedTotal,
       stitchCount: calculatedTotal,
       stitchCountFront: frontStitches,
       stitchCountBack: backStitches,

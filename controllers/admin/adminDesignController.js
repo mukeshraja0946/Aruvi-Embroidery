@@ -237,10 +237,15 @@ exports.postCreate = async (req, res, next) => {
     console.log('[PUBLISH] Request received for design creation:', req.body.title);
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, description,
+      hoop_size, description,
       dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft,
       average_rating, reviews_count
     } = req.body;
+
+    const rawFront = req.body.stitch_count_front !== undefined ? req.body.stitch_count_front : (req.body.frontStitchCount !== undefined ? req.body.frontStitchCount : req.body.front_stitch_count);
+    const rawBack = req.body.stitch_count_back !== undefined ? req.body.stitch_count_back : (req.body.backStitchCount !== undefined ? req.body.backStitchCount : req.body.back_stitch_count);
+    const rawSleeve = req.body.stitch_count_sleeve !== undefined ? req.body.stitch_count_sleeve : (req.body.sleeveStitchCount !== undefined ? req.body.sleeveStitchCount : req.body.sleeve_stitch_count);
+    const rawTotal = req.body.stitch_count !== undefined ? req.body.stitch_count : (req.body.totalStitchCount !== undefined ? req.body.totalStitchCount : req.body.total_stitch_count);
 
     const isAjax = checkIsAjax(req);
 
@@ -276,19 +281,19 @@ exports.postCreate = async (req, res, next) => {
     }
 
     // Validate Stitch Counts
-    const frontCheck = validateStitchCount(stitch_count_front, 'Front Stitch Count');
+    const frontCheck = validateStitchCount(rawFront, 'Front Stitch Count');
     if (!frontCheck.valid) {
       if (isAjax) return res.status(400).json({ success: false, message: frontCheck.error });
       req.flash('error', frontCheck.error);
       return res.redirect('back');
     }
-    const backCheck = validateStitchCount(stitch_count_back, 'Back Stitch Count');
+    const backCheck = validateStitchCount(rawBack, 'Back Stitch Count');
     if (!backCheck.valid) {
       if (isAjax) return res.status(400).json({ success: false, message: backCheck.error });
       req.flash('error', backCheck.error);
       return res.redirect('back');
     }
-    const sleeveCheck = validateStitchCount(stitch_count_sleeve, 'Sleeve Stitch Count');
+    const sleeveCheck = validateStitchCount(rawSleeve, 'Sleeve Stitch Count');
     if (!sleeveCheck.valid) {
       if (isAjax) return res.status(400).json({ success: false, message: sleeveCheck.error });
       req.flash('error', sleeveCheck.error);
@@ -371,6 +376,10 @@ exports.postCreate = async (req, res, next) => {
       stitch_count_front: frontCheck.value,
       stitch_count_back: backCheck.value,
       stitch_count_sleeve: sleeveCheck.value,
+      frontStitchCount: frontCheck.value,
+      backStitchCount: backCheck.value,
+      sleeveStitchCount: sleeveCheck.value,
+      totalStitchCount: finalTotalStitches,
       description: description !== undefined ? description : null,
       dimensions: dimensions ? String(dimensions).trim() : null,
       formats: detectedFormatsStr,
@@ -413,17 +422,33 @@ exports.postCreate = async (req, res, next) => {
     console.log(`[PUBLISH SUCCESS] Design #${designId} "${title}" ${statusMsg} successfully.`);
     await ActivityLog.logFromReq(req, 'create', 'design', designId, `Created design #${designId} "${title}" (SKU: ${finalSku})`);
 
+    const savedDesign = await Design.getById(designId);
+
     if (isAjax) {
       return res.json({
         success: true,
         message: `Design "${title}" ${statusMsg} successfully!`,
         designId,
-        redirectUrl: '/admin/designs'
+        design: {
+          id: savedDesign ? savedDesign.id : designId,
+          title: savedDesign ? savedDesign.title : title,
+          sku: savedDesign ? savedDesign.sku : finalSku,
+          frontStitchCount: savedDesign ? (savedDesign.frontStitchCount ?? savedDesign.stitch_count_front) : frontCheck.value,
+          backStitchCount: savedDesign ? (savedDesign.backStitchCount ?? savedDesign.stitch_count_back) : backCheck.value,
+          sleeveStitchCount: savedDesign ? (savedDesign.sleeveStitchCount ?? savedDesign.stitch_count_sleeve) : sleeveCheck.value,
+          totalStitchCount: savedDesign ? (savedDesign.totalStitchCount ?? savedDesign.stitch_count) : finalTotalStitches,
+          stitch_count_front: savedDesign ? savedDesign.stitch_count_front : frontCheck.value,
+          stitch_count_back: savedDesign ? savedDesign.stitch_count_back : backCheck.value,
+          stitch_count_sleeve: savedDesign ? savedDesign.stitch_count_sleeve : sleeveCheck.value,
+          stitch_count: savedDesign ? savedDesign.stitch_count : finalTotalStitches,
+          is_active: finalActiveState
+        },
+        redirectUrl: `/admin/designs/edit/${designId}`
       });
     }
 
     req.flash('success', `Design "${title}" ${statusMsg} successfully!`);
-    res.redirect('/admin/designs');
+    res.redirect(`/admin/designs/edit/${designId}`);
   } catch (err) {
     console.error('[PUBLISH CREATE ERROR]:', err);
     const isAjax = checkIsAjax(req);
@@ -462,10 +487,15 @@ exports.postEdit = async (req, res, next) => {
     console.log(`[PUBLISH] Request received for design #${id} edit`);
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, description,
+      hoop_size, description,
       dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft, selected_formats,
       average_rating, reviews_count
     } = req.body;
+
+    const rawFront = req.body.stitch_count_front !== undefined ? req.body.stitch_count_front : (req.body.frontStitchCount !== undefined ? req.body.frontStitchCount : req.body.front_stitch_count);
+    const rawBack = req.body.stitch_count_back !== undefined ? req.body.stitch_count_back : (req.body.backStitchCount !== undefined ? req.body.backStitchCount : req.body.back_stitch_count);
+    const rawSleeve = req.body.stitch_count_sleeve !== undefined ? req.body.stitch_count_sleeve : (req.body.sleeveStitchCount !== undefined ? req.body.sleeveStitchCount : req.body.sleeve_stitch_count);
+    const rawTotal = req.body.stitch_count !== undefined ? req.body.stitch_count : (req.body.totalStitchCount !== undefined ? req.body.totalStitchCount : req.body.total_stitch_count);
 
     const isAjax = checkIsAjax(req);
 
@@ -501,19 +531,19 @@ exports.postEdit = async (req, res, next) => {
     }
 
     // Validate Stitch Counts
-    const frontCheck = validateStitchCount(stitch_count_front, 'Front Stitch Count');
+    const frontCheck = validateStitchCount(rawFront, 'Front Stitch Count');
     if (!frontCheck.valid) {
       if (isAjax) return res.status(400).json({ success: false, message: frontCheck.error });
       req.flash('error', frontCheck.error);
       return res.redirect('back');
     }
-    const backCheck = validateStitchCount(stitch_count_back, 'Back Stitch Count');
+    const backCheck = validateStitchCount(rawBack, 'Back Stitch Count');
     if (!backCheck.valid) {
       if (isAjax) return res.status(400).json({ success: false, message: backCheck.error });
       req.flash('error', backCheck.error);
       return res.redirect('back');
     }
-    const sleeveCheck = validateStitchCount(stitch_count_sleeve, 'Sleeve Stitch Count');
+    const sleeveCheck = validateStitchCount(rawSleeve, 'Sleeve Stitch Count');
     if (!sleeveCheck.valid) {
       if (isAjax) return res.status(400).json({ success: false, message: sleeveCheck.error });
       req.flash('error', sleeveCheck.error);
@@ -527,10 +557,19 @@ exports.postEdit = async (req, res, next) => {
       return res.redirect('/admin/designs');
     }
 
-    // Determine effective component counts
-    const effectiveFront = frontCheck.value !== undefined ? frontCheck.value : existingDesign.stitch_count_front;
-    const effectiveBack = backCheck.value !== undefined ? backCheck.value : existingDesign.stitch_count_back;
-    const effectiveSleeve = sleeveCheck.value !== undefined ? sleeveCheck.value : existingDesign.stitch_count_sleeve;
+    // Determine effective component counts:
+    // If field was NOT provided in the request (undefined), retain existing persisted value.
+    // If field was provided as empty or null, value is null.
+    // If field was provided with a number, value is that number.
+    const effectiveFront = frontCheck.value !== undefined 
+      ? frontCheck.value 
+      : (existingDesign.stitch_count_front !== undefined ? existingDesign.stitch_count_front : (existingDesign.frontStitchCount !== undefined ? existingDesign.frontStitchCount : null));
+    const effectiveBack = backCheck.value !== undefined 
+      ? backCheck.value 
+      : (existingDesign.stitch_count_back !== undefined ? existingDesign.stitch_count_back : (existingDesign.backStitchCount !== undefined ? existingDesign.backStitchCount : null));
+    const effectiveSleeve = sleeveCheck.value !== undefined 
+      ? sleeveCheck.value 
+      : (existingDesign.stitch_count_sleeve !== undefined ? existingDesign.stitch_count_sleeve : (existingDesign.sleeveStitchCount !== undefined ? existingDesign.sleeveStitchCount : null));
 
     const hasEffFront = effectiveFront !== null && effectiveFront !== undefined;
     const hasEffBack = effectiveBack !== null && effectiveBack !== undefined;
@@ -593,9 +632,13 @@ exports.postEdit = async (req, res, next) => {
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || existingDesign.hoop_size || null,
       stitch_count: finalTotalVal,
-      stitch_count_front: frontCheck.value !== undefined ? frontCheck.value : (existingDesign.stitch_count_front || null),
-      stitch_count_back: backCheck.value !== undefined ? backCheck.value : (existingDesign.stitch_count_back || null),
-      stitch_count_sleeve: sleeveCheck.value !== undefined ? sleeveCheck.value : (existingDesign.stitch_count_sleeve || null),
+      stitch_count_front: effectiveFront,
+      stitch_count_back: effectiveBack,
+      stitch_count_sleeve: effectiveSleeve,
+      frontStitchCount: effectiveFront,
+      backStitchCount: effectiveBack,
+      sleeveStitchCount: effectiveSleeve,
+      totalStitchCount: finalTotalVal,
       description: description !== undefined ? description : (existingDesign.description || null),
       dimensions: dimensions !== undefined ? (dimensions ? String(dimensions).trim() : null) : (existingDesign.dimensions || null),
       formats: formats || existingDesign.formats || '',
@@ -646,12 +689,28 @@ exports.postEdit = async (req, res, next) => {
     console.log(`[PUBLISH SUCCESS] Design #${id} "${title}" updated and ${statusMsg} successfully.`);
     await ActivityLog.logFromReq(req, 'update', 'design', id, `Updated design #${id} "${title}"`);
 
+    const savedDesign = await Design.getById(id);
+
     if (isAjax) {
       return res.json({
         success: true,
         message: `Design "${title}" updated and ${statusMsg} successfully.`,
         designId: id,
-        redirectUrl: '/admin/designs'
+        design: {
+          id: savedDesign ? savedDesign.id : id,
+          title: savedDesign ? savedDesign.title : title,
+          sku: savedDesign ? savedDesign.sku : finalSku,
+          frontStitchCount: savedDesign ? (savedDesign.frontStitchCount ?? savedDesign.stitch_count_front) : effectiveFront,
+          backStitchCount: savedDesign ? (savedDesign.backStitchCount ?? savedDesign.stitch_count_back) : effectiveBack,
+          sleeveStitchCount: savedDesign ? (savedDesign.sleeveStitchCount ?? savedDesign.stitch_count_sleeve) : effectiveSleeve,
+          totalStitchCount: savedDesign ? (savedDesign.totalStitchCount ?? savedDesign.stitch_count) : finalTotalVal,
+          stitch_count_front: savedDesign ? savedDesign.stitch_count_front : effectiveFront,
+          stitch_count_back: savedDesign ? savedDesign.stitch_count_back : effectiveBack,
+          stitch_count_sleeve: savedDesign ? savedDesign.stitch_count_sleeve : effectiveSleeve,
+          stitch_count: savedDesign ? savedDesign.stitch_count : finalTotalVal,
+          is_active: finalActiveState
+        },
+        redirectUrl: `/admin/designs/edit/${id}`
       });
     }
 
