@@ -10,12 +10,18 @@ const REQUIRED_SCHEMA = {
   roles: ['id', 'name', 'description'],
   users: ['id', 'full_name', 'email', 'password_hash', 'phone', 'address', 'profile_picture', 'role', 'is_active', 'created_at'],
   categories: ['id', 'name', 'slug', 'description', 'image_url', 'display_order', 'is_active', 'created_at'],
-  designs: ['id', 'title', 'sku', 'slug', 'short_description', 'description', 'price', 'sale_price', 'category_id', 'sub_category', 'formats', 'is_featured', 'is_trending', 'is_active', 'download_count', 'tags', 'total_sales', 'average_rating', 'reviews_count', 'created_at'],
+  designs: [
+    'id', 'title', 'sku', 'slug', 'short_description', 'description', 'price', 'sale_price',
+    'category_id', 'sub_category', 'hoop_size', 'stitch_count', 'stitch_count_front',
+    'stitch_count_back', 'stitch_count_sleeve', 'dimensions', 'formats', 'is_featured',
+    'is_trending', 'is_active', 'download_count', 'tags', 'total_sales', 'average_rating',
+    'reviews_count', 'import_image_filename', 'import_zip_filename', 'deleted_at', 'created_at'
+  ],
   design_images: ['id', 'design_id', 'image_url', 'is_primary', 'display_order'],
-  design_files: ['id', 'design_id', 'file_name', 'file_path', 'file_format', 'file_size', 'is_preview', 'created_at'],
+  design_files: ['id', 'design_id', 'file_name', 'file_path', 'file_format', 'file_size', 'checksum', 'is_preview', 'created_at'],
   cart_items: ['id', 'user_id', 'session_id', 'design_id', 'quantity', 'created_at'],
   orders: ['id', 'order_number', 'user_id', 'total_amount', 'discount_amount', 'final_amount', 'coupon_code', 'status', 'razorpay_order_id', 'razorpay_payment_id', 'payment_gateway', 'cashfree_order_id', 'cashfree_payment_id', 'created_at'],
-  order_items: ['id', 'order_id', 'design_id', 'quantity', 'price_at_purchase', 'created_at'],
+  order_items: ['id', 'order_id', 'design_id', 'quantity', 'price_at_purchase', 'mrp', 'discount_amount', 'created_at'],
   custom_orders: ['id', 'user_id', 'full_name', 'email', 'phone', 'design_details', 'status', 'created_at'],
   banners: ['id', 'title', 'image_url', 'link_url', 'display_order', 'is_active', 'created_at'],
   payments: ['id', 'order_id', 'amount', 'status', 'payment_method', 'created_at'],
@@ -33,7 +39,9 @@ const REQUIRED_SCHEMA = {
   import_job_items: ['id', 'job_id', 'row_no', 'sku', 'title', 'category_name', 'price', 'sale_price', 'formats', 'image_filename', 'image_stored_url', 'file_filename', 'file_stored_path', 'validation_status', 'import_status'],
   email_campaigns: ['id', 'subject', 'body_html', 'total_recipients', 'success_count', 'failed_count', 'status', 'created_at'],
   email_campaign_logs: ['id', 'campaign_id', 'recipient_email', 'status', 'error_message', 'created_at'],
-  unsubscribed_customers: ['id', 'email', 'created_at']
+  unsubscribed_customers: ['id', 'email', 'created_at'],
+  price_update_logs: ['id', 'admin_id', 'admin_email', 'filter_summary', 'method_summary', 'total_affected', 'is_undone', 'created_at'],
+  price_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_mrp', 'old_price', 'new_mrp', 'new_price', 'created_at']
 };
 
 /**
@@ -167,7 +175,63 @@ async function checkSystemHealth() {
   }
 }
 
+/**
+ * Fast schema safety check run on application startup.
+ * Returns { isHealthy, missingTables, missingColumns, missingSummary }
+ * and logs loud warnings if any tables or columns are missing.
+ */
+async function checkSchemaSafetyOnStartup() {
+  try {
+    const health = await checkSystemHealth();
+    if (!health.connected) {
+      return {
+        isHealthy: false,
+        missingTables: health.missingTables,
+        missingColumns: health.missingColumns,
+        missingSummary: 'Database offline or unreachable'
+      };
+    }
+
+    if (!health.isHealthy) {
+      const missingList = [
+        ...health.missingTables.map(t => `table:${t}`),
+        ...health.missingColumns.map(c => `${c.table}.${c.column}`)
+      ];
+
+      console.error('====================================================');
+      console.error('🚨 [DATABASE SCHEMA INTEGRITY WARNING]');
+      console.error(`   Found ${missingList.length} missing database element(s):`);
+      missingList.forEach(m => console.error(`     - ❌ Missing ${m}`));
+      console.error('   Action: Run "npm run migrate" or click "Apply Pending Migrations" in Admin → Tools → System Health.');
+      console.error('====================================================');
+
+      return {
+        isHealthy: false,
+        missingTables: health.missingTables,
+        missingColumns: health.missingColumns,
+        missingSummary: missingList.slice(0, 4).join(', ') + (missingList.length > 4 ? ` (+${missingList.length - 4} more)` : '')
+      };
+    }
+
+    return {
+      isHealthy: true,
+      missingTables: [],
+      missingColumns: [],
+      missingSummary: ''
+    };
+  } catch (err) {
+    console.warn('[Startup Schema Check Warning]:', err.message);
+    return {
+      isHealthy: false,
+      missingTables: [],
+      missingColumns: [],
+      missingSummary: err.message
+    };
+  }
+}
+
 module.exports = {
   checkSystemHealth,
+  checkSchemaSafetyOnStartup,
   REQUIRED_SCHEMA
 };

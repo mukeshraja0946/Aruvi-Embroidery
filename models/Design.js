@@ -624,26 +624,68 @@ class Design {
     return d;
   }
 
+  static async getAvailableColumns() {
+    if (!db.isConnected()) return new Set();
+    if (this._availableColumns && this._availableColumns.size > 0) {
+      return this._availableColumns;
+    }
+    try {
+      const rows = await db.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'designs'"
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        this._availableColumns = new Set(rows.map(r => (r.column_name || r.COLUMN_NAME || '').toLowerCase()));
+      } else {
+        this._availableColumns = new Set();
+      }
+    } catch (e) {
+      this._availableColumns = new Set();
+    }
+    return this._availableColumns;
+  }
+
   static async ensureDatabaseColumns() {
     if (!db.isConnected()) return;
     try {
-      const [columns] = await db.query(
+      const rows = await db.query(
         "SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'designs'"
       );
-      const colNames = (columns || []).map(c => c.column_name ? c.column_name.toLowerCase() : '');
+      const colNames = Array.isArray(rows) ? new Set(rows.map(c => (c.column_name || c.COLUMN_NAME || '').toLowerCase())) : new Set();
 
-      if (!colNames.includes('stitch_count_front')) {
-        await db.query("ALTER TABLE `designs` ADD COLUMN `stitch_count_front` INT DEFAULT NULL AFTER `stitch_count`").catch(e => console.warn('[DB Col Add Front]:', e.message));
+      const requiredCols = [
+        { name: 'stitch_count_front', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count`' },
+        { name: 'stitch_count_back', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_front`' },
+        { name: 'stitch_count_sleeve', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_back`' },
+        { name: 'hoop_size', def: 'VARCHAR(50) NULL DEFAULT NULL AFTER `category_id`' },
+        { name: 'description', def: 'TEXT NULL DEFAULT NULL AFTER `slug`' },
+        { name: 'short_description', def: 'TEXT NULL DEFAULT NULL AFTER `sku`' },
+        { name: 'sub_category', def: 'VARCHAR(100) NULL DEFAULT NULL AFTER `category_id`' },
+        { name: 'sku', def: 'VARCHAR(100) NULL DEFAULT NULL AFTER `title`' },
+        { name: 'is_trending', def: 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_featured`' },
+        { name: 'download_count', def: 'INT NOT NULL DEFAULT 0 AFTER `is_active`' },
+        { name: 'tags', def: 'TEXT NULL DEFAULT NULL AFTER `download_count`' },
+        { name: 'average_rating', def: 'DECIMAL(3,2) NOT NULL DEFAULT 4.80' },
+        { name: 'reviews_count', def: 'INT NOT NULL DEFAULT 120' },
+        { name: 'import_image_filename', def: 'VARCHAR(255) NULL DEFAULT NULL' },
+        { name: 'import_zip_filename', def: 'VARCHAR(255) NULL DEFAULT NULL' },
+        { name: 'deleted_at', def: 'DATETIME NULL DEFAULT NULL' }
+      ];
+
+      for (const col of requiredCols) {
+        if (!colNames.has(col.name)) {
+          try {
+            await db.query(`ALTER TABLE \`designs\` ADD COLUMN IF NOT EXISTS \`${col.name}\` ${col.def}`);
+            colNames.add(col.name);
+          } catch (alterErr) {
+            // Fallback for older MySQL without IF NOT EXISTS syntax
+            try {
+              await db.query(`ALTER TABLE \`designs\` ADD COLUMN \`${col.name}\` ${col.def}`);
+              colNames.add(col.name);
+            } catch (e2) {}
+          }
+        }
       }
-      if (!colNames.includes('stitch_count_back')) {
-        await db.query("ALTER TABLE `designs` ADD COLUMN `stitch_count_back` INT DEFAULT NULL AFTER `stitch_count_front`").catch(e => console.warn('[DB Col Add Back]:', e.message));
-      }
-      if (!colNames.includes('stitch_count_sleeve')) {
-        await db.query("ALTER TABLE `designs` ADD COLUMN `stitch_count_sleeve` INT DEFAULT NULL AFTER `stitch_count_back`").catch(e => console.warn('[DB Col Add Sleeve]:', e.message));
-      }
-      if (!colNames.includes('description')) {
-        await db.query("ALTER TABLE `designs` ADD COLUMN `description` TEXT DEFAULT NULL AFTER `slug`").catch(e => console.warn('[DB Col Add Desc]:', e.message));
-      }
+      this._availableColumns = colNames;
     } catch (err) {
       console.warn('[Design.ensureDatabaseColumns Warning]:', err.message);
     }
@@ -997,75 +1039,78 @@ class Design {
 
     if (db.isConnected()) {
       try {
-        const res = await db.query(
-          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename, description)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            title,
-            finalSku,
-            finalSlug,
-            price,
-            sale_price || null,
-            category_id || null,
-            hoop_size || null,
-            mainStitchVal,
-            frontStitchVal,
-            backStitchVal,
-            sleeveStitchVal,
-            dimensions || null,
-            formats || '',
-            is_featured ? 1 : 0,
-            is_trending ? 1 : 0,
-            is_active ? 1 : 0,
-            download_count ? parseInt(download_count) : 0,
-            tags || null,
-            avgRatingVal,
-            revCountVal,
-            import_image_filename || null,
-            import_zip_filename || null,
-            description || null
-          ]
-        );
-        if (res && res.insertId) insertedId = res.insertId;
-      } catch (err) {
-        console.error('[Design.create DB Error]:', err.message);
-        if (err.code === 'ER_DUP_ENTRY' && String(err.message).toLowerCase().includes('sku')) {
-          try {
-            finalSku = await this.getNextSkuForCategory(category_id);
-            const retryRes = await db.query(
-              `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename, description)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                title,
-                finalSku,
-                finalSlug,
-                price,
-                sale_price || null,
-                category_id || null,
-                hoop_size || null,
-                mainStitchVal,
-                frontStitchVal,
-                backStitchVal,
-                sleeveStitchVal,
-                dimensions || null,
-                formats || '',
-                is_featured ? 1 : 0,
-                is_trending ? 1 : 0,
-                is_active ? 1 : 0,
-                download_count ? parseInt(download_count) : 0,
-                tags || null,
-                avgRatingVal,
-                revCountVal,
-                import_image_filename || null,
-                import_zip_filename || null,
-                description || null
-              ]
-            );
-            if (retryRes && retryRes.insertId) insertedId = retryRes.insertId;
-          } catch (retryErr) {
-            console.error('[Design.create Retry Error]:', retryErr.message);
+        await this.ensureDatabaseColumns();
+        const availableCols = await this.getAvailableColumns();
+
+        const insertMap = {
+          title: title,
+          sku: finalSku,
+          slug: finalSlug,
+          price: price,
+          sale_price: sale_price || null,
+          category_id: category_id || null,
+          hoop_size: hoop_size || null,
+          stitch_count: mainStitchVal,
+          stitch_count_front: frontStitchVal,
+          stitch_count_back: backStitchVal,
+          stitch_count_sleeve: sleeveStitchVal,
+          dimensions: dimensions || null,
+          formats: formats || '',
+          is_featured: is_featured ? 1 : 0,
+          is_trending: is_trending ? 1 : 0,
+          is_active: is_active ? 1 : 0,
+          download_count: download_count ? parseInt(download_count) : 0,
+          tags: tags || null,
+          average_rating: avgRatingVal,
+          reviews_count: revCountVal,
+          import_image_filename: import_image_filename || null,
+          import_zip_filename: import_zip_filename || null,
+          description: description || null
+        };
+
+        const executeInsert = async (skuToUse) => {
+          insertMap.sku = skuToUse;
+          const activeCols = [];
+          const activeVals = [];
+          for (const [col, val] of Object.entries(insertMap)) {
+            if (availableCols.size === 0 || availableCols.has(col)) {
+              activeCols.push(`\`${col}\``);
+              activeVals.push(val);
+            }
+          }
+          const placeholders = activeCols.map(() => '?').join(', ');
+          return await db.query(
+            `INSERT INTO designs (${activeCols.join(', ')}) VALUES (${placeholders})`,
+            activeVals
+          );
+        };
+
+        try {
+          const res = await executeInsert(finalSku);
+          if (res && res.insertId) insertedId = res.insertId;
+        } catch (err) {
+          console.error('[Design.create DB Error]:', err.message);
+          if (err.code === 'ER_DUP_ENTRY' && String(err.message).toLowerCase().includes('sku')) {
+            try {
+              finalSku = await this.getNextSkuForCategory(category_id);
+              const retryRes = await executeInsert(finalSku);
+              if (retryRes && retryRes.insertId) insertedId = retryRes.insertId;
+            } catch (retryErr) {
+              console.error('[Design.create Retry Error]:', retryErr.message);
+            }
+          } else if (err.message && err.message.includes('Unknown column')) {
+            console.warn('[Design.create Auto-Repairing Missing Column]:', err.message);
+            await this.ensureDatabaseColumns();
+            this._availableColumns = null;
+            const res = await executeInsert(finalSku);
+            if (res && res.insertId) insertedId = res.insertId;
+          } else {
+            throw err;
           }
         }
+      } catch (outerErr) {
+        console.error('[Design.create Outer Error]:', outerErr.message);
+        throw outerErr;
       }
     }
 
@@ -1173,105 +1218,74 @@ class Design {
         let updateFields = [];
         let updateParams = [];
 
-        if (title !== undefined) {
-          updateFields.push('title=?');
-          updateParams.push(title);
-        }
-        if (sku !== undefined) {
-          updateFields.push('sku=?');
-          updateParams.push(sku || null);
-        }
-        if (finalSlug !== undefined) {
-          updateFields.push('slug=?');
-          updateParams.push(finalSlug);
-        }
-        if (price !== undefined) {
-          updateFields.push('price=?');
-          updateParams.push(price);
-        }
-        if (sale_price !== undefined) {
-          updateFields.push('sale_price=?');
-          updateParams.push(sale_price !== null && sale_price !== '' ? sale_price : null);
-        }
-        if (category_id !== undefined) {
-          updateFields.push('category_id=?');
-          updateParams.push(category_id || null);
-        }
-        if (hoop_size !== undefined) {
-          updateFields.push('hoop_size=?');
-          updateParams.push(hoop_size || null);
-        }
-        if (computedStitchCount !== undefined) {
-          updateFields.push('stitch_count=?');
-          updateParams.push(computedStitchCount);
-        }
-        if (frontStitchVal !== undefined) {
-          updateFields.push('stitch_count_front=?');
-          updateParams.push(frontStitchVal);
-        }
-        if (backStitchVal !== undefined) {
-          updateFields.push('stitch_count_back=?');
-          updateParams.push(backStitchVal);
-        }
-        if (sleeveStitchVal !== undefined) {
-          updateFields.push('stitch_count_sleeve=?');
-          updateParams.push(sleeveStitchVal);
-        }
-        if (description !== undefined) {
-          updateFields.push('description=?');
-          updateParams.push(description || null);
-        }
-        if (dimensions !== undefined) {
-          updateFields.push('dimensions=?');
-          updateParams.push(dimensions || null);
-        }
-        if (formats !== undefined) {
-          updateFields.push('formats=?');
-          updateParams.push(formats || '');
-        }
-        if (is_featured !== undefined) {
-          updateFields.push('is_featured=?');
-          updateParams.push(is_featured ? 1 : 0);
-        }
-        if (is_trending !== undefined) {
-          updateFields.push('is_trending=?');
-          updateParams.push(is_trending ? 1 : 0);
-        }
-        if (is_active !== undefined) {
-          updateFields.push('is_active=?');
-          updateParams.push(is_active ? 1 : 0);
-        }
-        if (download_count !== undefined) {
-          updateFields.push('download_count=?');
-          updateParams.push(download_count ? parseInt(download_count) : 0);
-        }
-        if (tags !== undefined) {
-          updateFields.push('tags=?');
-          updateParams.push(tags || null);
-        }
-        if (import_image_filename !== undefined) {
-          updateFields.push('import_image_filename=?');
-          updateParams.push(import_image_filename || null);
-        }
-        if (import_zip_filename !== undefined) {
-          updateFields.push('import_zip_filename=?');
-          updateParams.push(import_zip_filename || null);
-        }
-        if (avgRatingVal !== undefined) {
-          updateFields.push('average_rating=?');
-          updateParams.push(avgRatingVal);
-        }
-        if (revCountVal !== undefined) {
-          updateFields.push('reviews_count=?');
-          updateParams.push(revCountVal);
-        }
+        await this.ensureDatabaseColumns();
+        const availableCols = await this.getAvailableColumns();
+
+        // Helper to push field only if column exists in table (or if table columns unknown)
+        const addUpdateField = (col, val) => {
+          if (availableCols.size === 0 || availableCols.has(col.toLowerCase())) {
+            updateFields.push(`\`${col}\`=?`);
+            updateParams.push(val);
+          }
+        };
+
+        if (title !== undefined) addUpdateField('title', title);
+        if (sku !== undefined) addUpdateField('sku', sku || null);
+        if (finalSlug !== undefined) addUpdateField('slug', finalSlug);
+        if (price !== undefined) addUpdateField('price', price);
+        if (sale_price !== undefined) addUpdateField('sale_price', sale_price !== null && sale_price !== '' ? sale_price : null);
+        if (category_id !== undefined) addUpdateField('category_id', category_id || null);
+        if (hoop_size !== undefined) addUpdateField('hoop_size', hoop_size || null);
+        if (computedStitchCount !== undefined) addUpdateField('stitch_count', computedStitchCount);
+        if (frontStitchVal !== undefined) addUpdateField('stitch_count_front', frontStitchVal);
+        if (backStitchVal !== undefined) addUpdateField('stitch_count_back', backStitchVal);
+        if (sleeveStitchVal !== undefined) addUpdateField('stitch_count_sleeve', sleeveStitchVal);
+        if (description !== undefined) addUpdateField('description', description || null);
+        if (dimensions !== undefined) addUpdateField('dimensions', dimensions || null);
+        if (formats !== undefined) addUpdateField('formats', formats || '');
+        if (is_featured !== undefined) addUpdateField('is_featured', is_featured ? 1 : 0);
+        if (is_trending !== undefined) addUpdateField('is_trending', is_trending ? 1 : 0);
+        if (is_active !== undefined) addUpdateField('is_active', is_active ? 1 : 0);
+        if (download_count !== undefined) addUpdateField('download_count', download_count ? parseInt(download_count) : 0);
+        if (tags !== undefined) addUpdateField('tags', tags || null);
+        if (import_image_filename !== undefined) addUpdateField('import_image_filename', import_image_filename || null);
+        if (import_zip_filename !== undefined) addUpdateField('import_zip_filename', import_zip_filename || null);
+        if (avgRatingVal !== undefined) addUpdateField('average_rating', avgRatingVal);
+        if (revCountVal !== undefined) addUpdateField('reviews_count', revCountVal);
 
         if (updateFields.length > 0) {
           updateParams.push(id);
-          await db.query(
-            `UPDATE designs SET ${updateFields.join(', ')} WHERE id=?`,
-            updateParams
-          );
+          try {
+            await db.query(
+              `UPDATE designs SET ${updateFields.join(', ')} WHERE id=?`,
+              updateParams
+            );
+          } catch (updateErr) {
+            if (updateErr.message && updateErr.message.includes('Unknown column')) {
+              console.warn('[Design.update Auto-Repairing Missing Column]:', updateErr.message);
+              await this.ensureDatabaseColumns();
+              this._availableColumns = null;
+              const refreshedCols = await this.getAvailableColumns();
+              const safeFields = [];
+              const safeParams = [];
+              for (let i = 0; i < updateFields.length; i++) {
+                const colName = updateFields[i].split('=')[0].replace(/[`"]/g, '').trim().toLowerCase();
+                if (refreshedCols.size === 0 || refreshedCols.has(colName)) {
+                  safeFields.push(updateFields[i]);
+                  safeParams.push(updateParams[i]);
+                }
+              }
+              if (safeFields.length > 0) {
+                safeParams.push(id);
+                await db.query(
+                  `UPDATE designs SET ${safeFields.join(', ')} WHERE id=?`,
+                  safeParams
+                );
+              }
+            } else {
+              throw updateErr;
+            }
+          }
         }
       } catch (err) {
         console.error('[Design.update DB Error]:', err.message);

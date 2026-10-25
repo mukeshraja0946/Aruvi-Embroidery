@@ -451,12 +451,22 @@ exports.postCreate = async (req, res, next) => {
     req.flash('success', `Design "${title}" ${statusMsg} successfully!`);
     res.redirect(`/admin/designs/edit/${designId}`);
   } catch (err) {
-    console.error('[PUBLISH CREATE ERROR]:', err);
+    const refId = 'ERR-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    console.error(`[PUBLISH CREATE ERROR ${refId}]:`, err);
+    let friendlyMessage = `Unable to create design. (Reference ID: ${refId})`;
+    if (err.code === 'ER_BAD_FIELD_ERROR' || (err.message && err.message.includes('Unknown column'))) {
+      friendlyMessage = `Database schema mismatch: A required database column is missing in production. Please run migrations via Admin → Tools → System Health or run 'npm run migrate'. (Reference ID: ${refId})`;
+    } else if (err.code === 'ER_DUP_ENTRY') {
+      friendlyMessage = `A design with this SKU or slug already exists. Please choose a unique SKU or title. (Reference ID: ${refId})`;
+    } else if (err.message) {
+      friendlyMessage = `${err.message} (Reference ID: ${refId})`;
+    }
+
     const isAjax = checkIsAjax(req);
     if (isAjax) {
-      return res.status(400).json({ success: false, message: err.message || 'Unable to create design.' });
+      return res.status(400).json({ success: false, message: friendlyMessage, refId });
     }
-    req.flash('error', `Unable to create design: ${err.message}`);
+    req.flash('error', friendlyMessage);
     res.redirect('back');
   }
 };
@@ -719,12 +729,22 @@ exports.postEdit = async (req, res, next) => {
     req.flash('success', `Design "${title}" updated and ${statusMsg} successfully.`);
     res.redirect(`/admin/designs/edit/${id}`);
   } catch (err) {
-    console.error('[PUBLISH EDIT ERROR]:', err);
+    const refId = 'ERR-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    console.error(`[PUBLISH EDIT ERROR ${refId}]:`, err);
+    let friendlyMessage = `Unable to update design. (Reference ID: ${refId})`;
+    if (err.code === 'ER_BAD_FIELD_ERROR' || (err.message && err.message.includes('Unknown column'))) {
+      friendlyMessage = `Database schema mismatch: A required database column is missing in production. Please run migrations via Admin → Tools → System Health or run 'npm run migrate'. (Reference ID: ${refId})`;
+    } else if (err.code === 'ER_DUP_ENTRY') {
+      friendlyMessage = `A design with this SKU or slug already exists. Please choose a unique SKU or title. (Reference ID: ${refId})`;
+    } else if (err.message) {
+      friendlyMessage = `${err.message} (Reference ID: ${refId})`;
+    }
+
     const isAjax = checkIsAjax(req);
     if (isAjax) {
-      return res.status(400).json({ success: false, message: err.message || 'Unable to update design.' });
+      return res.status(400).json({ success: false, message: friendlyMessage, refId });
     }
-    req.flash('error', `Unable to update design: ${err.message}`);
+    req.flash('error', friendlyMessage);
     res.redirect('back');
   }
 };

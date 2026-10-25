@@ -186,12 +186,19 @@ When pushing or pulling code updates to production:
    `migrations/production_sync.sql`
    *(Contains only `CREATE TABLE IF NOT EXISTS` and safe dynamic column/index checks. Never drops or alters existing data).*
 5. **System Health Verification:**
-   Visit **Admin → Tools → System Health** (`/admin/tools/system-health`) to verify that all 28 tables and 225+ columns exist with green indicators.
-6. **Future Development Rule:**
-   Every future feature that introduces a new table or column **must** include a new numbered migration file in `migrations/` (e.g., `migrations/011_feature_name.sql`). Deploying will automatically apply it upon restart.
+   Visit **Admin → Tools → System Health** (`/admin/tools/system-health`) to verify that all database tables and columns exist with green indicators. If any column is missing, a prominent alert is shown on both the Dashboard and System Health.
+
+6. **MANDATORY RULE FOR FUTURE WORK:**
+   > ⚠️ **CRITICAL RULE:** Any code change that needs a new table or column **MUST include a numbered migration file in the same change** (e.g. `migrations/017_descriptive_name.sql`).
+   > - All migration statements must use MariaDB 10.x compatible, strictly idempotent syntax: `CREATE TABLE IF NOT EXISTS` and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`.
+   > - Sensible types and defaults must be specified (e.g., `INT UNSIGNED NULL DEFAULT NULL`) so existing production rows are never corrupted.
+   > - Never use reserved words as unquoted column names.
+   > - Migrations must NEVER drop, truncate, rename, or delete existing data.
+   > - On deployment / restart, the application automatically applies pending migrations and runs a schema safety check before serving requests.
+
    ```bash
-   pm2 restart aruvi-embroidery
-   # or: systemctl restart aruvi-embroidery
+   npm run migrate
+   # or restart: pm2 restart aruvi-embroidery
    ```
 
 > **Note on Initial Setup:** To populate starter data on an empty fresh database, run `npm run seed`. If the database already has existing products or users, `npm run seed` will automatically detect them and safely skip execution without overwriting your data.

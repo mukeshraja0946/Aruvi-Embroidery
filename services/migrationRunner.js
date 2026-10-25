@@ -102,6 +102,97 @@ async function getAppliedMigrations(connection) {
 }
 
 /**
+ * Splits SQL into individual executable statements, respecting quotes and delimiters
+ */
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = '';
+  let inQuote = null;
+  const lines = sql.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('--') || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if ((char === "'" || char === '"' || char === '`') && (i === 0 || line[i - 1] !== '\\')) {
+        if (inQuote === char) inQuote = null;
+        else if (!inQuote) inQuote = char;
+      }
+      if (char === ';' && !inQuote) {
+        if (current.trim().length > 0) {
+          statements.push(current.trim());
+        }
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    current += '\n';
+  }
+
+  if (current.trim().length > 0) {
+    statements.push(current.trim());
+  }
+
+  return statements.filter(s => s.length > 0);
+}
+
+/**
+ * Executes a single migration's SQL statements safely and idempotently
+ */
+async function executeMigrationSql(conn, sql, file) {
+  const statements = splitSqlStatements(sql);
+
+  for (let idx = 0; idx < statements.length; idx++) {
+    const stmt = statements[idx];
+    if (!stmt) continue;
+
+    // Handle MariaDB "ALTER TABLE ... ADD COLUMN IF NOT EXISTS ..." with fallback for older MySQL
+    const alterColMatch = stmt.match(/^ALTER\s+TABLE\s+[`"]?([a-zA-Z0-9_]+)[`"]?\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+[`"]?([a-zA-Z0-9_]+)[`"]?\s+([\s\S]+)$/i);
+    if (alterColMatch) {
+      const tableName = alterColMatch[1];
+      const columnName = alterColMatch[2];
+      const colDef = alterColMatch[3];
+
+      try {
+        await conn.query(stmt);
+      } catch (err) {
+        // If older MySQL lacks "IF NOT EXISTS" syntax support (MariaDB supports it natively)
+        if (err.message && (err.message.includes('IF NOT EXISTS') || err.errno === 1064)) {
+          const [chk] = await conn.query(
+            'SELECT COUNT(*) as count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?',
+            [tableName, columnName]
+          );
+          if (chk && chk[0] && chk[0].count === 0) {
+            await conn.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${colDef}`);
+          }
+        } else if (err.errno === 1060 || (err.message && err.message.includes('Duplicate column name'))) {
+          // Column already exists, safe to ignore
+        } else {
+          throw err;
+        }
+      }
+      continue;
+    }
+
+    // Default statement execution
+    try {
+      await conn.query(stmt);
+    } catch (err) {
+      // 1050: Table already exists, 1060: Duplicate column name, 1061: Duplicate key name
+      if (err.errno === 1050 || err.errno === 1060 || err.errno === 1061) {
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+/**
  * Runs all pending numbered migrations in sequence
  */
 async function runPendingMigrations({ connection: existingConn, silent = false } = {}) {
@@ -151,9 +242,9 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
 
-      // Execute migration
+      // Execute migration safely statement-by-statement
       try {
-        await conn.query(sql);
+        await executeMigrationSql(conn, sql, file);
 
         // Record in schema_migrations
         await conn.query(

@@ -15,6 +15,7 @@ async function attachUserAndCart(req, res, next) {
   res.locals.flash = { success: [], error: [], info: [] };
   res.locals.messages = { success: '', error: '', info: '' };
   res.locals.csrfToken = '';
+  res.locals.schemaAlert = (req.app && req.app.locals && req.app.locals.schemaAlert) ? req.app.locals.schemaAlert : { isHealthy: true, missingCount: 0, missingSummary: '' };
 
   try {
     // 1. Session customer or admin user

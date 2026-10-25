@@ -243,16 +243,52 @@ app.use((req, res, next) => {
 const errorHandler = require('./middleware/errorHandler');
 app.use(errorHandler);
 
-// Start Server
-// 0.0.0.0 is required so Render can access the application
-async function startServer() {
-  // Automatically apply any pending database migrations before accepting requests
+// Global Schema Alert state for Admin Dashboard & System Health
+app.locals.schemaAlert = { isHealthy: true, missingCount: 0, missingSummary: '' };
+
+let hasInitializedDatabase = false;
+async function initializeDatabaseAndSchema() {
+  if (hasInitializedDatabase) return;
+  hasInitializedDatabase = true;
+
+  // 1. Automatically apply any pending database migrations before accepting requests
   try {
     const { runPendingMigrations } = require('./services/migrationRunner');
     await runPendingMigrations({ silent: false });
   } catch (migErr) {
-    console.error('❌ [DATABASE MIGRATION STARTUP ERROR]:', migErr.message);
+    console.error('====================================================');
+    console.error('❌ [DATABASE MIGRATION STARTUP ERROR]');
+    console.error(`   Message: ${migErr.message}`);
+    console.error('   Action: Check migrations or run "npm run migrate"');
+    console.error('====================================================');
   }
+
+  // 2. Schema Safety Check: compare required columns against information_schema
+  try {
+    const { checkSchemaSafetyOnStartup } = require('./services/schemaHealthService');
+    const schemaStatus = await checkSchemaSafetyOnStartup();
+    app.locals.schemaAlert = schemaStatus;
+  } catch (schemaErr) {
+    console.warn('[Startup Schema Check Warning]:', schemaErr.message);
+  }
+
+  // 3. Run auto-repairs for slugs and stitch counts
+  try {
+    const Design = require('./models/Design');
+    await Design.ensureDatabaseColumns();
+    await Design.repairInvalidDatabaseSlugs();
+    await Design.repairExistingStitchCounts();
+  } catch (err) {
+    console.warn('[Startup Repair] Repair warning:', err.message);
+  }
+}
+
+// Trigger initialization immediately on module load (supports Phusion Passenger, cPanel, PM2, Docker)
+const initPromise = initializeDatabaseAndSchema();
+
+// Start Server
+async function startServer() {
+  await initPromise;
 
   app.listen(PORT, '0.0.0.0', async () => {
     console.log('====================================================');
@@ -260,18 +296,13 @@ async function startServer() {
     console.log('📌 Tagline: "Where Threads Tell Stories"');
     console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
     console.log('====================================================');
-
-    try {
-      const Design = require('./models/Design');
-      await Design.repairInvalidDatabaseSlugs();
-      await Design.repairExistingStitchCounts();
-    } catch (err) {
-      console.warn('[Startup Repair] Repair warning:', err.message);
-    }
   });
 }
 
-if (require.main === module) {
+// Passenger or standalone startup check
+if (typeof PhusionPassenger !== 'undefined') {
+  app.listen('passenger');
+} else if (require.main === module) {
   startServer();
 }
 

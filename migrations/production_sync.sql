@@ -603,7 +603,58 @@ SET @query = IF(@idx_exists = 0, 'ALTER TABLE `design_files` ADD INDEX `idx_desi
 PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ----------------------------------------------------------------------------
--- 5. Record Applied Migrations in schema_migrations
+-- 5. Designs & Order Items Schema Extensions (Migrations 012 - 016)
+-- ----------------------------------------------------------------------------
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_front` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_back` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_sleeve` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `hoop_size` VARCHAR(50) NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `description` TEXT NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `short_description` TEXT NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `sub_category` VARCHAR(100) NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `import_image_filename` VARCHAR(255) NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `import_zip_filename` VARCHAR(255) NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME NULL DEFAULT NULL;
+
+ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `price_at_purchase` DECIMAL(10,2) NULL DEFAULT NULL;
+ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `mrp` DECIMAL(10,2) NULL DEFAULT NULL;
+ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `discount_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `quantity` INT NOT NULL DEFAULT 1;
+ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE `reviews` ADD COLUMN IF NOT EXISTS `comment` TEXT NULL DEFAULT NULL;
+ALTER TABLE `contact_messages` ADD COLUMN IF NOT EXISTS `status` VARCHAR(50) NOT NULL DEFAULT 'new';
+ALTER TABLE `design_files` ADD COLUMN IF NOT EXISTS `checksum` VARCHAR(64) NULL DEFAULT NULL;
+
+-- Price update logs
+CREATE TABLE IF NOT EXISTS `price_update_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `admin_id` INT NULL,
+  `admin_email` VARCHAR(150) NULL,
+  `filter_summary` TEXT NULL,
+  `method_summary` TEXT NULL,
+  `total_affected` INT NOT NULL DEFAULT 0,
+  `is_undone` TINYINT(1) NOT NULL DEFAULT 0,
+  `undone_at` DATETIME NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `price_update_log_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `log_id` INT NOT NULL,
+  `design_id` INT NOT NULL,
+  `sku` VARCHAR(100) NULL,
+  `old_mrp` DECIMAL(10,2) NULL,
+  `old_price` DECIMAL(10,2) NULL,
+  `new_mrp` DECIMAL(10,2) NULL,
+  `new_price` DECIMAL(10,2) NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_log_id (`log_id`),
+  INDEX idx_design_id (`design_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- 6. Record Applied Migrations in schema_migrations
 -- ----------------------------------------------------------------------------
 INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('001', '001_initial_schema.sql'),
@@ -616,7 +667,12 @@ INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('008', '008_create_import_jobs.sql'),
   ('009', '009_create_email_campaigns.sql'),
   ('010', '010_add_user_profile_and_design_details.sql'),
-  ('011', '011_rename_row_number_to_row_no.sql');
+  ('011', '011_rename_row_number_to_row_no.sql'),
+  ('012', '012_add_import_image_filename_to_designs.sql'),
+  ('013', '013_add_import_zip_filename_to_designs.sql'),
+  ('014', '014_create_price_update_logs.sql'),
+  ('015', '015_add_stitch_counts_to_designs.sql'),
+  ('016', '016_production_schema_sync.sql');
 
 -- ============================================================================
 -- End of production_sync.sql
