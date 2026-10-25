@@ -396,23 +396,23 @@
       </div>
 
       <!-- Main Designs Table Card -->
-      <div class="admin-card-box" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
-        <table class="admin-table-styled">
+      <div class="admin-card-box" style="padding: 0; overflow-x: auto; margin-bottom: 1.5rem; -webkit-overflow-scrolling: touch; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
+        <table class="admin-table-styled" style="min-width: 1220px; width: 100%; border-collapse: collapse;">
           <thead>
             <tr>
-              <th style="width: 38px; text-align: center;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllDesigns(this)"></th>
-              <th style="width: 60px;">#</th>
-              <th>Design Preview</th>
-              <th>Design Name</th>
-              <th>Category</th>
-              <th>Format</th>
-              <th>Files</th>
-              <th>Price (₹)</th>
-              <th>Stitches</th>
-              <th>Status</th>
-              <th>Downloads</th>
-              <th>Date Added</th>
-              <th style="text-align: right;">Actions</th>
+              <th style="width: 40px; text-align: center; padding: 0.85rem 0.6rem;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllDesigns(this)"></th>
+              <th style="width: 50px; white-space: nowrap; padding: 0.85rem 0.6rem;">#</th>
+              <th style="width: 75px; white-space: nowrap; padding: 0.85rem 0.7rem;">Design Preview</th>
+              <th style="min-width: 150px; white-space: nowrap; padding: 0.85rem 0.8rem;">Design Name</th>
+              <th style="width: 110px; white-space: nowrap; padding: 0.85rem 0.8rem;">Category</th>
+              <th style="width: 75px; white-space: nowrap; padding: 0.85rem 0.8rem;">Format</th>
+              <th style="width: 130px; white-space: nowrap; padding: 0.85rem 0.8rem;">Files</th>
+              <th style="width: 115px; white-space: nowrap; padding: 0.85rem 0.8rem;">Price (₹)</th>
+              <th style="width: 155px; white-space: nowrap; padding: 0.85rem 0.8rem;">Stitches</th>
+              <th style="width: 100px; white-space: nowrap; padding: 0.85rem 0.8rem;">Status</th>
+              <th style="width: 85px; white-space: nowrap; text-align: center; padding: 0.85rem 0.8rem;">Downloads</th>
+              <th style="width: 125px; white-space: nowrap; padding: 0.85rem 0.8rem;">Date Added</th>
+              <th style="text-align: right; white-space: nowrap; min-width: 230px; padding: 0.85rem 1rem;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -426,9 +426,13 @@
                   else if (catName.includes('Monogram')) catClass = 'cat-tag-monogram';
                 %>
                 <tr id="designRow-<%= d.id %>">
-                  <td style="text-align: center;"><input type="checkbox" class="design-checkbox" value="<%= d.id %>" onchange="updateSelectedCount()"></td>
-                  <td><strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong></td>
-                  <td>
+                  <td style="text-align: center; width: 40px; vertical-align: middle; padding: 0.75rem 0.6rem;">
+                    <input type="checkbox" class="design-checkbox" value="<%= d.id %>" onchange="updateSelectedCount()">
+                  </td>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.6rem;">
+                    <strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong>
+                  </td>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.7rem;">
                     <div style="position: relative; width: 52px; height: 52px; display: inline-block;">
                       <% if (d.primary_image) { %>
                         <img id="designImg-<%= d.id %>" src="<%= d.thumbnail_image || d.primary_image %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
@@ -446,14 +450,14 @@
                       <% } %>
                     </div>
                   </td>
-                  <td>
-                    <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark); margin-bottom: 1px;"><%= d.title %></strong>
-                    <span style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= d.sku || ('ARV-FL-00' + d.id) %></span>
+                  <td style="vertical-align: middle; padding: 0.75rem 0.8rem;">
+                    <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark); margin-bottom: 2px; line-height: 1.3;"><%= d.title %></strong>
+                    <span style="font-size: 0.72rem; color: var(--admin-text-muted); font-family: monospace; letter-spacing: 0.3px;"><%= d.sku || ('AED-00' + d.id) %></span>
                   </td>
-                  <td>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
                     <span class="cat-tag <%= catClass %>"><%= catName %></span>
                   </td>
-                  <td>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
                     <% const fmtList = d.formats ? d.formats.split(',').map(f => f.trim()).filter(Boolean) : []; %>
                     <% if (fmtList.length > 0) { %>
                       <% fmtList.forEach(fmt => { %>
@@ -463,28 +467,30 @@
                       <span style="font-size: 0.75rem; color: var(--admin-text-muted);">None</span>
                     <% } %>
                   </td>
-                  <td>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
                     <% if (d.machine_file_name || d.machine_file_path) { %>
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span class="badge" style="background: #E8F5E9; color: #2E7D32; font-size: 0.74rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;" title="<%= d.machine_file_name || 'Machine file attached' %>">
+                      <div style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                        <span class="badge" style="background: #E8F5E9; color: #2E7D32; font-size: 0.74rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;" title="<%= d.machine_file_name || 'Machine file attached' %>">
                           <i class="fa-solid fa-check"></i> ZIP <%= d.machine_file_size_formatted ? '(' + d.machine_file_size_formatted + ')' : '' %>
                         </span>
-                        <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" style="width: 22px; height: 22px; font-size: 0.65rem;" title="Replace ZIP"><i class="fa-solid fa-rotate"></i></button>
+                        <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" style="width: 24px; height: 24px; font-size: 0.7rem; flex-shrink: 0;" title="Replace ZIP"><i class="fa-solid fa-rotate"></i></button>
                       </div>
                     <% } else { %>
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span class="badge" style="background: #FFEBEE; color: #C62828; font-size: 0.74rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                      <div style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                        <span class="badge" style="background: #FFEBEE; color: #C62828; font-size: 0.74rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
                           <i class="fa-solid fa-xmark"></i> No file
                         </span>
-                        <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" style="width: 22px; height: 22px; font-size: 0.65rem; color: var(--admin-primary);" title="Upload ZIP"><i class="fa-solid fa-upload"></i></button>
+                        <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" style="width: 24px; height: 24px; font-size: 0.7rem; color: var(--admin-primary); flex-shrink: 0;" title="Upload ZIP"><i class="fa-solid fa-upload"></i></button>
                       </div>
                     <% } %>
                   </td>
-                  <td>
-                    <div class="inline-price-cell" id="priceCell-<%= d.id %>" data-id="<%= d.id %>" data-mrp="<%= d.price %>" data-price="<%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %>">
-                      <div class="price-display-wrapper" onclick="startInlinePriceEdit('<%= d.id %>')" title="Click to edit selling price" style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 2px 5px; border-radius: 6px; transition: all 0.15s; border: 1px dashed transparent;">
-                        <strong class="price-val" style="font-size: 0.88rem; color: var(--admin-text-dark);">₹<span id="priceVal-<%= d.id %>"><%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %></span></strong>
-                        <i class="fa-solid fa-pen" style="font-size: 0.65rem; color: var(--admin-text-muted); opacity: 0.6;"></i>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
+                    <div class="inline-price-cell" id="priceCell-<%= d.id %>" data-id="<%= d.id %>" data-mrp="<%= d.price %>" data-price="<%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %>" style="white-space: nowrap;">
+                      <div class="price-display-wrapper" onclick="startInlinePriceEdit('<%= d.id %>')" title="Click to edit selling price" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 6px; transition: all 0.15s; border: 1px dashed transparent;">
+                        <strong class="price-val" style="font-size: 0.9rem; color: var(--admin-text-dark); display: inline-flex; align-items: baseline; gap: 2px; font-weight: 700;">
+                          <span>₹</span><span id="priceVal-<%= d.id %>"><%= d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : d.price %></span>
+                        </strong>
+                        <i class="fa-solid fa-pen" style="font-size: 0.65rem; color: var(--admin-text-muted); opacity: 0.7;"></i>
                       </div>
                       <div class="price-edit-wrapper" id="priceEditBox-<%= d.id %>" style="display: none; align-items: center; gap: 4px; margin-top: 4px;">
                         <span style="font-size: 0.82rem; font-weight: 600; color: var(--admin-primary);">₹</span>
@@ -492,54 +498,60 @@
                         <button type="button" onclick="saveInlinePrice('<%= d.id %>')" style="height: 28px; width: 28px; border-radius: 4px; background: #2E7D32; color: #FFF; border: none; cursor: pointer; font-size: 0.72rem;" title="Save (Enter)"><i class="fa-solid fa-check"></i></button>
                         <button type="button" onclick="cancelInlinePriceEdit('<%= d.id %>')" style="height: 28px; width: 28px; border-radius: 4px; background: #E0E0E0; color: #333; border: none; cursor: pointer; font-size: 0.72rem;" title="Cancel (Esc)"><i class="fa-solid fa-xmark"></i></button>
                       </div>
-                      <div style="margin-top: 2px;">
+                      <div style="margin-top: 2px; font-size: 0.72rem;">
                         <% if (d.sale_price && d.price > d.sale_price) { %>
-                          <span id="mrpLine-<%= d.id %>" style="font-size: 0.74rem; color: var(--admin-text-muted); text-decoration: line-through; margin-right: 4px;">₹<%= d.price %></span>
-                          <span id="discountBadge-<%= d.id %>" style="display: inline-block; font-size: 0.68rem; color: #C62828; font-weight: 600;"><%= Math.round(((d.price - d.sale_price) / d.price) * 100) %>% OFF</span>
+                          <span id="mrpLine-<%= d.id %>" style="color: var(--admin-text-muted); text-decoration: line-through; margin-right: 4px;">₹<%= d.price %></span>
+                          <span id="discountBadge-<%= d.id %>" style="display: inline-block; color: #C62828; font-weight: 600;"><%= Math.round(((d.price - d.sale_price) / d.price) * 100) %>% OFF</span>
                         <% } else { %>
-                          <span id="mrpLine-<%= d.id %>" style="display: none; font-size: 0.74rem; color: var(--admin-text-muted); text-decoration: line-through; margin-right: 4px;"></span>
-                          <span id="discountBadge-<%= d.id %>" style="display: inline-block; font-size: 0.68rem; color: var(--admin-text-muted); font-weight: 500;">Regular</span>
+                          <span id="mrpLine-<%= d.id %>" style="display: none; color: var(--admin-text-muted); text-decoration: line-through; margin-right: 4px;"></span>
+                          <span id="discountBadge-<%= d.id %>" style="display: inline-block; color: var(--admin-text-muted); font-weight: 500;">Regular</span>
                         <% } %>
                       </div>
                     </div>
                   </td>
-                  <td>
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
                     <% const stitchTot = d.stitch_count_total !== null && d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== null && d.stitch_count !== undefined ? d.stitch_count : null); %>
                     <% if (stitchTot !== null && stitchTot !== '') { %>
-                      <div style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 4px;">
+                      <div style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;">
                         <span><%= Number(stitchTot).toLocaleString('en-IN') %></span>
                         <% if (d.stitch_total_manual) { %>
                           <span style="font-size: 0.65rem; background: #FFF8E1; color: #F57F17; border: 1px solid #FFE082; padding: 1px 4px; border-radius: 4px; font-weight: 600;" title="Manual Total Override">Manual</span>
                         <% } %>
                       </div>
-                      <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 1px;">
+                      <div style="font-size: 0.72rem; color: var(--admin-text-muted); margin-top: 2px; white-space: nowrap; line-height: 1.3;">
                         <% const comp = []; %>
                         <% if (d.stitch_count_front !== null && d.stitch_count_front !== undefined) comp.push('F: ' + Number(d.stitch_count_front).toLocaleString('en-IN')); %>
                         <% if (d.stitch_count_back !== null && d.stitch_count_back !== undefined) comp.push('B: ' + Number(d.stitch_count_back).toLocaleString('en-IN')); %>
                         <% if (d.stitch_count_sleeve !== null && d.stitch_count_sleeve !== undefined) comp.push('S: ' + Number(d.stitch_count_sleeve).toLocaleString('en-IN')); %>
-                        <%= comp.length > 0 ? comp.join(' • ') : 'Total' %>
-                      </span>
+                        <%= comp.length > 0 ? comp.join(' · ') : 'Total' %>
+                      </div>
                     <% } else { %>
                       <span style="color: var(--admin-text-muted); font-size: 0.84rem;">—</span>
                     <% } %>
                   </td>
-                  <td>
-                    <label class="switch-toggle">
+                  <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
+                    <label class="switch-toggle" style="display: inline-flex; align-items: center; gap: 8px; margin: 0; cursor: pointer;">
                       <input type="checkbox" <%= d.is_active ? 'checked' : '' %> onchange="toggleDesignStatus('<%= d.id %>', this)">
                       <span class="slider-round"></span>
                       <span id="statusLabel-<%= d.id %>" style="font-size: 0.78rem; font-weight: 600; color: <%= d.is_active ? '#2E7D32' : 'var(--admin-text-muted)' %>;"><%= d.is_active ? 'Active' : 'Inactive' %></span>
                     </label>
                   </td>
-                  <td>
-                    <span style="font-size: 0.82rem; color: var(--admin-text-dark); display: flex; align-items: center; gap: 4px;">
+                  <td style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 0.75rem 0.8rem;">
+                    <span style="font-size: 0.82rem; color: var(--admin-text-dark); display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
                       <i class="fa-solid fa-download" style="font-size: 0.75rem; color: var(--admin-primary);"></i> <%= d.download_count !== undefined && d.download_count !== null ? d.download_count : 0 %>
                     </span>
                   </td>
-                  <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    <%= typeof formatDateTime === 'function' ? formatDateTime(d.created_at) : (d.created_at || '-') %>
+                  <td style="color: var(--admin-text-muted); font-size: 0.76rem; white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem; line-height: 1.35;">
+                    <% if (d.created_at) { %>
+                      <% const dt = new Date(d.created_at); %>
+                      <div style="font-weight: 500; color: var(--admin-text-dark);"><%= !isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></div>
+                      <div style="font-size: 0.70rem; color: var(--admin-text-muted);"><%= !isNaN(dt.getTime()) ? dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '' %></div>
+                    <% } else { %>
+                      —
+                    <% } %>
                   </td>
-                  <td style="text-align: right;">
-                    <div style="display: inline-flex; gap: 6px;">
+                  <td style="text-align: right; white-space: nowrap; vertical-align: middle; padding: 0.75rem 1rem; min-width: 230px;">
+                    <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; white-space: nowrap;">
                       <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceImageModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" title="Replace Image"><i class="fa-solid fa-image"></i></button>
                       <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="openReplaceZipModal(this.dataset.id, this.dataset.title)" class="action-icon-btn" title="Replace ZIP"><i class="fa-solid fa-file-zipper"></i></button>
                       <button type="button" data-id="<%= d.id %>" data-title="<%= d.title %>" onclick="duplicateDesign(this.dataset.id, this.dataset.title)" class="action-icon-btn" title="Duplicate Design"><i class="fa-regular fa-copy"></i></button>
@@ -552,7 +564,7 @@
               <% }) %>
             <% } else { %>
               <tr>
-                <td colspan="12" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                <td colspan="13" style="text-align: center; padding: 2.5rem 1rem; color: var(--admin-text-muted);">
                   No embroidery designs found. Click "Add New Design" to create one.
                 </td>
               </tr>

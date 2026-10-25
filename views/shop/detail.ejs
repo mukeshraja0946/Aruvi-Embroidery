@@ -202,6 +202,12 @@
             </div>
           <% } %>
         </div>
+
+        <% if (design.description && design.description.trim()) { %>
+          <div style="margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--border-light); font-size: 0.88rem; color: var(--text-dark); line-height: 1.6; white-space: pre-line;">
+            <%= design.description %>
+          </div>
+        <% } %>
       </div>
 
       <!-- JSON-LD Structured Data with Stitches -->
@@ -308,176 +314,56 @@
     </div>
   </div>
 
-  <!-- Detail Content Section: Technical Details & Information (Unwanted sidebar card removed) -->
-  <div class="detail-content-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-    <div class="tab-main-grid" style="display: block; width: 100%;">
-      <div class="tab-left-pane" style="width: 100%;">
-        <!-- Technical File Details & Embroidery Design Details Box -->
-        <div class="detail-info-card" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.6rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.8rem;">
-            <h3 class="tab-heading" style="margin: 0; font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i> Design Details
-            </h3>
-            <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); background: #FAF6F0; padding: 3px 10px; border-radius: 6px;"><%= design.sku || ('AED-00' + design.id) %></span>
-          </div>
-
-          <!-- Key Design Attributes (Design Name & Category) -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.3rem; background: #FAF6F0; border-radius: 10px; padding: 1rem 1.2rem;">
-            <div>
-              <span style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Design Name</span>
-              <strong style="font-size: 1rem; color: var(--text-dark);"><%= design.title %></strong>
-            </div>
-            <div>
-              <span style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Category</span>
-              <strong style="font-size: 1rem; color: var(--text-dark);"><%= design.category_name || 'Embroidery Design' %></strong>
-            </div>
-            <% if (design.dimensions || design.hoop_size) { %>
-              <div>
-                <span style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Design Size</span>
-                <strong style="font-size: 1rem; color: var(--text-dark);"><%= design.dimensions || design.hoop_size %></strong>
-              </div>
-            <% } %>
-          </div>
-
-          <!-- Stitch Count Breakdown (Front, Back, Sleeve, Total) -->
-          <%
-            const parseNum = (val) => {
-              if (val === null || val === undefined) return null;
-              const clean = String(val).replace(/,/g, '').trim();
-              if (clean === '') return null;
-              const n = parseInt(clean, 10);
-              return (!isNaN(n) && n >= 0) ? n : null;
-            };
-
-            const frontVal = parseNum(design.stitch_count_front !== undefined ? design.stitch_count_front : design.frontStitchCount);
-            const backVal = parseNum(design.stitch_count_back !== undefined ? design.stitch_count_back : design.backStitchCount);
-            const sleeveVal = parseNum(design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : design.sleeveStitchCount);
-
-            const hasFront = frontVal !== null;
-            const hasBack = backVal !== null;
-            const hasSleeve = sleeveVal !== null;
-            const allComponentsAvailable = hasFront && hasBack && hasSleeve;
-            const anyComponentAvailable = hasFront || hasBack || hasSleeve;
-
-            let finalTotal = (design.stitch_count_total !== null && design.stitch_count_total !== undefined) ? Number(design.stitch_count_total) :
-                             ((design.stitch_count !== null && design.stitch_count !== undefined) ? Number(design.stitch_count) :
-                             (design.totalStitchCount !== null && design.totalStitchCount !== undefined ? Number(design.totalStitchCount) : null));
-
-            if (finalTotal === null && (hasFront || hasBack || hasSleeve)) {
-              finalTotal = (frontVal || 0) + (backVal || 0) + (sleeveVal || 0);
-            }
-
-            const hasAnyStitchData = anyComponentAvailable || (finalTotal !== null);
-          %>
-
-          <div style="margin-bottom: 1.5rem;">
-            <h4 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.8rem 0; color: var(--text-dark); display: flex; align-items: center; gap: 7px;">
-              <i class="fa-solid fa-needle" style="color: var(--primary);"></i> Stitch Count
-            </h4>
-
-            <% if (hasAnyStitchData) { %>
-              <!-- 4-Card Responsive Grid: 4 in row on desktop, 2-col on mobile -->
-              <div class="stitch-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 0.5rem;">
-                <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
-                  <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Front</span>
-                  <% if (hasFront) { %>
-                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(frontVal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
-                  <% } else { %>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
-                  <% } %>
-                </div>
-
-                <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
-                  <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Back</span>
-                  <% if (hasBack) { %>
-                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(backVal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
-                  <% } else { %>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
-                  <% } %>
-                </div>
-
-                <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
-                  <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Sleeve</span>
-                  <% if (hasSleeve) { %>
-                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(sleeveVal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
-                  <% } else { %>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
-                  <% } %>
-                </div>
-
-                <div class="stitch-stat-card stitch-total-card" style="background: #F4EBE1; border: 2px solid var(--primary); border-radius: 10px; padding: 0.85rem 1rem;">
-                  <span style="font-size: 0.74rem; color: var(--primary); display: block; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;">Total Stitch Count</span>
-                  <% if (finalTotal !== null) { %>
-                    <strong style="font-size: 1.2rem; color: var(--primary); display: block; margin-top: 2px;"><%= Number(finalTotal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">stitches</span></strong>
-                  <% } else { %>
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not available</span>
-                  <% } %>
-                </div>
-              </div>
-            <% } else { %>
-              <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0; font-style: italic;">Stitch count details not specified for this design.</p>
-            <% } %>
-          </div>
-
-          <!-- Detailed Description with preserved paragraphs and line breaks -->
-          <div>
-            <h4 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.6rem 0; color: var(--text-dark);">Description</h4>
-            <% if (design.description && design.description.trim()) { %>
-              <div class="design-detail-description" style="color: var(--text-dark); font-size: 0.92rem; line-height: 1.7; white-space: pre-line;">
-                <%= design.description %>
-              </div>
-            <% } else { %>
-              <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.6; margin: 0;">
-                High-quality machine embroidery design file carefully digitized for smooth stitch-out, zero thread breakage, and optimum thread tension. Compatible with all major computerized embroidery machines.
-              </p>
-            <% } %>
-          </div>
-        </div>
-
-        <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_reviews === '1') { %>
-          <!-- Real Reviews (Only when toggle is ON in Admin and real reviews exist) -->
-          <div class="real-reviews-container" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
-            <h3 class="tab-heading" style="margin-bottom: 0.8rem; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700;">Customer Reviews (<%= (typeof reviews !== 'undefined' && reviews) ? reviews.length : 0 %>)</h3>
-            <% if (typeof reviews !== 'undefined' && reviews && reviews.length > 0) { %>
-              <div style="display: flex; flex-direction: column; gap: 12px;">
-                <% reviews.forEach(r => { %>
-                  <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.9rem 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                      <strong style="font-size: 0.9rem; color: var(--text-dark);"><%= r.user_name || 'Customer' %></strong>
-                      <span style="color: #F39C12; font-size: 0.85rem; font-weight: 600;">★ <%= r.rating %></span>
+  <% if ((typeof siteSettings !== 'undefined' && siteSettings.show_design_reviews === '1') || (typeof siteSettings !== 'undefined' && siteSettings.show_design_related === '1' && typeof relatedDesigns !== 'undefined' && relatedDesigns && relatedDesigns.length > 0)) { %>
+    <!-- Detail Content Section: Reviews & Related Designs -->
+    <div class="detail-content-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+      <div class="tab-main-grid" style="display: block; width: 100%;">
+        <div class="tab-left-pane" style="width: 100%;">
+          <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_reviews === '1') { %>
+            <!-- Real Reviews (Only when toggle is ON in Admin and real reviews exist) -->
+            <div class="real-reviews-container" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+              <h3 class="tab-heading" style="margin-bottom: 0.8rem; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700;">Customer Reviews (<%= (typeof reviews !== 'undefined' && reviews) ? reviews.length : 0 %>)</h3>
+              <% if (typeof reviews !== 'undefined' && reviews && reviews.length > 0) { %>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  <% reviews.forEach(r => { %>
+                    <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.9rem 1rem;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <strong style="font-size: 0.9rem; color: var(--text-dark);"><%= r.user_name || 'Customer' %></strong>
+                        <span style="color: #F39C12; font-size: 0.85rem; font-weight: 600;">★ <%= r.rating %></span>
+                      </div>
+                      <p style="font-size: 0.88rem; color: var(--text-dark); margin: 0; line-height: 1.5;"><%= r.comment %></p>
                     </div>
-                    <p style="font-size: 0.88rem; color: var(--text-dark); margin: 0; line-height: 1.5;"><%= r.comment %></p>
-                  </div>
+                  <% }) %>
+                </div>
+              <% } else { %>
+                <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0;">No approved reviews yet for this design.</p>
+              <% } %>
+            </div>
+          <% } %>
+
+          <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_related === '1' && typeof relatedDesigns !== 'undefined' && relatedDesigns && relatedDesigns.length > 0) { %>
+            <!-- Real Database Related Designs (Only when toggle is ON in Admin) -->
+            <div class="real-related-container" style="margin-bottom: 1.5rem;">
+              <div class="section-heading-box flex-between" style="margin-bottom: 0.8rem;">
+                <h3 class="tab-heading" style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; margin: 0;">Related Designs</h3>
+                <a href="/designs?category=<%= design.category_slug %>" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
+              </div>
+              <div class="grid-4-strict">
+                <% relatedDesigns.forEach(relDesign => { %>
+                  <%- include('../partials/design-card', {
+                    design: relDesign,
+                    userPurchasedDesignIds: typeof userPurchasedDesignIds !== 'undefined' ? userPurchasedDesignIds : [],
+                    userWishlistDesignIds: typeof userWishlistDesignIds !== 'undefined' ? userWishlistDesignIds : [],
+                    siteSettings: typeof siteSettings !== 'undefined' ? siteSettings : {}
+                  }) %>
                 <% }) %>
               </div>
-            <% } else { %>
-              <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0;">No approved reviews yet for this design.</p>
-            <% } %>
-          </div>
-        <% } %>
-
-        <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_related === '1' && typeof relatedDesigns !== 'undefined' && relatedDesigns && relatedDesigns.length > 0) { %>
-          <!-- Real Database Related Designs (Only when toggle is ON in Admin) -->
-          <div class="real-related-container" style="margin-bottom: 1.5rem;">
-            <div class="section-heading-box flex-between" style="margin-bottom: 0.8rem;">
-              <h3 class="tab-heading" style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; margin: 0;">Related Designs</h3>
-              <a href="/designs?category=<%= design.category_slug %>" class="view-all-link">View All <i class="fa-solid fa-arrow-right"></i></a>
             </div>
-            <div class="grid-4-strict">
-              <% relatedDesigns.forEach(relDesign => { %>
-                <%- include('../partials/design-card', {
-                  design: relDesign,
-                  userPurchasedDesignIds: typeof userPurchasedDesignIds !== 'undefined' ? userPurchasedDesignIds : [],
-                  userWishlistDesignIds: typeof userWishlistDesignIds !== 'undefined' ? userWishlistDesignIds : [],
-                  siteSettings: typeof siteSettings !== 'undefined' ? siteSettings : {}
-                }) %>
-              <% }) %>
-            </div>
-          </div>
-        <% } %>
+          <% } %>
+        </div>
       </div>
     </div>
-  </div>
+  <% } %>
 </div>
 
 <!-- Fullscreen Tap-to-Zoom / Pinch-Zoom Lightbox Modal -->
