@@ -83,9 +83,16 @@ router.post('/admin/designs/import-rollback/:batchId', adminDesignController.pos
 router.get('/admin/designs/import-error-report/:batchId', adminDesignController.downloadImportErrorReport);
 router.post('/admin/designs/import-commit', adminDesignController.postImportCommit);
  
+// CSRF Token endpoint for client-side AJAX requests & dynamic refreshes
+router.get('/admin/api/csrf-token', (req, res) => {
+  const token = typeof req.csrfToken === 'function' ? req.csrfToken() : (req.session?.csrfSecret || res.locals?.csrfToken || '');
+  res.json({ success: true, csrfToken: token });
+});
+
 // Bulk Update Design Details (TXT, PDF, Word, Excel, Notes)
 router.get('/admin/designs/bulk-details', adminDesignController.getBulkDetails);
 router.get('/admin/designs/bulk-details/template', adminDesignController.downloadBulkDetailsTemplate);
+router.get('/admin/designs/bulk-details/template/:format', adminDesignController.downloadBulkDetailsTemplate);
 router.post('/admin/designs/bulk-details/preview', bulkDetailsUploadMiddleware, adminDesignController.postBulkDetailsPreview);
 router.post('/admin/designs/bulk-details/apply', adminDesignController.postBulkDetailsApply);
 router.post('/admin/designs/bulk-details/error-report', adminDesignController.downloadBulkDetailsErrorReport);

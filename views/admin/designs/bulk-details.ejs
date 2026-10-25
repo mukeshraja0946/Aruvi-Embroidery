@@ -178,6 +178,10 @@
       max-height: none;
       -webkit-line-clamp: unset;
     }
+
+    .template-menu-item:hover {
+      background: #F8F5F2 !important;
+    }
   </style>
 </head>
 <body class="admin-body">
@@ -252,6 +256,9 @@
 
     <!-- Main Content -->
     <main class="admin-content-area" style="padding: 2rem;">
+      <!-- Hidden CSRF fallback input -->
+      <input type="hidden" name="_csrf" id="globalCsrfInput" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+
       <!-- Breadcrumb & Title -->
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
         <div>
@@ -264,10 +271,44 @@
           <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Update embroidery stitch counts (front, back, sleeve), descriptions, and categories safely in bulk via Excel, Word, PDF, TXT, or direct notes.</p>
         </div>
 
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <a href="/admin/designs/bulk-details/template" class="btn" style="background: #107C41; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; padding: 9px 16px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 2px 8px rgba(16,124,65,0.2);">
-            <i class="fa-solid fa-file-excel"></i> Download Excel Template
-          </a>
+        <div style="display: flex; gap: 10px; align-items: center; position: relative;">
+          <!-- All Templates Download Dropdown -->
+          <div style="position: relative;" id="templateDropdownContainer">
+            <button type="button" id="templateDropdownBtn" onclick="toggleTemplateMenu(event)" class="btn" style="background: #107C41; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; padding: 9px 16px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(16,124,65,0.25);">
+              <i class="fa-solid fa-file-arrow-down"></i> Download Templates <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; margin-left: 2px;"></i>
+            </button>
+            <div id="templateDropdownMenu" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); width: 280px; z-index: 1000; overflow: hidden; padding: 6px 0;">
+              <div style="padding: 8px 16px 6px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--admin-text-muted); letter-spacing: 0.5px;">Download Format Template</div>
+              <a href="/admin/designs/bulk-details/template/excel" class="template-menu-item" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: var(--admin-text-dark); text-decoration: none; font-size: 0.84rem; font-weight: 500; transition: background 0.15s;">
+                <i class="fa-solid fa-file-excel" style="color: #107C41; font-size: 1.25rem; width: 20px; text-align: center;"></i>
+                <div>
+                  <strong style="color: #107C41;">Excel Spreadsheet</strong>
+                  <div style="font-size: 0.75rem; color: var(--admin-text-muted);">.xlsx format with structured columns</div>
+                </div>
+              </a>
+              <a href="/admin/designs/bulk-details/template/word" class="template-menu-item" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: var(--admin-text-dark); text-decoration: none; font-size: 0.84rem; font-weight: 500; transition: background 0.15s;">
+                <i class="fa-solid fa-file-word" style="color: #2B579A; font-size: 1.25rem; width: 20px; text-align: center;"></i>
+                <div>
+                  <strong style="color: #2B579A;">Word Document</strong>
+                  <div style="font-size: 0.75rem; color: var(--admin-text-muted);">.docx format with formatted notes</div>
+                </div>
+              </a>
+              <a href="/admin/designs/bulk-details/template/pdf" class="template-menu-item" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: var(--admin-text-dark); text-decoration: none; font-size: 0.84rem; font-weight: 500; transition: background 0.15s;">
+                <i class="fa-solid fa-file-pdf" style="color: #D32F2F; font-size: 1.25rem; width: 20px; text-align: center;"></i>
+                <div>
+                  <strong style="color: #D32F2F;">Text-based PDF</strong>
+                  <div style="font-size: 0.75rem; color: var(--admin-text-muted);">.pdf format with selectable text</div>
+                </div>
+              </a>
+              <a href="/admin/designs/bulk-details/template/txt" class="template-menu-item" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: var(--admin-text-dark); text-decoration: none; font-size: 0.84rem; font-weight: 500; transition: background 0.15s;">
+                <i class="fa-solid fa-file-lines" style="color: #555555; font-size: 1.25rem; width: 20px; text-align: center;"></i>
+                <div>
+                  <strong style="color: #555555;">Plain Text</strong>
+                  <div style="font-size: 0.75rem; color: var(--admin-text-muted);">.txt format with --- delimiters</div>
+                </div>
+              </a>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -297,13 +338,18 @@
         <div style="padding: 1.8rem;">
           <!-- MODE A: Direct Notes / Text Area -->
           <div id="modeNotesSection">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
               <label style="font-size: 0.85rem; font-weight: 700; color: var(--admin-text-dark);">
                 Paste Structured Notes
               </label>
-              <button type="button" onclick="insertSampleFormat()" class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; background: #FFF; border-color: var(--admin-border); color: var(--admin-primary); font-weight: 600; cursor: pointer;">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Insert Example Template
-              </button>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <a href="/admin/designs/bulk-details/template/txt" class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 12px; border-radius: 6px; background: #FFF; border: 1px solid var(--admin-border); color: #555; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                  <i class="fa-solid fa-file-arrow-down"></i> Download Text Template (.txt)
+                </a>
+                <button type="button" onclick="insertSampleFormat()" class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 12px; border-radius: 6px; background: #FFF; border: 1px solid var(--admin-border); color: var(--admin-primary); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Insert Example Template
+                </button>
+              </div>
             </div>
             <textarea id="notesInput" class="notes-textarea" placeholder="Design Code: AED-BLO-01
 Design Name: Rose Bloom Design
@@ -327,6 +373,20 @@ Description: Traditional border embroidery design for sarees."></textarea>
 
           <!-- MODE B: File Upload Dropzone (Excel, Word, PDF, TXT) -->
           <div id="modeFileSection" style="display: none;">
+            <!-- Contextual Active Format Template Download Banner -->
+            <div id="activeFormatTemplateBanner" style="display: flex; justify-content: space-between; align-items: center; background: #F8FAF8; border: 1px solid #D6E8D8; border-radius: 12px; padding: 12px 18px; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <i id="tabTemplateIcon" class="fa-solid fa-file-excel" style="font-size: 1.5rem; color: #107C41;"></i>
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark);" id="tabTemplateTitle">Excel Spreadsheet Template (.xlsx)</div>
+                  <div style="font-size: 0.77rem; color: var(--admin-text-muted);" id="tabTemplateDesc">Pre-configured with column headers, sample embroidery data, and field rules.</div>
+                </div>
+              </div>
+              <a id="tabTemplateDownloadBtn" href="/admin/designs/bulk-details/template/excel" class="btn" style="background: #107C41; color: #FFFFFF; font-size: 0.82rem; font-weight: 700; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); white-space: nowrap;">
+                <i class="fa-solid fa-download"></i> Download Excel Template
+              </a>
+            </div>
+
             <div class="dropzone-container" id="dropzoneBox" onclick="document.getElementById('fileInput').click()">
               <input type="file" id="fileInput" name="details_file" style="display: none;" onchange="handleFileSelect(this)">
               <div id="dropzonePrompt">
@@ -488,6 +548,51 @@ Description: Traditional border embroidery design for sarees."></textarea>
   let activePreviewData = null;
   let lastFailedRows = [];
 
+  // Dropdown menu toggle for all templates
+  function toggleTemplateMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('templateDropdownMenu');
+    if (!menu) return;
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  }
+
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('templateDropdownMenu');
+    if (menu && menu.style.display === 'block' && !e.target.closest('#templateDropdownContainer')) {
+      menu.style.display = 'none';
+    }
+  });
+
+  // CSRF Token Management
+  function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+           document.getElementById('globalCsrfInput')?.value ||
+           '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+  }
+
+  async function fetchFreshCsrfToken() {
+    try {
+      const res = await fetch('/admin/api/csrf-token');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.csrfToken) {
+          const meta = document.querySelector('meta[name="csrf-token"]');
+          if (meta) meta.setAttribute('content', data.csrfToken);
+          const input = document.getElementById('globalCsrfInput');
+          if (input) input.value = data.csrfToken;
+          return data.csrfToken;
+        }
+      }
+    } catch (e) {
+      console.warn('Unable to refresh CSRF token automatically:', e);
+    }
+    return getCsrfToken();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchFreshCsrfToken();
+  });
+
   function switchInputMode(mode, element) {
     currentInputMode = mode;
     document.querySelectorAll('.input-mode-tab').forEach(t => t.classList.remove('active'));
@@ -499,6 +604,12 @@ Description: Traditional border embroidery design for sarees."></textarea>
     const dropzoneSubtitle = document.getElementById('dropzoneSubtitle');
     const dropzoneIcon = document.getElementById('dropzoneIcon');
     const fileInput = document.getElementById('fileInput');
+
+    const banner = document.getElementById('activeFormatTemplateBanner');
+    const tabIcon = document.getElementById('tabTemplateIcon');
+    const tabTitle = document.getElementById('tabTemplateTitle');
+    const tabDesc = document.getElementById('tabTemplateDesc');
+    const tabBtn = document.getElementById('tabTemplateDownloadBtn');
 
     if (mode === 'notes') {
       notesSec.style.display = 'block';
@@ -514,24 +625,64 @@ Description: Traditional border embroidery design for sarees."></textarea>
         dropzoneSubtitle.textContent = 'Upload your structured embroidery designs spreadsheet';
         dropzoneIcon.className = 'fa-solid fa-file-excel';
         dropzoneIcon.style.color = '#107C41';
+
+        if (tabIcon) { tabIcon.className = 'fa-solid fa-file-excel'; tabIcon.style.color = '#107C41'; }
+        if (tabTitle) tabTitle.textContent = 'Excel Spreadsheet Template (.xlsx)';
+        if (tabDesc) tabDesc.textContent = 'Pre-configured with column headers, sample embroidery data, and field rules.';
+        if (tabBtn) {
+          tabBtn.href = '/admin/designs/bulk-details/template/excel';
+          tabBtn.innerHTML = '<i class="fa-solid fa-file-excel"></i> Download Excel Template';
+          tabBtn.style.background = '#107C41';
+        }
+        if (banner) { banner.style.background = '#F8FAF8'; banner.style.borderColor = '#D6E8D8'; }
       } else if (mode === 'word') {
         fileInput.accept = '.docx, application/vnd.openxmlformats-officedocument.wordprocessingml.document';
         dropzoneTitle.textContent = 'Upload Word Document (.docx)';
         dropzoneSubtitle.textContent = 'Upload structured Word document containing design specifications';
         dropzoneIcon.className = 'fa-solid fa-file-word';
         dropzoneIcon.style.color = '#2B579A';
+
+        if (tabIcon) { tabIcon.className = 'fa-solid fa-file-word'; tabIcon.style.color = '#2B579A'; }
+        if (tabTitle) tabTitle.textContent = 'Word Document Template (.docx)';
+        if (tabDesc) tabDesc.textContent = 'Pre-formatted Word document with structured design blocks and separation rules.';
+        if (tabBtn) {
+          tabBtn.href = '/admin/designs/bulk-details/template/word';
+          tabBtn.innerHTML = '<i class="fa-solid fa-file-word"></i> Download Word Template';
+          tabBtn.style.background = '#2B579A';
+        }
+        if (banner) { banner.style.background = '#F8FAFD'; banner.style.borderColor = '#D3DFEE'; }
       } else if (mode === 'pdf') {
         fileInput.accept = '.pdf, application/pdf';
         dropzoneTitle.textContent = 'Upload Text-based PDF (.pdf)';
         dropzoneSubtitle.textContent = 'Ensure the PDF contains selectable text (not scanned images)';
         dropzoneIcon.className = 'fa-solid fa-file-pdf';
         dropzoneIcon.style.color = '#D32F2F';
+
+        if (tabIcon) { tabIcon.className = 'fa-solid fa-file-pdf'; tabIcon.style.color = '#D32F2F'; }
+        if (tabTitle) tabTitle.textContent = 'Text-based PDF Template (.pdf)';
+        if (tabDesc) tabDesc.textContent = 'Standard PDF document with structured design specifications ready for import.';
+        if (tabBtn) {
+          tabBtn.href = '/admin/designs/bulk-details/template/pdf';
+          tabBtn.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Download PDF Template';
+          tabBtn.style.background = '#D32F2F';
+        }
+        if (banner) { banner.style.background = '#FDF8F8'; banner.style.borderColor = '#EED3D3'; }
       } else if (mode === 'txt') {
         fileInput.accept = '.txt, text/plain';
         dropzoneTitle.textContent = 'Upload Plain Text File (.txt)';
         dropzoneSubtitle.textContent = 'Upload structured text entries separated by ---';
         dropzoneIcon.className = 'fa-solid fa-file-lines';
         dropzoneIcon.style.color = '#555';
+
+        if (tabIcon) { tabIcon.className = 'fa-solid fa-file-lines'; tabIcon.style.color = '#555555'; }
+        if (tabTitle) tabTitle.textContent = 'Plain Text Template (.txt)';
+        if (tabDesc) tabDesc.textContent = 'Plain UTF-8 text file with structured design fields and --- delimiters.';
+        if (tabBtn) {
+          tabBtn.href = '/admin/designs/bulk-details/template/txt';
+          tabBtn.innerHTML = '<i class="fa-solid fa-file-lines"></i> Download Text Template';
+          tabBtn.style.background = '#555555';
+        }
+        if (banner) { banner.style.background = '#F9F9F9'; banner.style.borderColor = '#E0E0E0'; }
       }
     }
   }
@@ -642,8 +793,12 @@ Description: Intricate peacock border embroidery pattern for sarees and lehengas
     const previewBtn = document.getElementById('previewBtn');
     const originalBtnHtml = previewBtn.innerHTML;
 
+    let csrfToken = getCsrfToken();
+    if (!csrfToken) {
+      csrfToken = await fetchFreshCsrfToken();
+    }
+
     const formData = new FormData();
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     formData.append('_csrf', csrfToken);
 
     const clearOption = document.getElementById('clearFieldOption').checked ? '1' : '0';
@@ -668,15 +823,32 @@ Description: Intricate peacock border embroidery pattern for sarees and lehengas
       previewBtn.disabled = true;
       previewBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing & Validating...';
 
-      const res = await fetch('/admin/designs/bulk-details/preview', {
-        method: 'POST',
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: formData
-      });
+      const sendPreviewRequest = async (token) => {
+        return await fetch('/admin/designs/bulk-details/preview?_csrf=' + encodeURIComponent(token), {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': token
+          },
+          body: formData
+        });
+      };
 
-      const data = await res.json();
+      let res = await sendPreviewRequest(csrfToken);
+      let data = await res.json();
+
+      // Transparent retry on CSRF token expiration or mismatch
+      if (!res.ok && (res.status === 403 || data.isCsrf || (data.message && data.message.toLowerCase().includes('token')))) {
+        console.warn('CSRF token expired, refreshing token and retrying preview...');
+        const freshToken = await fetchFreshCsrfToken();
+        if (freshToken && freshToken !== csrfToken) {
+          csrfToken = freshToken;
+          formData.set('_csrf', freshToken);
+          res = await sendPreviewRequest(freshToken);
+          data = await res.json();
+        }
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Unable to parse details input.');
       }
@@ -830,20 +1002,38 @@ Description: Intricate peacock border embroidery pattern for sarees and lehengas
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Applying Updates...';
 
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-      const res = await fetch('/admin/designs/bulk-details/apply', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({
-          _csrf: csrfToken,
-          items: activePreviewData.items
-        })
-      });
+      let csrfToken = getCsrfToken();
+      if (!csrfToken) csrfToken = await fetchFreshCsrfToken();
 
-      const data = await res.json();
+      const sendApplyRequest = async (token) => {
+        return await fetch('/admin/designs/bulk-details/apply?_csrf=' + encodeURIComponent(token), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': token
+          },
+          body: JSON.stringify({
+            _csrf: token,
+            items: activePreviewData.items
+          })
+        });
+      };
+
+      let res = await sendApplyRequest(csrfToken);
+      let data = await res.json();
+
+      // Transparent retry on CSRF token expiration or mismatch
+      if (!res.ok && (res.status === 403 || data.isCsrf || (data.message && data.message.toLowerCase().includes('token')))) {
+        console.warn('CSRF token expired, refreshing token and retrying apply...');
+        const freshToken = await fetchFreshCsrfToken();
+        if (freshToken && freshToken !== csrfToken) {
+          csrfToken = freshToken;
+          res = await sendApplyRequest(freshToken);
+          data = await res.json();
+        }
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to apply updates.');
       }
@@ -881,17 +1071,33 @@ Description: Intricate peacock border embroidery pattern for sarees and lehengas
     if (!lastFailedRows || lastFailedRows.length === 0) return;
 
     try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-      const res = await fetch('/admin/designs/bulk-details/error-report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          _csrf: csrfToken,
-          failedRows: lastFailedRows
-        })
-      });
+      let csrfToken = getCsrfToken();
+      if (!csrfToken) csrfToken = await fetchFreshCsrfToken();
+
+      const sendErrorReportRequest = async (token) => {
+        return await fetch('/admin/designs/bulk-details/error-report?_csrf=' + encodeURIComponent(token), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': token
+          },
+          body: JSON.stringify({
+            _csrf: token,
+            failedRows: lastFailedRows
+          })
+        });
+      };
+
+      let res = await sendErrorReportRequest(csrfToken);
+      if (!res.ok) {
+        const freshToken = await fetchFreshCsrfToken();
+        if (freshToken && freshToken !== csrfToken) {
+          res = await sendErrorReportRequest(freshToken);
+        }
+      }
+
+      if (!res.ok) throw new Error('Failed to generate error report.');
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

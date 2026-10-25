@@ -3112,14 +3112,45 @@ exports.getBulkDetails = async (req, res, next) => {
 };
 
 /**
- * Bulk Update Design Details - Download Excel Template
+ * Bulk Update Design Details - Download Template for All Supported Formats (.xlsx, .docx, .pdf, .txt)
  */
 exports.downloadBulkDetailsTemplate = async (req, res, next) => {
   try {
+    const rawFormat = (req.params.format || req.query.format || req.query.type || 'xlsx').toString().toLowerCase().trim();
+    
+    if (rawFormat === 'word' || rawFormat === 'docx' || rawFormat === 'doc') {
+      const buffer = bulkDesignDetailsService.generateTemplateDocx();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename="aruvi_design_details_template.docx"');
+      return res.send(buffer);
+    }
+
+    if (rawFormat === 'pdf') {
+      const buffer = bulkDesignDetailsService.generateTemplatePdf();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="aruvi_design_details_template.pdf"');
+      return res.send(buffer);
+    }
+
+    if (rawFormat === 'txt' || rawFormat === 'text') {
+      const buffer = bulkDesignDetailsService.generateTemplateText();
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="aruvi_design_details_template.txt"');
+      return res.send(buffer);
+    }
+
+    if (rawFormat === 'sample' || rawFormat === 'json') {
+      return res.json({
+        success: true,
+        text: bulkDesignDetailsService.getSampleTemplateText()
+      });
+    }
+
+    // Default to Excel (.xlsx)
     const buffer = bulkDesignDetailsService.generateTemplateWorkbook();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="aruvi_design_details_template.xlsx"');
-    res.send(buffer);
+    return res.send(buffer);
   } catch (err) {
     next(err);
   }

@@ -21,6 +21,13 @@ function csrfProtection(req, res, next) {
   // Safe HTTP methods do not mutate state
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
   if (safeMethods.includes(req.method)) {
+    if (typeof res.cookie === 'function') {
+      res.cookie('XSRF-TOKEN', req.session.csrfSecret, {
+        httpOnly: false,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      });
+    }
     return next();
   }
 

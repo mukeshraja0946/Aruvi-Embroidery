@@ -3,6 +3,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const mammoth = require('mammoth');
 const pdfParse = require('pdf-parse');
+const AdmZip = require('adm-zip');
 
 const db = require('../config/db');
 const Design = require('../models/Design');
@@ -10,6 +11,155 @@ const Category = require('../models/Category');
 const ActivityLog = require('../models/ActivityLog');
 
 class BulkDesignDetailsService {
+  /**
+   * Returns clean structured text for templates and notes
+   */
+  getSampleTemplateText() {
+    return [
+      '================================================================================',
+      'ARUVI EMBROIDERY STUDIO - BULK DESIGN DETAILS TEMPLATE',
+      '================================================================================',
+      'INSTRUCTIONS & RULES:',
+      '1. Each design record begins with "Design Code / SKU:".',
+      '2. Separate multiple design entries with "---" on a single line.',
+      '3. Blank or omitted fields will leave existing database values UNCHANGED.',
+      '4. To explicitly erase or clear a field, enter [CLEAR].',
+      '5. Stitch counts should be non-negative whole numbers (e.g. 12500, 8200).',
+      '================================================================================',
+      '',
+      'Design Code / SKU: AED-BLO-01',
+      'Design Name: Rose Bloom Design',
+      'Category: Blouse Designs',
+      'Front Stitch Count: 12500',
+      'Back Stitch Count: 8200',
+      'Sleeve Stitch Count: 4500',
+      'Description: Floral embroidery design with matching front, back, and sleeve patterns.',
+      '',
+      '---',
+      '',
+      'Design Code / SKU: AED-BOR-02',
+      'Design Name: Peacock Border Motif',
+      'Category: Border Designs',
+      'Front Stitch Count: 9400',
+      'Back Stitch Count: 6100',
+      'Sleeve Stitch Count: 3200',
+      'Description: Intricate peacock border pattern suitable for sarees and lehengas.'
+    ].join('\n');
+  }
+
+  /**
+   * Generates Plain Text (.txt) Template
+   */
+  generateTemplateText() {
+    return Buffer.from(this.getSampleTemplateText(), 'utf-8');
+  }
+
+  /**
+   * Generates Word Document (.docx) Template
+   */
+  generateTemplateDocx() {
+    const zip = new AdmZip();
+    const contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>';
+
+    const relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>';
+
+    const escapeXml = (s) => String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+
+    const text = this.getSampleTemplateText();
+    const lines = text.split('\n');
+    const paragraphs = lines.map(line => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`).join('');
+
+    const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:body>' + paragraphs + '</w:body>' +
+      '</w:document>';
+
+    zip.addFile('[Content_Types].xml', Buffer.from(contentTypesXml, 'utf8'));
+    zip.addFile('_rels/.rels', Buffer.from(relsXml, 'utf8'));
+    zip.addFile('word/document.xml', Buffer.from(docXml, 'utf8'));
+
+    return zip.toBuffer();
+  }
+
+  /**
+   * Generates Text-based PDF (.pdf) Template
+   */
+  generateTemplatePdf() {
+    const escapePdfText = (str) => {
+      return str.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    };
+
+    const text = this.getSampleTemplateText();
+    const lines = text.split('\n');
+    let streamContent = 'BT\n/F1 9 Tf\n13 TL\n45 790 Td\n';
+    lines.forEach((line, idx) => {
+      if (idx === 0) {
+        streamContent += `(${escapePdfText(line)}) Tj\n`;
+      } else {
+        streamContent += `T* (${escapePdfText(line)}) Tj\n`;
+      }
+    });
+    streamContent += 'ET\n';
+
+    const streamLength = Buffer.byteLength(streamContent, 'utf8');
+
+    let pdf = '%PDF-1.4\n';
+    const offsets = [];
+
+    offsets.push(Buffer.byteLength(pdf, 'utf8'));
+    pdf += '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n';
+
+    offsets.push(Buffer.byteLength(pdf, 'utf8'));
+    pdf += '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n';
+
+    offsets.push(Buffer.byteLength(pdf, 'utf8'));
+    pdf += '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n';
+
+    offsets.push(Buffer.byteLength(pdf, 'utf8'));
+    pdf += `4 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamContent}endstream\nendobj\n`;
+
+    offsets.push(Buffer.byteLength(pdf, 'utf8'));
+    pdf += '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n';
+
+    const startXref = Buffer.byteLength(pdf, 'utf8');
+    pdf += `xref\n0 6\n0000000000 65535 f \n`;
+    for (const off of offsets) {
+      pdf += `${String(off).padStart(10, '0')} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
+
+    return Buffer.from(pdf, 'binary');
+  }
+
+  /**
+   * Helper to extract text from a PDF buffer (compatible with both pdf-parse v1 and v2)
+   */
+  async extractPdfText(buffer) {
+    if (typeof pdfParse === 'function') {
+      const data = await pdfParse(buffer);
+      return (data && data.text) ? data.text.trim() : '';
+    } else if (pdfParse && pdfParse.PDFParse) {
+      const parser = new pdfParse.PDFParse({ data: buffer });
+      const res = await parser.getText();
+      if (typeof parser.destroy === 'function') await parser.destroy();
+      return (res && res.text) ? res.text.trim() : (typeof res === 'string' ? res.trim() : '');
+    }
+    throw new Error('PDF parsing library is unavailable.');
+  }
+
   /**
    * Generates a clean Excel template with 'Design Details' sheet + 'Instructions' guide.
    */
@@ -185,16 +335,15 @@ class BulkDesignDetailsService {
         }
         throw new Error('Legacy binary .doc file could not be parsed safely. Please save or export your document as modern Word (.docx), Excel (.xlsx), PDF, or plain text (.txt) and try again.');
       } else if (ext === '.pdf') {
-        let pdfData;
+        let extractedText = '';
         try {
-          pdfData = await pdfParse(buffer);
+          extractedText = await this.extractPdfText(buffer);
         } catch (pdfErr) {
           throw new Error(`Unable to read PDF file: ${pdfErr.message}`);
         }
 
-        const extractedText = (pdfData && pdfData.text) ? pdfData.text.trim() : '';
         // If PDF contains very little or no text (e.g. scanned image pages), report OCR required as requested
-        if (extractedText.length < 15) {
+        if (!extractedText || extractedText.length < 15) {
           throw new Error('This PDF appears to be a scanned document or image-only PDF. Direct text extraction is not possible. Optical Character Recognition (OCR) is required to import scanned documents. Please upload a text-based PDF, Word, Excel, or TXT file instead.');
         }
 
