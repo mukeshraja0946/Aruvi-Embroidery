@@ -291,6 +291,17 @@ exports.postCreate = async (req, res, next) => {
       req.flash('error', sleeveCheck.error);
       return res.redirect('back');
     }
+    const totalCheck = validateStitchCount(stitch_count, 'Total Stitch Count');
+    if (!totalCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: totalCheck.error });
+      req.flash('error', totalCheck.error);
+      return res.redirect('back');
+    }
+
+    let finalTotalStitches = totalCheck.value;
+    if (finalTotalStitches === undefined && frontCheck.value !== undefined && backCheck.value !== undefined && sleeveCheck.value !== undefined) {
+      finalTotalStitches = (frontCheck.value || 0) + (backCheck.value || 0) + (sleeveCheck.value || 0);
+    }
 
     // SKU Auto-generation & Uniqueness Validation
     let finalSku = (sku && sku.trim()) ? sku.trim() : null;
@@ -350,12 +361,12 @@ exports.postCreate = async (req, res, next) => {
       sale_price: sellingPrice,
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || null,
-      stitch_count: stitch_count ? parseInt(stitch_count) : null,
+      stitch_count: finalTotalStitches !== undefined ? finalTotalStitches : null,
       stitch_count_front: frontCheck.value,
       stitch_count_back: backCheck.value,
       stitch_count_sleeve: sleeveCheck.value,
       description: description !== undefined ? description : null,
-      dimensions: dimensions || null,
+      dimensions: dimensions ? String(dimensions).trim() : null,
       formats: detectedFormatsStr,
       is_featured: is_featured ? 1 : 0,
       is_trending: is_trending ? 1 : 0,
@@ -502,6 +513,17 @@ exports.postEdit = async (req, res, next) => {
       req.flash('error', sleeveCheck.error);
       return res.redirect('back');
     }
+    const totalCheck = validateStitchCount(stitch_count, 'Total Stitch Count');
+    if (!totalCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: totalCheck.error });
+      req.flash('error', totalCheck.error);
+      return res.redirect('back');
+    }
+
+    let finalTotalVal = totalCheck.value !== undefined ? totalCheck.value : undefined;
+    if (finalTotalVal === undefined && frontCheck.value !== undefined && backCheck.value !== undefined && sleeveCheck.value !== undefined) {
+      finalTotalVal = (frontCheck.value || 0) + (backCheck.value || 0) + (sleeveCheck.value || 0);
+    }
 
     const existingDesign = await Design.getById(id);
     if (!existingDesign) {
@@ -556,12 +578,12 @@ exports.postEdit = async (req, res, next) => {
       sale_price: sellingPrice,
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || existingDesign.hoop_size || null,
-      stitch_count: (stitch_count !== undefined && stitch_count !== '') ? parseInt(stitch_count) : (existingDesign.stitch_count || null),
+      stitch_count: finalTotalVal !== undefined ? finalTotalVal : (existingDesign.stitch_count || null),
       stitch_count_front: frontCheck.value !== undefined ? frontCheck.value : (existingDesign.stitch_count_front || null),
       stitch_count_back: backCheck.value !== undefined ? backCheck.value : (existingDesign.stitch_count_back || null),
       stitch_count_sleeve: sleeveCheck.value !== undefined ? sleeveCheck.value : (existingDesign.stitch_count_sleeve || null),
       description: description !== undefined ? description : (existingDesign.description || null),
-      dimensions: dimensions || existingDesign.dimensions || null,
+      dimensions: dimensions !== undefined ? (dimensions ? String(dimensions).trim() : null) : (existingDesign.dimensions || null),
       formats: formats || existingDesign.formats || '',
       is_featured: is_featured ? 1 : 0,
       is_trending: is_trending ? 1 : 0,

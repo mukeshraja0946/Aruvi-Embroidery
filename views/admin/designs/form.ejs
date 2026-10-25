@@ -223,17 +223,25 @@
                 </div>
               </div>
 
-              <!-- Category -->
-              <div style="margin-bottom: 1.2rem;">
-                <label class="form-label-custom">Category <span class="req">*</span></label>
-                <select name="category_id" id="categorySelect" class="form-control-custom" required onchange="onCategoryChange()">
-                  <option value="">Select Category</option>
-                  <% categories.forEach(cat => { %>
-                    <option value="<%= cat.id %>" <%= (design && design.category_id == cat.id) ? 'selected' : '' %>>
-                      <%= cat.name %>
-                    </option>
-                  <% }) %>
-                </select>
+              <!-- Category & Design Size (2-Col) -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem;">
+                <div>
+                  <label class="form-label-custom">Category <span class="req">*</span></label>
+                  <select name="category_id" id="categorySelect" class="form-control-custom" required onchange="onCategoryChange()">
+                    <option value="">Select Category</option>
+                    <% categories.forEach(cat => { %>
+                      <option value="<%= cat.id %>" <%= (design && design.category_id == cat.id) ? 'selected' : '' %>>
+                        <%= cat.name %>
+                      </option>
+                    <% }) %>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Design Size</label>
+                  <input type="text" name="dimensions" class="form-control-custom" value="<%= design && (design.dimensions || design.hoop_size) ? (design.dimensions || design.hoop_size) : '' %>" placeholder="e.g. 140mm x 180mm (5x7 inch)">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Garment size / hoop dimensions (e.g. 140mm x 180mm)</span>
+                </div>
               </div>
 
               <!-- Detailed Description -->
@@ -250,25 +258,31 @@
                 <h3 style="margin: 0;"><i class="fa-solid fa-needle" style="color: var(--admin-primary); margin-right: 6px;"></i> Embroidery Stitch Counts</h3>
                 <span style="font-size: 0.75rem; color: var(--admin-text-muted);">Non-negative whole numbers</span>
               </div>
-              <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem 0;">Specify individual stitch counts for each garment section. Values are displayed on the customer design details page.</p>
+              <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem 0;">Specify individual stitch counts for each garment section. The total is displayed prominently on the customer page.</p>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1.2rem;">
                 <div>
                   <label class="form-label-custom">Front Stitch Count</label>
-                  <input type="number" min="0" step="1" name="stitch_count_front" class="form-control-custom" value="<%= design && design.stitch_count_front !== null && design.stitch_count_front !== undefined ? design.stitch_count_front : '' %>" placeholder="e.g. 12500">
+                  <input type="number" min="0" step="1" name="stitch_count_front" id="stitchFrontInput" class="form-control-custom stitch-comp-input" value="<%= design && design.stitch_count_front !== null && design.stitch_count_front !== undefined ? design.stitch_count_front : '' %>" placeholder="e.g. 12000" oninput="autoCalculateTotalStitches()">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Front neck / bodice</span>
                 </div>
 
                 <div>
                   <label class="form-label-custom">Back Stitch Count</label>
-                  <input type="number" min="0" step="1" name="stitch_count_back" class="form-control-custom" value="<%= design && design.stitch_count_back !== null && design.stitch_count_back !== undefined ? design.stitch_count_back : '' %>" placeholder="e.g. 8200">
+                  <input type="number" min="0" step="1" name="stitch_count_back" id="stitchBackInput" class="form-control-custom stitch-comp-input" value="<%= design && design.stitch_count_back !== null && design.stitch_count_back !== undefined ? design.stitch_count_back : '' %>" placeholder="e.g. 7500" oninput="autoCalculateTotalStitches()">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Back neck pattern</span>
                 </div>
 
                 <div>
                   <label class="form-label-custom">Sleeve Stitch Count</label>
-                  <input type="number" min="0" step="1" name="stitch_count_sleeve" class="form-control-custom" value="<%= design && design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : '' %>" placeholder="e.g. 4500">
+                  <input type="number" min="0" step="1" name="stitch_count_sleeve" id="stitchSleeveInput" class="form-control-custom stitch-comp-input" value="<%= design && design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : '' %>" placeholder="e.g. 5300" oninput="autoCalculateTotalStitches()">
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Sleeve / arm border</span>
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Total Stitch Count <span style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 600;">(Overall)</span></label>
+                  <input type="number" min="0" step="1" name="stitch_count" id="stitchCountTotalInput" class="form-control-custom" value="<%= design && design.stitch_count !== null && design.stitch_count !== undefined ? design.stitch_count : '' %>" placeholder="e.g. 24800" oninput="this.dataset.manual='true'">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Overall total (auto-sum or custom)</span>
                 </div>
               </div>
             </div>
@@ -1272,6 +1286,27 @@
         }
       }
     });
+  }
+
+  function autoCalculateTotalStitches() {
+    const frontEl = document.getElementById('stitchFrontInput');
+    const backEl = document.getElementById('stitchBackInput');
+    const sleeveEl = document.getElementById('stitchSleeveInput');
+    const totalEl = document.getElementById('stitchCountTotalInput');
+    if (!totalEl) return;
+
+    const fVal = frontEl && frontEl.value.trim() !== '' ? parseInt(frontEl.value, 10) : null;
+    const bVal = backEl && backEl.value.trim() !== '' ? parseInt(backEl.value, 10) : null;
+    const sVal = sleeveEl && sleeveEl.value.trim() !== '' ? parseInt(sleeveEl.value, 10) : null;
+
+    if (fVal !== null && !isNaN(fVal) && bVal !== null && !isNaN(bVal) && sVal !== null && !isNaN(sVal)) {
+      const sum = fVal + bVal + sVal;
+      totalEl.placeholder = 'e.g. ' + sum;
+      if (!totalEl.dataset.manual && (!totalEl.value || totalEl.dataset.autofilled === 'true')) {
+        totalEl.value = sum;
+        totalEl.dataset.autofilled = 'true';
+      }
+    }
   }
 </script>
 

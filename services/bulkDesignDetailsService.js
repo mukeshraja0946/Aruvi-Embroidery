@@ -625,6 +625,14 @@ class BulkDesignDetailsService {
           updatePayload.description = item.proposed.description;
         }
 
+        // Keep total stitch count synchronized when all three components exist
+        const f = updatePayload.stitch_count_front !== undefined ? updatePayload.stitch_count_front : item.existing.stitch_count_front;
+        const b = updatePayload.stitch_count_back !== undefined ? updatePayload.stitch_count_back : item.existing.stitch_count_back;
+        const s = updatePayload.stitch_count_sleeve !== undefined ? updatePayload.stitch_count_sleeve : item.existing.stitch_count_sleeve;
+        if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
+          updatePayload.stitch_count = Number(f) + Number(b) + Number(s);
+        }
+
         await Design.update(item.designId, updatePayload);
         updatedCount++;
       } catch (updateErr) {

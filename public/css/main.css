@@ -2072,10 +2072,8 @@ textarea.form-control {
 }
 
 .tab-main-grid {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 2.5rem;
-  align-items: flex-start;
+  display: block;
+  width: 100%;
 }
 
 .tab-heading {
