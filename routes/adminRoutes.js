@@ -102,6 +102,13 @@ router.post('/admin/api/bulk-price/preview', upload.single('file'), adminDesignC
 router.post('/admin/api/bulk-price/apply', adminDesignController.applyBulkPriceUpdate);
 router.post('/admin/api/designs/:id/inline-price', adminDesignController.updateInlinePrice);
 
+// Bulk Stitch Updates & Design Export
+router.get('/admin/designs/bulk-stitch/template', adminDesignController.downloadBulkStitchTemplate);
+router.post('/admin/api/bulk-stitch/count', adminDesignController.getBulkStitchCount);
+router.post('/admin/api/bulk-stitch/preview', upload.single('file'), adminDesignController.getBulkStitchPreview);
+router.post('/admin/api/bulk-stitch/apply', adminDesignController.applyBulkStitchUpdate);
+router.get('/admin/designs/export', adminDesignController.exportDesigns);
+
 // Categories Management
 router.get('/admin/categories', adminCategoryController.getCategories);
 router.post('/admin/categories/create', upload.single('image'), adminCategoryController.postCreate);
@@ -204,5 +211,12 @@ router.get('/admin/tools/price-history', adminToolsController.getPriceHistory);
 router.get('/admin/tools/price-history/:id', adminToolsController.getPriceHistoryDetail);
 router.post('/admin/tools/price-history/undo/:id', adminToolsController.undoPriceHistory);
 router.get('/admin/tools/price-history/download/:id', adminToolsController.downloadPriceHistoryCsv);
+
+// Stitch Update History & Audit (Update History)
+router.get('/admin/tools/stitch-history', adminToolsController.getStitchHistory);
+router.get('/admin/tools/update-history', adminToolsController.getStitchHistory);
+router.get('/admin/tools/stitch-history/:id', adminToolsController.getStitchHistoryDetail);
+router.post('/admin/tools/stitch-history/undo/:id', adminToolsController.undoStitchHistory);
+router.get('/admin/tools/stitch-history/download/:id', adminToolsController.downloadStitchHistoryCsv);
 
 module.exports = router;

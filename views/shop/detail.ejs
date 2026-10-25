@@ -31,8 +31,9 @@
       </div>
 
       <div class="main-image-display" id="mainImageDisplayWrapper" style="cursor: zoom-in;" onclick="openLightbox(document.getElementById('mainDisplayImg').src)">
-        <button type="button" class="wishlist-round-btn wishlist-btn <%= inWishlist ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
-          <i class="fa-<%= inWishlist ? 'solid' : 'regular' %> fa-heart"></i>
+        <% const isWish = (typeof inWishlist !== 'undefined' && inWishlist) || (typeof userWishlistDesignIds !== 'undefined' && userWishlistDesignIds && userWishlistDesignIds.includes(design.id)); %>
+        <button type="button" class="wishlist-round-btn wishlist-btn <%= isWish ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
+          <i class="fa-<%= isWish ? 'solid' : 'regular' %> fa-heart"></i>
         </button>
         <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img">
         <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass-plus"></i> Tap to zoom</span>
@@ -132,8 +133,93 @@
               <span class="spec-value"><%= design.formats %></span>
             </div>
           <% } %>
+
+          <%
+            const _stitchFmtLocale = (typeof siteSettings !== 'undefined' && siteSettings && siteSettings.stitch_number_format === 'international') ? 'en-US' : 'en-IN';
+            function _fmtStitchRow(val) {
+              if (val === null || val === undefined || val === '') return null;
+              const clean = String(val).replace(/,/g, '').trim();
+              if (clean === '') return null;
+              const n = parseInt(clean, 10);
+              if (isNaN(n) || n <= 0) return null;
+              return n.toLocaleString(_stitchFmtLocale);
+            }
+
+            const _frontStr = _fmtStitchRow(design.stitch_count_front !== undefined ? design.stitch_count_front : design.frontStitchCount);
+            const _backStr = _fmtStitchRow(design.stitch_count_back !== undefined ? design.stitch_count_back : design.backStitchCount);
+            const _sleeveStr = _fmtStitchRow(design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : design.sleeveStitchCount);
+            
+            let _rawTotal = (design.stitch_count_total !== null && design.stitch_count_total !== undefined) ? design.stitch_count_total :
+                            ((design.stitch_count !== null && design.stitch_count !== undefined) ? design.stitch_count :
+                            (design.totalStitchCount !== null && design.totalStitchCount !== undefined ? design.totalStitchCount : null));
+
+            if ((_rawTotal === null || _rawTotal === undefined || _rawTotal === '') && (_frontStr || _backStr || _sleeveStr)) {
+              const fn = _frontStr ? parseInt(_frontStr.replace(/,/g, ''), 10) : 0;
+              const bn = _backStr ? parseInt(_backStr.replace(/,/g, ''), 10) : 0;
+              const sn = _sleeveStr ? parseInt(_sleeveStr.replace(/,/g, ''), 10) : 0;
+              _rawTotal = fn + bn + sn;
+            }
+            const _totalStr = _fmtStitchRow(_rawTotal);
+
+            const _showFront = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_front !== '0') && _frontStr;
+            const _showBack = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_back !== '0') && _backStr;
+            const _showSleeve = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_sleeve !== '0') && _sleeveStr;
+            const _hasAnyStitchVal = Boolean(_frontStr || _backStr || _sleeveStr || _totalStr);
+            const _showTotal = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_total !== '0') && _totalStr && _hasAnyStitchVal;
+
+            const _labelFront = (typeof siteSettings !== 'undefined' && siteSettings.label_stitch_front) || 'Stitch Count (Front)';
+            const _labelBack = (typeof siteSettings !== 'undefined' && siteSettings.label_stitch_back) || 'Stitch Count (Back)';
+            const _labelSleeve = (typeof siteSettings !== 'undefined' && siteSettings.label_stitch_sleeve) || 'Stitch Count (Sleeve)';
+            const _labelTotal = (typeof siteSettings !== 'undefined' && siteSettings.label_stitch_total) || 'Total Stitch Count';
+          %>
+
+          <% if (_showFront) { %>
+            <div class="spec-row">
+              <span class="spec-label"><%= _labelFront %></span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value"><%= _frontStr %></span>
+            </div>
+          <% } %>
+          <% if (_showBack) { %>
+            <div class="spec-row">
+              <span class="spec-label"><%= _labelBack %></span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value"><%= _backStr %></span>
+            </div>
+          <% } %>
+          <% if (_showSleeve) { %>
+            <div class="spec-row">
+              <span class="spec-label"><%= _labelSleeve %></span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value"><%= _sleeveStr %></span>
+            </div>
+          <% } %>
+          <% if (_showTotal) { %>
+            <div class="spec-row">
+              <span class="spec-label"><%= _labelTotal %></span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value highlight-bold"><%= _totalStr %></span>
+            </div>
+          <% } %>
         </div>
       </div>
+
+      <!-- JSON-LD Structured Data with Stitches -->
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org/",
+        "@type": "Product",
+        "name": <%- JSON.stringify(design.title) %>,
+        "sku": <%- JSON.stringify(design.sku || ('AED-00' + design.id)) %>,
+        "description": <%- JSON.stringify((design.description ? design.description + ' ' : '') + (_totalStr ? 'Total Stitch Count: ' + _totalStr + '. ' : '')) %>,
+        "offers": {
+          "@type": "Offer",
+          "priceCurrency": "INR",
+          "price": <%= (design.sale_price !== null && design.sale_price !== undefined) ? design.sale_price : design.price %>,
+          "availability": "https://schema.org/InStock"
+        }
+      }
+      </script>
 
       <!-- Add to Cart & Buy Now Actions -->
       <form action="/cart/add" method="POST" class="detail-action-form" id="addToCartForm">
@@ -273,30 +359,12 @@
             const allComponentsAvailable = hasFront && hasBack && hasSleeve;
             const anyComponentAvailable = hasFront || hasBack || hasSleeve;
 
-            // Total Stitch Count = Front + Back + Sleeve
-            // If all three component values are provided, calculate total.
-            // If any component is missing, show as "Incomplete".
-            // Do not use a previously saved total when it conflicts with component counts.
-            let finalTotal = null;
-            let totalDisplayState = 'none'; // 'calculated', 'incomplete', 'legacy', 'none'
+            let finalTotal = (design.stitch_count_total !== null && design.stitch_count_total !== undefined) ? Number(design.stitch_count_total) :
+                             ((design.stitch_count !== null && design.stitch_count !== undefined) ? Number(design.stitch_count) :
+                             (design.totalStitchCount !== null && design.totalStitchCount !== undefined ? Number(design.totalStitchCount) : null));
 
-            if (allComponentsAvailable) {
-              finalTotal = frontVal + backVal + sleeveVal;
-              totalDisplayState = 'calculated';
-            } else if (anyComponentAvailable) {
-              totalDisplayState = 'incomplete';
-            } else if (design.stitch_count !== null && design.stitch_count !== undefined) {
-              const legacyTotal = parseNum(design.stitch_count);
-              if (legacyTotal !== null) {
-                finalTotal = legacyTotal;
-                totalDisplayState = 'legacy';
-              }
-            } else if (design.totalStitchCount !== null && design.totalStitchCount !== undefined) {
-              const legacyTotal = parseNum(design.totalStitchCount);
-              if (legacyTotal !== null) {
-                finalTotal = legacyTotal;
-                totalDisplayState = 'legacy';
-              }
+            if (finalTotal === null && (hasFront || hasBack || hasSleeve)) {
+              finalTotal = (frontVal || 0) + (backVal || 0) + (sleeveVal || 0);
             }
 
             const hasAnyStitchData = anyComponentAvailable || (finalTotal !== null);
@@ -313,7 +381,7 @@
                 <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
                   <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Front</span>
                   <% if (hasFront) { %>
-                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(frontVal).toLocaleString() %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(frontVal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
                   <% } else { %>
                     <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
                   <% } %>
@@ -322,7 +390,7 @@
                 <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
                   <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Back</span>
                   <% if (hasBack) { %>
-                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(backVal).toLocaleString() %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(backVal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
                   <% } else { %>
                     <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
                   <% } %>
@@ -331,7 +399,7 @@
                 <div class="stitch-stat-card" style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem 1rem;">
                   <span style="font-size: 0.74rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;">Sleeve</span>
                   <% if (hasSleeve) { %>
-                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(sleeveVal).toLocaleString() %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+                    <strong style="font-size: 1.1rem; color: var(--text-dark); display: block; margin-top: 2px;"><%= Number(sleeveVal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
                   <% } else { %>
                     <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not specified</span>
                   <% } %>
@@ -339,13 +407,8 @@
 
                 <div class="stitch-stat-card stitch-total-card" style="background: #F4EBE1; border: 2px solid var(--primary); border-radius: 10px; padding: 0.85rem 1rem;">
                   <span style="font-size: 0.74rem; color: var(--primary); display: block; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;">Total Stitch Count</span>
-                  <% if (totalDisplayState === 'calculated' && finalTotal !== null) { %>
-                    <strong style="font-size: 1.2rem; color: var(--primary); display: block; margin-top: 2px;"><%= Number(finalTotal).toLocaleString() %> <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">stitches</span></strong>
-                  <% } else if (totalDisplayState === 'incomplete') { %>
-                    <span style="font-size: 0.95rem; color: #C62828; font-weight: 700; display: block; margin-top: 2px;">Incomplete</span>
-                    <span style="font-size: 0.7rem; color: var(--text-muted); display: block;">Requires all 3 components</span>
-                  <% } else if (totalDisplayState === 'legacy' && finalTotal !== null) { %>
-                    <strong style="font-size: 1.2rem; color: var(--primary); display: block; margin-top: 2px;"><%= Number(finalTotal).toLocaleString() %> <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">stitches</span></strong>
+                  <% if (finalTotal !== null) { %>
+                    <strong style="font-size: 1.2rem; color: var(--primary); display: block; margin-top: 2px;"><%= Number(finalTotal).toLocaleString(_stitchFmtLocale) %> <span style="font-size: 0.78rem; font-weight: 600; color: var(--primary);">stitches</span></strong>
                   <% } else { %>
                     <span style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; display: block; margin-top: 2px;">Not available</span>
                   <% } %>

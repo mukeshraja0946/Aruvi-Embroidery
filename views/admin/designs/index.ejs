@@ -210,9 +210,28 @@
           <button type="button" onclick="openBulkPriceModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #D97706; color: #B45309; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk update prices safely across catalog">
             <i class="fa-solid fa-indian-rupee-sign"></i> Bulk Update Price
           </button>
-          <button type="button" id="updateSelectedPriceBtn" onclick="openBulkPriceModalForSelected()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #D97706; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
-            <i class="fa-solid fa-indian-rupee-sign"></i> Update Selected (<span id="updateSelectedPriceCountNum">0</span>)
+          <button type="button" onclick="openBulkStitchModal()" class="btn btn-outline" style="height: 42px; padding: 0 1.25rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #7B1FA2; color: #6A1B9A; cursor: pointer; white-space: nowrap; transition: all 0.2s;" title="Bulk update stitch counts across catalog">
+            <i class="fa-solid fa-scissors"></i> Bulk Update Stitch Count
           </button>
+          <button type="button" id="updateSelectedPriceBtn" onclick="openBulkPriceModalForSelected()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #D97706; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
+            <i class="fa-solid fa-indian-rupee-sign"></i> Update Price (<span id="updateSelectedPriceCountNum">0</span>)
+          </button>
+          <button type="button" id="updateSelectedStitchBtn" onclick="openBulkStitchModalForSelected()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #6A1B9A; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
+            <i class="fa-solid fa-scissors"></i> Update Stitches (<span id="updateSelectedStitchCountNum">0</span>)
+          </button>
+          <div style="position: relative; display: inline-block;">
+            <button type="button" onclick="const m=document.getElementById('exportDropdownMenu'); if(m) m.style.display = m.style.display==='none'?'block':'none';" class="btn btn-outline" style="height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1px solid var(--admin-border); color: var(--admin-text-dark); cursor: pointer; white-space: nowrap;">
+              <i class="fa-solid fa-file-export"></i> Export <i class="fa-solid fa-chevron-down" style="font-size: 0.7rem; margin-left: 2px;"></i>
+            </button>
+            <div id="exportDropdownMenu" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 4px; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); z-index: 100; min-width: 175px; overflow: hidden;">
+              <a href="/admin/designs/export?format=xlsx" style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.84rem; color: #1B5E20; text-decoration: none; font-weight: 600; border-bottom: 1px solid var(--admin-border); transition: background 0.15s;">
+                <i class="fa-solid fa-file-excel"></i> Export Excel (.xlsx)
+              </a>
+              <a href="/admin/designs/export?format=csv" style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 0.84rem; color: #0284C7; text-decoration: none; font-weight: 600; transition: background 0.15s;">
+                <i class="fa-solid fa-file-csv"></i> Export CSV (.csv)
+              </a>
+            </div>
+          </div>
           <button type="button" id="deleteSelectedBtn" onclick="confirmDeleteSelectedDesigns()" class="btn" style="display: none; height: 42px; padding: 0 1.1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #C62828; color: #FFFFFF; border: none; cursor: pointer; align-items: center; gap: 8px; white-space: nowrap;">
             <i class="fa-regular fa-trash-can"></i> Delete Selected (<span id="selectedCountNum">0</span>)
           </button>
@@ -344,6 +363,13 @@
             <option value="has_zip" <%= (typeof selectedFileFilter !== 'undefined' && selectedFileFilter === 'has_zip') ? 'selected' : '' %>>Has ZIP ✓</option>
           </select>
 
+          <!-- Stitch Count Filter -->
+          <select name="stitchFilter" onchange="this.form.submit()" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
+            <option value="">All Stitches</option>
+            <option value="missing" <%= (typeof selectedStitchFilter !== 'undefined' && selectedStitchFilter === 'missing') ? 'selected' : '' %>>Stitch count missing</option>
+            <option value="has_stitch" <%= (typeof selectedStitchFilter !== 'undefined' && selectedStitchFilter === 'has_stitch') ? 'selected' : '' %>>Has stitch count ✓</option>
+          </select>
+
           <!-- Standardized Sort Filter -->
           <%- include('../../partials/sort-dropdown', {
             id: 'admin_designs_sort_dd',
@@ -355,6 +381,8 @@
               { value: 'oldest', label: 'Sort by Oldest', iconType: 'oldest' },
               { value: 'price_low', label: 'Price: Low to High', iconType: 'price_low' },
               { value: 'price_high', label: 'Price: High to Low', iconType: 'price_high' },
+              { value: 'stitches_high', label: 'Stitches: High to Low', iconType: 'price_high' },
+              { value: 'stitches_low', label: 'Stitches: Low to High', iconType: 'price_low' },
               { value: 'popular', label: 'Most Downloaded', iconType: 'popular' }
             ]
           }) %>
@@ -380,6 +408,7 @@
               <th>Format</th>
               <th>Files</th>
               <th>Price (₹)</th>
+              <th>Stitches</th>
               <th>Status</th>
               <th>Downloads</th>
               <th>Date Added</th>
@@ -473,6 +502,26 @@
                         <% } %>
                       </div>
                     </div>
+                  </td>
+                  <td>
+                    <% const stitchTot = d.stitch_count_total !== null && d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== null && d.stitch_count !== undefined ? d.stitch_count : null); %>
+                    <% if (stitchTot !== null && stitchTot !== '') { %>
+                      <div style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 4px;">
+                        <span><%= Number(stitchTot).toLocaleString('en-IN') %></span>
+                        <% if (d.stitch_total_manual) { %>
+                          <span style="font-size: 0.65rem; background: #FFF8E1; color: #F57F17; border: 1px solid #FFE082; padding: 1px 4px; border-radius: 4px; font-weight: 600;" title="Manual Total Override">Manual</span>
+                        <% } %>
+                      </div>
+                      <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 1px;">
+                        <% const comp = []; %>
+                        <% if (d.stitch_count_front !== null && d.stitch_count_front !== undefined) comp.push('F: ' + Number(d.stitch_count_front).toLocaleString('en-IN')); %>
+                        <% if (d.stitch_count_back !== null && d.stitch_count_back !== undefined) comp.push('B: ' + Number(d.stitch_count_back).toLocaleString('en-IN')); %>
+                        <% if (d.stitch_count_sleeve !== null && d.stitch_count_sleeve !== undefined) comp.push('S: ' + Number(d.stitch_count_sleeve).toLocaleString('en-IN')); %>
+                        <%= comp.length > 0 ? comp.join(' • ') : 'Total' %>
+                      </span>
+                    <% } else { %>
+                      <span style="color: var(--admin-text-muted); font-size: 0.84rem;">—</span>
+                    <% } %>
                   </td>
                   <td>
                     <label class="switch-toggle">
@@ -1772,10 +1821,386 @@
   </div>
 </div>
 
+<!-- ======================================================================= -->
+<!-- Bulk Stitch Count Update Modal (3-Step Safe Engine) -->
+<!-- ======================================================================= -->
+<div id="bulkStitchModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 980px; max-height: 94vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+    
+    <!-- Modal Header & Stepper -->
+    <div style="padding: 1.2rem 1.6rem; border-bottom: 1px solid var(--admin-border); background: #FAF6F0; flex-shrink: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 2px;">
+            <i class="fa-solid fa-scissors" style="color: #6A1B9A;"></i> Bulk Update Stitch Count
+          </h3>
+          <span style="font-size: 0.8rem; color: var(--admin-text-muted);">
+            Safely update Front, Back, Sleeve, and Total stitch counts via spreadsheet, rules, or automatic calculation with instant preview and rollback undo
+          </span>
+        </div>
+        <button type="button" onclick="closeBulkStitchModal()" style="background: none; border: none; font-size: 1.6rem; color: var(--admin-text-muted); cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+
+      <!-- Stepper Indicator -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+        <div id="stepStitchTab1" class="step-tab active" style="padding: 8px 12px; border-radius: 8px; background: #4A148C; color: #FFF; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+          <span style="background: rgba(255,255,255,0.25); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.74rem;">1</span>
+          1. Choose Method & Target
+        </div>
+        <div id="stepStitchTab2" class="step-tab" style="padding: 8px 12px; border-radius: 8px; background: #ECEFF1; color: #546E7A; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+          <span style="background: rgba(0,0,0,0.1); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.74rem;">2</span>
+          2. Preview Changes
+        </div>
+        <div id="stepStitchTab3" class="step-tab" style="padding: 8px 12px; border-radius: 8px; background: #ECEFF1; color: #546E7A; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+          <span style="background: rgba(0,0,0,0.1); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.74rem;">3</span>
+          3. Apply in Database
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding: 1.5rem; overflow-y: auto; flex: 1;">
+      <form id="bulkStitchForm" onsubmit="event.preventDefault();">
+
+        <!-- STEP 1: METHOD & TARGET -->
+        <div id="bulkStitchStep1">
+          <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.8rem;">
+            Select Update Method
+          </h4>
+
+          <!-- Method Options -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 1.5rem;">
+            <label style="display: flex; gap: 12px; padding: 14px; border: 2px solid #E0E0E0; border-radius: 12px; cursor: pointer; background: #FAFAFA; transition: border-color 0.15s;" class="stitch-method-card">
+              <input type="radio" name="stitchMethod" value="spreadsheet" checked onchange="handleStitchMethodChange()" style="margin-top: 3px;">
+              <div>
+                <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 2px;">
+                  <i class="fa-solid fa-file-excel" style="color: #1B5E20;"></i> Upload Spreadsheet
+                </strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                  Upload .xlsx or .csv with columns: SKU, Front, Back, Sleeve, Total.
+                </span>
+              </div>
+            </label>
+
+            <label style="display: flex; gap: 12px; padding: 14px; border: 2px solid #E0E0E0; border-radius: 12px; cursor: pointer; background: #FAFAFA; transition: border-color 0.15s;" class="stitch-method-card">
+              <input type="radio" name="stitchMethod" value="rule" onchange="handleStitchMethodChange()" style="margin-top: 3px;">
+              <div>
+                <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 2px;">
+                  <i class="fa-solid fa-calculator" style="color: #6A1B9A;"></i> Apply Rule to Designs
+                </strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                  Set fixed count or increase/decrease by number/percent for chosen fields.
+                </span>
+              </div>
+            </label>
+
+            <label style="display: flex; gap: 12px; padding: 14px; border: 2px solid #E0E0E0; border-radius: 12px; cursor: pointer; background: #FAFAFA; transition: border-color 0.15s;" class="stitch-method-card">
+              <input type="radio" name="stitchMethod" value="recalculate" onchange="handleStitchMethodChange()" style="margin-top: 3px;">
+              <div>
+                <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 2px;">
+                  <i class="fa-solid fa-rotate" style="color: #0284C7;"></i> Recalculate Totals
+                </strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                  Recalculate Total = Front + Back + Sleeve across designs.
+                </span>
+              </div>
+            </label>
+          </div>
+
+          <!-- Method A: Spreadsheet Configuration -->
+          <div id="stitchMethodSpreadsheetBox" style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.4rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <strong style="font-size: 0.92rem; color: var(--admin-text-dark); display: block;">Select Excel or CSV File</strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Header aliases accepted: "Stitch Front", "Front Stitch", "stitch_count_front", "Back", "Sleeve", "Total", etc.</span>
+              </div>
+              <a href="/admin/designs/bulk-stitch/template" class="btn btn-outline btn-sm" style="background: #FFF; color: #1B5E20; border-color: #1B5E20; font-weight: 700; text-decoration: none; border-radius: 8px;">
+                <i class="fa-solid fa-file-excel"></i> Download Template (.xlsx)
+              </a>
+            </div>
+
+            <div style="border: 2px dashed #9C27B0; border-radius: 12px; padding: 1.5rem; text-align: center; background: #FFF; margin-bottom: 1rem;">
+              <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.2rem; color: #7B1FA2; margin-bottom: 8px;"></i>
+              <p style="margin: 0 0 6px 0; font-size: 0.88rem; font-weight: 600; color: var(--admin-text-dark);">
+                Click to browse or drag & drop spreadsheet file
+              </p>
+              <p id="stitchSpreadsheetFileName" style="margin: 0 0 10px 0; font-size: 0.8rem; color: var(--admin-text-muted);">No file chosen</p>
+              <input type="file" id="stitchSpreadsheetInput" accept=".xlsx,.xls,.csv" onchange="handleStitchFileSelected(this)" style="display: inline-block; font-size: 0.85rem; max-width: 320px;">
+            </div>
+
+            <!-- Empty cell behavior option -->
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--admin-text-dark); cursor: pointer;">
+              <input type="checkbox" id="treatEmptyAsClearCheckbox" style="width: 16px; height: 16px; accent-color: #6A1B9A;">
+              <span><strong>Treat empty cells as clear / NULL</strong> (Default OFF: empty cells leave existing stitch values untouched)</span>
+            </label>
+          </div>
+
+          <!-- Method B: Rule Configuration -->
+          <div id="stitchMethodRuleBox" style="display: none; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.4rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 1rem;">
+              <div>
+                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px;">Target Field</label>
+                <select id="stitchRuleTargetField" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.85rem;">
+                  <option value="stitch_count_front">Front Stitch Count</option>
+                  <option value="stitch_count_back">Back Stitch Count</option>
+                  <option value="stitch_count_sleeve">Sleeve Stitch Count</option>
+                  <option value="stitch_count_total">Total Stitch Count (Manual Override)</option>
+                  <option value="all">All Components (Front, Back, Sleeve)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px;">Operation</label>
+                <select id="stitchRuleOperation" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.85rem;">
+                  <option value="fixed">Set to Fixed Value</option>
+                  <option value="increase_number">Increase by Number (+)</option>
+                  <option value="decrease_number">Decrease by Number (-)</option>
+                  <option value="increase_percent">Increase by Percentage (%)</option>
+                  <option value="decrease_percent">Decrease by Percentage (%)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px;">Value</label>
+                <input type="number" id="stitchRuleValue" min="0" max="10000000" placeholder="e.g. 12500" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.85rem;">
+              </div>
+            </div>
+            <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+              <i class="fa-solid fa-circle-info"></i> Whole numbers only (0 to 10,000,000). Total automatically recomputed unless Total itself is targeted.
+            </span>
+          </div>
+
+          <!-- Method C: Recalculate Configuration -->
+          <div id="stitchMethodRecalcBox" style="display: none; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.4rem; margin-bottom: 1.5rem;">
+            <p style="font-size: 0.86rem; color: var(--admin-text-dark); margin: 0 0 10px;">
+              Automatically computes <code>Total = Front + Back + Sleeve</code> for target designs. Empty values are treated as 0. If all 3 components are empty, Total remains NULL.
+            </p>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--admin-text-dark); cursor: pointer;">
+              <input type="checkbox" id="includeManualTotalsCheckbox" style="width: 16px; height: 16px; accent-color: #6A1B9A;">
+              <span><strong>Include designs with manual total overrides</strong> (Default OFF: skips designs where admin manually typed total)</span>
+            </label>
+          </div>
+
+          <!-- Targeting Scope Box (visible for Rule and Recalculate) -->
+          <div id="stitchTargetingBox" style="display: none;">
+            <h4 style="font-size: 1rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.8rem;">
+              Select Target Designs
+            </h4>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.2rem;">
+              <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+                <input type="radio" name="stitchScope" value="all" checked onchange="handleStitchScopeChange()">
+                <div>
+                  <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);">All Designs</strong>
+                  <span style="font-size: 0.76rem; color: var(--admin-text-muted);">Apply across entire catalog.</span>
+                </div>
+              </label>
+
+              <label id="stitchScopeSelectedLabel" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+                <input type="radio" name="stitchScope" value="selected" onchange="handleStitchScopeChange()">
+                <div>
+                  <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);">
+                    Only Checked Table Rows (<span id="stitchModalSelectedCount">0</span> selected)
+                  </strong>
+                  <span style="font-size: 0.76rem; color: var(--admin-text-muted);">Apply only to the rows ticked in the Manage Designs table.</span>
+                </div>
+              </label>
+
+              <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 10px; cursor: pointer; background: #FAFAFA;">
+                <input type="radio" name="stitchScope" value="custom" onchange="handleStitchScopeChange()">
+                <div>
+                  <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);">Filter by Category, Status, or Stitch Status</strong>
+                  <span style="font-size: 0.76rem; color: var(--admin-text-muted);">Target a specific subset using filter criteria.</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- Custom Filter Controls -->
+            <div id="stitchCustomFiltersBox" style="display: none; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.2rem;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                <div>
+                  <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Category</label>
+                  <select id="stitchFilterCategory" style="width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); font-size: 0.82rem; padding: 0 8px;">
+                    <option value="">All Categories</option>
+                    <% if (categories && categories.length > 0) { %>
+                      <% categories.forEach(c => { %>
+                        <option value="<%= c.id %>"><%= c.name %></option>
+                      <% }) %>
+                    <% } %>
+                  </select>
+                </div>
+                <div>
+                  <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Status</label>
+                  <select id="stitchFilterStatus" style="width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); font-size: 0.82rem; padding: 0 8px;">
+                    <option value="all">All Status</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive / Draft Only</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">Stitch Status</label>
+                  <select id="stitchFilterStitchStatus" style="width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--admin-border); font-size: 0.82rem; padding: 0 8px;">
+                    <option value="all">All</option>
+                    <option value="missing">Missing Stitch Count Only</option>
+                    <option value="has_stitch">Has Stitch Count</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- STEP 2: PREVIEW CHANGES -->
+        <div id="bulkStitchStep2" style="display: none;">
+          <!-- Metric Badges Row -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.2rem;">
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 10px; padding: 10px 14px; text-align: center;">
+              <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--admin-text-muted); font-weight: 700;">TOTAL ANALYZED</span>
+              <div id="stitchPreviewTotalCount" style="font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark);">0</div>
+            </div>
+            <div style="background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 10px 14px; text-align: center;">
+              <span style="font-size: 0.72rem; text-transform: uppercase; color: #2E7D32; font-weight: 700;">WILL UPDATE</span>
+              <div id="stitchPreviewValidCount" style="font-size: 1.3rem; font-weight: 700; color: #2E7D32;">0</div>
+            </div>
+            <div style="background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 10px; padding: 10px 14px; text-align: center;">
+              <span style="font-size: 0.72rem; text-transform: uppercase; color: #C62828; font-weight: 700;">ERRORS</span>
+              <div id="stitchPreviewErrorCount" style="font-size: 1.3rem; font-weight: 700; color: #C62828;">0</div>
+            </div>
+            <div style="background: #ECEFF1; border: 1px solid #CFD8DC; border-radius: 10px; padding: 10px 14px; text-align: center;">
+              <span style="font-size: 0.72rem; text-transform: uppercase; color: #546E7A; font-weight: 700;">UNCHANGED</span>
+              <div id="stitchPreviewUnchangedCount" style="font-size: 1.3rem; font-weight: 700; color: #546E7A;">0</div>
+            </div>
+          </div>
+
+          <!-- Controls: Filter Pills & Search -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="stitch-filter-pill active" data-filter="all" onclick="setStitchPreviewFilter('all')" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; border: none; background: #4A148C; color: #FFF; cursor: pointer;">All</button>
+              <button type="button" class="stitch-filter-pill" data-filter="changed" onclick="setStitchPreviewFilter('changed')" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; border: none; background: #F5F5F5; color: #616161; cursor: pointer;">Changes Only</button>
+              <button type="button" class="stitch-filter-pill" data-filter="errors" onclick="setStitchPreviewFilter('errors')" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; border: none; background: #F5F5F5; color: #616161; cursor: pointer;">Errors</button>
+              <button type="button" class="stitch-filter-pill" data-filter="unchanged" onclick="setStitchPreviewFilter('unchanged')" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; border: none; background: #F5F5F5; color: #616161; cursor: pointer;">Unchanged</button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span id="stitchExcludedNotice" style="font-size: 0.76rem; color: #C62828; font-weight: 600; display: none;"></span>
+              <input type="text" placeholder="Filter preview by SKU or title..." oninput="handleStitchPreviewSearch(this.value)" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--admin-border); font-size: 0.82rem; width: 220px;">
+            </div>
+          </div>
+
+          <!-- Preview Table Container -->
+          <div style="border: 1px solid var(--admin-border); border-radius: 10px; overflow: hidden; margin-bottom: 1rem; max-height: 48vh; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+              <thead>
+                <tr style="background: #F9FAFB; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--admin-border); text-align: left;">
+                  <th style="padding: 8px 10px; width: 40px; text-align: center;">Apply</th>
+                  <th style="padding: 8px 10px;">Design / SKU</th>
+                  <th style="padding: 8px 10px;">Front</th>
+                  <th style="padding: 8px 10px;">Back</th>
+                  <th style="padding: 8px 10px;">Sleeve</th>
+                  <th style="padding: 8px 10px;">Total</th>
+                  <th style="padding: 8px 10px; width: 90px; text-align: center;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="stitchPreviewTbody"></tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--admin-text-muted);">
+            <span id="stitchPreviewPageInfo">Showing Page 1 of 1</span>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" id="stitchPreviewPrevBtn" onclick="stitchPreviewPrevPage()" class="btn btn-outline" style="height: 28px; padding: 0 10px; font-size: 0.76rem; border-radius: 6px;">Previous</button>
+              <button type="button" id="stitchPreviewNextBtn" onclick="stitchPreviewNextPage()" class="btn btn-outline" style="height: 28px; padding: 0 10px; font-size: 0.76rem; border-radius: 6px;">Next</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: APPLY & LIVE PROGRESS -->
+        <div id="bulkStitchStep3" style="display: none; padding: 1rem 0;">
+          <div style="text-align: center; max-width: 500px; margin: 0 auto;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: #F3E5F5; color: #6A1B9A; display: inline-flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 1.2rem;">
+              <i class="fa-solid fa-scissors"></i>
+            </div>
+            
+            <h4 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
+              Applying Stitch Count Update
+            </h4>
+            <p id="stitchApplyProgressText" style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0 0 1.5rem;">
+              Processing in single database transaction in batches of 500...
+            </p>
+
+            <!-- Progress Bar -->
+            <div style="height: 12px; background: #ECEFF1; border-radius: 6px; overflow: hidden; margin-bottom: 8px; position: relative;">
+              <div id="stitchApplyProgressBar" style="height: 100%; width: 10%; background: linear-gradient(90deg, #6A1B9A, #9C27B0); border-radius: 6px; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="stitchApplyProgressPercent" style="font-size: 0.78rem; font-weight: 700; color: #6A1B9A; margin-bottom: 1.5rem;">10%</div>
+
+            <!-- Success Box -->
+            <div id="stitchApplySuccessBox" style="display: none; background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 12px; padding: 1.4rem; margin-bottom: 1.5rem;">
+              <i class="fa-solid fa-circle-check" style="font-size: 2rem; color: #2E7D32; margin-bottom: 8px;"></i>
+              <h5 style="font-size: 1.05rem; font-weight: 700; color: #1B5E20; margin: 0 0 6px;">Update Applied Successfully!</h5>
+              <p id="stitchApplySuccessMessage" style="font-size: 0.86rem; color: #2E7D32; margin: 0 0 1.2rem;">All stitch counts updated and synchronized.</p>
+              <div style="display: flex; gap: 10px; justify-content: center;">
+                <a href="/admin/tools/stitch-history" class="btn btn-outline" style="height: 38px; padding: 0 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-clock-rotate-left"></i> View Update History
+                </a>
+                <button type="button" id="stitchApplyDoneBtn" onclick="finishStitchUpdateAndRefresh()" class="btn btn-primary" style="height: 38px; padding: 0 16px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; background: #2E7D32; border-color: #2E7D32; color: #FFF; cursor: pointer;">
+                  Done & Refresh Designs
+                </button>
+              </div>
+            </div>
+
+            <!-- Error Box -->
+            <div id="stitchApplyErrorBox" style="display: none; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 12px; padding: 1.4rem; margin-bottom: 1.5rem; text-align: left;">
+              <div style="display: flex; align-items: center; gap: 8px; color: #C62828; font-weight: 700; margin-bottom: 6px;">
+                <i class="fa-solid fa-triangle-exclamation"></i> Transaction Failed & Rolled Back
+              </div>
+              <p id="stitchApplyErrorMessage" style="font-size: 0.84rem; color: #B71C1C; margin: 0 0 10px;">An error occurred.</p>
+              <button type="button" onclick="stitchBackToStep1()" class="btn btn-outline btn-sm" style="border-radius: 6px;">Back to Step 1</button>
+            </div>
+
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Modal Footers for each step -->
+    <div id="stitchFooterStep1" style="padding: 1.1rem 1.6rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+      <div></div>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" onclick="closeBulkStitchModal()" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">Cancel</button>
+        <button type="button" id="stitchProceedPreviewBtn" onclick="proceedToStitchPreview()" class="btn btn-primary" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; background: #6A1B9A; border-color: #6A1B9A; color: #FFF; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          Next: Preview Changes <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="stitchFooterStep2" style="display: none; padding: 1.1rem 1.6rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+      <button type="button" onclick="stitchBackToStep1()" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">
+        <i class="fa-solid fa-arrow-left"></i> Back
+      </button>
+      <div style="display: flex; gap: 10px;">
+        <button type="button" onclick="closeBulkStitchModal()" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">Cancel</button>
+        <button type="button" id="stitchProceedApplyBtn" onclick="proceedToStitchApply()" class="btn btn-primary" style="padding: 8px 24px; border-radius: 8px; font-size: 0.88rem; font-weight: 700; background: #2E7D32; border-color: #2E7D32; color: #FFF; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-check"></i> Apply Stitch Update
+        </button>
+      </div>
+    </div>
+
+    <div id="stitchFooterStep3" style="display: none; padding: 1.1rem 1.6rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
+      <button type="button" onclick="closeBulkStitchModal()" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">Close</button>
+    </div>
+
+  </div>
+</div>
+
 <script>
   window.CSRF_TOKEN = '<%= csrfToken %>';
 </script>
 <script src="/public/js/admin/designs.js"></script>
+<script src="/public/js/admin/bulk-stitch.js"></script>
 <script src="/public/js/sort-dropdown.js"></script>
 </body>
 </html>

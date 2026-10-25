@@ -21,6 +21,10 @@ class BulkImportService {
         'Category': 'Blouse Designs',
         'Original Price MRP': 120,
         'Selling Price': 49,
+        'Stitch Front': 12450,
+        'Stitch Back': 18300,
+        'Stitch Sleeve': 6200,
+        'Stitch Total': 36950,
         'Available Formats': 'DST, PES, JEF, EXP',
         'Description': 'Intricate rose floral embroidery design file for bridal blouses with zari border.',
         'Tags': 'rose, blouse, bridal, zari',
@@ -34,6 +38,10 @@ class BulkImportService {
         'Category': 'Border Designs',
         'Original Price MRP': 150,
         'Selling Price': 59,
+        'Stitch Front': 15200,
+        'Stitch Back': 22400,
+        'Stitch Sleeve': 8100,
+        'Stitch Total': 45700,
         'Available Formats': 'DST, PES, JEF',
         'Description': 'Traditional peacock temple neck border embroidery file for sarees.',
         'Tags': 'peacock, temple, border, saree',
@@ -49,6 +57,10 @@ class BulkImportService {
       { 'Field Name': 'Category', 'Required': 'NO', 'Description': 'Name of category (e.g. Blouse Designs, Floral, Borders). Auto-created if new.' },
       { 'Field Name': 'Original Price MRP', 'Required': 'YES', 'Description': 'MRP / List price in INR (number, e.g. 120).' },
       { 'Field Name': 'Selling Price', 'Required': 'YES', 'Description': 'Discounted selling price (number, e.g. 49). Must be <= Original Price.' },
+      { 'Field Name': 'Stitch Front', 'Required': 'NO', 'Description': 'Front component stitch count (whole number 0 to 10,000,000).' },
+      { 'Field Name': 'Stitch Back', 'Required': 'NO', 'Description': 'Back component stitch count (whole number 0 to 10,000,000).' },
+      { 'Field Name': 'Stitch Sleeve', 'Required': 'NO', 'Description': 'Sleeve component stitch count (whole number 0 to 10,000,000).' },
+      { 'Field Name': 'Stitch Total', 'Required': 'NO', 'Description': 'Total stitch count. If blank, auto-calculated as front + back + sleeve.' },
       { 'Field Name': 'Available Formats', 'Required': 'NO', 'Description': 'Embroidery formats included (default: DST, PES, JEF, EXP).' },
       { 'Field Name': 'Description', 'Required': 'NO', 'Description': 'Full description displayed on customer product page.' },
       { 'Field Name': 'Tags', 'Required': 'NO', 'Description': 'Comma-separated keywords for search.' },
@@ -120,6 +132,47 @@ class BulkImportService {
     }
 
     return null;
+  }
+
+  /**
+   * Idempotently ensure import_job_items has stitch count columns for bulk import
+   */
+  async ensureJobItemColumns() {
+    if (!db.isConnected()) await db.initPool();
+    try {
+      await db.query(`
+        ALTER TABLE \`import_job_items\` 
+          ADD COLUMN IF NOT EXISTS \`stitch_count_front\` INT UNSIGNED NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`stitch_count_back\` INT UNSIGNED NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`stitch_count_sleeve\` INT UNSIGNED NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`stitch_count_total\` INT UNSIGNED NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`stitch_total_manual\` TINYINT NOT NULL DEFAULT 0
+      `).catch(async () => {
+        const cols = await db.query(
+          "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'import_job_items' AND COLUMN_NAME LIKE 'stitch_%'"
+        ).catch(() => []);
+        const existing = new Set(cols.map(c => c.COLUMN_NAME));
+        if (!existing.has('stitch_count_front')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_front` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('stitch_count_back')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_back` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('stitch_count_sleeve')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_sleeve` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('stitch_count_total')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_total` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('stitch_total_manual')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_total_manual` TINYINT NOT NULL DEFAULT 0").catch(() => {});
+      });
+    } catch (err) {
+      // non-fatal
+    }
+  }
+
+  async hasJobItemStitchColumns() {
+    if (!db.isConnected()) return false;
+    try {
+      const cols = await db.query(
+        "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'import_job_items' AND COLUMN_NAME = 'stitch_count_front'"
+      );
+      return cols && cols.length > 0;
+    } catch (e) {
+      return false;
+    }
   }
 
   /**
@@ -197,6 +250,11 @@ class BulkImportService {
     const previewImageAliases = ['preview image filename', 'preview image', 'image filename', 'image', 'preview file', 'image name', 'photo filename'];
     const machineZipAliases = ['machine zip filename', 'machine file', 'zip filename', 'machine zip', 'zip file', 'embroidery file', 'file filename'];
 
+    const stitchFrontAliases = ['stitch front', 'front stitch', 'front stitches', 'stitch_count_front', 'stitch count front', 'front'];
+    const stitchBackAliases = ['stitch back', 'back stitch', 'back stitches', 'stitch_count_back', 'stitch count back', 'back'];
+    const stitchSleeveAliases = ['stitch sleeve', 'sleeve stitch', 'sleeve stitches', 'stitch_count_sleeve', 'stitch count sleeve', 'sleeve', 'sleeves'];
+    const stitchTotalAliases = ['stitch total', 'total stitch', 'total stitches', 'stitch_count_total', 'stitch count total', 'total', 'stitches'];
+
     // 2. Validate Required Columns: Design Name, MRP, Selling Price
     const hasTitle = Boolean(findMatchingHeader(titleAliases));
     const hasMrp = Boolean(findMatchingHeader(mrpAliases));
@@ -261,8 +319,13 @@ class BulkImportService {
       const previewImgRaw = getVal(previewImageAliases);
       const machineZipRaw = getVal(machineZipAliases);
 
+      const rawFront = getVal(stitchFrontAliases);
+      const rawBack = getVal(stitchBackAliases);
+      const rawSleeve = getVal(stitchSleeveAliases);
+      const rawTotal = getVal(stitchTotalAliases);
+
       // Skip completely blank rows
-      if (!title && !sku && !mrpRaw && !sellingRaw && !categoryName) {
+      if (!title && !sku && !mrpRaw && !sellingRaw && !categoryName && !rawFront && !rawBack && !rawSleeve && !rawTotal) {
         continue;
       }
 
@@ -323,6 +386,44 @@ class BulkImportService {
         }
       }
 
+      // Validation 5: Stitch counts
+      const parseStitchNumber = (raw, label) => {
+        if (!raw) return { val: null, err: null };
+        const clean = String(raw).replace(/,/g, '').trim();
+        if (clean === '') return { val: null, err: null };
+        const n = Number(clean);
+        if (isNaN(n) || !Number.isInteger(n) || n < 0 || n > 10000000) {
+          return { val: null, err: `Invalid ${label} "${raw}": must be a whole number between 0 and 10,000,000.` };
+        }
+        return { val: n, err: null };
+      };
+
+      const pFront = parseStitchNumber(rawFront, 'Front Stitch');
+      const pBack = parseStitchNumber(rawBack, 'Back Stitch');
+      const pSleeve = parseStitchNumber(rawSleeve, 'Sleeve Stitch');
+      const pTotal = parseStitchNumber(rawTotal, 'Total Stitch');
+
+      if (pFront.err) errors.push(pFront.err);
+      if (pBack.err) errors.push(pBack.err);
+      if (pSleeve.err) errors.push(pSleeve.err);
+      if (pTotal.err) errors.push(pTotal.err);
+
+      let frontVal = pFront.val;
+      let backVal = pBack.val;
+      let sleeveVal = pSleeve.val;
+      let totalVal = pTotal.val;
+      let isManualTotal = 0;
+
+      if (totalVal !== null) {
+        isManualTotal = 1;
+      } else {
+        if (frontVal !== null || backVal !== null || sleeveVal !== null) {
+          totalVal = (frontVal || 0) + (backVal || 0) + (sleeveVal || 0);
+        } else {
+          totalVal = null;
+        }
+      }
+
       const status = (statusRaw.toLowerCase().includes('draft') || statusRaw === '0' || statusRaw.toLowerCase() === 'inactive') ? 'Draft' : 'Active';
 
       let validationStatus = 'valid';
@@ -350,6 +451,11 @@ class BulkImportService {
         status,
         imageFilename: previewImgRaw || (sku ? `${sku}.jpg` : null),
         fileFilename: machineZipRaw || (sku ? `${sku}.zip` : null),
+        stitch_count_front: frontVal,
+        stitch_count_back: backVal,
+        stitch_count_sleeve: sleeveVal,
+        stitch_count_total: totalVal,
+        stitch_total_manual: isManualTotal,
         validationStatus,
         validationError: errors.join(' ') || (isDuplicate ? `SKU "${sku}" already exists in store catalog.` : null)
       });
@@ -375,33 +481,69 @@ class BulkImportService {
     ]);
     const jobId = jobRes.insertId;
 
+    // Ensure columns exist on import_job_items before inserting
+    await this.ensureJobItemColumns();
+    const hasStitchCols = await this.hasJobItemStitchColumns();
+
     // Insert items in batches of 200 using mysql2 VALUES ? bulk array placeholder
     const insertBatchSize = 200;
     for (let b = 0; b < validatedItems.length; b += insertBatchSize) {
       const slice = validatedItems.slice(b, b + insertBatchSize);
-      const rows = slice.map(it => [
-        jobId,
-        it.rowNo,
-        it.sku,
-        it.title,
-        it.categoryName,
-        it.price,
-        it.salePrice,
-        it.formats,
-        it.description,
-        it.tags,
-        it.status,
-        it.imageFilename,
-        it.fileFilename,
-        it.validationStatus,
-        it.validationError
-      ]);
 
-      await db.query(`
-        INSERT INTO \`import_job_items\` 
-          (\`job_id\`, \`row_no\`, \`sku\`, \`title\`, \`category_name\`, \`price\`, \`sale_price\`, \`formats\`, \`description\`, \`tags\`, \`status\`, \`image_filename\`, \`file_filename\`, \`validation_status\`, \`validation_error\`)
-        VALUES ?
-      `, [rows]);
+      if (hasStitchCols) {
+        const rows = slice.map(it => [
+          jobId,
+          it.rowNo,
+          it.sku,
+          it.title,
+          it.categoryName,
+          it.price,
+          it.salePrice,
+          it.formats,
+          it.description,
+          it.tags,
+          it.status,
+          it.imageFilename,
+          it.fileFilename,
+          it.stitch_count_front,
+          it.stitch_count_back,
+          it.stitch_count_sleeve,
+          it.stitch_count_total,
+          it.stitch_total_manual,
+          it.validationStatus,
+          it.validationError
+        ]);
+
+        await db.query(`
+          INSERT INTO \`import_job_items\` 
+            (\`job_id\`, \`row_no\`, \`sku\`, \`title\`, \`category_name\`, \`price\`, \`sale_price\`, \`formats\`, \`description\`, \`tags\`, \`status\`, \`image_filename\`, \`file_filename\`, \`stitch_count_front\`, \`stitch_count_back\`, \`stitch_count_sleeve\`, \`stitch_count_total\`, \`stitch_total_manual\`, \`validation_status\`, \`validation_error\`)
+          VALUES ?
+        `, [rows]);
+      } else {
+        const rows = slice.map(it => [
+          jobId,
+          it.rowNo,
+          it.sku,
+          it.title,
+          it.categoryName,
+          it.price,
+          it.salePrice,
+          it.formats,
+          it.description,
+          it.tags,
+          it.status,
+          it.imageFilename,
+          it.fileFilename,
+          it.validationStatus,
+          it.validationError
+        ]);
+
+        await db.query(`
+          INSERT INTO \`import_job_items\` 
+            (\`job_id\`, \`row_no\`, \`sku\`, \`title\`, \`category_name\`, \`price\`, \`sale_price\`, \`formats\`, \`description\`, \`tags\`, \`status\`, \`image_filename\`, \`file_filename\`, \`validation_status\`, \`validation_error\`)
+          VALUES ?
+        `, [rows]);
+      }
     }
 
     return {
@@ -424,6 +566,11 @@ class BulkImportService {
         price: it.price,
         salePrice: it.salePrice,
         categoryName: it.categoryName,
+        stitch_count_front: it.stitch_count_front,
+        stitch_count_back: it.stitch_count_back,
+        stitch_count_sleeve: it.stitch_count_sleeve,
+        stitch_count_total: it.stitch_count_total,
+        stitch_total_manual: it.stitch_total_manual,
         image_filename: it.imageFilename,
         file_filename: it.fileFilename,
         isDuplicate: it.validationStatus === 'duplicate',
@@ -719,6 +866,11 @@ class BulkImportService {
               description: item.description,
               tags: item.tags,
               is_active: item.status === 'Active' ? 1 : 0,
+              stitch_count_front: item.stitch_count_front !== undefined ? item.stitch_count_front : null,
+              stitch_count_back: item.stitch_count_back !== undefined ? item.stitch_count_back : null,
+              stitch_count_sleeve: item.stitch_count_sleeve !== undefined ? item.stitch_count_sleeve : null,
+              stitch_count_total: item.stitch_count_total !== undefined ? item.stitch_count_total : null,
+              stitch_total_manual: item.stitch_total_manual ? 1 : 0,
               import_image_filename: item.image_filename || null,
               import_zip_filename: item.file_filename || null
             });
@@ -737,6 +889,11 @@ class BulkImportService {
               tags: item.tags,
               is_active: item.status === 'Active' ? 1 : 0,
               download_count: 0, // strictly 0
+              stitch_count_front: item.stitch_count_front !== undefined ? item.stitch_count_front : null,
+              stitch_count_back: item.stitch_count_back !== undefined ? item.stitch_count_back : null,
+              stitch_count_sleeve: item.stitch_count_sleeve !== undefined ? item.stitch_count_sleeve : null,
+              stitch_count_total: item.stitch_count_total !== undefined ? item.stitch_count_total : null,
+              stitch_total_manual: item.stitch_total_manual ? 1 : 0,
               import_image_filename: item.image_filename || null,
               import_zip_filename: item.file_filename || null
             });

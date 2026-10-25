@@ -1520,6 +1520,19 @@ textarea.form-control {
   border-radius: 4px;
 }
 
+.card-stitch-pill {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #7A3E16;
+  background-color: #FDF4E7;
+  border: 1px solid #F5DDBE;
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .card-price-row {
   display: flex;
   align-items: center;
@@ -1919,12 +1932,33 @@ textarea.form-control {
   font-weight: 500;
 }
 
-.spec-value.highlight-bold {
-  font-weight: 700;
-}
-
 .spec-value a {
   color: var(--text-dark);
+}
+
+@media (max-width: 480px) {
+  .specs-table {
+    gap: 8px;
+    font-size: 0.82rem;
+  }
+  .spec-row {
+    grid-template-columns: 145px 12px 1fr;
+    align-items: baseline;
+    word-break: break-word;
+  }
+  .spec-label {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  .spec-colon {
+    font-size: 0.82rem;
+    text-align: center;
+  }
+  .spec-value {
+    font-size: 0.84rem;
+    line-height: 1.35;
+    word-break: break-word;
+  }
 }
 
 /* Actions Row */

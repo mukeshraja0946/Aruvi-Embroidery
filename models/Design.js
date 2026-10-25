@@ -51,9 +51,12 @@ class Design {
     is_trending = null,
     status = null,
     fileFilter = null,
-    file_filter = null
+    file_filter = null,
+    stitchFilter = null,
+    stitch_filter = null
   } = {}) {
     const activeFileFilter = fileFilter || file_filter;
+    const activeStitchFilter = stitchFilter || stitch_filter;
     if (db.isConnected()) {
       try {
         let whereClause = [];
@@ -73,6 +76,12 @@ class Design {
           whereClause.push('NOT EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
         } else if (activeFileFilter === 'has_zip') {
           whereClause.push('EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
+        }
+
+        if (activeStitchFilter === 'missing') {
+          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count) IS NULL OR COALESCE(d.stitch_count_total, d.stitch_count) = 0)');
+        } else if (activeStitchFilter === 'has_stitch') {
+          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count) IS NOT NULL AND COALESCE(d.stitch_count_total, d.stitch_count) > 0)');
         }
 
         if (is_featured !== null && is_featured !== undefined) {
@@ -134,6 +143,10 @@ class Design {
           orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
         } else if (sort === 'price_desc' || sort === 'price_high') {
           orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
+        } else if (sort === 'stitches_asc' || sort === 'stitches_low') {
+          orderBy = 'ORDER BY (CASE WHEN COALESCE(d.stitch_count_total, d.stitch_count) IS NULL THEN 1 ELSE 0 END), COALESCE(d.stitch_count_total, d.stitch_count) ASC, d.id ASC';
+        } else if (sort === 'stitches_desc' || sort === 'stitches_high') {
+          orderBy = 'ORDER BY (CASE WHEN COALESCE(d.stitch_count_total, d.stitch_count) IS NULL THEN 1 ELSE 0 END), COALESCE(d.stitch_count_total, d.stitch_count) DESC, d.id DESC';
         } else if (sort === 'popular' || sort === 'most_popular') {
           orderBy = 'ORDER BY (COALESCE((SELECT COUNT(*) FROM order_items oi WHERE oi.design_id = d.id), 0) + COALESCE(d.download_count, 0) + COALESCE(d.total_sales, 0)) DESC, d.id DESC';
         } else if (sort === 'top_rated' || sort === 'rating') {
@@ -235,6 +248,12 @@ class Design {
     if (category_id) filtered = filtered.filter(d => d.category_id == category_id);
     if (category_slug) filtered = filtered.filter(d => d.category_slug === category_slug);
 
+    if (activeStitchFilter === 'missing') {
+      filtered = filtered.filter(d => !d.stitch_count_total || Number(d.stitch_count_total) === 0);
+    } else if (activeStitchFilter === 'has_stitch') {
+      filtered = filtered.filter(d => d.stitch_count_total && Number(d.stitch_count_total) > 0);
+    }
+
     // Compute dynamic formats and check images for fallback designs
     for (const d of filtered) {
       this.normalizePrimaryImage(d);
@@ -252,6 +271,18 @@ class Design {
       filtered.sort((a, b) => (parseFloat(a.sale_price ?? a.price ?? 0) - parseFloat(b.sale_price ?? b.price ?? 0)));
     } else if (sort === 'price_high' || sort === 'price_desc') {
       filtered.sort((a, b) => (parseFloat(b.sale_price ?? b.price ?? 0) - parseFloat(a.sale_price ?? a.price ?? 0)));
+    } else if (sort === 'stitches_low' || sort === 'stitches_asc') {
+      filtered.sort((a, b) => {
+        const valA = (a.stitch_count_total !== null && a.stitch_count_total !== undefined) ? Number(a.stitch_count_total) : Infinity;
+        const valB = (b.stitch_count_total !== null && b.stitch_count_total !== undefined) ? Number(b.stitch_count_total) : Infinity;
+        return valA - valB || a.id - b.id;
+      });
+    } else if (sort === 'stitches_high' || sort === 'stitches_desc') {
+      filtered.sort((a, b) => {
+        const valA = (a.stitch_count_total !== null && a.stitch_count_total !== undefined) ? Number(a.stitch_count_total) : -Infinity;
+        const valB = (b.stitch_count_total !== null && b.stitch_count_total !== undefined) ? Number(b.stitch_count_total) : -Infinity;
+        return valB - valA || b.id - a.id;
+      });
     } else if (sort === 'popular' || sort === 'most_popular') {
       filtered.sort((a, b) => ((b.download_count || b.reviews_count || 0) - (a.download_count || a.reviews_count || 0)));
     } else if (sort === 'oldest') {
@@ -602,14 +633,18 @@ class Design {
     const f = parseNum(d.stitch_count_front !== undefined ? d.stitch_count_front : d.frontStitchCount);
     const b = parseNum(d.stitch_count_back !== undefined ? d.stitch_count_back : d.backStitchCount);
     const s = parseNum(d.stitch_count_sleeve !== undefined ? d.stitch_count_sleeve : d.sleeveStitchCount);
+    const isManual = (d.stitch_total_manual === 1 || d.stitch_total_manual === '1' || d.stitchTotalManual === 1 || d.stitchTotalManual === '1');
 
     let t = null;
-    if (f !== null && b !== null && s !== null) {
-      t = f + b + s;
-    } else if (f === null && b === null && s === null) {
-      t = parseNum(d.stitch_count !== undefined ? d.stitch_count : d.totalStitchCount);
+    if (isManual) {
+      t = parseNum(d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== undefined ? d.stitch_count : d.totalStitchCount));
     } else {
-      t = null;
+      // Auto: total = front + back + sleeve (treat empty as 0; if all three are empty, total stays NULL).
+      if (f !== null || b !== null || s !== null) {
+        t = (f || 0) + (b || 0) + (s || 0);
+      } else {
+        t = parseNum(d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== undefined ? d.stitch_count : d.totalStitchCount));
+      }
     }
 
     d.stitch_count_front = f;
@@ -618,8 +653,11 @@ class Design {
     d.backStitchCount = b;
     d.stitch_count_sleeve = s;
     d.sleeveStitchCount = s;
+    d.stitch_count_total = t;
     d.stitch_count = t;
     d.totalStitchCount = t;
+    d.stitch_total_manual = isManual ? 1 : 0;
+    d.stitchTotalManual = d.stitch_total_manual;
 
     return d;
   }
@@ -656,6 +694,8 @@ class Design {
         { name: 'stitch_count_front', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count`' },
         { name: 'stitch_count_back', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_front`' },
         { name: 'stitch_count_sleeve', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_back`' },
+        { name: 'stitch_count_total', def: 'INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_sleeve`' },
+        { name: 'stitch_total_manual', def: 'TINYINT NOT NULL DEFAULT 0 AFTER `stitch_count_total`' },
         { name: 'hoop_size', def: 'VARCHAR(50) NULL DEFAULT NULL AFTER `category_id`' },
         { name: 'description', def: 'TEXT NULL DEFAULT NULL AFTER `slug`' },
         { name: 'short_description', def: 'TEXT NULL DEFAULT NULL AFTER `sku`' },
@@ -1019,20 +1059,24 @@ class Design {
     const rawFront = data.stitch_count_front !== undefined ? data.stitch_count_front : (data.frontStitchCount !== undefined ? data.frontStitchCount : data.front_stitch_count);
     const rawBack = data.stitch_count_back !== undefined ? data.stitch_count_back : (data.backStitchCount !== undefined ? data.backStitchCount : data.back_stitch_count);
     const rawSleeve = data.stitch_count_sleeve !== undefined ? data.stitch_count_sleeve : (data.sleeveStitchCount !== undefined ? data.sleeveStitchCount : data.sleeve_stitch_count);
-    const rawTotal = data.stitch_count !== undefined ? data.stitch_count : (data.totalStitchCount !== undefined ? data.totalStitchCount : data.total_stitch_count);
+    const rawTotal = data.stitch_count_total !== undefined ? data.stitch_count_total : (data.stitch_count !== undefined ? data.stitch_count : (data.totalStitchCount !== undefined ? data.totalStitchCount : data.total_stitch_count));
+    const isManual = (data.stitch_total_manual === 1 || data.stitch_total_manual === '1' || data.stitchTotalManual === 1 || data.stitchTotalManual === '1');
 
     const frontStitchVal = parseStitch(rawFront);
     const backStitchVal = parseStitch(rawBack);
     const sleeveStitchVal = parseStitch(rawSleeve);
     
-    // Strict calculation rule: Total = Front + Back + Sleeve only when all three exist
+    // Auto vs Manual calculation rule
     let mainStitchVal = null;
-    if (frontStitchVal !== null && backStitchVal !== null && sleeveStitchVal !== null) {
-      mainStitchVal = frontStitchVal + backStitchVal + sleeveStitchVal;
-    } else if (frontStitchVal === null && backStitchVal === null && sleeveStitchVal === null) {
+    if (isManual) {
       mainStitchVal = parseStitch(rawTotal);
     } else {
-      mainStitchVal = null;
+      // Auto: total = front + back + sleeve (treat empty as 0; if all three are empty, total stays NULL).
+      if (frontStitchVal !== null || backStitchVal !== null || sleeveStitchVal !== null) {
+        mainStitchVal = (frontStitchVal || 0) + (backStitchVal || 0) + (sleeveStitchVal || 0);
+      } else {
+        mainStitchVal = parseStitch(rawTotal);
+      }
     }
 
     let insertedId = null;
@@ -1051,6 +1095,8 @@ class Design {
           category_id: category_id || null,
           hoop_size: hoop_size || null,
           stitch_count: mainStitchVal,
+          stitch_count_total: mainStitchVal,
+          stitch_total_manual: isManual ? 1 : 0,
           stitch_count_front: frontStitchVal,
           stitch_count_back: backStitchVal,
           stitch_count_sleeve: sleeveStitchVal,
@@ -1132,7 +1178,10 @@ class Design {
       category_slug: 'blouse-designs',
       hoop_size: hoop_size || null,
       stitch_count: mainStitchVal,
+      stitch_count_total: mainStitchVal,
       totalStitchCount: mainStitchVal,
+      stitch_total_manual: isManual ? 1 : 0,
+      stitchTotalManual: isManual ? 1 : 0,
       stitch_count_front: frontStitchVal,
       frontStitchCount: frontStitchVal,
       stitch_count_back: backStitchVal,
@@ -1193,7 +1242,10 @@ class Design {
     const rawFront = data.stitch_count_front !== undefined ? data.stitch_count_front : (data.frontStitchCount !== undefined ? data.frontStitchCount : data.front_stitch_count);
     const rawBack = data.stitch_count_back !== undefined ? data.stitch_count_back : (data.backStitchCount !== undefined ? data.backStitchCount : data.back_stitch_count);
     const rawSleeve = data.stitch_count_sleeve !== undefined ? data.stitch_count_sleeve : (data.sleeveStitchCount !== undefined ? data.sleeveStitchCount : data.sleeve_stitch_count);
-    const rawTotal = data.stitch_count !== undefined ? data.stitch_count : (data.totalStitchCount !== undefined ? data.totalStitchCount : data.total_stitch_count);
+    const rawTotal = data.stitch_count_total !== undefined ? data.stitch_count_total : (data.stitch_count !== undefined ? data.stitch_count : (data.totalStitchCount !== undefined ? data.totalStitchCount : data.total_stitch_count));
+    const isManual = data.stitch_total_manual !== undefined
+      ? (data.stitch_total_manual === 1 || data.stitch_total_manual === '1' || data.stitchTotalManual === 1 || data.stitchTotalManual === '1')
+      : undefined;
 
     const frontStitchVal = parseStitch(rawFront);
     const backStitchVal = parseStitch(rawBack);
@@ -1206,8 +1258,8 @@ class Design {
       const b = backStitchVal !== undefined ? backStitchVal : (existing ? (existing.stitch_count_back ?? existing.backStitchCount) : null);
       const s = sleeveStitchVal !== undefined ? sleeveStitchVal : (existing ? (existing.stitch_count_sleeve ?? existing.sleeveStitchCount) : null);
 
-      if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
-        computedStitchCount = Number(f) + Number(b) + Number(s);
+      if (f !== null || b !== null || s !== null) {
+        computedStitchCount = (f || 0) + (b || 0) + (s || 0);
       } else {
         computedStitchCount = null;
       }
@@ -1236,7 +1288,11 @@ class Design {
         if (sale_price !== undefined) addUpdateField('sale_price', sale_price !== null && sale_price !== '' ? sale_price : null);
         if (category_id !== undefined) addUpdateField('category_id', category_id || null);
         if (hoop_size !== undefined) addUpdateField('hoop_size', hoop_size || null);
-        if (computedStitchCount !== undefined) addUpdateField('stitch_count', computedStitchCount);
+        if (computedStitchCount !== undefined) {
+          addUpdateField('stitch_count', computedStitchCount);
+          addUpdateField('stitch_count_total', computedStitchCount);
+        }
+        if (isManual !== undefined) addUpdateField('stitch_total_manual', isManual ? 1 : 0);
         if (frontStitchVal !== undefined) addUpdateField('stitch_count_front', frontStitchVal);
         if (backStitchVal !== undefined) addUpdateField('stitch_count_back', backStitchVal);
         if (sleeveStitchVal !== undefined) addUpdateField('stitch_count_sleeve', sleeveStitchVal);
@@ -1304,7 +1360,12 @@ class Design {
       if (category_id !== undefined) target.category_id = category_id ? parseInt(category_id) : null;
       if (computedStitchCount !== undefined) {
         target.stitch_count = computedStitchCount;
+        target.stitch_count_total = computedStitchCount;
         target.totalStitchCount = computedStitchCount;
+      }
+      if (isManual !== undefined) {
+        target.stitch_total_manual = isManual ? 1 : 0;
+        target.stitchTotalManual = target.stitch_total_manual;
       }
       if (frontStitchVal !== undefined) {
         target.stitch_count_front = frontStitchVal;
@@ -1808,6 +1869,57 @@ class Design {
       await this.delete(id);
     }
     return true;
+  }
+
+  static async duplicate(id) {
+    const original = await this.getById(id);
+    if (!original) throw new Error('Design not found');
+
+    const newTitle = `${original.title} (Copy)`;
+    const newSlug = await this.generateUniqueSlug(newTitle);
+    let newSku = null;
+    try {
+      if (original.category_id) {
+        newSku = await this.getNextSkuForCategory(original.category_id);
+      }
+    } catch (e) {
+      newSku = `AED-CPY-${Date.now().toString().slice(-4)}`;
+    }
+
+    const newDesignId = await this.create({
+      title: newTitle,
+      slug: newSlug,
+      sku: newSku,
+      description: original.description || '',
+      price: original.price || 0,
+      sale_price: original.sale_price !== null && original.sale_price !== undefined ? original.sale_price : null,
+      category_id: original.category_id,
+      hoop_size: original.hoop_size || null,
+      stitch_count: original.stitch_count || null,
+      stitch_count_total: original.stitch_count_total ?? original.totalStitchCount ?? original.stitch_count ?? null,
+      stitch_total_manual: original.stitch_total_manual ?? original.stitchTotalManual ?? 0,
+      stitch_count_front: original.stitch_count_front ?? original.frontStitchCount ?? null,
+      stitch_count_back: original.stitch_count_back ?? original.backStitchCount ?? null,
+      stitch_count_sleeve: original.stitch_count_sleeve ?? original.sleeveStitchCount ?? null,
+      dimensions: original.dimensions || null,
+      formats: original.formats || 'DST',
+      tags: original.tags || null,
+      is_featured: 0,
+      is_active: 0
+    });
+
+    if (original.images && original.images.length > 0) {
+      for (const img of original.images) {
+        await this.addImage(newDesignId, img.image_url, img.is_primary, img.display_order);
+      }
+    }
+    if (original.files && original.files.length > 0) {
+      for (const f of original.files) {
+        await this.addFile(newDesignId, f.file_name, f.file_path, f.file_format, f.file_size, f.is_preview);
+      }
+    }
+
+    return newDesignId;
   }
 
   static async getSuggestions(query, limit = 8) {

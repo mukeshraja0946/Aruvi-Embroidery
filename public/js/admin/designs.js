@@ -53,8 +53,17 @@ function updateSelectedCount() {
     priceBtn.style.display = count > 0 ? 'inline-flex' : 'none';
   }
 
+  const stitchBtn = document.getElementById('updateSelectedStitchBtn');
+  const stitchNumEl = document.getElementById('updateSelectedStitchCountNum');
+  if (stitchNumEl) stitchNumEl.textContent = count;
+  if (stitchBtn) {
+    stitchBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+
   const modalSelectedCountEl = document.getElementById('modalSelectedCount');
   if (modalSelectedCountEl) modalSelectedCountEl.textContent = count;
+  const stitchModalSelectedCountEl = document.getElementById('stitchModalSelectedCount');
+  if (stitchModalSelectedCountEl) stitchModalSelectedCountEl.textContent = count;
 
   const master = document.getElementById('selectAllCheckbox');
   const all = document.querySelectorAll('.design-checkbox');

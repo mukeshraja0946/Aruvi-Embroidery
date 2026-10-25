@@ -11,6 +11,7 @@ const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDr
 const ActivityLog = require('../../models/ActivityLog');
 const User = require('../../models/User');
 const bulkPriceService = require('../../services/bulkPriceService');
+const bulkStitchService = require('../../services/bulkStitchService');
 const bulkDesignDetailsService = require('../../services/bulkDesignDetailsService');
 const { runBackup } = require('../../scripts/backup');
 
@@ -20,7 +21,7 @@ const errorLogger = require('../../services/errorLogger');
 exports.getDesigns = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { search, category, status, sort, fileFilter } = req.query;
+    const { search, category, status, sort, fileFilter, stitchFilter } = req.query;
 
     let categoryId = null;
     let categorySlug = null;
@@ -37,6 +38,7 @@ exports.getDesigns = async (req, res, next) => {
       category_slug: categorySlug,
       status: status || null,
       fileFilter: fileFilter || null,
+      stitchFilter: stitchFilter || null,
       sort: sort || 'newest',
       page,
       limit: 15
@@ -49,7 +51,7 @@ exports.getDesigns = async (req, res, next) => {
       title: 'Manage Embroidery Designs - Admin',
       designs,
       categories,
-      total: (search || category || status || fileFilter) ? total : stats.totalDesigns,
+      total: (search || category || status || fileFilter || stitchFilter) ? total : stats.totalDesigns,
       activeCount: stats.activeDesigns,
       inactiveCount: stats.inactiveDesigns,
       categoryCount: stats.totalCategories,
@@ -60,7 +62,8 @@ exports.getDesigns = async (req, res, next) => {
       selectedCategory: category || '',
       selectedStatus: status || '',
       selectedSort: sort || 'newest',
-      selectedFileFilter: fileFilter || ''
+      selectedFileFilter: fileFilter || '',
+      selectedStitchFilter: stitchFilter || ''
     });
   } catch (err) {
     next(err);
@@ -223,11 +226,11 @@ function validateStitchCount(value, fieldName) {
   }
   const clean = String(value).replace(/,/g, '').trim();
   if (!/^\d+$/.test(clean)) {
-    return { valid: false, error: `${fieldName} must be a non-negative whole number (e.g. 12500).` };
+    return { valid: false, error: `${fieldName} must be a whole number (0 to 10,000,000).` };
   }
   const num = parseInt(clean, 10);
-  if (num < 0) {
-    return { valid: false, error: `${fieldName} must be a non-negative whole number.` };
+  if (num < 0 || num > 10000000) {
+    return { valid: false, error: `${fieldName} must be between 0 and 10,000,000.` };
   }
   return { valid: true, value: num };
 }
@@ -300,18 +303,29 @@ exports.postCreate = async (req, res, next) => {
       return res.redirect('back');
     }
 
-    // Strict Calculation: Total Stitch Count = Front + Back + Sleeve
-    // If all three component counts are valid non-negative numbers, calculate the exact sum.
-    // If any component count is missing, do not silently treat it as zero. Total is null (incomplete).
+    // Auto vs Manual Stitch Total Rule:
+    // Auto: total = front + back + sleeve (treat empty as 0; if all three are empty, total stays NULL)
+    // Manual: admin can type a total that overrides the sum
     const hasFront = frontCheck.value !== null && frontCheck.value !== undefined;
     const hasBack = backCheck.value !== null && backCheck.value !== undefined;
     const hasSleeve = sleeveCheck.value !== null && sleeveCheck.value !== undefined;
 
+    const isManual = (req.body.stitch_total_manual === '1' || req.body.stitch_total_manual === 1);
     let finalTotalStitches = null;
-    if (hasFront && hasBack && hasSleeve) {
-      finalTotalStitches = Number(frontCheck.value) + Number(backCheck.value) + Number(sleeveCheck.value);
+    if (isManual) {
+      const totalCheck = validateStitchCount(rawTotal, 'Total Stitch Count');
+      if (!totalCheck.valid) {
+        if (isAjax) return res.status(400).json({ success: false, message: totalCheck.error });
+        req.flash('error', totalCheck.error);
+        return res.redirect('back');
+      }
+      finalTotalStitches = totalCheck.value;
     } else {
-      finalTotalStitches = null;
+      if (hasFront || hasBack || hasSleeve) {
+        finalTotalStitches = (frontCheck.value || 0) + (backCheck.value || 0) + (sleeveCheck.value || 0);
+      } else {
+        finalTotalStitches = null;
+      }
     }
 
     // SKU Auto-generation & Uniqueness Validation
@@ -586,15 +600,25 @@ exports.postEdit = async (req, res, next) => {
     const hasEffBack = effectiveBack !== null && effectiveBack !== undefined;
     const hasEffSleeve = effectiveSleeve !== null && effectiveSleeve !== undefined;
 
-    // Strict Calculation: Total Stitch Count = Front + Back + Sleeve
-    // If all three component values are present, total is their exact sum.
-    // If any component is missing, do not silently treat it as zero. Total is null (incomplete).
-    // Do not use a previously saved total when it conflicts with current component counts.
+    // Auto vs Manual Stitch Total Rule:
+    // Auto: total = front + back + sleeve (treat empty as 0; if all three are empty, total stays NULL)
+    // Manual: admin can type a total that overrides the sum
+    const isManual = (req.body.stitch_total_manual === '1' || req.body.stitch_total_manual === 1);
     let finalTotalVal = null;
-    if (hasEffFront && hasEffBack && hasEffSleeve) {
-      finalTotalVal = Number(effectiveFront) + Number(effectiveBack) + Number(effectiveSleeve);
+    if (isManual) {
+      const totalCheck = validateStitchCount(rawTotal, 'Total Stitch Count');
+      if (!totalCheck.valid) {
+        if (isAjax) return res.status(400).json({ success: false, message: totalCheck.error });
+        req.flash('error', totalCheck.error);
+        return res.redirect('back');
+      }
+      finalTotalVal = totalCheck.value;
     } else {
-      finalTotalVal = null;
+      if (hasEffFront || hasEffBack || hasEffSleeve) {
+        finalTotalVal = (Number(effectiveFront) || 0) + (Number(effectiveBack) || 0) + (Number(effectiveSleeve) || 0);
+      } else {
+        finalTotalVal = null;
+      }
     }
 
     // SKU Uniqueness Validation
@@ -643,6 +667,8 @@ exports.postEdit = async (req, res, next) => {
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || existingDesign.hoop_size || null,
       stitch_count: finalTotalVal,
+      stitch_count_total: finalTotalVal,
+      stitch_total_manual: isManual ? 1 : 0,
       stitch_count_front: effectiveFront,
       stitch_count_back: effectiveBack,
       stitch_count_sleeve: effectiveSleeve,
@@ -1036,6 +1062,162 @@ exports.applyBulkPriceUpdate = async (req, res, next) => {
 };
 
 /**
+ * Download official Excel template (.xlsx) for bulk stitch updates
+ * GET /admin/designs/bulk-stitch/template
+ */
+exports.downloadBulkStitchTemplate = async (req, res, next) => {
+  try {
+    const buffer = bulkStitchService.generateTemplate();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="Aruvi_Stitch_Count_Template.xlsx"');
+    return res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get live target count for Bulk Stitch Update
+ * POST /admin/api/bulk-stitch/count
+ */
+exports.getBulkStitchCount = async (req, res, next) => {
+  try {
+    const { filters, selectedIds } = req.body || {};
+    const count = await bulkStitchService.getLiveCount(filters || {}, selectedIds || []);
+    res.json({ success: true, count });
+  } catch (err) {
+    console.error('getBulkStitchCount error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to count target designs.' });
+  }
+};
+
+/**
+ * Build preview for Bulk Stitch Update
+ * POST /admin/api/bulk-stitch/preview
+ */
+exports.getBulkStitchPreview = async (req, res, next) => {
+  try {
+    let options = req.body || {};
+    if (typeof options.filters === 'string') {
+      try { options.filters = JSON.parse(options.filters); } catch (e) {}
+    }
+    const mergedOptions = {
+      ...(options.filters || {}),
+      ...options,
+      treatEmptyAsClear: options.treatEmptyAsClear === '1' || options.treatEmptyAsClear === true || options.treatEmptyAsClear === 'true',
+      includeManualTotals: options.includeManualTotals === '1' || options.includeManualTotals === true || options.includeManualTotals === 'true'
+    };
+
+    if (req.file) {
+      mergedOptions.method = 'spreadsheet';
+    }
+
+    const preview = await bulkStitchService.buildPreview(mergedOptions, req.file || null);
+    res.json({ success: true, ...preview });
+  } catch (err) {
+    console.error('getBulkStitchPreview error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to generate stitch preview.' });
+  }
+};
+
+/**
+ * Commit bulk stitch update in safe transaction
+ * POST /admin/api/bulk-stitch/apply
+ */
+exports.applyBulkStitchUpdate = async (req, res, next) => {
+  try {
+    const { items, excludedIds, excludedSkus, filterSummary, methodSummary } = req.body || {};
+    const result = await bulkStitchService.applyStitchUpdate({
+      items,
+      excludedIds: excludedIds || [],
+      excludedSkus: excludedSkus || [],
+      filterSummary: filterSummary || 'Bulk Stitch Update',
+      methodSummary: methodSummary || 'Stitch Update',
+      adminUser: req.user
+    });
+
+    res.json({
+      success: true,
+      ...result,
+      message: `Stitch counts updated successfully for ${result.totalAffected} design(s)!`
+    });
+  } catch (err) {
+    console.error('applyBulkStitchUpdate error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to apply stitch update.' });
+  }
+};
+
+/**
+ * Export product catalog with stitch counts (CSV or XLSX)
+ * GET /admin/designs/export
+ */
+exports.exportDesigns = async (req, res, next) => {
+  try {
+    const format = (req.query.format || 'xlsx').toLowerCase();
+    const XLSX = require('xlsx');
+
+    // Fetch all designs
+    const designsResult = await Design.getAll({ limit: 100000, is_active: -1 });
+    const allDesigns = designsResult.designs || [];
+
+    const exportRows = allDesigns.map(d => ({
+      'ID': d.id,
+      'SKU': d.sku || `AED-${d.id}`,
+      'Design Name': d.title,
+      'Category': d.category_name || '',
+      'Original Price MRP': d.price || 0,
+      'Selling Price': d.sale_price !== null && d.sale_price !== undefined ? d.sale_price : (d.price || 0),
+      'Stitch Front': d.stitch_count_front !== null && d.stitch_count_front !== undefined ? d.stitch_count_front : '',
+      'Stitch Back': d.stitch_count_back !== null && d.stitch_count_back !== undefined ? d.stitch_count_back : '',
+      'Stitch Sleeve': d.stitch_count_sleeve !== null && d.stitch_count_sleeve !== undefined ? d.stitch_count_sleeve : '',
+      'Stitch Total': d.stitch_count_total !== null && d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== null && d.stitch_count !== undefined ? d.stitch_count : ''),
+      'Total Mode': d.stitch_total_manual ? 'Manual' : 'Auto',
+      'Available Formats': d.formats || '',
+      'Status': d.is_active ? 'Active' : 'Inactive',
+      'Created At': d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : ''
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+
+    ws['!cols'] = [
+      { wch: 8 },  // ID
+      { wch: 16 }, // SKU
+      { wch: 32 }, // Title
+      { wch: 20 }, // Category
+      { wch: 16 }, // MRP
+      { wch: 14 }, // Sale
+      { wch: 14 }, // Front
+      { wch: 14 }, // Back
+      { wch: 14 }, // Sleeve
+      { wch: 14 }, // Total
+      { wch: 12 }, // Mode
+      { wch: 22 }, // Formats
+      { wch: 10 }, // Status
+      { wch: 14 }  // Date
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Designs');
+
+    if (format === 'csv') {
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="aruvi_designs_export.csv"');
+      return res.send(csv);
+    } else {
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="aruvi_designs_export.xlsx"');
+      return res.send(buffer);
+    }
+  } catch (err) {
+    console.error('exportDesigns error:', err);
+    req.flash('error', 'Export failed: ' + err.message);
+    res.redirect('/admin/designs');
+  }
+};
+
+/**
  * Inline price editing in designs table
  * POST /admin/api/designs/:id/inline-price
  */
@@ -1151,6 +1333,11 @@ exports.duplicateDesign = async (req, res, next) => {
       category_id: original.category_id,
       hoop_size: original.hoop_size || null,
       stitch_count: original.stitch_count || null,
+      stitch_count_total: original.stitch_count_total ?? original.totalStitchCount ?? original.stitch_count ?? null,
+      stitch_total_manual: original.stitch_total_manual ?? original.stitchTotalManual ?? 0,
+      stitch_count_front: original.stitch_count_front ?? original.frontStitchCount ?? null,
+      stitch_count_back: original.stitch_count_back ?? original.backStitchCount ?? null,
+      stitch_count_sleeve: original.stitch_count_sleeve ?? original.sleeveStitchCount ?? null,
       dimensions: original.dimensions || null,
       formats: original.formats || 'DST',
       tags: original.tags || null,

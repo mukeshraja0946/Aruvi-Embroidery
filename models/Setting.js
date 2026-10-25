@@ -111,7 +111,17 @@ const fallbackSettings = {
   feature_card3_icon: 'fa-solid fa-shield-halved',
   feature_card4_title: 'Dedicated Support',
   feature_card4_subtitle: "We're here to help you",
-  feature_card4_icon: 'fa-solid fa-headset'
+  feature_card4_icon: 'fa-solid fa-headset',
+  stitch_number_format: 'indian',
+  show_stitch_front: '1',
+  label_stitch_front: 'Stitch Count (Front)',
+  show_stitch_back: '1',
+  label_stitch_back: 'Stitch Count (Back)',
+  show_stitch_sleeve: '1',
+  label_stitch_sleeve: 'Stitch Count (Sleeve)',
+  show_stitch_total: '1',
+  label_stitch_total: 'Total Stitch Count',
+  show_stitch_on_cards: '0'
 };
 
 class Setting {

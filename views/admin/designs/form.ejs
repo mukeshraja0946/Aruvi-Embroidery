@@ -252,56 +252,78 @@
               </div>
             </div>
 
-            <!-- Card: Embroidery Stitch Counts -->
-            <div class="form-section-card">
+            <!-- Card: Stitch Count -->
+            <div class="form-section-card" id="stitchCountSection">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem;">
-                <h3 style="margin: 0;"><i class="fa-solid fa-needle" style="color: var(--admin-primary); margin-right: 6px;"></i> Embroidery Stitch Counts</h3>
-                <span style="font-size: 0.75rem; color: var(--admin-text-muted);">Non-negative whole numbers</span>
+                <h3 style="margin: 0;"><i class="fa-solid fa-needle" style="color: var(--admin-primary); margin-right: 6px;"></i> Stitch Count</h3>
+                <span style="font-size: 0.75rem; color: var(--admin-text-muted);">Whole numbers (0 to 10,000,000)</span>
               </div>
-              <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem 0;">Specify individual stitch counts for each garment section. The total is displayed prominently on the customer page.</p>
+              <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem 0;">Enter section stitch counts. Total calculates live in Auto mode, or click Override to set a manual total.</p>
 
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1.2rem;">
+                <!-- Front Stitch Count -->
                 <div>
-                  <label class="form-label-custom">Front Stitch Count</label>
-                  <input type="text" inputmode="numeric" pattern="[0-9,]*" name="stitch_count_front" id="stitchFrontInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_front !== null && design.stitch_count_front !== undefined ? Number(design.stitch_count_front).toLocaleString() : (design.frontStitchCount !== null && design.frontStitchCount !== undefined ? Number(design.frontStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 12,000" oninput="autoCalculateTotalStitches()">
+                  <label class="form-label-custom">Front</label>
+                  <input type="text" inputmode="numeric" name="stitch_count_front" id="stitchFrontInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_front !== null && design.stitch_count_front !== undefined ? Number(design.stitch_count_front).toLocaleString() : (design.frontStitchCount !== null && design.frontStitchCount !== undefined ? Number(design.frontStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 12,000" oninput="handleStitchComponentInput('front')">
                   <input type="hidden" name="frontStitchCount" id="frontStitchCountHidden" value="<%= design && (design.stitch_count_front !== null && design.stitch_count_front !== undefined ? design.stitch_count_front : (design.frontStitchCount !== null && design.frontStitchCount !== undefined ? design.frontStitchCount : '')) %>">
+                  <div class="stitch-inline-error" id="stitchFrontError" style="display: none; color: #C62828; font-size: 0.72rem; margin-top: 3px; font-weight: 500;"></div>
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Front neck / bodice</span>
                 </div>
 
+                <!-- Back Stitch Count -->
                 <div>
-                  <label class="form-label-custom">Back Stitch Count</label>
-                  <input type="text" inputmode="numeric" pattern="[0-9,]*" name="stitch_count_back" id="stitchBackInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_back !== null && design.stitch_count_back !== undefined ? Number(design.stitch_count_back).toLocaleString() : (design.backStitchCount !== null && design.backStitchCount !== undefined ? Number(design.backStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 7,500" oninput="autoCalculateTotalStitches()">
+                  <label class="form-label-custom">Back</label>
+                  <input type="text" inputmode="numeric" name="stitch_count_back" id="stitchBackInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_back !== null && design.stitch_count_back !== undefined ? Number(design.stitch_count_back).toLocaleString() : (design.backStitchCount !== null && design.backStitchCount !== undefined ? Number(design.backStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 7,500" oninput="handleStitchComponentInput('back')">
                   <input type="hidden" name="backStitchCount" id="backStitchCountHidden" value="<%= design && (design.stitch_count_back !== null && design.stitch_count_back !== undefined ? design.stitch_count_back : (design.backStitchCount !== null && design.backStitchCount !== undefined ? design.backStitchCount : '')) %>">
+                  <div class="stitch-inline-error" id="stitchBackError" style="display: none; color: #C62828; font-size: 0.72rem; margin-top: 3px; font-weight: 500;"></div>
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Back neck pattern</span>
                 </div>
 
+                <!-- Sleeve Stitch Count -->
                 <div>
-                  <label class="form-label-custom">Sleeve Stitch Count</label>
-                  <input type="text" inputmode="numeric" pattern="[0-9,]*" name="stitch_count_sleeve" id="stitchSleeveInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? Number(design.stitch_count_sleeve).toLocaleString() : (design.sleeveStitchCount !== null && design.sleeveStitchCount !== undefined ? Number(design.sleeveStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 5,300" oninput="autoCalculateTotalStitches()">
+                  <label class="form-label-custom">Sleeve</label>
+                  <input type="text" inputmode="numeric" name="stitch_count_sleeve" id="stitchSleeveInput" class="form-control-custom stitch-comp-input" value="<%= design && (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? Number(design.stitch_count_sleeve).toLocaleString() : (design.sleeveStitchCount !== null && design.sleeveStitchCount !== undefined ? Number(design.sleeveStitchCount).toLocaleString() : '')) %>" placeholder="e.g. 5,300" oninput="handleStitchComponentInput('sleeve')">
                   <input type="hidden" name="sleeveStitchCount" id="sleeveStitchCountHidden" value="<%= design && (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : (design.sleeveStitchCount !== null && design.sleeveStitchCount !== undefined ? design.sleeveStitchCount : '')) %>">
+                  <div class="stitch-inline-error" id="stitchSleeveError" style="display: none; color: #C62828; font-size: 0.72rem; margin-top: 3px; font-weight: 500;"></div>
                   <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Sleeve / arm border</span>
                 </div>
 
+                <!-- Total Stitch Count (with Auto/Manual toggle) -->
                 <div>
-                  <label class="form-label-custom">Total Stitch Count <span style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 600;">(Auto-Calculated)</span></label>
                   <%
+                    const isManualInit = design && (design.stitch_total_manual === 1 || design.stitch_total_manual === '1' || design.stitchTotalManual === 1 || design.stitchTotalManual === '1');
                     const initFront = design ? (design.stitch_count_front ?? design.frontStitchCount) : null;
                     const initBack = design ? (design.stitch_count_back ?? design.backStitchCount) : null;
                     const initSleeve = design ? (design.stitch_count_sleeve ?? design.sleeveStitchCount) : null;
-                    const initHasAll = initFront !== null && initFront !== undefined && initBack !== null && initBack !== undefined && initSleeve !== null && initSleeve !== undefined && String(initFront).trim() !== '' && String(initBack).trim() !== '' && String(initSleeve).trim() !== '';
                     let initTotal = null;
-                    if (initHasAll) {
-                      initTotal = Number(initFront) + Number(initBack) + Number(initSleeve);
-                    } else if (design && (design.stitch_count ?? design.totalStitchCount)) {
-                      initTotal = Number(design.stitch_count ?? design.totalStitchCount);
+                    if (isManualInit) {
+                      initTotal = design ? (design.stitch_count_total ?? design.stitch_count ?? design.totalStitchCount) : null;
+                    } else if (initFront !== null || initBack !== null || initSleeve !== null) {
+                      initTotal = (Number(initFront) || 0) + (Number(initBack) || 0) + (Number(initSleeve) || 0);
+                    } else if (design && (design.stitch_count_total ?? design.stitch_count ?? design.totalStitchCount)) {
+                      initTotal = Number(design.stitch_count_total ?? design.stitch_count ?? design.totalStitchCount);
                     }
                   %>
-                  <input type="text" id="stitchCountTotalDisplay" class="form-control-custom" readonly style="background: <%= initTotal !== null ? '#F4EBE1' : '#FAF6F0' %>; font-weight: 700; color: <%= initTotal !== null ? 'var(--admin-primary)' : '#8C7E75' %>; cursor: not-allowed;" placeholder="Incomplete" value="<%= initTotal !== null ? Number(initTotal).toLocaleString() + ' stitches' : '' %>">
-                  <input type="hidden" name="stitch_count" id="stitchCountTotalHidden" value="<%= initTotal !== null ? initTotal : '' %>">
-                  <input type="hidden" name="totalStitchCount" id="totalStitchCountHidden" value="<%= initTotal !== null ? initTotal : '' %>">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                    <label class="form-label-custom" style="margin: 0;">Total</label>
+                    <button type="button" id="toggleStitchModeBtn" onclick="toggleStitchManualMode()" style="background: <%= isManualInit ? '#FEE2E2' : '#E0E7FF' %>; border: 1px solid <%= isManualInit ? '#FCA5A5' : '#C7D2FE' %>; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; color: <%= isManualInit ? '#B91C1C' : '#3730A3' %>; transition: all 0.2s;" title="Toggle between Auto calculation and Manual override">
+                      <i id="stitchModeIcon" class="fa-solid <%= isManualInit ? 'fa-pencil' : 'fa-wand-magic-sparkles' %>"></i>
+                      <span id="stitchModeText"><%= isManualInit ? 'Manual' : 'Auto' %></span>
+                      <span id="stitchModeActionHint" style="font-weight: 400; opacity: 0.85;">(<%= isManualInit ? 'Reset' : 'Override' %>)</span>
+                    </button>
+                  </div>
+
+                  <input type="text" inputmode="numeric" name="stitch_count_total" id="stitchTotalInput" class="form-control-custom" <%= isManualInit ? '' : 'readonly' %> style="background: <%= isManualInit ? '#FFFFFF' : (initTotal !== null ? '#F4EBE1' : '#FAF6F0') %>; font-weight: 700; color: <%= isManualInit ? 'var(--admin-text-dark)' : (initTotal !== null ? 'var(--admin-primary)' : '#8C7E75') %>; <%= isManualInit ? '' : 'cursor: not-allowed;' %>" placeholder="Empty / Auto" value="<%= initTotal !== null && initTotal !== undefined ? Number(initTotal).toLocaleString() : '' %>" oninput="handleStitchTotalManualInput()">
+                  <input type="hidden" name="stitch_total_manual" id="stitchTotalManualHidden" value="<%= isManualInit ? '1' : '0' %>">
+                  <input type="hidden" name="stitch_count" id="stitchCountTotalHidden" value="<%= initTotal !== null && initTotal !== undefined ? initTotal : '' %>">
+                  <input type="hidden" name="totalStitchCount" id="totalStitchCountHidden" value="<%= initTotal !== null && initTotal !== undefined ? initTotal : '' %>">
+                  
+                  <div class="stitch-inline-error" id="stitchTotalError" style="display: none; color: #C62828; font-size: 0.72rem; margin-top: 3px; font-weight: 500;"></div>
                   <span id="stitchCountTotalStatus" style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                    <% if (initTotal !== null) { %>
-                      <span style="color: #2E7D32; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Persisted Total: <%= Number(initTotal).toLocaleString() %> stitches</span>
+                    <% if (isManualInit && initTotal !== null) { %>
+                      <span style="color: #B91C1C; font-weight: 600;"><i class="fa-solid fa-pen-to-square"></i> Manual Override: <%= Number(initTotal).toLocaleString() %></span>
+                    <% } else if (initTotal !== null) { %>
+                      <span style="color: #2E7D32; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Auto Total: <%= Number(initTotal).toLocaleString() %></span>
                     <% } else { %>
                       Front + Back + Sleeve
                     <% } %>
@@ -1368,76 +1390,199 @@
     });
   }
 
-  function autoCalculateTotalStitches() {
+  function cleanStitchNumber(str) {
+    if (str === undefined || str === null) return null;
+    const clean = String(str).trim().replace(/,/g, '');
+    if (clean === '') return null;
+    if (!/^\d+$/.test(clean)) return NaN;
+    return parseInt(clean, 10);
+  }
+
+  function validateStitchField(inputEl, errorEl, fieldName) {
+    if (!inputEl) return { valid: true, value: null };
+    const raw = inputEl.value.trim();
+    if (raw === '') {
+      if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+      inputEl.style.borderColor = 'var(--admin-border)';
+      return { valid: true, value: null };
+    }
+    const val = cleanStitchNumber(raw);
+    if (isNaN(val)) {
+      const msg = `${fieldName} must be a whole number only.`;
+      if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+      inputEl.style.borderColor = '#C62828';
+      return { valid: false, error: msg, value: NaN };
+    }
+    if (val < 0 || val > 10000000) {
+      const msg = `${fieldName} must be between 0 and 10,000,000.`;
+      if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+      inputEl.style.borderColor = '#C62828';
+      return { valid: false, error: msg, value: val };
+    }
+    if (errorEl) { errorEl.textContent = ''; errorEl.style.display = 'none'; }
+    inputEl.style.borderColor = 'var(--admin-border)';
+    return { valid: true, value: val };
+  }
+
+  function toggleStitchManualMode() {
+    const manualHidden = document.getElementById('stitchTotalManualHidden');
+    const totalInput = document.getElementById('stitchTotalInput');
+    const badgeText = document.getElementById('stitchModeText');
+    const actionHint = document.getElementById('stitchModeActionHint');
+    const modeIcon = document.getElementById('stitchModeIcon');
+    const modeBtn = document.getElementById('toggleStitchModeBtn');
+    const statusEl = document.getElementById('stitchCountTotalStatus');
+    if (!manualHidden || !totalInput) return;
+
+    const isCurrentlyManual = manualHidden.value === '1';
+    const setManual = !isCurrentlyManual;
+
+    manualHidden.value = setManual ? '1' : '0';
+
+    if (setManual) {
+      // Switch to MANUAL override mode
+      totalInput.readOnly = false;
+      totalInput.style.background = '#FFFFFF';
+      totalInput.style.color = 'var(--admin-text-dark)';
+      totalInput.style.cursor = 'text';
+      totalInput.style.borderColor = '#C7D2FE';
+      totalInput.focus();
+
+      if (badgeText) badgeText.textContent = 'Manual';
+      if (actionHint) actionHint.textContent = '(Reset)';
+      if (modeIcon) { modeIcon.className = 'fa-solid fa-pencil'; }
+      if (modeBtn) {
+        modeBtn.style.background = '#FEE2E2';
+        modeBtn.style.borderColor = '#FCA5A5';
+        modeBtn.style.color = '#B91C1C';
+        modeBtn.title = 'Click to reset back to Auto calculation';
+      }
+      if (statusEl) {
+        const curVal = cleanStitchNumber(totalInput.value);
+        statusEl.innerHTML = (curVal !== null && !isNaN(curVal))
+          ? `<span style="color: #B91C1C; font-weight: 600;"><i class="fa-solid fa-pen-to-square"></i> Manual Override: ${curVal.toLocaleString()}</span>`
+          : `<span style="color: #B91C1C; font-weight: 600;"><i class="fa-solid fa-pen-to-square"></i> Manual Override: Type any total</span>`;
+      }
+    } else {
+      // Switch back to AUTO calculation mode
+      totalInput.readOnly = true;
+      totalInput.style.cursor = 'not-allowed';
+
+      if (badgeText) badgeText.textContent = 'Auto';
+      if (actionHint) actionHint.textContent = '(Override)';
+      if (modeIcon) { modeIcon.className = 'fa-solid fa-wand-magic-sparkles'; }
+      if (modeBtn) {
+        modeBtn.style.background = '#E0E7FF';
+        modeBtn.style.borderColor = '#C7D2FE';
+        modeBtn.style.color = '#3730A3';
+        modeBtn.title = 'Click to override auto-calculation manually';
+      }
+      recalculateAutoStitchTotal();
+    }
+  }
+
+  function handleStitchComponentInput(component) {
     const frontEl = document.getElementById('stitchFrontInput');
     const backEl = document.getElementById('stitchBackInput');
     const sleeveEl = document.getElementById('stitchSleeveInput');
-    const totalDisplay = document.getElementById('stitchCountTotalDisplay');
-    const totalHidden = document.getElementById('stitchCountTotalHidden');
+    const frontErr = document.getElementById('stitchFrontError');
+    const backErr = document.getElementById('stitchBackError');
+    const sleeveErr = document.getElementById('stitchSleeveError');
+
     const frontHidden = document.getElementById('frontStitchCountHidden');
     const backHidden = document.getElementById('backStitchCountHidden');
     const sleeveHidden = document.getElementById('sleeveStitchCountHidden');
+
+    if (component === 'front') {
+      const fCheck = validateStitchField(frontEl, frontErr, 'Front');
+      if (frontHidden) frontHidden.value = fCheck.valid && fCheck.value !== null ? fCheck.value : '';
+    } else if (component === 'back') {
+      const bCheck = validateStitchField(backEl, backErr, 'Back');
+      if (backHidden) backHidden.value = bCheck.valid && bCheck.value !== null ? bCheck.value : '';
+    } else if (component === 'sleeve') {
+      const sCheck = validateStitchField(sleeveEl, sleeveErr, 'Sleeve');
+      if (sleeveHidden) sleeveHidden.value = sCheck.valid && sCheck.value !== null ? sCheck.value : '';
+    }
+
+    const manualHidden = document.getElementById('stitchTotalManualHidden');
+    if (!manualHidden || manualHidden.value !== '1') {
+      recalculateAutoStitchTotal();
+    }
+  }
+
+  function handleStitchTotalManualInput() {
+    const totalInput = document.getElementById('stitchTotalInput');
+    const totalError = document.getElementById('stitchTotalError');
+    const totalHidden = document.getElementById('stitchCountTotalHidden');
     const totalCamelHidden = document.getElementById('totalStitchCountHidden');
     const statusEl = document.getElementById('stitchCountTotalStatus');
-    if (!totalDisplay) return;
+    if (!totalInput) return;
 
-    const parseVal = (el) => {
-      if (!el || el.value === undefined || el.value === null) return null;
-      const str = String(el.value).trim().replace(/,/g, '');
-      if (str === '') return null;
-      if (!/^\d+$/.test(str)) return NaN;
-      return parseInt(str, 10);
-    };
+    const tCheck = validateStitchField(totalInput, totalError, 'Total');
+    if (tCheck.valid && tCheck.value !== null) {
+      if (totalHidden) totalHidden.value = tCheck.value;
+      if (totalCamelHidden) totalCamelHidden.value = tCheck.value;
+      if (statusEl) {
+        statusEl.innerHTML = `<span style="color: #B91C1C; font-weight: 600;"><i class="fa-solid fa-pen-to-square"></i> Manual Override: ${tCheck.value.toLocaleString()}</span>`;
+      }
+    } else if (tCheck.valid && tCheck.value === null) {
+      if (totalHidden) totalHidden.value = '';
+      if (totalCamelHidden) totalCamelHidden.value = '';
+      if (statusEl) {
+        statusEl.innerHTML = `<span style="color: var(--admin-text-muted);">Empty</span>`;
+      }
+    }
+  }
 
-    const f = parseVal(frontEl);
-    const b = parseVal(backEl);
-    const s = parseVal(sleeveEl);
+  function recalculateAutoStitchTotal() {
+    const frontEl = document.getElementById('stitchFrontInput');
+    const backEl = document.getElementById('stitchBackInput');
+    const sleeveEl = document.getElementById('stitchSleeveInput');
+    const totalInput = document.getElementById('stitchTotalInput');
+    const totalHidden = document.getElementById('stitchCountTotalHidden');
+    const totalCamelHidden = document.getElementById('totalStitchCountHidden');
+    const statusEl = document.getElementById('stitchCountTotalStatus');
+    if (!totalInput) return;
+
+    const f = cleanStitchNumber(frontEl ? frontEl.value : '');
+    const b = cleanStitchNumber(backEl ? backEl.value : '');
+    const s = cleanStitchNumber(sleeveEl ? sleeveEl.value : '');
 
     const fValid = f !== null && !isNaN(f) && f >= 0;
     const bValid = b !== null && !isNaN(b) && b >= 0;
     const sValid = s !== null && !isNaN(s) && s >= 0;
 
-    const fEmpty = !frontEl || frontEl.value.trim() === '';
-    const bEmpty = !backEl || backEl.value.trim() === '';
-    const sEmpty = !sleeveEl || sleeveEl.value.trim() === '';
+    const hasAny = fValid || bValid || sValid;
 
-    if (frontHidden) frontHidden.value = fValid ? f : '';
-    if (backHidden) backHidden.value = bValid ? b : '';
-    if (sleeveHidden) sleeveHidden.value = sValid ? s : '';
-
-    if (fValid && bValid && sValid) {
-      const sum = f + b + s;
-      totalDisplay.value = sum.toLocaleString() + ' stitches';
+    if (hasAny) {
+      const sum = (fValid ? f : 0) + (bValid ? b : 0) + (sValid ? s : 0);
+      totalInput.value = sum.toLocaleString();
       if (totalHidden) totalHidden.value = sum;
       if (totalCamelHidden) totalCamelHidden.value = sum;
-      totalDisplay.style.color = '#B86B35';
-      totalDisplay.style.background = '#F4EBE1';
-      totalDisplay.style.borderColor = '#B86B35';
+      totalInput.style.color = '#B86B35';
+      totalInput.style.background = '#F4EBE1';
+      totalInput.style.borderColor = '#B86B35';
       if (statusEl) {
-        statusEl.innerHTML = `<span style="color: #2E7D32; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Calculated: ${f.toLocaleString()} + ${b.toLocaleString()} + ${s.toLocaleString()} = ${sum.toLocaleString()} stitches</span>`;
+        statusEl.innerHTML = `<span style="color: #2E7D32; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Auto Total: ${sum.toLocaleString()}</span>`;
       }
     } else {
+      totalInput.value = '';
       if (totalHidden) totalHidden.value = '';
       if (totalCamelHidden) totalCamelHidden.value = '';
-      const missing = [];
-      if (!fValid) missing.push('Front');
-      if (!bValid) missing.push('Back');
-      if (!sValid) missing.push('Sleeve');
-
-      if (fEmpty && bEmpty && sEmpty) {
-        totalDisplay.value = 'Not specified';
-        if (statusEl) {
-          statusEl.innerHTML = `<span style="color: var(--admin-text-muted);">Front + Back + Sleeve</span>`;
-        }
-      } else {
-        totalDisplay.value = 'Incomplete';
-        if (statusEl) {
-          statusEl.innerHTML = `<span style="color: #C62828; font-weight: 600;"><i class="fa-solid fa-triangle-exclamation"></i> Incomplete (missing: ${missing.join(', ')})</span>`;
-        }
+      totalInput.style.color = '#8C7E75';
+      totalInput.style.background = '#FAF6F0';
+      totalInput.style.borderColor = 'var(--admin-border)';
+      if (statusEl) {
+        statusEl.innerHTML = `<span style="color: var(--admin-text-muted);">Front + Back + Sleeve</span>`;
       }
-      totalDisplay.style.color = '#8C7E75';
-      totalDisplay.style.background = '#FAF6F0';
-      totalDisplay.style.borderColor = 'var(--admin-border)';
+    }
+  }
+
+  // Alias for backward compatibility
+  function autoCalculateTotalStitches() {
+    const manualHidden = document.getElementById('stitchTotalManualHidden');
+    if (!manualHidden || manualHidden.value !== '1') {
+      recalculateAutoStitchTotal();
     }
   }
 </script>

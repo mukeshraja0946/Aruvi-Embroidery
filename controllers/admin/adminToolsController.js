@@ -12,6 +12,7 @@ const ActivityLog = require('../../models/ActivityLog');
 const { checkSystemHealth } = require('../../services/schemaHealthService');
 const { runPendingMigrations } = require('../../services/migrationRunner');
 const bulkPriceService = require('../../services/bulkPriceService');
+const bulkStitchService = require('../../services/bulkStitchService');
 
 const projectRoot = path.resolve(__dirname, '../..');
 const stagingBaseDir = path.join(projectRoot, 'scratch', 'relink_staging');
@@ -872,5 +873,83 @@ exports.downloadPriceHistoryCsv = async (req, res, next) => {
     res.redirect('/admin/tools/price-history');
   }
 };
+
+// =========================================================================
+// 6. BULK STITCH COUNT UPDATE HISTORY & AUDIT
+// =========================================================================
+
+/**
+ * Render Stitch Update History page
+ * GET /admin/tools/stitch-history
+ */
+exports.getStitchHistory = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 15;
+    const history = await bulkStitchService.getHistory({ page, limit });
+
+    res.render('admin/tools/stitch-history', {
+      title: 'Stitch Update History - Admin Tools',
+      logs: history.logs,
+      total: history.pagination ? history.pagination.totalLogs : 0,
+      totalPages: history.pagination ? history.pagination.totalPages : 1,
+      currentPage: history.pagination ? history.pagination.currentPage : 1
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get details of a single stitch update log (JSON)
+ * GET /admin/tools/stitch-history/:id
+ */
+exports.getStitchHistoryDetail = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const detail = await bulkStitchService.getHistoryDetail(id);
+    if (!detail) {
+      return res.status(404).json({ success: false, message: 'Stitch update log not found.' });
+    }
+    res.json({ success: true, ...detail });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Unable to retrieve stitch update details.' });
+  }
+};
+
+/**
+ * Undo / Revert a past stitch update
+ * POST /admin/tools/stitch-history/undo/:id
+ */
+exports.undoStitchHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await bulkStitchService.undoStitchUpdate(id, req.user);
+    res.json(result);
+  } catch (err) {
+    console.error('undoStitchHistory error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Unable to revert stitch update.' });
+  }
+};
+
+/**
+ * Download CSV export of a stitch update log
+ * GET /admin/tools/stitch-history/download/:id
+ */
+exports.downloadStitchHistoryCsv = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const csv = await bulkStitchService.exportHistoryCsv(id);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="stitch_update_log_${id}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('downloadStitchHistoryCsv error:', err);
+    req.flash('error', err.message || 'Unable to download stitch update CSV.');
+    res.redirect('/admin/tools/stitch-history');
+  }
+};
+
 
 

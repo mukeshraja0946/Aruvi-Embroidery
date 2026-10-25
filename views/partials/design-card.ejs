@@ -41,6 +41,21 @@
       <% fmtsList.forEach(fmt => { %>
         <span class="fmt-pill"><%= fmt %></span>
       <% }) %>
+      <% 
+        const showStitchOnCards = (typeof siteSettings !== 'undefined' && siteSettings.show_stitch_on_cards === '1');
+        const cardTotalStitches = (design.stitch_count_total !== null && design.stitch_count_total !== undefined && design.stitch_count_total !== '') 
+          ? Number(design.stitch_count_total) 
+          : ((design.stitch_count !== null && design.stitch_count !== undefined && design.stitch_count !== '') ? Number(design.stitch_count) : null);
+        const isIntl = (typeof siteSettings !== 'undefined' && siteSettings.stitch_number_format === 'international');
+        const formattedCardStitches = (cardTotalStitches !== null && !isNaN(cardTotalStitches) && cardTotalStitches > 0)
+          ? (isIntl ? cardTotalStitches.toLocaleString('en-US') : cardTotalStitches.toLocaleString('en-IN'))
+          : null;
+      %>
+      <% if (showStitchOnCards && formattedCardStitches) { %>
+        <span class="card-stitch-pill" title="Total Stitches: <%= formattedCardStitches %>">
+          <i class="fa-solid fa-layer-group" style="font-size: 0.65rem;"></i> <%= formattedCardStitches %> st
+        </span>
+      <% } %>
     </div>
 
     <!-- Rating Row: ONLY displayed when real approved reviews exist; completely hidden otherwise -->

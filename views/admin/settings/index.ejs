@@ -640,6 +640,107 @@
           </div>
         </div>
 
+        <!-- Card 7b: Stitch Count Display & Formatting -->
+        <div id="stitch-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">
+                <i class="fa-solid fa-layer-group" style="color: var(--admin-primary); margin-right: 6px;"></i> Stitch Count Display & Labels
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Configure thousands separators (Indian vs International), row labels on customer detail page, and card visibility.</span>
+            </div>
+            <span style="background: #EFEBE9; color: #4E342E; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-sliders"></i> Stitch Engine</span>
+          </div>
+
+          <!-- General Format & Cards Display -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label class="form-label-custom" style="display: block; font-size: 0.86rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px;">
+                <i class="fa-solid fa-calculator" style="color: var(--admin-primary); margin-right: 4px;"></i> Number Formatting (Thousands Separators)
+              </label>
+              <select name="stitch_number_format" class="form-control" style="height: 42px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.85rem; width: 100%; background: #FFF;">
+                <option value="indian" <%= (!settings.stitch_number_format || settings.stitch_number_format === 'indian') ? 'selected' : '' %>>Indian Format (e.g. 1,24,580)</option>
+                <option value="international" <%= (settings.stitch_number_format === 'international') ? 'selected' : '' %>>International Format (e.g. 124,580)</option>
+              </select>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Applies to detail page specs, listing card badges, and admin tables.</small>
+            </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column; justify-content: center;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">Show Total Stitches on Cards</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Renders a stitch badge on catalog & category product cards (default: OFF).</span>
+                </div>
+                <input type="checkbox" name="show_stitch_on_cards" value="1" <%= (typeof settings !== 'undefined' && settings.show_stitch_on_cards === '1') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
+            </div>
+          </div>
+
+          <!-- Detail Page Rows & Labels -->
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.4rem;">
+            <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">
+              <i class="fa-solid fa-table-list" style="color: var(--admin-primary); margin-right: 4px;"></i> Customer Detail Page Rows & Custom Labels
+            </strong>
+            <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 1.2rem;">
+              Rows only appear on the customer detail page when the design has a positive value. You can rename labels or toggle individual rows off globally.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
+              <!-- Front -->
+              <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-weight: 700; font-size: 0.85rem; color: var(--admin-text-dark);">Front Stitches</span>
+                  <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+                    <input type="checkbox" name="show_stitch_front" value="1" <%= (typeof settings === 'undefined' || settings.show_stitch_front !== '0') ? 'checked' : '' %> style="accent-color: var(--admin-primary);">
+                    <span>Enabled</span>
+                  </label>
+                </div>
+                <label style="display: block; font-size: 0.75rem; color: var(--admin-text-muted); margin-bottom: 4px;">Label Text</label>
+                <input type="text" name="label_stitch_front" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.label_stitch_front) ? settings.label_stitch_front : 'Stitch Count (Front)' %>">
+              </div>
+
+              <!-- Back -->
+              <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-weight: 700; font-size: 0.85rem; color: var(--admin-text-dark);">Back Stitches</span>
+                  <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+                    <input type="checkbox" name="show_stitch_back" value="1" <%= (typeof settings === 'undefined' || settings.show_stitch_back !== '0') ? 'checked' : '' %> style="accent-color: var(--admin-primary);">
+                    <span>Enabled</span>
+                  </label>
+                </div>
+                <label style="display: block; font-size: 0.75rem; color: var(--admin-text-muted); margin-bottom: 4px;">Label Text</label>
+                <input type="text" name="label_stitch_back" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.label_stitch_back) ? settings.label_stitch_back : 'Stitch Count (Back)' %>">
+              </div>
+
+              <!-- Sleeve -->
+              <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-weight: 700; font-size: 0.85rem; color: var(--admin-text-dark);">Sleeve Stitches</span>
+                  <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+                    <input type="checkbox" name="show_stitch_sleeve" value="1" <%= (typeof settings === 'undefined' || settings.show_stitch_sleeve !== '0') ? 'checked' : '' %> style="accent-color: var(--admin-primary);">
+                    <span>Enabled</span>
+                  </label>
+                </div>
+                <label style="display: block; font-size: 0.75rem; color: var(--admin-text-muted); margin-bottom: 4px;">Label Text</label>
+                <input type="text" name="label_stitch_sleeve" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.label_stitch_sleeve) ? settings.label_stitch_sleeve : 'Stitch Count (Sleeve)' %>">
+              </div>
+
+              <!-- Total -->
+              <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-weight: 700; font-size: 0.85rem; color: var(--admin-text-dark);">Total Stitches</span>
+                  <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+                    <input type="checkbox" name="show_stitch_total" value="1" <%= (typeof settings === 'undefined' || settings.show_stitch_total !== '0') ? 'checked' : '' %> style="accent-color: var(--admin-primary);">
+                    <span>Enabled</span>
+                  </label>
+                </div>
+                <label style="display: block; font-size: 0.75rem; color: var(--admin-text-muted); margin-bottom: 4px;">Label Text</label>
+                <input type="text" name="label_stitch_total" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.label_stitch_total) ? settings.label_stitch_total : 'Total Stitch Count' %>">
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Card 8: Trust / Feature Cards (Shared across Home, Custom Order & About) -->
         <div id="feature-cards-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
           <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">

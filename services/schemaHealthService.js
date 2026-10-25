@@ -13,9 +13,10 @@ const REQUIRED_SCHEMA = {
   designs: [
     'id', 'title', 'sku', 'slug', 'short_description', 'description', 'price', 'sale_price',
     'category_id', 'sub_category', 'hoop_size', 'stitch_count', 'stitch_count_front',
-    'stitch_count_back', 'stitch_count_sleeve', 'dimensions', 'formats', 'is_featured',
-    'is_trending', 'is_active', 'download_count', 'tags', 'total_sales', 'average_rating',
-    'reviews_count', 'import_image_filename', 'import_zip_filename', 'deleted_at', 'created_at'
+    'stitch_count_back', 'stitch_count_sleeve', 'stitch_count_total', 'stitch_total_manual',
+    'dimensions', 'formats', 'is_featured', 'is_trending', 'is_active', 'download_count',
+    'tags', 'total_sales', 'average_rating', 'reviews_count', 'import_image_filename',
+    'import_zip_filename', 'deleted_at', 'created_at'
   ],
   design_images: ['id', 'design_id', 'image_url', 'is_primary', 'display_order'],
   design_files: ['id', 'design_id', 'file_name', 'file_path', 'file_format', 'file_size', 'checksum', 'is_preview', 'created_at'],
@@ -36,12 +37,14 @@ const REQUIRED_SCHEMA = {
   file_scan_results: ['id', 'design_id', 'title', 'sku', 'category_name', 'price', 'is_active', 'image_url', 'image_status', 'file_path', 'file_name', 'file_status', 'scanned_at'],
   scan_jobs: ['id', 'status', 'total_designs', 'scanned_designs', 'missing_images', 'missing_files', 'missing_both', 'started_at', 'completed_at', 'created_at'],
   import_jobs: ['id', 'batch_id', 'status', 'total_rows', 'valid_rows', 'error_rows', 'duplicate_rows', 'imported_count', 'skipped_count', 'failed_count', 'update_existing', 'spreadsheet_filename', 'created_at', 'completed_at'],
-  import_job_items: ['id', 'job_id', 'row_no', 'sku', 'title', 'category_name', 'price', 'sale_price', 'formats', 'image_filename', 'image_stored_url', 'file_filename', 'file_stored_path', 'validation_status', 'import_status'],
+  import_job_items: ['id', 'job_id', 'row_no', 'sku', 'title', 'category_name', 'price', 'sale_price', 'formats', 'image_filename', 'image_stored_url', 'file_filename', 'file_stored_path', 'stitch_count_front', 'stitch_count_back', 'stitch_count_sleeve', 'stitch_count_total', 'stitch_total_manual', 'validation_status', 'import_status'],
   email_campaigns: ['id', 'subject', 'body_html', 'total_recipients', 'success_count', 'failed_count', 'status', 'created_at'],
   email_campaign_logs: ['id', 'campaign_id', 'recipient_email', 'status', 'error_message', 'created_at'],
   unsubscribed_customers: ['id', 'email', 'created_at'],
   price_update_logs: ['id', 'admin_id', 'admin_email', 'filter_summary', 'method_summary', 'total_affected', 'is_undone', 'created_at'],
-  price_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_mrp', 'old_price', 'new_mrp', 'new_price', 'created_at']
+  price_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_mrp', 'old_price', 'new_mrp', 'new_price', 'created_at'],
+  stitch_update_logs: ['id', 'admin_id', 'admin_email', 'filter_summary', 'method_summary', 'total_affected', 'is_undone', 'created_at'],
+  stitch_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_front', 'old_back', 'old_sleeve', 'old_total', 'old_manual', 'new_front', 'new_back', 'new_sleeve', 'new_total', 'new_manual', 'created_at']
 };
 
 /**

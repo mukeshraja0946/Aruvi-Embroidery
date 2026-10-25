@@ -603,11 +603,14 @@ SET @query = IF(@idx_exists = 0, 'ALTER TABLE `design_files` ADD INDEX `idx_desi
 PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ----------------------------------------------------------------------------
--- 5. Designs & Order Items Schema Extensions (Migrations 012 - 016)
+-- 5. Designs & Order Items Schema Extensions (Migrations 012 - 017)
 -- ----------------------------------------------------------------------------
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_front` INT UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_back` INT UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_sleeve` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count_total` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_total_manual` TINYINT NOT NULL DEFAULT 0;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `stitch_count` INT UNSIGNED NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `hoop_size` VARCHAR(50) NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `description` TEXT NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `short_description` TEXT NULL DEFAULT NULL;
@@ -615,6 +618,12 @@ ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `sub_category` VARCHAR(100) NULL 
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `import_image_filename` VARCHAR(255) NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `import_zip_filename` VARCHAR(255) NULL DEFAULT NULL;
 ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME NULL DEFAULT NULL;
+
+ALTER TABLE `import_job_items` ADD COLUMN IF NOT EXISTS `stitch_count_front` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `import_job_items` ADD COLUMN IF NOT EXISTS `stitch_count_back` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `import_job_items` ADD COLUMN IF NOT EXISTS `stitch_count_sleeve` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `import_job_items` ADD COLUMN IF NOT EXISTS `stitch_count_total` INT UNSIGNED NULL DEFAULT NULL;
+ALTER TABLE `import_job_items` ADD COLUMN IF NOT EXISTS `stitch_total_manual` TINYINT NOT NULL DEFAULT 0;
 
 ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `price_at_purchase` DECIMAL(10,2) NULL DEFAULT NULL;
 ALTER TABLE `order_items` ADD COLUMN IF NOT EXISTS `mrp` DECIMAL(10,2) NULL DEFAULT NULL;
@@ -653,6 +662,39 @@ CREATE TABLE IF NOT EXISTS `price_update_log_items` (
   INDEX idx_design_id (`design_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Stitch update logs
+CREATE TABLE IF NOT EXISTS `stitch_update_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `admin_id` INT NULL,
+  `admin_email` VARCHAR(150) NULL,
+  `filter_summary` TEXT NULL,
+  `method_summary` TEXT NULL,
+  `total_affected` INT NOT NULL DEFAULT 0,
+  `is_undone` TINYINT(1) NOT NULL DEFAULT 0,
+  `undone_at` DATETIME NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `stitch_update_log_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `log_id` INT NOT NULL,
+  `design_id` INT NOT NULL,
+  `sku` VARCHAR(100) NULL,
+  `old_front` INT UNSIGNED NULL,
+  `old_back` INT UNSIGNED NULL,
+  `old_sleeve` INT UNSIGNED NULL,
+  `old_total` INT UNSIGNED NULL,
+  `old_manual` TINYINT NOT NULL DEFAULT 0,
+  `new_front` INT UNSIGNED NULL,
+  `new_back` INT UNSIGNED NULL,
+  `new_sleeve` INT UNSIGNED NULL,
+  `new_total` INT UNSIGNED NULL,
+  `new_manual` TINYINT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_stitch_log_id (`log_id`),
+  INDEX idx_stitch_design_id (`design_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------------------------------------------------------
 -- 6. Record Applied Migrations in schema_migrations
 -- ----------------------------------------------------------------------------
@@ -672,7 +714,8 @@ INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('013', '013_add_import_zip_filename_to_designs.sql'),
   ('014', '014_create_price_update_logs.sql'),
   ('015', '015_add_stitch_counts_to_designs.sql'),
-  ('016', '016_production_schema_sync.sql');
+  ('016', '016_production_schema_sync.sql'),
+  ('017', '017_stitch_counts_and_bulk_update.sql');
 
 -- ============================================================================
 -- End of production_sync.sql
