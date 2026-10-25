@@ -67,16 +67,16 @@ CREATE TABLE IF NOT EXISTS `stitch_update_log_items` (
 -- ----------------------------------------------------------------------------
 -- 4. DEFAULT SETTINGS FOR STITCH COUNT FORMATTING & LABELS
 -- ----------------------------------------------------------------------------
-INSERT INTO `settings` (`setting_key`, `setting_value`, `setting_group`, `description`)
+INSERT INTO `settings` (`setting_key`, `setting_value`)
 VALUES
-  ('stitch_number_format', 'indian', 'design_page', 'Stitch count number formatting (indian e.g. 1,24,580 or international e.g. 124,580)'),
-  ('show_stitch_front', '1', 'design_page', 'Display front stitch count row on design detail page'),
-  ('label_stitch_front', 'Stitch Count (Front)', 'design_page', 'Label for front stitch count row'),
-  ('show_stitch_back', '1', 'design_page', 'Display back stitch count row on design detail page'),
-  ('label_stitch_back', 'Stitch Count (Back)', 'design_page', 'Label for back stitch count row'),
-  ('show_stitch_sleeve', '1', 'design_page', 'Display sleeve stitch count row on design detail page'),
-  ('label_stitch_sleeve', 'Stitch Count (Sleeve)', 'design_page', 'Label for sleeve stitch count row'),
-  ('show_stitch_total', '1', 'design_page', 'Display total stitch count row on design detail page'),
-  ('label_stitch_total', 'Total Stitch Count', 'design_page', 'Label for total stitch count row'),
-  ('show_stitch_on_cards', '0', 'design_page', 'Show total stitches badge on product listing cards (default: 0 OFF)')
+  ('stitch_number_format', 'indian'),
+  ('show_stitch_front', '1'),
+  ('label_stitch_front', 'Stitch Count (Front)'),
+  ('show_stitch_back', '1'),
+  ('label_stitch_back', 'Stitch Count (Back)'),
+  ('show_stitch_sleeve', '1'),
+  ('label_stitch_sleeve', 'Stitch Count (Sleeve)'),
+  ('show_stitch_total', '1'),
+  ('label_stitch_total', 'Total Stitch Count'),
+  ('show_stitch_on_cards', '0')
 ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;

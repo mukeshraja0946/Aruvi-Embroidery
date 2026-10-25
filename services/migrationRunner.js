@@ -187,6 +187,11 @@ async function executeMigrationSql(conn, sql, file) {
       if (err.errno === 1050 || err.errno === 1060 || err.errno === 1061) {
         continue;
       }
+      // 1054: Unknown column (e.g., if settings table lacks setting_group/description column)
+      if (err.errno === 1054 && /INSERT\s+INTO\s+[`"]?settings[`"]?/i.test(stmt)) {
+        console.warn('[Migration Runner] Safe notice: column in settings insert not present, skipping optional metadata');
+        continue;
+      }
       throw err;
     }
   }

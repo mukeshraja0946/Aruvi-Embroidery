@@ -1966,6 +1966,182 @@ class Design {
     }
     return matches;
   }
+
+  /**
+   * Automatically ensures all stitch columns, audit tables, and schema migrations exist.
+   * Completely self-healing on startup and when called from health checks.
+   */
+  static async ensureDatabaseColumns() {
+    if (!db.isConnected()) return false;
+
+    try {
+      // 1. Ensure designs columns
+      const designCols = [
+        ['stitch_count_front', 'INT UNSIGNED NULL DEFAULT NULL'],
+        ['stitch_count_back', 'INT UNSIGNED NULL DEFAULT NULL'],
+        ['stitch_count_sleeve', 'INT UNSIGNED NULL DEFAULT NULL'],
+        ['stitch_count_total', 'INT UNSIGNED NULL DEFAULT NULL'],
+        ['stitch_total_manual', 'TINYINT NOT NULL DEFAULT 0'],
+        ['stitch_count', 'INT UNSIGNED NULL DEFAULT NULL']
+      ];
+
+      for (const [col, typeDef] of designCols) {
+        try {
+          await db.query(`ALTER TABLE \`designs\` ADD COLUMN IF NOT EXISTS \`${col}\` ${typeDef}`);
+        } catch (colErr) {
+          if (colErr.message && (colErr.message.includes('IF NOT EXISTS') || colErr.errno === 1064)) {
+            const chk = await db.query(
+              'SELECT COUNT(*) as count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = "designs" AND column_name = ?',
+              [col]
+            );
+            if (chk && chk[0] && chk[0].count === 0) {
+              await db.query(`ALTER TABLE \`designs\` ADD COLUMN \`${col}\` ${typeDef}`);
+            }
+          }
+        }
+      }
+
+      // 2. Ensure import_job_items columns
+      const [importJobTableCheck] = await db.query("SHOW TABLES LIKE 'import_job_items'") || [];
+      if (importJobTableCheck) {
+        const importCols = [
+          ['stitch_count_front', 'INT UNSIGNED NULL DEFAULT NULL'],
+          ['stitch_count_back', 'INT UNSIGNED NULL DEFAULT NULL'],
+          ['stitch_count_sleeve', 'INT UNSIGNED NULL DEFAULT NULL'],
+          ['stitch_count_total', 'INT UNSIGNED NULL DEFAULT NULL'],
+          ['stitch_total_manual', 'TINYINT NOT NULL DEFAULT 0']
+        ];
+        for (const [col, typeDef] of importCols) {
+          try {
+            await db.query(`ALTER TABLE \`import_job_items\` ADD COLUMN IF NOT EXISTS \`${col}\` ${typeDef}`);
+          } catch (e) {
+            try {
+              const chk = await db.query(
+                'SELECT COUNT(*) as count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = "import_job_items" AND column_name = ?',
+                [col]
+              );
+              if (chk && chk[0] && chk[0].count === 0) {
+                await db.query(`ALTER TABLE \`import_job_items\` ADD COLUMN \`${col}\` ${typeDef}`);
+              }
+            } catch (ignore) {}
+          }
+        }
+      }
+
+      // 3. Ensure stitch_update_logs table
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS \`stitch_update_logs\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`admin_id\` INT NULL,
+          \`admin_email\` VARCHAR(150) NULL,
+          \`filter_summary\` TEXT NULL,
+          \`method_summary\` TEXT NULL,
+          \`total_affected\` INT NOT NULL DEFAULT 0,
+          \`is_undone\` TINYINT(1) NOT NULL DEFAULT 0,
+          \`undone_at\` DATETIME NULL,
+          \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // 4. Ensure stitch_update_log_items table
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS \`stitch_update_log_items\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`log_id\` INT NOT NULL,
+          \`design_id\` INT NOT NULL,
+          \`sku\` VARCHAR(100) NULL,
+          \`old_front\` INT UNSIGNED NULL,
+          \`old_back\` INT UNSIGNED NULL,
+          \`old_sleeve\` INT UNSIGNED NULL,
+          \`old_total\` INT UNSIGNED NULL,
+          \`old_manual\` TINYINT NOT NULL DEFAULT 0,
+          \`new_front\` INT UNSIGNED NULL,
+          \`new_back\` INT UNSIGNED NULL,
+          \`new_sleeve\` INT UNSIGNED NULL,
+          \`new_total\` INT UNSIGNED NULL,
+          \`new_manual\` TINYINT NOT NULL DEFAULT 0,
+          \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX \`idx_stitch_log_id\` (\`log_id\`),
+          INDEX \`idx_stitch_design_id\` (\`design_id\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // 5. Ensure schema_migrations table exists and register 017
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS \`schema_migrations\` (
+          \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+          \`version\` VARCHAR(100) NOT NULL UNIQUE,
+          \`name\` VARCHAR(255) NOT NULL,
+          \`applied_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      await db.query(`
+        INSERT IGNORE INTO \`schema_migrations\` (\`version\`, \`name\`)
+        VALUES ('017', '017_stitch_counts_and_bulk_update.sql')
+      `);
+
+      // 6. Ensure default stitch settings in settings table
+      await db.query(`
+        INSERT INTO \`settings\` (\`setting_key\`, \`setting_value\`) VALUES
+          ('stitch_number_format', 'indian'),
+          ('show_stitch_front', '1'),
+          ('label_stitch_front', 'Stitch Count (Front)'),
+          ('show_stitch_back', '1'),
+          ('label_stitch_back', 'Stitch Count (Back)'),
+          ('show_stitch_sleeve', '1'),
+          ('label_stitch_sleeve', 'Stitch Count (Sleeve)'),
+          ('show_stitch_total', '1'),
+          ('label_stitch_total', 'Total Stitch Count'),
+          ('show_stitch_on_cards', '0')
+        ON DUPLICATE KEY UPDATE \`setting_key\` = \`setting_key\`
+      `);
+
+      return true;
+    } catch (err) {
+      console.warn('[Design.ensureDatabaseColumns] Notice:', err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Auto-repairs missing or invalid slugs for existing catalog designs
+   */
+  static async repairInvalidDatabaseSlugs() {
+    if (!db.isConnected()) return;
+    try {
+      const invalidDesigns = await db.query("SELECT id, title FROM designs WHERE slug IS NULL OR slug = '' OR slug = 'undefined' LIMIT 50");
+      if (Array.isArray(invalidDesigns) && invalidDesigns.length > 0) {
+        for (const d of invalidDesigns) {
+          const freshSlug = await this.generateUniqueSlug(d.title || `design-${d.id}`, d.id);
+          await db.query('UPDATE designs SET slug = ? WHERE id = ?', [freshSlug, d.id]);
+        }
+      }
+    } catch (err) {
+      console.warn('[repairInvalidDatabaseSlugs] Notice:', err.message);
+    }
+  }
+
+  /**
+   * Auto-syncs legacy stitch_count with stitch_count_total
+   */
+  static async repairExistingStitchCounts() {
+    if (!db.isConnected()) return;
+    try {
+      await db.query(`
+        UPDATE designs 
+        SET stitch_count_total = stitch_count 
+        WHERE stitch_count_total IS NULL AND stitch_count IS NOT NULL AND stitch_count > 0
+      `);
+      await db.query(`
+        UPDATE designs 
+        SET stitch_count = stitch_count_total 
+        WHERE stitch_count IS NULL AND stitch_count_total IS NOT NULL AND stitch_count_total > 0
+      `);
+    } catch (err) {
+      console.warn('[repairExistingStitchCounts] Notice:', err.message);
+    }
+  }
 }
 
 module.exports = Design;

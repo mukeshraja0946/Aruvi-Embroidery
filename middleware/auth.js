@@ -185,6 +185,18 @@ async function isAdmin(req, res, next) {
           pendingCustomOrders,
           unreadNotifications: unreadMessages + pendingCustomOrders
         };
+
+        // Self-heal schema alert dynamically if flagged
+        if (req.app && req.app.locals && req.app.locals.schemaAlert && !req.app.locals.schemaAlert.isHealthy) {
+          try {
+            const Design = require('../models/Design');
+            await Design.ensureDatabaseColumns();
+            const { checkSchemaSafetyOnStartup } = require('../services/schemaHealthService');
+            const freshAlert = await checkSchemaSafetyOnStartup();
+            req.app.locals.schemaAlert = freshAlert;
+            res.locals.schemaAlert = freshAlert;
+          } catch (healErr) {}
+        }
       } catch (badgeErr) {
         // Keep default zeros
       }

@@ -695,6 +695,20 @@ CREATE TABLE IF NOT EXISTS `stitch_update_log_items` (
   INDEX idx_stitch_design_id (`design_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Default Stitch Count Settings
+INSERT INTO `settings` (`setting_key`, `setting_value`) VALUES
+  ('stitch_number_format', 'indian'),
+  ('show_stitch_front', '1'),
+  ('label_stitch_front', 'Stitch Count (Front)'),
+  ('show_stitch_back', '1'),
+  ('label_stitch_back', 'Stitch Count (Back)'),
+  ('show_stitch_sleeve', '1'),
+  ('label_stitch_sleeve', 'Stitch Count (Sleeve)'),
+  ('show_stitch_total', '1'),
+  ('label_stitch_total', 'Total Stitch Count'),
+  ('show_stitch_on_cards', '0')
+ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
+
 -- ----------------------------------------------------------------------------
 -- 6. Record Applied Migrations in schema_migrations
 -- ----------------------------------------------------------------------------
