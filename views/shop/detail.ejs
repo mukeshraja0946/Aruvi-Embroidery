@@ -105,8 +105,34 @@
         <div class="spec-row">
           <span class="spec-label">Design Code</span>
           <span class="spec-colon">:</span>
-          <span class="spec-value"><%= design.sku || ('AF-00' + design.id) %></span>
+          <span class="spec-value"><%= design.sku || ('AED-00' + design.id) %></span>
         </div>
+        <div class="spec-row">
+          <span class="spec-label">Category</span>
+          <span class="spec-colon">:</span>
+          <span class="spec-value"><%= design.category_name || 'Embroidery Design' %></span>
+        </div>
+        <% if (design.stitch_count_front !== null && design.stitch_count_front !== undefined && design.stitch_count_front !== '') { %>
+          <div class="spec-row">
+            <span class="spec-label">Front Stitches</span>
+            <span class="spec-colon">:</span>
+            <span class="spec-value"><%= Number(design.stitch_count_front).toLocaleString() %> stitches</span>
+          </div>
+        <% } %>
+        <% if (design.stitch_count_back !== null && design.stitch_count_back !== undefined && design.stitch_count_back !== '') { %>
+          <div class="spec-row">
+            <span class="spec-label">Back Stitches</span>
+            <span class="spec-colon">:</span>
+            <span class="spec-value"><%= Number(design.stitch_count_back).toLocaleString() %> stitches</span>
+          </div>
+        <% } %>
+        <% if (design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined && design.stitch_count_sleeve !== '') { %>
+          <div class="spec-row">
+            <span class="spec-label">Sleeve Stitches</span>
+            <span class="spec-colon">:</span>
+            <span class="spec-value"><%= Number(design.stitch_count_sleeve).toLocaleString() %> stitches</span>
+          </div>
+        <% } %>
         <div class="spec-row">
           <span class="spec-label">Available Formats</span>
           <span class="spec-colon">:</span>
@@ -211,16 +237,84 @@
     <div class="tab-main-grid">
       <!-- Left Content Pane -->
       <div class="tab-left-pane">
-        <!-- Technical File Details Box -->
-        <div class="detail-info-card" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
-          <h3 class="tab-heading" style="margin-bottom: 0.6rem; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--text-dark);">Technical File Details</h3>
-          <p class="tab-text-content" style="color: var(--text-dark); line-height: 1.6; font-size: 0.92rem; margin-bottom: 1rem;">
-            This digital download includes precision-engineered machine embroidery files in standard format(s) (<%= design.formats || 'DST' %>). Tested on Tajima, Brother, Janome, and Singer machines for zero thread breakage and high density coverage.
-          </p>
-          <% if (design.description && design.description.trim()) { %>
-            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-dark);">Description</h4>
-            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin: 0;"><%= design.description %></p>
-          <% } %>
+        <!-- Technical File Details & Embroidery Design Details Box -->
+        <div class="detail-info-card" style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 14px; padding: 1.6rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.8rem;">
+            <h3 class="tab-heading" style="margin: 0; font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i> Design Details
+            </h3>
+            <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); background: #FAF6F0; padding: 3px 10px; border-radius: 6px;"><%= design.sku || ('AED-00' + design.id) %></span>
+          </div>
+
+          <!-- Key Design Attributes (Design Name & Category) -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.3rem; background: #FAF6F0; border-radius: 10px; padding: 1rem 1.2rem;">
+            <div>
+              <span style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Design Name</span>
+              <strong style="font-size: 1rem; color: var(--text-dark);"><%= design.title %></strong>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">Category</span>
+              <strong style="font-size: 1rem; color: var(--text-dark);"><%= design.category_name || 'Embroidery Design' %></strong>
+            </div>
+          </div>
+
+          <!-- Stitch Count Breakdown (Front, Back, Sleeve) -->
+          <%
+            const hasFrontStitch = design.stitch_count_front !== null && design.stitch_count_front !== undefined && design.stitch_count_front !== '';
+            const hasBackStitch = design.stitch_count_back !== null && design.stitch_count_back !== undefined && design.stitch_count_back !== '';
+            const hasSleeveStitch = design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined && design.stitch_count_sleeve !== '';
+            const hasAnyPartStitch = hasFrontStitch || hasBackStitch || hasSleeveStitch;
+            const hasLegacyStitch = design.stitch_count !== null && design.stitch_count !== undefined && design.stitch_count !== '' && parseInt(design.stitch_count) > 0;
+          %>
+
+          <div style="margin-bottom: 1.4rem;">
+            <h4 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.7rem 0; color: var(--text-dark); display: flex; align-items: center; gap: 7px;">
+              <i class="fa-solid fa-needle" style="color: var(--primary);"></i> Stitch Count
+            </h4>
+            <% if (hasAnyPartStitch) { %>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                <% if (hasFrontStitch) { %>
+                  <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.75rem 1rem;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase;">Front</span>
+                    <strong style="font-size: 1.05rem; color: var(--text-dark);"><%= Number(design.stitch_count_front).toLocaleString() %> <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+                  </div>
+                <% } %>
+                <% if (hasBackStitch) { %>
+                  <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.75rem 1rem;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase;">Back</span>
+                    <strong style="font-size: 1.05rem; color: var(--text-dark);"><%= Number(design.stitch_count_back).toLocaleString() %> <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+                  </div>
+                <% } %>
+                <% if (hasSleeveStitch) { %>
+                  <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.75rem 1rem;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase;">Sleeve</span>
+                    <strong style="font-size: 1.05rem; color: var(--text-dark);"><%= Number(design.stitch_count_sleeve).toLocaleString() %> <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+                  </div>
+                <% } %>
+              </div>
+            <% } else if (hasLegacyStitch) { %>
+              <div style="background: #FAF6F0; border: 1px solid var(--border-light); border-radius: 10px; padding: 0.75rem 1rem; display: inline-block;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 600; text-transform: uppercase;">Total Stitch Count</span>
+                <strong style="font-size: 1.05rem; color: var(--text-dark);"><%= Number(design.stitch_count).toLocaleString() %> <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);">stitches</span></strong>
+              </div>
+            <% } else { %>
+              <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0; font-style: italic;">Stitch count details not specified for this design.</p>
+            <% } %>
+          </div>
+
+          <!-- Detailed Description with preserved paragraphs and line breaks -->
+          <div>
+            <h4 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.6rem 0; color: var(--text-dark);">Description</h4>
+            <% if (design.description && design.description.trim()) { %>
+              <div class="design-detail-description" style="color: var(--text-dark); font-size: 0.92rem; line-height: 1.7; white-space: pre-line;">
+                <%= design.description %>
+              </div>
+            <% } else { %>
+              <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.6; margin: 0;">
+                High-quality machine embroidery design file carefully digitized for smooth stitch-out, zero thread breakage, and optimum thread tension. Compatible with all major computerized embroidery machines.
+              </p>
+            <% } %>
+          </div>
         </div>
 
         <% if (typeof siteSettings !== 'undefined' && siteSettings.show_design_reviews === '1') { %>
@@ -294,17 +388,28 @@
         <h4 class="sidebar-box-title" style="margin-top: 1.8rem;">Design Information</h4>
         <div class="design-info-list">
           <div class="info-row">
-            <span>Design Size</span>
-            <strong><%= design.dimensions || '120.5 mm × 98.3 mm' %></strong>
+            <span>Design Code</span>
+            <strong><%= design.sku || ('AED-00' + design.id) %></strong>
           </div>
           <div class="info-row">
-            <span>Stitch Count</span>
-            <strong><%= design.stitch_count ? Number(design.stitch_count).toLocaleString() : '28,450' %></strong>
+            <span>Category</span>
+            <strong><%= design.category_name || 'Embroidery Design' %></strong>
           </div>
-          <div class="info-row">
-            <span>Colors</span>
-            <strong><%= design.color_count ? (design.color_count + ' Colors') : '8 Colors' %></strong>
-          </div>
+          <% if (design.dimensions) { %>
+            <div class="info-row">
+              <span>Design Size</span>
+              <strong><%= design.dimensions %></strong>
+            </div>
+          <% } %>
+          <%
+            const sidebarTotalStitches = (design.stitch_count_front || 0) + (design.stitch_count_back || 0) + (design.stitch_count_sleeve || 0) || (design.stitch_count || 0);
+          %>
+          <% if (sidebarTotalStitches > 0) { %>
+            <div class="info-row">
+              <span>Total Stitches</span>
+              <strong><%= Number(sidebarTotalStitches).toLocaleString() %></strong>
+            </div>
+          <% } %>
           <div class="info-row">
             <span>Formats</span>
             <strong><%= design.formats || 'None' %></strong>

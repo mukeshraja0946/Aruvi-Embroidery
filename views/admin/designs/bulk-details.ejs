@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <style>
+    :root {
+      --admin-primary: #B8402A;
+      --admin-primary-dark: #932C19;
+      --admin-border: #EFE6D9;
+      --admin-text-dark: #2A211D;
+      --admin-text-muted: #7A6F68;
+      --admin-bg-light: #FAF6F0;
+    }
+
+    .bulk-card-box {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+
+    .input-mode-tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 1px solid var(--admin-border);
+      padding: 1rem 1.5rem 0;
+      background: #FCFAF7;
+      overflow-x: auto;
+    }
+
+    .input-mode-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 10px 10px 0 0;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--admin-text-muted);
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .input-mode-tab:hover {
+      color: var(--admin-primary);
+      background: #FFFFFF;
+    }
+
+    .input-mode-tab.active {
+      color: var(--admin-primary);
+      background: #FFFFFF;
+      border-color: var(--admin-border);
+      border-bottom: 2px solid var(--admin-primary);
+      margin-bottom: -1px;
+    }
+
+    .dropzone-container {
+      border: 2px dashed #D7CCC8;
+      border-radius: 14px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      background: #FAF8F5;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .dropzone-container:hover, .dropzone-container.dragover {
+      border-color: var(--admin-primary);
+      background: #FFF5F2;
+    }
+
+    .notes-textarea {
+      width: 100%;
+      height: 230px;
+      border: 1px solid var(--admin-border);
+      border-radius: 12px;
+      padding: 1rem;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: var(--admin-text-dark);
+      background: #FFFFFF;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+
+    .notes-textarea:focus {
+      outline: none;
+      border-color: var(--admin-primary);
+      box-shadow: 0 0 0 3px rgba(184, 64, 42, 0.1);
+    }
+
+    .stat-badge-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .chip-ready { background: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9; }
+    .chip-nochange { background: #E3F2FD; color: #1565C0; border: 1px solid #BBDEFB; }
+    .chip-unmatched { background: #FFF3E0; color: #E65100; border: 1px solid #FFE0B2; }
+    .chip-invalid { background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
+
+    .diff-pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #F3E5F5;
+      color: #6A1B9A;
+      margin: 2px;
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.86rem;
+    }
+
+    .preview-table th {
+      background: #FAF6F0;
+      color: var(--admin-text-dark);
+      font-weight: 700;
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--admin-border);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .preview-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #F0EAE1;
+      vertical-align: top;
+    }
+
+    .preview-table tr:hover td {
+      background: #FCFAF8;
+    }
+
+    .desc-preview-text {
+      max-height: 75px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      font-size: 0.82rem;
+      color: #555;
+      white-space: pre-line;
+    }
+
+    .desc-preview-text.expanded {
+      max-height: none;
+      -webkit-line-clamp: unset;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search designs, orders, customers...">
+    </div>
+
+    <div class="admin-header-right">
+      <a href="/admin/designs" class="btn btn-outline btn-sm" style="height: 36px; padding: 0 14px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--admin-text-dark); border-color: var(--admin-border); background: #FFF;">
+        <i class="fa-solid fa-arrow-left"></i> Manage Designs
+      </a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin Main Container -->
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- DESIGNS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/bulk-details" class="active"><span><i class="fa-solid fa-file-pen"></i> Bulk Update Details</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- ORDERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">ORDERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/orders"><span><i class="fa-regular fa-newspaper"></i> All Orders</span></a></li>
+        </ul>
+      </div>
+
+      <!-- CUSTOMERS Section -->
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">CUSTOMERS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content-area" style="padding: 2rem;">
+      <!-- Breadcrumb & Title -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+            <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp;
+            <a href="/admin/designs" style="color: var(--admin-text-muted); text-decoration: none;">Designs</a> &nbsp;>&nbsp;
+            <span style="color: var(--admin-primary); font-weight: 600;">Bulk Update Design Details</span>
+          </div>
+          <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Bulk Update Design Details</h1>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Update embroidery stitch counts (front, back, sleeve), descriptions, and categories safely in bulk via Excel, Word, PDF, TXT, or direct notes.</p>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <a href="/admin/designs/bulk-details/template" class="btn" style="background: #107C41; color: #FFFFFF; font-size: 0.85rem; font-weight: 600; padding: 9px 16px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 2px 8px rgba(16,124,65,0.2);">
+            <i class="fa-solid fa-file-excel"></i> Download Excel Template
+          </a>
+        </div>
+      </div>
+
+      <!-- Alert Box -->
+      <div id="statusAlert" style="display: none; padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1.5rem; font-size: 0.9rem;"></div>
+
+      <!-- STEP 1: Input & Source Selection Card -->
+      <div class="bulk-card-box" id="inputSectionCard">
+        <div class="input-mode-tabs">
+          <button type="button" class="input-mode-tab active" onclick="switchInputMode('notes', this)">
+            <i class="fa-solid fa-align-left"></i> Notes / Paste Text
+          </button>
+          <button type="button" class="input-mode-tab" onclick="switchInputMode('excel', this)">
+            <i class="fa-solid fa-file-excel" style="color: #107C41;"></i> Excel Spreadsheet (.xlsx, .xls)
+          </button>
+          <button type="button" class="input-mode-tab" onclick="switchInputMode('word', this)">
+            <i class="fa-solid fa-file-word" style="color: #2B579A;"></i> Word Document (.docx)
+          </button>
+          <button type="button" class="input-mode-tab" onclick="switchInputMode('pdf', this)">
+            <i class="fa-solid fa-file-pdf" style="color: #D32F2F;"></i> Text-based PDF (.pdf)
+          </button>
+          <button type="button" class="input-mode-tab" onclick="switchInputMode('txt', this)">
+            <i class="fa-solid fa-file-lines" style="color: #555;"></i> Plain Text (.txt)
+          </button>
+        </div>
+
+        <div style="padding: 1.8rem;">
+          <!-- MODE A: Direct Notes / Text Area -->
+          <div id="modeNotesSection">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--admin-text-dark);">
+                Paste Structured Notes
+              </label>
+              <button type="button" onclick="insertSampleFormat()" class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; background: #FFF; border-color: var(--admin-border); color: var(--admin-primary); font-weight: 600; cursor: pointer;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Insert Example Template
+              </button>
+            </div>
+            <textarea id="notesInput" class="notes-textarea" placeholder="Design Code: AED-BLO-01
+Design Name: Rose Bloom Design
+Category: Blouse Designs
+Front Stitch Count: 12500
+Back Stitch Count: 8200
+Sleeve Stitch Count: 4500
+Description: Floral embroidery design with matching front, back, and sleeve patterns.
+
+---
+
+Design Code: AED-BOR-02
+Front Stitch Count: 9400
+Back Stitch Count: 6100
+Sleeve Stitch Count: 3200
+Description: Traditional border embroidery design for sarees."></textarea>
+            <div style="font-size: 0.76rem; color: var(--admin-text-muted); margin-top: 6px;">
+              Separate multiple entries with <code>---</code> or new <code>Design Code:</code> headers. Blank fields will leave existing values untouched.
+            </div>
+          </div>
+
+          <!-- MODE B: File Upload Dropzone (Excel, Word, PDF, TXT) -->
+          <div id="modeFileSection" style="display: none;">
+            <div class="dropzone-container" id="dropzoneBox" onclick="document.getElementById('fileInput').click()">
+              <input type="file" id="fileInput" name="details_file" style="display: none;" onchange="handleFileSelect(this)">
+              <div id="dropzonePrompt">
+                <i id="dropzoneIcon" class="fa-solid fa-cloud-arrow-up" style="font-size: 2.8rem; color: var(--admin-primary); margin-bottom: 0.6rem; display: block;"></i>
+                <strong style="font-size: 1.05rem; color: var(--admin-text-dark); display: block; margin-bottom: 4px;" id="dropzoneTitle">
+                  Drop your file here, or browse
+                </strong>
+                <span style="font-size: 0.82rem; color: var(--admin-text-muted); display: block; margin-bottom: 1rem;" id="dropzoneSubtitle">
+                  Supports .xlsx, .xls, .docx, .pdf, and .txt files up to 25 MB
+                </span>
+                <button type="button" class="btn" style="background: var(--admin-primary); color: #FFF; font-size: 0.82rem; font-weight: 700; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;">
+                  <i class="fa-regular fa-folder-open"></i> Choose File
+                </button>
+              </div>
+
+              <!-- Selected File Display -->
+              <div id="selectedFileInfo" style="display: none; align-items: center; justify-content: center; gap: 14px; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1rem; max-width: 450px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                <i id="selectedFileIcon" class="fa-solid fa-file" style="font-size: 2rem; color: var(--admin-primary);"></i>
+                <div style="text-align: left; flex: 1; overflow: hidden;">
+                  <strong id="selectedFileName" style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">filename.xlsx</strong>
+                  <span id="selectedFileSize" style="font-size: 0.78rem; color: var(--admin-text-muted);">12 KB</span>
+                </div>
+                <button type="button" onclick="clearSelectedFile(event)" style="background: #FFEBEE; border: none; color: #C62828; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;" title="Remove file">&times;</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Options & Controls -->
+          <div style="margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--admin-text-dark); cursor: pointer;">
+              <input type="checkbox" id="clearFieldOption" name="clear_field_option" value="1" style="width: 17px; height: 17px; accent-color: var(--admin-primary);">
+              <span><strong>Explicit Clear Option:</strong> Erase field value when cell or note contains <code>[CLEAR]</code></span>
+            </label>
+
+            <button type="button" id="previewBtn" onclick="generatePreview()" class="btn" style="background: var(--admin-primary); color: #FFFFFF; font-size: 0.9rem; font-weight: 700; padding: 10px 24px; border-radius: 10px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(184, 64, 42, 0.25);">
+              <i class="fa-solid fa-magnifying-glass"></i> Preview & Validate Updates
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Preview & Confirmation Section (Initially hidden) -->
+      <div class="bulk-card-box" id="previewSectionCard" style="display: none;">
+        <!-- Header & Stats Banner -->
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--admin-border); background: #FAF8F5;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <h2 style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px 0;">
+                <i class="fa-solid fa-list-check" style="color: var(--admin-primary); margin-right: 6px;"></i> Import Preview & Validation
+              </h2>
+              <span style="font-size: 0.84rem; color: var(--admin-text-muted);">
+                Review changes before applying. The database will not be updated until you click <strong>Confirm Update</strong>.
+              </span>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button type="button" onclick="cancelPreview()" class="btn btn-outline" style="border-radius: 8px; font-size: 0.85rem; padding: 8px 18px; font-weight: 600; background: #FFF; border-color: var(--admin-border); color: #555;">
+                <i class="fa-solid fa-xmark"></i> Cancel
+              </button>
+              <button type="button" id="confirmUpdateBtn" onclick="confirmUpdate()" class="btn" style="background: #2E7D32; color: #FFFFFF; font-size: 0.88rem; font-weight: 700; padding: 9px 24px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(46,125,50,0.25);">
+                <i class="fa-solid fa-check-double"></i> Confirm & Apply Update (<span id="readyCountBadge">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary Badges -->
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <div class="stat-badge-chip chip-ready">
+              <i class="fa-solid fa-circle-check"></i> Ready to Update: <span id="statReady">0</span>
+            </div>
+            <div class="stat-badge-chip chip-nochange">
+              <i class="fa-solid fa-circle-minus"></i> Unchanged / Identical: <span id="statNoChange">0</span>
+            </div>
+            <div class="stat-badge-chip chip-unmatched">
+              <i class="fa-solid fa-triangle-exclamation"></i> Unmatched SKUs: <span id="statUnmatched">0</span>
+            </div>
+            <div class="stat-badge-chip chip-invalid">
+              <i class="fa-solid fa-circle-xmark"></i> Errors / Invalid: <span id="statInvalid">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview Table Viewport -->
+        <div style="max-height: 520px; overflow-y: auto; overflow-x: auto;">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">#</th>
+                <th style="width: 140px;">Design Code / SKU</th>
+                <th style="width: 160px;">Design Name</th>
+                <th style="width: 130px;">Category</th>
+                <th style="width: 200px;">Stitch Counts (F / B / S)</th>
+                <th style="min-width: 220px;">Description</th>
+                <th style="width: 130px;">Fields to Change</th>
+                <th style="width: 140px;">Status / Notes</th>
+              </tr>
+            </thead>
+            <tbody id="previewTableBody">
+              <!-- Dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STEP 3: Post-Update Results Card (Initially hidden) -->
+      <div class="bulk-card-box" id="resultSectionCard" style="display: none; padding: 2rem;">
+        <div style="text-align: center; max-width: 550px; margin: 0 auto;">
+          <div style="width: 64px; height: 64px; background: #E8F5E9; color: #2E7D32; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1.2rem;">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <h2 style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.5rem;">
+            Bulk Details Update Complete!
+          </h2>
+          <p style="font-size: 0.9rem; color: var(--admin-text-muted); margin: 0 0 1.8rem;">
+            The embroidery design catalog has been updated successfully.
+          </p>
+
+          <!-- Result Totals Grid -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #FAF6F0; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.8rem;">
+            <div>
+              <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: block;">UPDATED</span>
+              <strong id="resUpdated" style="font-size: 1.4rem; color: #2E7D32;">0</strong>
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: block;">SKIPPED</span>
+              <strong id="resSkipped" style="font-size: 1.4rem; color: #1565C0;">0</strong>
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: block;">UNMATCHED</span>
+              <strong id="resUnmatched" style="font-size: 1.4rem; color: #E65100;">0</strong>
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: block;">FAILED</span>
+              <strong id="resFailed" style="font-size: 1.4rem; color: #C62828;">0</strong>
+            </div>
+          </div>
+
+          <!-- Result Actions -->
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" id="downloadErrorReportBtn" onclick="downloadErrorReport()" class="btn btn-outline" style="display: none; border-radius: 8px; font-size: 0.85rem; padding: 10px 18px; font-weight: 600; color: #C62828; border-color: #FFCDD2; background: #FFF;">
+              <i class="fa-solid fa-download"></i> Download Error Report (.xlsx)
+            </button>
+            <button type="button" onclick="resetToNewImport()" class="btn btn-outline" style="border-radius: 8px; font-size: 0.85rem; padding: 10px 18px; font-weight: 600; background: #FFF; border-color: var(--admin-border);">
+              <i class="fa-solid fa-rotate"></i> Update More Designs
+            </button>
+            <a href="/admin/designs" class="btn" style="background: var(--admin-primary); color: #FFF; border-radius: 8px; font-size: 0.85rem; font-weight: 700; padding: 10px 22px; text-decoration: none;">
+              <i class="fa-solid fa-box-archive"></i> Go to Manage Designs
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  let currentInputMode = 'notes';
+  let selectedFileObject = null;
+  let activePreviewData = null;
+  let lastFailedRows = [];
+
+  function switchInputMode(mode, element) {
+    currentInputMode = mode;
+    document.querySelectorAll('.input-mode-tab').forEach(t => t.classList.remove('active'));
+    element.classList.add('active');
+
+    const notesSec = document.getElementById('modeNotesSection');
+    const fileSec = document.getElementById('modeFileSection');
+    const dropzoneTitle = document.getElementById('dropzoneTitle');
+    const dropzoneSubtitle = document.getElementById('dropzoneSubtitle');
+    const dropzoneIcon = document.getElementById('dropzoneIcon');
+    const fileInput = document.getElementById('fileInput');
+
+    if (mode === 'notes') {
+      notesSec.style.display = 'block';
+      fileSec.style.display = 'none';
+      selectedFileObject = null;
+    } else {
+      notesSec.style.display = 'none';
+      fileSec.style.display = 'block';
+
+      if (mode === 'excel') {
+        fileInput.accept = '.xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel';
+        dropzoneTitle.textContent = 'Upload Excel Spreadsheet (.xlsx, .xls)';
+        dropzoneSubtitle.textContent = 'Upload your structured embroidery designs spreadsheet';
+        dropzoneIcon.className = 'fa-solid fa-file-excel';
+        dropzoneIcon.style.color = '#107C41';
+      } else if (mode === 'word') {
+        fileInput.accept = '.docx, application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        dropzoneTitle.textContent = 'Upload Word Document (.docx)';
+        dropzoneSubtitle.textContent = 'Upload structured Word document containing design specifications';
+        dropzoneIcon.className = 'fa-solid fa-file-word';
+        dropzoneIcon.style.color = '#2B579A';
+      } else if (mode === 'pdf') {
+        fileInput.accept = '.pdf, application/pdf';
+        dropzoneTitle.textContent = 'Upload Text-based PDF (.pdf)';
+        dropzoneSubtitle.textContent = 'Ensure the PDF contains selectable text (not scanned images)';
+        dropzoneIcon.className = 'fa-solid fa-file-pdf';
+        dropzoneIcon.style.color = '#D32F2F';
+      } else if (mode === 'txt') {
+        fileInput.accept = '.txt, text/plain';
+        dropzoneTitle.textContent = 'Upload Plain Text File (.txt)';
+        dropzoneSubtitle.textContent = 'Upload structured text entries separated by ---';
+        dropzoneIcon.className = 'fa-solid fa-file-lines';
+        dropzoneIcon.style.color = '#555';
+      }
+    }
+  }
+
+  function insertSampleFormat() {
+    const sample = `Design Code: AED-BLO-01
+Design Name: Rose Bloom Design
+Category: Blouse Designs
+Front Stitch Count: 12500
+Back Stitch Count: 8200
+Sleeve Stitch Count: 4500
+Description: Floral embroidery design with matching front, back, and sleeve patterns suitable for bridal blouses.
+
+---
+
+Design Code: AED-BOR-02
+Design Name: Peacock Border Motif
+Category: Border Designs
+Front Stitch Count: 9400
+Back Stitch Count: 6100
+Sleeve Stitch Count: 3200
+Description: Intricate peacock border embroidery pattern for sarees and lehengas.`;
+
+    const notesArea = document.getElementById('notesInput');
+    notesArea.value = sample;
+    notesArea.focus();
+  }
+
+  function handleFileSelect(input) {
+    if (input.files && input.files[0]) {
+      setFile(input.files[0]);
+    }
+  }
+
+  function setFile(file) {
+    selectedFileObject = file;
+    document.getElementById('dropzonePrompt').style.display = 'none';
+    const info = document.getElementById('selectedFileInfo');
+    info.style.display = 'flex';
+    document.getElementById('selectedFileName').textContent = file.name;
+    document.getElementById('selectedFileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    const icon = document.getElementById('selectedFileIcon');
+    if (['xlsx', 'xls'].includes(ext)) {
+      icon.className = 'fa-solid fa-file-excel'; icon.style.color = '#107C41';
+    } else if (ext === 'docx') {
+      icon.className = 'fa-solid fa-file-word'; icon.style.color = '#2B579A';
+    } else if (ext === 'pdf') {
+      icon.className = 'fa-solid fa-file-pdf'; icon.style.color = '#D32F2F';
+    } else {
+      icon.className = 'fa-solid fa-file-lines'; icon.style.color = '#555';
+    }
+  }
+
+  function clearSelectedFile(e) {
+    if (e) e.stopPropagation();
+    selectedFileObject = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('selectedFileInfo').style.display = 'none';
+    document.getElementById('dropzonePrompt').style.display = 'block';
+  }
+
+  // Drag and drop events
+  const dropzone = document.getElementById('dropzoneBox');
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropzone.addEventListener(eventName, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      dropzone.classList.add('dragover');
+    }, false);
+  });
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropzone.addEventListener(eventName, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      dropzone.classList.remove('dragover');
+    }, false);
+  });
+  dropzone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files[0]) {
+      setFile(dt.files[0]);
+    }
+  });
+
+  function showAlert(msg, type = 'error') {
+    const alert = document.getElementById('statusAlert');
+    alert.style.display = 'block';
+    if (type === 'error') {
+      alert.style.background = '#FFEBEE';
+      alert.style.border = '1px solid #FFCDD2';
+      alert.style.color = '#C62828';
+      alert.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <strong>Error:</strong> ${msg}`;
+    } else if (type === 'success') {
+      alert.style.background = '#E8F5E9';
+      alert.style.border = '1px solid #C8E6C9';
+      alert.style.color = '#2E7D32';
+      alert.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg}`;
+    }
+    alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideAlert() {
+    document.getElementById('statusAlert').style.display = 'none';
+  }
+
+  async function generatePreview() {
+    hideAlert();
+    const previewBtn = document.getElementById('previewBtn');
+    const originalBtnHtml = previewBtn.innerHTML;
+
+    const formData = new FormData();
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    formData.append('_csrf', csrfToken);
+
+    const clearOption = document.getElementById('clearFieldOption').checked ? '1' : '0';
+    formData.append('clear_field_option', clearOption);
+
+    if (currentInputMode === 'notes') {
+      const notes = document.getElementById('notesInput').value;
+      if (!notes || !notes.trim()) {
+        showAlert('Please paste structured design notes or choose a file format to proceed.');
+        return;
+      }
+      formData.append('notes', notes);
+    } else {
+      if (!selectedFileObject) {
+        showAlert('Please choose or drop a file before generating preview.');
+        return;
+      }
+      formData.append('details_file', selectedFileObject);
+    }
+
+    try {
+      previewBtn.disabled = true;
+      previewBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing & Validating...';
+
+      const res = await fetch('/admin/designs/bulk-details/preview', {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Unable to parse details input.');
+      }
+
+      activePreviewData = data.preview;
+      renderPreviewTable(data.preview);
+
+      document.getElementById('previewSectionCard').style.display = 'block';
+      document.getElementById('previewSectionCard').scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      showAlert(err.message, 'error');
+    } finally {
+      previewBtn.disabled = false;
+      previewBtn.innerHTML = originalBtnHtml;
+    }
+  }
+
+  function renderPreviewTable(preview) {
+    document.getElementById('statReady').textContent = preview.readyCount;
+    document.getElementById('statNoChange').textContent = preview.noChangeCount;
+    document.getElementById('statUnmatched').textContent = preview.unmatchedCount;
+    document.getElementById('statInvalid').textContent = preview.invalidCount;
+    document.getElementById('readyCountBadge').textContent = preview.readyCount;
+
+    const confirmBtn = document.getElementById('confirmUpdateBtn');
+    confirmBtn.disabled = preview.readyCount === 0;
+    confirmBtn.style.opacity = preview.readyCount === 0 ? '0.5' : '1';
+    confirmBtn.style.cursor = preview.readyCount === 0 ? 'not-allowed' : 'pointer';
+
+    const tbody = document.getElementById('previewTableBody');
+    tbody.innerHTML = '';
+
+    preview.items.forEach(item => {
+      const tr = document.createElement('tr');
+
+      // Status Badge
+      let statusBadge = '';
+      if (item.status === 'ready') {
+        statusBadge = '<span class="stat-badge-chip chip-ready"><i class="fa-solid fa-check"></i> Ready</span>';
+      } else if (item.status === 'no_change') {
+        statusBadge = '<span class="stat-badge-chip chip-nochange"><i class="fa-solid fa-minus"></i> No Changes</span>';
+      } else if (item.status === 'unmatched') {
+        statusBadge = '<span class="stat-badge-chip chip-unmatched"><i class="fa-solid fa-question"></i> Unmatched</span>';
+      } else {
+        statusBadge = '<span class="stat-badge-chip chip-invalid"><i class="fa-solid fa-triangle-exclamation"></i> Invalid</span>';
+      }
+
+      // Changes Badges
+      const changesHtml = item.changes && item.changes.length > 0
+        ? item.changes.map(c => `<span class="diff-pill">${c}</span>`).join('')
+        : '<span style="color: #999; font-size: 0.78rem;">None</span>';
+
+      // Errors & Warnings
+      let notesHtml = '';
+      if (item.errors && item.errors.length > 0) {
+        notesHtml += `<div style="color: #C62828; font-size: 0.76rem; font-weight: 600; margin-top: 4px;">${item.errors.join('<br>')}</div>`;
+      }
+      if (item.warnings && item.warnings.length > 0) {
+        notesHtml += `<div style="color: #E65100; font-size: 0.76rem; margin-top: 4px;">${item.warnings.join('<br>')}</div>`;
+      }
+
+      // Stitch count display
+      const fmtStitch = (val) => (val !== null && val !== undefined && val !== '') ? Number(val).toLocaleString() : '—';
+      const fEx = fmtStitch(item.existing.stitch_count_front);
+      const fPr = fmtStitch(item.proposed.stitch_count_front);
+      const bEx = fmtStitch(item.existing.stitch_count_back);
+      const bPr = fmtStitch(item.proposed.stitch_count_back);
+      const sEx = fmtStitch(item.existing.stitch_count_sleeve);
+      const sPr = fmtStitch(item.proposed.stitch_count_sleeve);
+
+      const fChanged = item.changes.includes('Front Stitch Count');
+      const bChanged = item.changes.includes('Back Stitch Count');
+      const sChanged = item.changes.includes('Sleeve Stitch Count');
+
+      tr.innerHTML = `
+        <td style="color: #888; font-weight: 600;">${item.rowNumber}</td>
+        <td>
+          <strong style="color: var(--admin-text-dark);">${item.sku}</strong>
+          ${item.designId ? `<span style="display: block; font-size: 0.72rem; color: #888;">ID: #${item.designId}</span>` : ''}
+        </td>
+        <td>
+          <span style="display: block; font-weight: 600; color: ${item.changes.includes('Design Name') ? 'var(--admin-primary)' : 'var(--admin-text-dark)'};">
+            ${item.proposed.title || item.existing.title}
+          </span>
+          ${item.changes.includes('Design Name') ? `<span style="font-size: 0.72rem; color: #888; text-decoration: line-through;">${item.existing.title}</span>` : ''}
+        </td>
+        <td>
+          <span style="font-weight: 500; color: ${item.changes.includes('Category') ? 'var(--admin-primary)' : 'inherit'};">
+            ${item.proposed.category_name || item.existing.category_name || '—'}
+          </span>
+          ${item.changes.includes('Category') ? `<span style="display: block; font-size: 0.72rem; color: #888; text-decoration: line-through;">${item.existing.category_name}</span>` : ''}
+        </td>
+        <td style="font-size: 0.82rem;">
+          <div><strong style="color: #666;">F:</strong> <span style="${fChanged ? 'font-weight: 700; color: #2E7D32;' : ''}">${fPr}</span> ${fChanged ? `<span style="text-decoration: line-through; color: #999; font-size: 0.75rem;">(${fEx})</span>` : ''}</div>
+          <div><strong style="color: #666;">B:</strong> <span style="${bChanged ? 'font-weight: 700; color: #2E7D32;' : ''}">${bPr}</span> ${bChanged ? `<span style="text-decoration: line-through; color: #999; font-size: 0.75rem;">(${bEx})</span>` : ''}</div>
+          <div><strong style="color: #666;">S:</strong> <span style="${sChanged ? 'font-weight: 700; color: #2E7D32;' : ''}">${sPr}</span> ${sChanged ? `<span style="text-decoration: line-through; color: #999; font-size: 0.75rem;">(${sEx})</span>` : ''}</div>
+        </td>
+        <td>
+          <div class="desc-preview-text" id="descPreview_${item.rowNumber}">${item.proposed.description || '<span style="color: #999; font-style: italic;">(Empty)</span>'}</div>
+          ${item.proposed.description && item.proposed.description.length > 90 ? `<a href="javascript:void(0)" onclick="toggleDesc(${item.rowNumber}, this)" style="font-size: 0.72rem; color: var(--admin-primary); text-decoration: underline;">Show more</a>` : ''}
+        </td>
+        <td>${changesHtml}</td>
+        <td>
+          ${statusBadge}
+          ${notesHtml}
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function toggleDesc(rowNum, link) {
+    const el = document.getElementById(`descPreview_${rowNum}`);
+    if (el.classList.contains('expanded')) {
+      el.classList.remove('expanded');
+      link.textContent = 'Show more';
+    } else {
+      el.classList.add('expanded');
+      link.textContent = 'Show less';
+    }
+  }
+
+  function cancelPreview() {
+    activePreviewData = null;
+    document.getElementById('previewSectionCard').style.display = 'none';
+    document.getElementById('inputSectionCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function confirmUpdate() {
+    if (!activePreviewData || !activePreviewData.items) return;
+
+    const readyItems = activePreviewData.items.filter(i => i.status === 'ready' && i.hasChanges);
+    if (readyItems.length === 0) {
+      showAlert('No valid rows with changes are ready to update.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to update ${readyItems.length} matched design(s) in the catalog?`)) {
+      return;
+    }
+
+    const confirmBtn = document.getElementById('confirmUpdateBtn');
+    const originalBtnHtml = confirmBtn.innerHTML;
+
+    try {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Applying Updates...';
+
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const res = await fetch('/admin/designs/bulk-details/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          _csrf: csrfToken,
+          items: activePreviewData.items
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to apply updates.');
+      }
+
+      // Display results
+      lastFailedRows = data.failedRows || [];
+      document.getElementById('resUpdated').textContent = data.updatedCount || 0;
+      document.getElementById('resSkipped').textContent = data.skippedCount || 0;
+      document.getElementById('resUnmatched').textContent = data.unmatchedCount || 0;
+      document.getElementById('resFailed').textContent = data.failedCount || 0;
+
+      const errBtn = document.getElementById('downloadErrorReportBtn');
+      if (lastFailedRows.length > 0) {
+        errBtn.style.display = 'inline-flex';
+        errBtn.innerHTML = `<i class="fa-solid fa-download"></i> Download Error Report (${lastFailedRows.length} failed)`;
+      } else {
+        errBtn.style.display = 'none';
+      }
+
+      document.getElementById('inputSectionCard').style.display = 'none';
+      document.getElementById('previewSectionCard').style.display = 'none';
+      document.getElementById('resultSectionCard').style.display = 'block';
+      document.getElementById('resultSectionCard').scrollIntoView({ behavior: 'smooth' });
+
+      showAlert(`Successfully updated ${data.updatedCount} design(s)!`, 'success');
+    } catch (err) {
+      showAlert(err.message, 'error');
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalBtnHtml;
+    }
+  }
+
+  async function downloadErrorReport() {
+    if (!lastFailedRows || lastFailedRows.length === 0) return;
+
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const res = await fetch('/admin/designs/bulk-details/error-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          _csrf: csrfToken,
+          failedRows: lastFailedRows
+        })
+      });
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bulk_details_error_report.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      alert('Failed to download error report: ' + err.message);
+    }
+  }
+
+  function resetToNewImport() {
+    activePreviewData = null;
+    lastFailedRows = [];
+    document.getElementById('resultSectionCard').style.display = 'none';
+    document.getElementById('previewSectionCard').style.display = 'none';
+    document.getElementById('inputSectionCard').style.display = 'block';
+    clearSelectedFile();
+    document.getElementById('notesInput').value = '';
+    hideAlert();
+    document.getElementById('inputSectionCard').scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>

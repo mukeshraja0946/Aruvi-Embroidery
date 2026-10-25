@@ -114,7 +114,8 @@
         <div class="sidebar-heading">DESIGNS</div>
         <ul class="sidebar-nav-list">
           <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/designs/create" class="active"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create" class="<%= !design ? 'active' : '' %>"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/bulk-details"><span><i class="fa-solid fa-file-pen"></i> Bulk Update Details</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
           <li class="sidebar-nav-item"><a href="/admin/custom-orders"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Orders</span></a></li>
         </ul>
@@ -223,7 +224,7 @@
               </div>
 
               <!-- Category -->
-              <div>
+              <div style="margin-bottom: 1.2rem;">
                 <label class="form-label-custom">Category <span class="req">*</span></label>
                 <select name="category_id" id="categorySelect" class="form-control-custom" required onchange="onCategoryChange()">
                   <option value="">Select Category</option>
@@ -233,6 +234,42 @@
                     </option>
                   <% }) %>
                 </select>
+              </div>
+
+              <!-- Detailed Description -->
+              <div>
+                <label class="form-label-custom">Detailed Description</label>
+                <textarea name="description" id="designDescription" class="form-control-custom" rows="4" style="height: auto; min-height: 100px; resize: vertical;" placeholder="Detailed floral embroidery design suitable for blouse embroidery. Includes front, back, and sleeve design information..."><%= design && design.description ? design.description : '' %></textarea>
+                <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Supports multiple paragraphs and line breaks. Displayed on the customer design page.</span>
+              </div>
+            </div>
+
+            <!-- Card: Embroidery Stitch Counts -->
+            <div class="form-section-card">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-needle" style="color: var(--admin-primary); margin-right: 6px;"></i> Embroidery Stitch Counts</h3>
+                <span style="font-size: 0.75rem; color: var(--admin-text-muted);">Non-negative whole numbers</span>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem 0;">Specify individual stitch counts for each garment section. Values are displayed on the customer design details page.</p>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem;">
+                <div>
+                  <label class="form-label-custom">Front Stitch Count</label>
+                  <input type="number" min="0" step="1" name="stitch_count_front" class="form-control-custom" value="<%= design && design.stitch_count_front !== null && design.stitch_count_front !== undefined ? design.stitch_count_front : '' %>" placeholder="e.g. 12500">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Front neck / bodice</span>
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Back Stitch Count</label>
+                  <input type="number" min="0" step="1" name="stitch_count_back" class="form-control-custom" value="<%= design && design.stitch_count_back !== null && design.stitch_count_back !== undefined ? design.stitch_count_back : '' %>" placeholder="e.g. 8200">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Back neck pattern</span>
+                </div>
+
+                <div>
+                  <label class="form-label-custom">Sleeve Stitch Count</label>
+                  <input type="number" min="0" step="1" name="stitch_count_sleeve" class="form-control-custom" value="<%= design && design.stitch_count_sleeve !== null && design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : '' %>" placeholder="e.g. 4500">
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted); display: block; margin-top: 4px;">Sleeve / arm border</span>
+                </div>
               </div>
             </div>
 

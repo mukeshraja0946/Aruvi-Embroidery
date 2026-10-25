@@ -5,6 +5,7 @@ const upload = require('../middleware/multerUpload');
 const { spreadsheetUploadMiddleware } = require('../middleware/spreadsheetUpload');
 const { bulkImageUploadMiddleware } = require('../middleware/bulkImageUpload');
 const { bulkZipChunkMiddleware, bulkZipDirectUploadMiddleware, singleZipUploadMiddleware } = require('../middleware/bulkZipUpload');
+const { bulkDetailsUploadMiddleware } = require('../middleware/bulkDetailsUpload');
 
 const adminAuthController = require('../controllers/admin/adminAuthController');
 const adminDashboardController = require('../controllers/admin/adminDashboardController');
@@ -81,6 +82,13 @@ router.get('/admin/designs/import-job-status/:batchId', adminDesignController.ge
 router.post('/admin/designs/import-rollback/:batchId', adminDesignController.postImportRollback);
 router.get('/admin/designs/import-error-report/:batchId', adminDesignController.downloadImportErrorReport);
 router.post('/admin/designs/import-commit', adminDesignController.postImportCommit);
+ 
+// Bulk Update Design Details (TXT, PDF, Word, Excel, Notes)
+router.get('/admin/designs/bulk-details', adminDesignController.getBulkDetails);
+router.get('/admin/designs/bulk-details/template', adminDesignController.downloadBulkDetailsTemplate);
+router.post('/admin/designs/bulk-details/preview', bulkDetailsUploadMiddleware, adminDesignController.postBulkDetailsPreview);
+router.post('/admin/designs/bulk-details/apply', adminDesignController.postBulkDetailsApply);
+router.post('/admin/designs/bulk-details/error-report', adminDesignController.downloadBulkDetailsErrorReport);
 
 router.post('/admin/products/delete/:id', adminDesignController.deleteDesign);
 router.post('/admin/designs/delete/:id', adminDesignController.deleteDesign);

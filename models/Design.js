@@ -812,9 +812,17 @@ class Design {
   static async create(data) {
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
+      hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, description,
+      dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
       average_rating, reviews_count, import_image_filename, import_zip_filename
     } = data;
+
+    const parseStitch = (val) => {
+      if (val === undefined || val === null || val === '') return null;
+      const clean = String(val).replace(/,/g, '').trim();
+      const n = parseInt(clean, 10);
+      return (!isNaN(n) && n >= 0) ? n : null;
+    };
 
     // Ensure slug is non-empty and unique
     const finalSlug = slug ? slug : await this.generateUniqueSlug(title);
@@ -832,13 +840,18 @@ class Design {
     const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : 4.80;
     const revCountVal = (reviews_count !== undefined && reviews_count !== null && reviews_count !== '') ? parseInt(reviews_count) : 0;
 
+    const frontStitchVal = parseStitch(stitch_count_front);
+    const backStitchVal = parseStitch(stitch_count_back);
+    const sleeveStitchVal = parseStitch(stitch_count_sleeve);
+    const mainStitchVal = parseStitch(stitch_count) || (frontStitchVal || 0) + (backStitchVal || 0) + (sleeveStitchVal || 0) || null;
+
     let insertedId = null;
 
     if (db.isConnected()) {
       try {
         const res = await db.query(
-          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename, description)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             title,
             finalSku,
@@ -847,7 +860,10 @@ class Design {
             sale_price || null,
             category_id || null,
             hoop_size || null,
-            stitch_count !== undefined && stitch_count !== null && stitch_count !== '' ? parseInt(stitch_count) : null,
+            mainStitchVal,
+            frontStitchVal,
+            backStitchVal,
+            sleeveStitchVal,
             dimensions || null,
             formats || '',
             is_featured ? 1 : 0,
@@ -858,7 +874,8 @@ class Design {
             avgRatingVal,
             revCountVal,
             import_image_filename || null,
-            import_zip_filename || null
+            import_zip_filename || null,
+            description || null
           ]
         );
         if (res && res.insertId) insertedId = res.insertId;
@@ -868,8 +885,8 @@ class Design {
           try {
             finalSku = await this.getNextSkuForCategory(category_id);
             const retryRes = await db.query(
-              `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT INTO designs (title, sku, slug, price, sale_price, category_id, hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, average_rating, reviews_count, import_image_filename, import_zip_filename, description)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 title,
                 finalSku,
@@ -878,7 +895,10 @@ class Design {
                 sale_price || null,
                 category_id || null,
                 hoop_size || null,
-                stitch_count !== undefined && stitch_count !== null && stitch_count !== '' ? parseInt(stitch_count) : null,
+                mainStitchVal,
+                frontStitchVal,
+                backStitchVal,
+                sleeveStitchVal,
                 dimensions || null,
                 formats || '',
                 is_featured ? 1 : 0,
@@ -889,7 +909,8 @@ class Design {
                 avgRatingVal,
                 revCountVal,
                 import_image_filename || null,
-                import_zip_filename || null
+                import_zip_filename || null,
+                description || null
               ]
             );
             if (retryRes && retryRes.insertId) insertedId = retryRes.insertId;
@@ -910,13 +931,17 @@ class Design {
       title,
       sku: finalSku || `AED ${insertedId}`,
       slug: finalSlug,
+      description: description || null,
       price: parseFloat(price),
       sale_price: sale_price ? parseFloat(sale_price) : null,
       category_id: category_id ? parseInt(category_id) : 6,
       category_name: 'Blouse Designs',
       category_slug: 'blouse-designs',
       hoop_size: hoop_size || null,
-      stitch_count: stitch_count ? parseInt(stitch_count) : null,
+      stitch_count: mainStitchVal,
+      stitch_count_front: frontStitchVal,
+      stitch_count_back: backStitchVal,
+      stitch_count_sleeve: sleeveStitchVal,
       dimensions: dimensions || null,
       formats: formats || 'DST, PES, JEF, EXP',
       is_featured: is_featured ? 1 : 0,
@@ -944,9 +969,18 @@ class Design {
   static async update(id, data) {
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
+      hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, description,
+      dimensions, formats, is_featured, is_trending, is_active, download_count, tags,
       average_rating, reviews_count, import_image_filename, import_zip_filename
     } = data;
+
+    const parseStitch = (val) => {
+      if (val === undefined) return undefined;
+      if (val === null || val === '') return null;
+      const clean = String(val).replace(/,/g, '').trim();
+      const n = parseInt(clean, 10);
+      return (!isNaN(n) && n >= 0) ? n : null;
+    };
 
     // Ensure slug is valid & unique excluding current design ID
     let finalSlug = slug;
@@ -959,38 +993,93 @@ class Design {
 
     if (db.isConnected()) {
       try {
-        let updateFields = [
-          'title=?', 'sku=?', 'slug=?', 'price=?', 'sale_price=?', 'category_id=?',
-          'hoop_size=?', 'stitch_count=?', 'dimensions=?', 'formats=?', 'is_featured=?', 'is_trending=?', 'is_active=?', 'download_count=?', 'tags=?'
-        ];
-        let updateParams = [
-          title,
-          sku || null,
-          finalSlug,
-          price,
-          sale_price !== undefined && sale_price !== null && sale_price !== '' ? sale_price : null,
-          category_id || null,
-          hoop_size || null,
-          stitch_count !== undefined && stitch_count !== null && stitch_count !== '' ? parseInt(stitch_count) : null,
-          dimensions || null,
-          formats || '',
-          is_featured ? 1 : 0,
-          is_trending ? 1 : 0,
-          is_active ? 1 : 0,
-          download_count ? parseInt(download_count) : 0,
-          tags || null
-        ];
+        let updateFields = [];
+        let updateParams = [];
 
+        if (title !== undefined) {
+          updateFields.push('title=?');
+          updateParams.push(title);
+        }
+        if (sku !== undefined) {
+          updateFields.push('sku=?');
+          updateParams.push(sku || null);
+        }
+        if (finalSlug !== undefined) {
+          updateFields.push('slug=?');
+          updateParams.push(finalSlug);
+        }
+        if (price !== undefined) {
+          updateFields.push('price=?');
+          updateParams.push(price);
+        }
+        if (sale_price !== undefined) {
+          updateFields.push('sale_price=?');
+          updateParams.push(sale_price !== null && sale_price !== '' ? sale_price : null);
+        }
+        if (category_id !== undefined) {
+          updateFields.push('category_id=?');
+          updateParams.push(category_id || null);
+        }
+        if (hoop_size !== undefined) {
+          updateFields.push('hoop_size=?');
+          updateParams.push(hoop_size || null);
+        }
+        if (stitch_count !== undefined) {
+          updateFields.push('stitch_count=?');
+          updateParams.push(parseStitch(stitch_count));
+        }
+        if (stitch_count_front !== undefined) {
+          updateFields.push('stitch_count_front=?');
+          updateParams.push(parseStitch(stitch_count_front));
+        }
+        if (stitch_count_back !== undefined) {
+          updateFields.push('stitch_count_back=?');
+          updateParams.push(parseStitch(stitch_count_back));
+        }
+        if (stitch_count_sleeve !== undefined) {
+          updateFields.push('stitch_count_sleeve=?');
+          updateParams.push(parseStitch(stitch_count_sleeve));
+        }
+        if (description !== undefined) {
+          updateFields.push('description=?');
+          updateParams.push(description || null);
+        }
+        if (dimensions !== undefined) {
+          updateFields.push('dimensions=?');
+          updateParams.push(dimensions || null);
+        }
+        if (formats !== undefined) {
+          updateFields.push('formats=?');
+          updateParams.push(formats || '');
+        }
+        if (is_featured !== undefined) {
+          updateFields.push('is_featured=?');
+          updateParams.push(is_featured ? 1 : 0);
+        }
+        if (is_trending !== undefined) {
+          updateFields.push('is_trending=?');
+          updateParams.push(is_trending ? 1 : 0);
+        }
+        if (is_active !== undefined) {
+          updateFields.push('is_active=?');
+          updateParams.push(is_active ? 1 : 0);
+        }
+        if (download_count !== undefined) {
+          updateFields.push('download_count=?');
+          updateParams.push(download_count ? parseInt(download_count) : 0);
+        }
+        if (tags !== undefined) {
+          updateFields.push('tags=?');
+          updateParams.push(tags || null);
+        }
         if (import_image_filename !== undefined) {
           updateFields.push('import_image_filename=?');
           updateParams.push(import_image_filename || null);
         }
-
         if (import_zip_filename !== undefined) {
           updateFields.push('import_zip_filename=?');
           updateParams.push(import_zip_filename || null);
         }
-
         if (avgRatingVal !== undefined) {
           updateFields.push('average_rating=?');
           updateParams.push(avgRatingVal);
@@ -1000,12 +1089,13 @@ class Design {
           updateParams.push(revCountVal);
         }
 
-        updateParams.push(id);
-
-        await db.query(
-          `UPDATE designs SET ${updateFields.join(', ')} WHERE id=?`,
-          updateParams
-        );
+        if (updateFields.length > 0) {
+          updateParams.push(id);
+          await db.query(
+            `UPDATE designs SET ${updateFields.join(', ')} WHERE id=?`,
+            updateParams
+          );
+        }
       } catch (err) {
         console.error('[Design.update DB Error]:', err.message);
       }
@@ -1019,9 +1109,13 @@ class Design {
       if (finalSlug !== undefined) target.slug = finalSlug;
       if (price !== undefined) target.price = parseFloat(price);
       if (sale_price !== undefined) target.sale_price = sale_price !== null && sale_price !== '' ? parseFloat(sale_price) : null;
-      if (category_id !== undefined) target.category_id = parseInt(category_id);
+      if (category_id !== undefined) target.category_id = category_id ? parseInt(category_id) : null;
       if (hoop_size !== undefined) target.hoop_size = hoop_size;
-      if (stitch_count !== undefined) target.stitch_count = parseInt(stitch_count);
+      if (stitch_count !== undefined) target.stitch_count = parseStitch(stitch_count);
+      if (stitch_count_front !== undefined) target.stitch_count_front = parseStitch(stitch_count_front);
+      if (stitch_count_back !== undefined) target.stitch_count_back = parseStitch(stitch_count_back);
+      if (stitch_count_sleeve !== undefined) target.stitch_count_sleeve = parseStitch(stitch_count_sleeve);
+      if (description !== undefined) target.description = description || null;
       if (dimensions !== undefined) target.dimensions = dimensions;
       if (formats !== undefined) target.formats = formats;
       if (is_featured !== undefined) target.is_featured = is_featured ? 1 : 0;
@@ -1033,6 +1127,52 @@ class Design {
       if (revCountVal !== undefined) target.reviews_count = revCountVal;
     }
     return true;
+  }
+
+  static async findBySku(sku) {
+    if (!sku || !String(sku).trim()) return null;
+    const cleanSku = String(sku).trim();
+    if (db.isConnected()) {
+      try {
+        const rows = await db.query(
+          `SELECT d.*, c.name as category_name, c.slug as category_slug 
+           FROM designs d 
+           LEFT JOIN categories c ON d.category_id = c.id 
+           WHERE LOWER(TRIM(d.sku)) = LOWER(TRIM(?)) LIMIT 1`,
+          [cleanSku]
+        );
+        if (rows && rows[0]) return rows[0];
+      } catch (e) {
+        console.warn('[Design.findBySku DB error]:', e.message);
+      }
+    }
+    return fallbackDesigns.find(d => d.sku && d.sku.trim().toLowerCase() === cleanSku.toLowerCase()) || null;
+  }
+
+  static async getAllMapBySku() {
+    let list = [];
+    if (db.isConnected()) {
+      try {
+        list = await db.query(
+          `SELECT d.*, c.name as category_name, c.slug as category_slug 
+           FROM designs d 
+           LEFT JOIN categories c ON d.category_id = c.id 
+           WHERE (d.deleted_at IS NULL OR d.deleted_at = '')`
+        ) || [];
+      } catch (e) {
+        console.warn('[Design.getAllMapBySku DB error]:', e.message);
+      }
+    }
+    if (!list || !list.length) {
+      list = [...fallbackDesigns];
+    }
+    const map = new Map();
+    for (const item of list) {
+      if (item.sku) {
+        map.set(item.sku.trim().toUpperCase(), item);
+      }
+    }
+    return { list, map };
   }
 
   static async updateStatus(id, is_active) {

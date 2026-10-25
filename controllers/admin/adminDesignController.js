@@ -11,6 +11,7 @@ const { getPreviewsDir, getDesignsDir, resolveFilePath, fileExists, getStorageDr
 const ActivityLog = require('../../models/ActivityLog');
 const User = require('../../models/User');
 const bulkPriceService = require('../../services/bulkPriceService');
+const bulkDesignDetailsService = require('../../services/bulkDesignDetailsService');
 const { runBackup } = require('../../scripts/backup');
 
 const AdminStatsService = require('../../services/adminStatsService');
@@ -213,12 +214,28 @@ function checkIsAjax(req) {
   return false;
 }
 
+function validateStitchCount(value, fieldName) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return { valid: true, value: null };
+  }
+  const clean = String(value).replace(/,/g, '').trim();
+  if (!/^\d+$/.test(clean)) {
+    return { valid: false, error: `${fieldName} must be a non-negative whole number (e.g. 12500).` };
+  }
+  const num = parseInt(clean, 10);
+  if (num < 0) {
+    return { valid: false, error: `${fieldName} must be a non-negative whole number.` };
+  }
+  return { valid: true, value: num };
+}
+
 exports.postCreate = async (req, res, next) => {
   try {
     console.log('[PUBLISH] Request received for design creation:', req.body.title);
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft,
+      hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, description,
+      dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft,
       average_rating, reviews_count
     } = req.body;
 
@@ -252,6 +269,26 @@ exports.postCreate = async (req, res, next) => {
       const errMsg = 'Final Selling Price cannot exceed Original Price (MRP).';
       if (isAjax) return res.status(400).json({ success: false, message: errMsg });
       req.flash('error', errMsg);
+      return res.redirect('back');
+    }
+
+    // Validate Stitch Counts
+    const frontCheck = validateStitchCount(stitch_count_front, 'Front Stitch Count');
+    if (!frontCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: frontCheck.error });
+      req.flash('error', frontCheck.error);
+      return res.redirect('back');
+    }
+    const backCheck = validateStitchCount(stitch_count_back, 'Back Stitch Count');
+    if (!backCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: backCheck.error });
+      req.flash('error', backCheck.error);
+      return res.redirect('back');
+    }
+    const sleeveCheck = validateStitchCount(stitch_count_sleeve, 'Sleeve Stitch Count');
+    if (!sleeveCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: sleeveCheck.error });
+      req.flash('error', sleeveCheck.error);
       return res.redirect('back');
     }
 
@@ -314,6 +351,10 @@ exports.postCreate = async (req, res, next) => {
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || null,
       stitch_count: stitch_count ? parseInt(stitch_count) : null,
+      stitch_count_front: frontCheck.value,
+      stitch_count_back: backCheck.value,
+      stitch_count_sleeve: sleeveCheck.value,
+      description: description !== undefined ? description : null,
       dimensions: dimensions || null,
       formats: detectedFormatsStr,
       is_featured: is_featured ? 1 : 0,
@@ -404,7 +445,8 @@ exports.postEdit = async (req, res, next) => {
     console.log(`[PUBLISH] Request received for design #${id} edit`);
     const {
       title, sku, slug, price, sale_price, category_id,
-      hoop_size, stitch_count, dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft, selected_formats,
+      hoop_size, stitch_count, stitch_count_front, stitch_count_back, stitch_count_sleeve, description,
+      dimensions, formats, is_featured, is_trending, is_active, download_count, tags, status_draft, selected_formats,
       average_rating, reviews_count
     } = req.body;
 
@@ -438,6 +480,26 @@ exports.postEdit = async (req, res, next) => {
       const errMsg = 'Final Selling Price cannot exceed Original Price (MRP).';
       if (isAjax) return res.status(400).json({ success: false, message: errMsg });
       req.flash('error', errMsg);
+      return res.redirect('back');
+    }
+
+    // Validate Stitch Counts
+    const frontCheck = validateStitchCount(stitch_count_front, 'Front Stitch Count');
+    if (!frontCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: frontCheck.error });
+      req.flash('error', frontCheck.error);
+      return res.redirect('back');
+    }
+    const backCheck = validateStitchCount(stitch_count_back, 'Back Stitch Count');
+    if (!backCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: backCheck.error });
+      req.flash('error', backCheck.error);
+      return res.redirect('back');
+    }
+    const sleeveCheck = validateStitchCount(stitch_count_sleeve, 'Sleeve Stitch Count');
+    if (!sleeveCheck.valid) {
+      if (isAjax) return res.status(400).json({ success: false, message: sleeveCheck.error });
+      req.flash('error', sleeveCheck.error);
       return res.redirect('back');
     }
 
@@ -494,7 +556,11 @@ exports.postEdit = async (req, res, next) => {
       sale_price: sellingPrice,
       category_id: category_id ? parseInt(category_id) : null,
       hoop_size: hoop_size || existingDesign.hoop_size || null,
-      stitch_count: stitch_count ? parseInt(stitch_count) : (existingDesign.stitch_count || null),
+      stitch_count: (stitch_count !== undefined && stitch_count !== '') ? parseInt(stitch_count) : (existingDesign.stitch_count || null),
+      stitch_count_front: frontCheck.value !== undefined ? frontCheck.value : (existingDesign.stitch_count_front || null),
+      stitch_count_back: backCheck.value !== undefined ? backCheck.value : (existingDesign.stitch_count_back || null),
+      stitch_count_sleeve: sleeveCheck.value !== undefined ? sleeveCheck.value : (existingDesign.stitch_count_sleeve || null),
+      description: description !== undefined ? description : (existingDesign.description || null),
       dimensions: dimensions || existingDesign.dimensions || null,
       formats: formats || existingDesign.formats || '',
       is_featured: is_featured ? 1 : 0,
@@ -2724,4 +2790,134 @@ exports.replaceZipSingle = async (req, res) => {
 
 exports.validateMachineFileOrZip = validateMachineFileOrZip;
 exports.findMatchingDesignForZip = findMatchingDesignForZip;
+
+/**
+ * Bulk Update Design Details - View
+ */
+exports.getBulkDetails = async (req, res, next) => {
+  try {
+    const stats = await AdminStatsService.getDesignStats();
+    res.render('admin/designs/bulk-details', {
+      title: 'Bulk Update Design Details - Admin',
+      stats,
+      csrfToken: req.csrfToken ? req.csrfToken() : (res.locals.csrfToken || '')
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Bulk Update Design Details - Download Excel Template
+ */
+exports.downloadBulkDetailsTemplate = async (req, res, next) => {
+  try {
+    const buffer = bulkDesignDetailsService.generateTemplateWorkbook();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="aruvi_design_details_template.xlsx"');
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Bulk Update Design Details - Parse Input & Return Preview
+ */
+exports.postBulkDetailsPreview = async (req, res, next) => {
+  try {
+    const clearFieldOption = req.body.clear_field_option === '1' || req.body.clear_field_option === true;
+    const notes = req.body.notes || '';
+    const file = req.file || null;
+
+    if (!file && (!notes || !notes.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please paste structured notes or upload a file (.xlsx, .xls, .docx, .pdf, .txt) to proceed.'
+      });
+    }
+
+    const parsedEntries = await bulkDesignDetailsService.parseRawInput({
+      file,
+      notes,
+      clearFieldOption
+    });
+
+    if (file && file.path && fs.existsSync(file.path)) {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+    }
+
+    const preview = await bulkDesignDetailsService.buildPreview(parsedEntries, clearFieldOption);
+
+    return res.json({
+      success: true,
+      preview
+    });
+  } catch (err) {
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'Unable to parse input for bulk update.'
+    });
+  }
+};
+
+/**
+ * Bulk Update Design Details - Apply Confirmed Changes
+ */
+exports.postBulkDetailsApply = async (req, res, next) => {
+  try {
+    let items = req.body.items;
+    if (typeof items === 'string') {
+      try {
+        items = JSON.parse(items);
+      } catch (parseErr) {
+        return res.status(400).json({
+          success: false,
+          message: 'Malformed items payload.'
+        });
+      }
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No designs selected for update.'
+      });
+    }
+
+    const result = await bulkDesignDetailsService.applyBulkUpdate(items, req);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to apply bulk updates.'
+    });
+  }
+};
+
+/**
+ * Bulk Update Design Details - Download Error Report
+ */
+exports.downloadBulkDetailsErrorReport = async (req, res, next) => {
+  try {
+    let failedRows = req.body.failedRows;
+    if (typeof failedRows === 'string') {
+      try {
+        failedRows = JSON.parse(failedRows);
+      } catch (e) {
+        failedRows = [];
+      }
+    }
+    const buffer = bulkDesignDetailsService.generateErrorReport(failedRows || []);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="bulk_details_error_report.xlsx"');
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
 
