@@ -201,6 +201,10 @@ async function checkSchemaSafetyOnStartup() {
         ...health.missingColumns.map(c => `${c.table}.${c.column}`)
       ];
 
+      if (health.migrations && !health.migrations.isUpToDate && health.migrations.pending && health.migrations.pending.length > 0) {
+        missingList.push(...health.migrations.pending.map(p => `migration:${p.file}`));
+      }
+
       console.error('====================================================');
       console.error('🚨 [DATABASE SCHEMA INTEGRITY WARNING]');
       console.error(`   Found ${missingList.length} missing database element(s):`);
@@ -208,11 +212,15 @@ async function checkSchemaSafetyOnStartup() {
       console.error('   Action: Run "npm run migrate" or click "Apply Pending Migrations" in Admin → Tools → System Health.');
       console.error('====================================================');
 
+      const summaryText = missingList.length > 0
+        ? missingList.slice(0, 4).join(', ') + (missingList.length > 4 ? ` (+${missingList.length - 4} more)` : '')
+        : (health.migrations && !health.migrations.isUpToDate ? 'Pending database migrations' : 'Incomplete database schema');
+
       return {
         isHealthy: false,
         missingTables: health.missingTables,
         missingColumns: health.missingColumns,
-        missingSummary: missingList.slice(0, 4).join(', ') + (missingList.length > 4 ? ` (+${missingList.length - 4} more)` : '')
+        missingSummary: summaryText
       };
     }
 

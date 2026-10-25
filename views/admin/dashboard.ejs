@@ -143,9 +143,14 @@
               <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
             <div>
-              <strong style="color: #991B1B; font-size: 0.95rem;">Database Schema Warning: Missing Tables or Columns Detected</strong>
+              <strong style="color: #991B1B; font-size: 0.95rem;">Database Schema Warning: Pending Migrations or Missing Schema Detected</strong>
               <div style="color: #B91C1C; font-size: 0.82rem; margin-top: 2px;">
-                Production database is missing: <strong><%= schemaAlert.missingSummary %></strong>. Designs or features may fail until migrations are applied.
+                <% if (schemaAlert.missingSummary) { %>
+                  Pending updates: <strong><%= schemaAlert.missingSummary %></strong>.
+                <% } else { %>
+                  Pending database schema migrations need to be applied.
+                <% } %>
+                Click &ldquo;Fix Schema in System Health&rdquo; to apply them safely without touching existing data.
               </div>
             </div>
           </div>

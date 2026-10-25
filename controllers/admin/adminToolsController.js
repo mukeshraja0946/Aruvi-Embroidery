@@ -9,7 +9,7 @@ const healthCheckService = require('../../services/healthCheckService');
 const { runBackup, backupsDir } = require('../../scripts/backup');
 const Design = require('../../models/Design');
 const ActivityLog = require('../../models/ActivityLog');
-const { checkSystemHealth } = require('../../services/schemaHealthService');
+const { checkSystemHealth, checkSchemaSafetyOnStartup } = require('../../services/schemaHealthService');
 const { runPendingMigrations } = require('../../services/migrationRunner');
 const bulkPriceService = require('../../services/bulkPriceService');
 const bulkStitchService = require('../../services/bulkStitchService');
@@ -715,6 +715,16 @@ exports.downloadBackup = async (req, res, next) => {
 exports.getSystemHealth = async (req, res, next) => {
   try {
     const health = await checkSystemHealth();
+    if (req.app) {
+      if (health.isHealthy) {
+        req.app.locals.schemaAlert = { isHealthy: true, missingTables: [], missingColumns: [], missingSummary: '' };
+      } else {
+        try {
+          const schemaStatus = await checkSchemaSafetyOnStartup();
+          req.app.locals.schemaAlert = schemaStatus;
+        } catch (sErr) {}
+      }
+    }
     res.render('admin/tools/system-health', {
       title: 'Database & System Health - Admin',
       health,
@@ -748,6 +758,14 @@ exports.postRunMigrations = async (req, res, next) => {
     console.log('[Admin Tools] Manual migration execution triggered by admin user');
     const result = await runPendingMigrations({ silent: false });
     await ActivityLog.logFromReq(req, 'migrate', 'system', null, `Executed database migrations (${result.appliedCount} applied)`);
+
+    // Refresh schema alert
+    if (req.app) {
+      try {
+        const schemaStatus = await checkSchemaSafetyOnStartup();
+        req.app.locals.schemaAlert = schemaStatus;
+      } catch (sErr) {}
+    }
 
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
     if (isAjax) {
