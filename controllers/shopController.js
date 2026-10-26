@@ -1,3 +1,6 @@
+const path = require('path');
+const fs = require('fs');
+const sharp = require('sharp');
 const Design = require('../models/Design');
 const Category = require('../models/Category');
 const Review = require('../models/Review');
@@ -383,5 +386,112 @@ exports.getDesignApi = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+/**
+ * Download Customer Design Preview as a real PNG image
+ * Converts JPG / WebP to authentic PNG via sharp or serves original PNG directly.
+ * Filename format: <sku>.png or <title>.png
+ */
+exports.downloadPreviewPng = async (req, res, next) => {
+  try {
+    const designId = req.params.id;
+    const design = await Design.getById(designId) || await Design.getBySlug(designId);
+    if (!design) {
+      return res.status(404).json({ success: false, message: 'Design not found' });
+    }
+
+    const reqImgUrl = req.query.imgUrl || design.primary_image;
+    if (!reqImgUrl) {
+      return res.status(404).json({ success: false, message: 'No preview image available for this design' });
+    }
+
+    // Security check: strictly forbid machine embroidery files, archives, and system files
+    const forbiddenExts = ['.zip', '.dst', '.pes', '.jef', '.exp', '.xxx', '.vp3', '.hus', '.env', '.json', '.sql', '.js'];
+    const lowerUrl = reqImgUrl.toLowerCase().split('?')[0];
+    if (forbiddenExts.some(ext => lowerUrl.endsWith(ext))) {
+      return res.status(403).json({ success: false, message: 'Machine files cannot be downloaded via preview download' });
+    }
+    if (reqImgUrl.includes('..') || reqImgUrl.includes('etc/passwd') || reqImgUrl.includes('.env')) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    let inputBuffer = null;
+
+    // First attempt local file lookup (handles both relative paths and full URLs pointing to this host)
+    let localRel = reqImgUrl;
+    if (reqImgUrl.startsWith('http://') || reqImgUrl.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(reqImgUrl);
+        localRel = parsedUrl.pathname;
+      } catch (e) {
+        localRel = reqImgUrl;
+      }
+    }
+
+    const cleanRel = localRel.split('?')[0].replace(/^\//, '');
+    const candidates = [
+      path.resolve(__dirname, '..', cleanRel),
+      path.resolve(__dirname, '..', 'public', cleanRel.replace(/^public\//, '')),
+      path.resolve(__dirname, '..', 'public', 'uploads', cleanRel.replace(/^(public\/)?uploads\//, '')),
+      path.resolve(__dirname, '..', 'public', 'uploads', 'previews', cleanRel.replace(/^(public\/)?(uploads\/)?previews\//, '')),
+      path.resolve(__dirname, '..', 'public', 'images', cleanRel.replace(/^(public\/)?images\//, ''))
+    ];
+
+    let foundPath = null;
+    for (const cand of candidates) {
+      if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
+        foundPath = cand;
+        break;
+      }
+    }
+
+    if (foundPath) {
+      inputBuffer = await fs.promises.readFile(foundPath);
+    } else if (reqImgUrl.startsWith('http://') || reqImgUrl.startsWith('https://')) {
+      try {
+        const fetchRes = await fetch(reqImgUrl);
+        if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
+        const arrayBuf = await fetchRes.arrayBuffer();
+        inputBuffer = Buffer.from(arrayBuf);
+      } catch (netErr) {
+        return res.status(502).json({ success: false, message: 'Failed to fetch remote preview image: ' + netErr.message });
+      }
+    } else {
+      return res.status(404).json({ success: false, message: 'Preview image file not found on server' });
+    }
+
+    if (!inputBuffer || inputBuffer.length === 0) {
+      return res.status(500).json({ success: false, message: 'Preview image file is empty' });
+    }
+
+    // Check if input is already a valid PNG (magic bytes: 89 50 4E 47 0D 0A 1A 0A)
+    const isPng = inputBuffer.length > 8 &&
+                  inputBuffer[0] === 0x89 &&
+                  inputBuffer[1] === 0x50 &&
+                  inputBuffer[2] === 0x4E &&
+                  inputBuffer[3] === 0x47;
+
+    let outputPngBuffer;
+    if (isPng) {
+      outputPngBuffer = inputBuffer;
+    } else {
+      outputPngBuffer = await sharp(inputBuffer)
+        .png({ compressionLevel: 9, adaptiveFiltering: true })
+        .toBuffer();
+    }
+
+    const rawSkuOrTitle = (design.sku || design.title || 'design').replace(/[/\\?%*:|"<>]/g, '-').trim();
+    const downloadFilename = `${rawSkuOrTitle}.png`;
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
+    res.setHeader('Content-Length', outputPngBuffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.end(outputPngBuffer);
+  } catch (err) {
+    console.error('[Download Preview PNG Error]:', err);
+    return res.status(500).json({ success: false, message: 'Error processing preview image: ' + err.message });
   }
 };

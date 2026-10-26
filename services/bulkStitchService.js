@@ -59,24 +59,24 @@ class BulkStitchService {
     const exampleRows = [
       {
         'SKU': 'AED-BLO-01',
-        'Front': 12450,
-        'Back': 18300,
-        'Sleeve': 6200,
-        'Total': 36950
+        'Front': '',
+        'Back': '',
+        'Sleeve': '',
+        'Total': ''
       },
       {
         'SKU': 'AED-BOR-02',
-        'Front': 8500,
-        'Back': 12000,
-        'Sleeve': 4100,
-        'Total': '' // Left blank to demonstrate auto-sum: 8500 + 12000 + 4100 = 24600
+        'Front': '',
+        'Back': '',
+        'Sleeve': '',
+        'Total': ''
       },
       {
         'SKU': 'AED-MN-03',
-        'Front': 9500,
+        'Front': '',
         'Back': '',
         'Sleeve': '',
-        'Total': 9500
+        'Total': ''
       }
     ];
 

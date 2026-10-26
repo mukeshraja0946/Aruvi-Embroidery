@@ -43,9 +43,20 @@
       <% }) %>
       <% 
         const showStitchOnCards = (typeof siteSettings !== 'undefined' && siteSettings.show_stitch_on_cards === '1');
-        const cardTotalStitches = (design.stitch_count_total !== null && design.stitch_count_total !== undefined && design.stitch_count_total !== '') 
-          ? Number(design.stitch_count_total) 
-          : ((design.stitch_count !== null && design.stitch_count !== undefined && design.stitch_count !== '') ? Number(design.stitch_count) : null);
+        const _cardFront = Number(design.stitch_count_front || design.frontStitchCount || 0);
+        const _cardBack = Number(design.stitch_count_back || design.backStitchCount || 0);
+        const _cardSleeve = Number(design.stitch_count_sleeve || design.sleeveStitchCount || 0);
+        const _cardHasParts = (_cardFront > 0 || _cardBack > 0 || _cardSleeve > 0);
+        const _cardIsManual = Boolean(design.stitch_total_manual === 1 || design.stitch_total_manual === '1' || design.stitchTotalManual === 1 || design.stitchTotalManual === '1');
+        const _cardRawTot = Number(design.stitch_count_total ?? design.totalStitchCount ?? design.stitch_count ?? 0);
+        
+        let cardTotalStitches = null;
+        if (_cardIsManual && _cardRawTot > 0) {
+          cardTotalStitches = _cardRawTot;
+        } else if (_cardHasParts) {
+          cardTotalStitches = (_cardFront || 0) + (_cardBack || 0) + (_cardSleeve || 0);
+        }
+
         const isIntl = (typeof siteSettings !== 'undefined' && siteSettings.stitch_number_format === 'international');
         const formattedCardStitches = (cardTotalStitches !== null && !isNaN(cardTotalStitches) && cardTotalStitches > 0)
           ? (isIntl ? cardTotalStitches.toLocaleString('en-US') : cardTotalStitches.toLocaleString('en-IN'))

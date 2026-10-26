@@ -225,12 +225,18 @@ function validateStitchCount(value, fieldName) {
     return { valid: true, value: null };
   }
   const clean = String(value).replace(/,/g, '').trim();
+  if (clean === '' || clean === '0') {
+    return { valid: true, value: null };
+  }
   if (!/^\d+$/.test(clean)) {
-    return { valid: false, error: `${fieldName} must be a whole number (0 to 10,000,000).` };
+    return { valid: false, error: `${fieldName} must be a whole number greater than 0.` };
   }
   const num = parseInt(clean, 10);
-  if (num < 0 || num > 10000000) {
-    return { valid: false, error: `${fieldName} must be between 0 and 10,000,000.` };
+  if (num <= 0) {
+    return { valid: true, value: null };
+  }
+  if (num > 10000000) {
+    return { valid: false, error: `${fieldName} must be between 1 and 10,000,000.` };
   }
   return { valid: true, value: num };
 }

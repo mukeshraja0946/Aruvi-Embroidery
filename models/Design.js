@@ -78,10 +78,10 @@ class Design {
           whereClause.push('EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
         }
 
-        if (activeStitchFilter === 'missing') {
-          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count) IS NULL OR COALESCE(d.stitch_count_total, d.stitch_count) = 0)');
+        if (activeStitchFilter === 'missing' || activeStitchFilter === 'not_set') {
+          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) <= 0 AND COALESCE(d.stitch_count_front, 0) <= 0 AND COALESCE(d.stitch_count_back, 0) <= 0 AND COALESCE(d.stitch_count_sleeve, 0) <= 0)');
         } else if (activeStitchFilter === 'has_stitch') {
-          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count) IS NOT NULL AND COALESCE(d.stitch_count_total, d.stitch_count) > 0)');
+          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) > 0 OR COALESCE(d.stitch_count_front, 0) > 0 OR COALESCE(d.stitch_count_back, 0) > 0 OR COALESCE(d.stitch_count_sleeve, 0) > 0)');
         }
 
         if (is_featured !== null && is_featured !== undefined) {
@@ -248,10 +248,10 @@ class Design {
     if (category_id) filtered = filtered.filter(d => d.category_id == category_id);
     if (category_slug) filtered = filtered.filter(d => d.category_slug === category_slug);
 
-    if (activeStitchFilter === 'missing') {
-      filtered = filtered.filter(d => !d.stitch_count_total || Number(d.stitch_count_total) === 0);
+    if (activeStitchFilter === 'missing' || activeStitchFilter === 'not_set') {
+      filtered = filtered.filter(d => (!d.stitch_count_total || Number(d.stitch_count_total) === 0) && (!d.stitch_count_front || Number(d.stitch_count_front) === 0) && (!d.stitch_count_back || Number(d.stitch_count_back) === 0) && (!d.stitch_count_sleeve || Number(d.stitch_count_sleeve) === 0));
     } else if (activeStitchFilter === 'has_stitch') {
-      filtered = filtered.filter(d => d.stitch_count_total && Number(d.stitch_count_total) > 0);
+      filtered = filtered.filter(d => (d.stitch_count_total && Number(d.stitch_count_total) > 0) || (d.stitch_count_front && Number(d.stitch_count_front) > 0) || (d.stitch_count_back && Number(d.stitch_count_back) > 0) || (d.stitch_count_sleeve && Number(d.stitch_count_sleeve) > 0));
     }
 
     // Compute dynamic formats and check images for fallback designs
@@ -627,7 +627,7 @@ class Design {
       if (v === null || v === undefined || v === '') return null;
       const clean = String(v).replace(/,/g, '').trim();
       const n = parseInt(clean, 10);
-      return (!isNaN(n) && n >= 0) ? n : null;
+      return (!isNaN(n) && n > 0) ? n : null;
     };
 
     const f = parseNum(d.stitch_count_front !== undefined ? d.stitch_count_front : d.frontStitchCount);
@@ -639,11 +639,11 @@ class Design {
     if (isManual) {
       t = parseNum(d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== undefined ? d.stitch_count : d.totalStitchCount));
     } else {
-      // Auto: total = front + back + sleeve (treat empty as 0; if all three are empty, total stays NULL).
+      // Auto: total = sum of available parts (if at least one part exists). If no parts exist, total stays NULL.
       if (f !== null || b !== null || s !== null) {
         t = (f || 0) + (b || 0) + (s || 0);
       } else {
-        t = parseNum(d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== undefined ? d.stitch_count : d.totalStitchCount));
+        t = null;
       }
     }
 
@@ -735,23 +735,24 @@ class Design {
     if (db.isConnected()) {
       try {
         await this.ensureDatabaseColumns();
-        // 1. Recalculate totals where all three component values are present
+        // 1. Recalculate totals where at least one component value is present and total is not manual override
         await db.query(`
           UPDATE designs 
-          SET stitch_count = (stitch_count_front + stitch_count_back + stitch_count_sleeve)
-          WHERE stitch_count_front IS NOT NULL 
-            AND stitch_count_back IS NOT NULL 
-            AND stitch_count_sleeve IS NOT NULL
-            AND (stitch_count IS NULL OR stitch_count != (stitch_count_front + stitch_count_back + stitch_count_sleeve))
+          SET stitch_count_total = (COALESCE(stitch_count_front, 0) + COALESCE(stitch_count_back, 0) + COALESCE(stitch_count_sleeve, 0)),
+              stitch_count = (COALESCE(stitch_count_front, 0) + COALESCE(stitch_count_back, 0) + COALESCE(stitch_count_sleeve, 0))
+          WHERE (stitch_count_front > 0 OR stitch_count_back > 0 OR stitch_count_sleeve > 0)
+            AND COALESCE(stitch_total_manual, 0) = 0
         `);
 
-        // 2. Set stitch_count to NULL when component counts are incomplete (some present, but not all 3)
+        // 2. Set stitch_count and stitch_count_total to NULL when no components exist and total is not manual
         await db.query(`
           UPDATE designs 
-          SET stitch_count = NULL 
-          WHERE (stitch_count_front IS NOT NULL OR stitch_count_back IS NOT NULL OR stitch_count_sleeve IS NOT NULL)
-            AND (stitch_count_front IS NULL OR stitch_count_back IS NULL OR stitch_count_sleeve IS NULL)
-            AND stitch_count IS NOT NULL
+          SET stitch_count = NULL, stitch_count_total = NULL
+          WHERE (stitch_count_front IS NULL OR stitch_count_front = 0)
+            AND (stitch_count_back IS NULL OR stitch_count_back = 0)
+            AND (stitch_count_sleeve IS NULL OR stitch_count_sleeve = 0)
+            AND COALESCE(stitch_total_manual, 0) = 0
+            AND (stitch_count IS NOT NULL OR stitch_count_total IS NOT NULL)
         `);
       } catch (err) {
         console.warn('[Stitch Count Repair Warning]:', err.message);
@@ -760,16 +761,6 @@ class Design {
 
     // Synchronize in-memory fallback store safely
     for (const d of fallbackDesigns) {
-      const f = d.stitch_count_front !== undefined ? d.stitch_count_front : d.frontStitchCount;
-      const b = d.stitch_count_back !== undefined ? d.stitch_count_back : d.backStitchCount;
-      const s = d.stitch_count_sleeve !== undefined ? d.stitch_count_sleeve : d.sleeveStitchCount;
-      if (f !== null && f !== undefined && b !== null && b !== undefined && s !== null && s !== undefined) {
-        d.stitch_count = Number(f) + Number(b) + Number(s);
-        d.totalStitchCount = d.stitch_count;
-      } else if (f !== null && f !== undefined || b !== null && b !== undefined || s !== null && s !== undefined) {
-        d.stitch_count = null;
-        d.totalStitchCount = null;
-      }
       this.normalizeStitchCounts(d);
     }
     saveFallbackDesigns(fallbackDesigns);
@@ -1037,7 +1028,7 @@ class Design {
       if (val === undefined || val === null || val === '') return null;
       const clean = String(val).replace(/,/g, '').trim();
       const n = parseInt(clean, 10);
-      return (!isNaN(n) && n >= 0) ? n : null;
+      return (!isNaN(n) && n > 0) ? n : null;
     };
 
     // Ensure slug is non-empty and unique
@@ -1071,11 +1062,11 @@ class Design {
     if (isManual) {
       mainStitchVal = parseStitch(rawTotal);
     } else {
-      // Auto: total = front + back + sleeve (treat empty as 0; if all three are empty, total stays NULL).
+      // Auto: total = sum of available parts (if at least one part exists). If all parts are empty/null, total stays NULL.
       if (frontStitchVal !== null || backStitchVal !== null || sleeveStitchVal !== null) {
         mainStitchVal = (frontStitchVal || 0) + (backStitchVal || 0) + (sleeveStitchVal || 0);
       } else {
-        mainStitchVal = parseStitch(rawTotal);
+        mainStitchVal = null;
       }
     }
 
@@ -1227,13 +1218,15 @@ class Design {
       if (val === null || val === '') return null;
       const clean = String(val).replace(/,/g, '').trim();
       const n = parseInt(clean, 10);
-      return (!isNaN(n) && n >= 0) ? n : null;
+      return (!isNaN(n) && n > 0) ? n : null;
     };
 
-    // Ensure slug is valid & unique excluding current design ID
-    let finalSlug = slug;
-    if (!finalSlug || finalSlug.trim() === '') {
-      finalSlug = await this.generateUniqueSlug(title || `design-${id}`, id);
+    // Ensure slug is updated only when slug or title was explicitly provided
+    let finalSlug = undefined;
+    if (slug !== undefined) {
+      finalSlug = (slug && slug.trim() !== '') ? slug : await this.generateUniqueSlug(title || `design-${id}`, id);
+    } else if (title !== undefined) {
+      finalSlug = await this.generateUniqueSlug(title, id);
     }
 
     const avgRatingVal = (average_rating !== undefined && average_rating !== null && average_rating !== '') ? parseFloat(average_rating) : undefined;
@@ -1253,10 +1246,13 @@ class Design {
 
     let computedStitchCount = parseStitch(rawTotal);
     if (computedStitchCount === undefined && (frontStitchVal !== undefined || backStitchVal !== undefined || sleeveStitchVal !== undefined)) {
+      let f = frontStitchVal;
+      let b = backStitchVal;
+      let s = sleeveStitchVal;
       const existing = fallbackDesigns.find(d => d.id == id);
-      const f = frontStitchVal !== undefined ? frontStitchVal : (existing ? (existing.stitch_count_front ?? existing.frontStitchCount) : null);
-      const b = backStitchVal !== undefined ? backStitchVal : (existing ? (existing.stitch_count_back ?? existing.backStitchCount) : null);
-      const s = sleeveStitchVal !== undefined ? sleeveStitchVal : (existing ? (existing.stitch_count_sleeve ?? existing.sleeveStitchCount) : null);
+      if (f === undefined) f = existing ? parseStitch(existing.stitch_count_front ?? existing.frontStitchCount) : null;
+      if (b === undefined) b = existing ? parseStitch(existing.stitch_count_back ?? existing.backStitchCount) : null;
+      if (s === undefined) s = existing ? parseStitch(existing.stitch_count_sleeve ?? existing.sleeveStitchCount) : null;
 
       if (f !== null || b !== null || s !== null) {
         computedStitchCount = (f || 0) + (b || 0) + (s || 0);
@@ -2122,26 +2118,6 @@ class Design {
     }
   }
 
-  /**
-   * Auto-syncs legacy stitch_count with stitch_count_total
-   */
-  static async repairExistingStitchCounts() {
-    if (!db.isConnected()) return;
-    try {
-      await db.query(`
-        UPDATE designs 
-        SET stitch_count_total = stitch_count 
-        WHERE stitch_count_total IS NULL AND stitch_count IS NOT NULL AND stitch_count > 0
-      `);
-      await db.query(`
-        UPDATE designs 
-        SET stitch_count = stitch_count_total 
-        WHERE stitch_count IS NULL AND stitch_count_total IS NOT NULL AND stitch_count_total > 0
-      `);
-    } catch (err) {
-      console.warn('[repairExistingStitchCounts] Notice:', err.message);
-    }
-  }
 }
 
 module.exports = Design;

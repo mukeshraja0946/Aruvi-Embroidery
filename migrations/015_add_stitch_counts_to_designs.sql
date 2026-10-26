@@ -9,7 +9,7 @@ SET @dbname = DATABASE();
 SET @col_exists = 0;
 SELECT COUNT(*) INTO @col_exists FROM information_schema.columns 
 WHERE table_schema = @dbname AND table_name = 'designs' AND column_name = 'stitch_count_front';
-SET @query = IF(@col_exists = 0, 'ALTER TABLE `designs` ADD COLUMN `stitch_count_front` INT DEFAULT NULL AFTER `stitch_count`', 'SELECT 1');
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `designs` ADD COLUMN `stitch_count_front` INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count`', 'SELECT 1');
 PREPARE stmt FROM @query;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
@@ -18,7 +18,7 @@ DEALLOCATE PREPARE stmt;
 SET @col_exists = 0;
 SELECT COUNT(*) INTO @col_exists FROM information_schema.columns 
 WHERE table_schema = @dbname AND table_name = 'designs' AND column_name = 'stitch_count_back';
-SET @query = IF(@col_exists = 0, 'ALTER TABLE `designs` ADD COLUMN `stitch_count_back` INT DEFAULT NULL AFTER `stitch_count_front`', 'SELECT 1');
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `designs` ADD COLUMN `stitch_count_back` INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_front`', 'SELECT 1');
 PREPARE stmt FROM @query;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
@@ -27,7 +27,7 @@ DEALLOCATE PREPARE stmt;
 SET @col_exists = 0;
 SELECT COUNT(*) INTO @col_exists FROM information_schema.columns 
 WHERE table_schema = @dbname AND table_name = 'designs' AND column_name = 'stitch_count_sleeve';
-SET @query = IF(@col_exists = 0, 'ALTER TABLE `designs` ADD COLUMN `stitch_count_sleeve` INT DEFAULT NULL AFTER `stitch_count_back`', 'SELECT 1');
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `designs` ADD COLUMN `stitch_count_sleeve` INT UNSIGNED NULL DEFAULT NULL AFTER `stitch_count_back`', 'SELECT 1');
 PREPARE stmt FROM @query;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

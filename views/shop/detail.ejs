@@ -36,7 +36,14 @@
           <i class="fa-<%= isWish ? 'solid' : 'regular' %> fa-heart"></i>
         </button>
         <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img">
-        <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass-plus"></i> Tap to zoom</span>
+        
+        <!-- Download Preview PNG Button (Bottom-Left) matching Reference UI -->
+        <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
+          <i class="fa-solid fa-download"></i>
+          <span>Download</span>
+        </button>
+
+        <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass"></i> Tap to zoom</span>
       </div>
     </div>
 
@@ -112,60 +119,75 @@
             <span class="spec-colon">:</span>
             <span class="spec-value"><%= design.sku || ('AED-00' + design.id) %></span>
           </div>
-          <% if (design.category_name) { %>
+          <% if (design.category_name && design.category_name.trim()) { %>
             <div class="spec-row">
               <span class="spec-label">Category</span>
               <span class="spec-colon">:</span>
-              <span class="spec-value"><%= design.category_name %></span>
-            </div>
-          <% } %>
-          <% if (design.dimensions || design.hoop_size) { %>
-            <div class="spec-row">
-              <span class="spec-label">Design Size</span>
-              <span class="spec-colon">:</span>
-              <span class="spec-value"><%= design.dimensions || design.hoop_size %></span>
+              <span class="spec-value"><%= design.category_name.trim() %></span>
             </div>
           <% } %>
           <% if (design.formats && design.formats.trim()) { %>
             <div class="spec-row">
               <span class="spec-label">Available Formats</span>
               <span class="spec-colon">:</span>
-              <span class="spec-value"><%= design.formats %></span>
+              <span class="spec-value"><%= design.formats.trim() %></span>
+            </div>
+          <% } %>
+          <% if (design.dimensions && design.dimensions.trim()) { %>
+            <div class="spec-row">
+              <span class="spec-label">Design Size</span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value"><%= design.dimensions.trim() %></span>
+            </div>
+          <% } %>
+          <% if (design.hoop_size && design.hoop_size.trim()) { %>
+            <div class="spec-row">
+              <span class="spec-label">Hoop Size</span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value"><%= design.hoop_size.trim() %></span>
             </div>
           <% } %>
 
           <%
             const _stitchFmtLocale = (typeof siteSettings !== 'undefined' && siteSettings && siteSettings.stitch_number_format === 'international') ? 'en-US' : 'en-IN';
-            function _fmtStitchRow(val) {
+            function _parseStitchVal(val) {
               if (val === null || val === undefined || val === '') return null;
               const clean = String(val).replace(/,/g, '').trim();
               if (clean === '') return null;
               const n = parseInt(clean, 10);
-              if (isNaN(n) || n <= 0) return null;
-              return n.toLocaleString(_stitchFmtLocale);
+              return (!isNaN(n) && n > 0) ? n : null;
+            }
+            function _fmtStitchVal(n) {
+              return (n !== null && n > 0) ? n.toLocaleString(_stitchFmtLocale) : null;
             }
 
-            const _frontStr = _fmtStitchRow(design.stitch_count_front !== undefined ? design.stitch_count_front : design.frontStitchCount);
-            const _backStr = _fmtStitchRow(design.stitch_count_back !== undefined ? design.stitch_count_back : design.backStitchCount);
-            const _sleeveStr = _fmtStitchRow(design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : design.sleeveStitchCount);
-            
-            let _rawTotal = (design.stitch_count_total !== null && design.stitch_count_total !== undefined) ? design.stitch_count_total :
-                            ((design.stitch_count !== null && design.stitch_count !== undefined) ? design.stitch_count :
-                            (design.totalStitchCount !== null && design.totalStitchCount !== undefined ? design.totalStitchCount : null));
+            const _frontNum = _parseStitchVal(design.stitch_count_front !== undefined ? design.stitch_count_front : design.frontStitchCount);
+            const _backNum = _parseStitchVal(design.stitch_count_back !== undefined ? design.stitch_count_back : design.backStitchCount);
+            const _sleeveNum = _parseStitchVal(design.stitch_count_sleeve !== undefined ? design.stitch_count_sleeve : design.sleeveStitchCount);
 
-            if ((_rawTotal === null || _rawTotal === undefined || _rawTotal === '') && (_frontStr || _backStr || _sleeveStr)) {
-              const fn = _frontStr ? parseInt(_frontStr.replace(/,/g, ''), 10) : 0;
-              const bn = _backStr ? parseInt(_backStr.replace(/,/g, ''), 10) : 0;
-              const sn = _sleeveStr ? parseInt(_sleeveStr.replace(/,/g, ''), 10) : 0;
-              _rawTotal = fn + bn + sn;
+            const _frontStr = _fmtStitchVal(_frontNum);
+            const _backStr = _fmtStitchVal(_backNum);
+            const _sleeveStr = _fmtStitchVal(_sleeveNum);
+
+            const _hasParts = Boolean(_frontNum || _backNum || _sleeveNum);
+            const _isManualTotal = Boolean(design.stitch_total_manual === 1 || design.stitch_total_manual === '1' || design.stitchTotalManual === 1 || design.stitchTotalManual === '1');
+            const _rawManualTotal = _parseStitchVal(design.stitch_count_total !== undefined ? design.stitch_count_total : (design.totalStitchCount !== undefined ? design.totalStitchCount : design.stitch_count));
+
+            let _finalTotalNum = null;
+            if (_isManualTotal && _rawManualTotal) {
+              _finalTotalNum = _rawManualTotal;
+            } else if (_hasParts) {
+              _finalTotalNum = (_frontNum || 0) + (_backNum || 0) + (_sleeveNum || 0);
+            } else {
+              _finalTotalNum = null;
             }
-            const _totalStr = _fmtStitchRow(_rawTotal);
 
-            const _showFront = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_front !== '0') && _frontStr;
-            const _showBack = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_back !== '0') && _backStr;
-            const _showSleeve = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_sleeve !== '0') && _sleeveStr;
-            const _hasAnyStitchVal = Boolean(_frontStr || _backStr || _sleeveStr || _totalStr);
-            const _showTotal = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_total !== '0') && _totalStr && _hasAnyStitchVal;
+            const _totalStr = _fmtStitchVal(_finalTotalNum);
+
+            const _showFront = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_front !== '0') && Boolean(_frontStr);
+            const _showBack = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_back !== '0') && Boolean(_backStr);
+            const _showSleeve = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_sleeve !== '0') && Boolean(_sleeveStr);
+            const _showTotal = (typeof siteSettings === 'undefined' || siteSettings.show_stitch_total !== '0') && Boolean(_totalStr) && (_hasParts || (_isManualTotal && _rawManualTotal));
 
             const _labelFront = (typeof siteSettings !== 'undefined' && siteSettings.label_stitch_front) || 'Stitch Count (Front)';
             const _labelBack = (typeof siteSettings !== 'undefined' && siteSettings.label_stitch_back) || 'Stitch Count (Back)';
@@ -217,7 +239,7 @@
         "@type": "Product",
         "name": <%- JSON.stringify(design.title) %>,
         "sku": <%- JSON.stringify(design.sku || ('AED-00' + design.id)) %>,
-        "description": <%- JSON.stringify((design.description ? design.description + ' ' : '') + (_totalStr ? 'Total Stitch Count: ' + _totalStr + '. ' : '')) %>,
+        "description": <%- JSON.stringify((design.description ? design.description + ' ' : '') + (_showTotal && _totalStr ? 'Total Stitch Count: ' + _totalStr + '. ' : '')) %>,
         "offers": {
           "@type": "Offer",
           "priceCurrency": "INR",
@@ -380,6 +402,123 @@
     document.getElementById('mainDisplayImg').src = src;
     document.querySelectorAll('.thumb-item').forEach(el => el.classList.remove('active'));
     element.classList.add('active');
+  }
+
+  // Download currently displayed preview as authentic PNG
+  async function downloadPreviewImage(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const btn = document.getElementById('downloadPreviewBtn');
+    const mainImg = document.getElementById('mainDisplayImg');
+    if (!mainImg || !mainImg.src) {
+      alert('Preview image not available for download.');
+      return;
+    }
+
+    const designId = '<%= design.id %>';
+    const rawName = '<%= (design.sku || design.title || "design").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
+    const targetFilename = `${rawName}.png`;
+    const imgSrc = mainImg.src;
+
+    const originalContent = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Downloading...</span>';
+      btn.disabled = true;
+      btn.style.opacity = '0.85';
+    }
+
+    function triggerDownload(blob, name) {
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    }
+
+    try {
+      let downloaded = false;
+
+      // 1. If it is already a PNG and directly fetchable
+      if (imgSrc.toLowerCase().includes('.png')) {
+        try {
+          const fetchRes = await fetch(imgSrc, { mode: 'cors' });
+          if (fetchRes.ok) {
+            const blob = await fetchRes.blob();
+            if (blob && blob.size > 0 && (blob.type === 'image/png' || blob.type.startsWith('image/'))) {
+              const pngBlob = (blob.type === 'image/png') ? blob : new Blob([blob], { type: 'image/png' });
+              triggerDownload(pngBlob, targetFilename);
+              downloaded = true;
+            }
+          }
+        } catch (corsErr) {
+          // Fall through to canvas or server fallback
+        }
+      }
+
+      // 2. Client-side Canvas conversion to ensure authentic PNG without UI elements
+      if (!downloaded) {
+        try {
+          const tempImg = new Image();
+          tempImg.crossOrigin = 'anonymous';
+          await new Promise((resolve, reject) => {
+            tempImg.onload = resolve;
+            tempImg.onerror = reject;
+            tempImg.src = imgSrc;
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = tempImg.naturalWidth || tempImg.width || 800;
+          canvas.height = tempImg.naturalHeight || tempImg.height || 800;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(tempImg, 0, 0);
+
+          const pngBlob = await new Promise((resolve, reject) => {
+            canvas.toBlob(b => {
+              if (b) resolve(b);
+              else reject(new Error('Canvas PNG export returned empty'));
+            }, 'image/png', 1.0);
+          });
+
+          if (pngBlob && pngBlob.size > 0) {
+            triggerDownload(pngBlob, targetFilename);
+            downloaded = true;
+          }
+        } catch (canvasErr) {
+          console.warn('Canvas conversion failed, falling back to server-side converter:', canvasErr.message);
+        }
+      }
+
+      // 3. Fallback to server-side endpoint with sharp conversion (handles any CORS or cloud URLs)
+      if (!downloaded) {
+        const serverEndpoint = `/api/designs/${designId}/download-preview-png?imgUrl=${encodeURIComponent(imgSrc)}`;
+        const sRes = await fetch(serverEndpoint);
+        if (!sRes.ok) {
+          const errData = await sRes.json().catch(() => ({}));
+          throw new Error(errData.message || `Server returned HTTP ${sRes.status}`);
+        }
+        const sBlob = await sRes.blob();
+        if (!sBlob || sBlob.size === 0) {
+          throw new Error('Downloaded PNG was empty');
+        }
+        triggerDownload(sBlob, targetFilename);
+        downloaded = true;
+      }
+    } catch (err) {
+      console.error('Download preview error:', err);
+      alert('Unable to download preview image: ' + (err.message || 'Network error'));
+    } finally {
+      if (btn) {
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      }
+    }
   }
 
   // Tap-to-Zoom Pinch Lightbox Controller

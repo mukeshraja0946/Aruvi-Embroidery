@@ -366,7 +366,7 @@
           <!-- Stitch Count Filter -->
           <select name="stitchFilter" onchange="this.form.submit()" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
             <option value="">All Stitches</option>
-            <option value="missing" <%= (typeof selectedStitchFilter !== 'undefined' && selectedStitchFilter === 'missing') ? 'selected' : '' %>>Stitch count missing</option>
+            <option value="missing" <%= (typeof selectedStitchFilter !== 'undefined' && (selectedStitchFilter === 'missing' || selectedStitchFilter === 'not_set')) ? 'selected' : '' %>>Stitch count not set</option>
             <option value="has_stitch" <%= (typeof selectedStitchFilter !== 'undefined' && selectedStitchFilter === 'has_stitch') ? 'selected' : '' %>>Has stitch count ✓</option>
           </select>
 
@@ -510,23 +510,38 @@
                     </div>
                   </td>
                   <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
-                    <% const stitchTot = d.stitch_count_total !== null && d.stitch_count_total !== undefined ? d.stitch_count_total : (d.stitch_count !== null && d.stitch_count !== undefined ? d.stitch_count : null); %>
-                    <% if (stitchTot !== null && stitchTot !== '') { %>
+                    <% 
+                      const _dF = (d.stitch_count_front !== null && d.stitch_count_front !== undefined && Number(d.stitch_count_front) > 0) ? Number(d.stitch_count_front) : null;
+                      const _dB = (d.stitch_count_back !== null && d.stitch_count_back !== undefined && Number(d.stitch_count_back) > 0) ? Number(d.stitch_count_back) : null;
+                      const _dS = (d.stitch_count_sleeve !== null && d.stitch_count_sleeve !== undefined && Number(d.stitch_count_sleeve) > 0) ? Number(d.stitch_count_sleeve) : null;
+                      const _dHasParts = (_dF !== null || _dB !== null || _dS !== null);
+                      const _dIsManual = Boolean(d.stitch_total_manual === 1 || d.stitch_total_manual === '1' || d.stitchTotalManual === 1 || d.stitchTotalManual === '1');
+                      const _dRawTot = Number(d.stitch_count_total ?? d.totalStitchCount ?? d.stitch_count ?? 0);
+                      let stitchTot = null;
+                      if (_dIsManual && _dRawTot > 0) {
+                        stitchTot = _dRawTot;
+                      } else if (_dHasParts) {
+                        stitchTot = (_dF || 0) + (_dB || 0) + (_dS || 0);
+                      }
+                    %>
+                    <% if (stitchTot !== null && stitchTot > 0) { %>
                       <div style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;">
                         <span><%= Number(stitchTot).toLocaleString('en-IN') %></span>
-                        <% if (d.stitch_total_manual) { %>
+                        <% if (_dIsManual) { %>
                           <span style="font-size: 0.65rem; background: #FFF8E1; color: #F57F17; border: 1px solid #FFE082; padding: 1px 4px; border-radius: 4px; font-weight: 600;" title="Manual Total Override">Manual</span>
                         <% } %>
                       </div>
-                      <div style="font-size: 0.72rem; color: var(--admin-text-muted); margin-top: 2px; white-space: nowrap; line-height: 1.3;">
-                        <% const comp = []; %>
-                        <% if (d.stitch_count_front !== null && d.stitch_count_front !== undefined) comp.push('F: ' + Number(d.stitch_count_front).toLocaleString('en-IN')); %>
-                        <% if (d.stitch_count_back !== null && d.stitch_count_back !== undefined) comp.push('B: ' + Number(d.stitch_count_back).toLocaleString('en-IN')); %>
-                        <% if (d.stitch_count_sleeve !== null && d.stitch_count_sleeve !== undefined) comp.push('S: ' + Number(d.stitch_count_sleeve).toLocaleString('en-IN')); %>
-                        <%= comp.length > 0 ? comp.join(' · ') : 'Total' %>
-                      </div>
+                      <% if (_dHasParts) { %>
+                        <div style="font-size: 0.72rem; color: var(--admin-text-muted); margin-top: 2px; white-space: nowrap; line-height: 1.3;">
+                          <% const comp = []; %>
+                          <% if (_dF !== null) comp.push('F: ' + _dF.toLocaleString('en-IN')); %>
+                          <% if (_dB !== null) comp.push('B: ' + _dB.toLocaleString('en-IN')); %>
+                          <% if (_dS !== null) comp.push('S: ' + _dS.toLocaleString('en-IN')); %>
+                          <%= comp.join(' · ') %>
+                        </div>
+                      <% } %>
                     <% } else { %>
-                      <span style="color: var(--admin-text-muted); font-size: 0.84rem;">—</span>
+                      <span style="color: var(--admin-text-muted); font-size: 0.84rem;">-</span>
                     <% } %>
                   </td>
                   <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.8rem;">
