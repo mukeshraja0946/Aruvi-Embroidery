@@ -11,25 +11,8 @@
 
   <!-- Top Main 3-Column Layout -->
   <div class="product-detail-hero">
-    <!-- Left Column: Gallery (Thumbnails Stack + Large Main Preview) -->
+    <!-- Left Column: Gallery (Thumbnails Strip + Large Main Preview) -->
     <div class="product-gallery-box">
-      <div class="thumbnails-stack">
-        <% if (design.images && design.images.length > 0) { %>
-          <% design.images.forEach((img, idx) => { %>
-            <div class="thumb-item <%= (img.is_primary || idx === 0) ? 'active' : '' %>" onclick="changeMainImage('<%= img.image_url %>', this)">
-              <img src="<%= img.image_url %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;">
-            </div>
-          <% }) %>
-        <% } else { %>
-          <div class="thumb-item active" onclick="changeMainImage('<%= design.primary_image || '/public/images/cat_floral.jpg' %>', this)">
-            <img src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" style="object-fit: contain; background: #FAF6F0;">
-          </div>
-        <% } %>
-        <% if (design.images && design.images.length > 4) { %>
-          <div class="thumb-scroll-down"><i class="fa-solid fa-chevron-down"></i></div>
-        <% } %>
-      </div>
-
       <div class="main-image-display" id="mainImageDisplayWrapper" style="cursor: zoom-in;" onclick="openLightbox(document.getElementById('mainDisplayImg').src)">
         <% const isWish = (typeof inWishlist !== 'undefined' && inWishlist) || (typeof userWishlistDesignIds !== 'undefined' && userWishlistDesignIds && userWishlistDesignIds.includes(design.id)); %>
         <button type="button" class="wishlist-round-btn wishlist-btn <%= isWish ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
@@ -37,13 +20,34 @@
         </button>
         <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img">
         
-        <!-- Download Preview PNG Button (Bottom-Left) matching Reference UI -->
-        <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
-          <i class="fa-solid fa-download"></i>
-          <span>Download</span>
-        </button>
+        <% if (typeof hasPurchased !== 'undefined' && hasPurchased) { %>
+          <!-- Paid Download Pill (only for verified purchasers) -->
+          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
+            <i class="fa-solid fa-download"></i>
+            <span>Download</span>
+          </button>
+        <% } %>
 
         <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass"></i> Tap to zoom</span>
+      </div>
+
+      <div class="thumbnails-scroll-container">
+        <div class="thumbnails-stack">
+          <% if (design.images && design.images.length > 0) { %>
+            <% design.images.forEach((img, idx) => { %>
+              <div class="thumb-item <%= (img.is_primary || idx === 0) ? 'active' : '' %>" onclick="changeMainImage('<%= img.image_url %>', this)">
+                <img src="<%= img.image_url %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;">
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="thumb-item active" onclick="changeMainImage('<%= design.primary_image || '/public/images/cat_floral.jpg' %>', this)">
+              <img src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" style="object-fit: contain; background: #FAF6F0;">
+            </div>
+          <% } %>
+          <% if (design.images && design.images.length > 4) { %>
+            <div class="thumb-scroll-down"><i class="fa-solid fa-chevron-down"></i></div>
+          <% } %>
+        </div>
       </div>
     </div>
 

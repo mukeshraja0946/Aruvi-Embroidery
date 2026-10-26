@@ -103,15 +103,16 @@ class Order {
     couponCode = null,
     razorpayOrderId = null,
     cashfreeOrderId = null,
-    paymentGateway = 'razorpay'
+    paymentGateway = 'razorpay',
+    isTest = 0
   }) {
     const orderNumber = 'AE-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000);
 
     if (db.isConnected()) {
       const orderRes = await db.query(
-        `INSERT INTO orders (order_number, user_id, guest_email, guest_name, guest_phone, total_amount, discount_amount, final_amount, coupon_code, status, razorpay_order_id, cashfree_order_id, payment_gateway)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
-        [orderNumber, userId || null, guestEmail || null, guestName || null, guestPhone || null, totalAmount, discountAmount, finalAmount, couponCode || null, razorpayOrderId || null, cashfreeOrderId || null, paymentGateway]
+        `INSERT INTO orders (order_number, user_id, guest_email, guest_name, guest_phone, total_amount, discount_amount, final_amount, coupon_code, status, razorpay_order_id, cashfree_order_id, payment_gateway, is_test)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+        [orderNumber, userId || null, guestEmail || null, guestName || null, guestPhone || null, totalAmount, discountAmount, finalAmount, couponCode || null, razorpayOrderId || null, cashfreeOrderId || null, paymentGateway, isTest ? 1 : 0]
       );
       const orderId = orderRes.insertId;
 

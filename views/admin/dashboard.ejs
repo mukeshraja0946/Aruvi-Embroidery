@@ -11,8 +11,389 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/public/css/main.css">
   <link rel="stylesheet" href="/public/css/admin.css">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Reset Data Button & Header Badges */
+    .btn-reset-data-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #FFFFFF;
+      color: #DC2626;
+      border: 1.5px solid #DC2626;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 3px rgba(220, 38, 38, 0.08);
+    }
+    .btn-reset-data-outline:hover {
+      background: #DC2626;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+      transform: translateY(-1px);
+    }
+    .btn-reset-data-outline:active {
+      transform: translateY(0);
+    }
+
+    .badge-test-mode {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FCD34D;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Modal Backdrop & Container */
+    .admin-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+    }
+    .admin-modal-card {
+      background: #FFFFFF;
+      border-radius: 14px;
+      max-width: 680px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--admin-border);
+      display: flex;
+      flex-direction: column;
+    }
+    .admin-modal-header {
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--admin-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: #FFFFFF;
+      z-index: 10;
+    }
+    .modal-icon-badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      font-size: 1.6rem;
+      color: var(--admin-text-muted);
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+    .modal-close-btn:hover {
+      background: #F3F4F6;
+      color: var(--admin-text-dark);
+    }
+
+    /* Step Indicators */
+    .modal-steps-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.9rem 1.5rem;
+      background: #FAF9F6;
+      border-bottom: 1px solid var(--admin-border);
+    }
+    .step-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--admin-text-muted);
+      font-weight: 500;
+    }
+    .step-circle {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #E5E7EB;
+      color: #6B7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .step-badge.active {
+      color: var(--admin-primary);
+      font-weight: 700;
+    }
+    .step-badge.active .step-circle {
+      background: var(--admin-primary);
+      color: #FFFFFF;
+    }
+    .step-badge.completed .step-circle {
+      background: #10B981;
+      color: #FFFFFF;
+    }
+    .step-connector {
+      flex: 1;
+      height: 2px;
+      background: #E5E7EB;
+      margin: 0 10px;
+    }
+
+    /* Modal Step Body */
+    .modal-step-body {
+      padding: 1.5rem;
+    }
+    .reset-options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 1.5rem;
+    }
+    .reset-option-card {
+      border: 1px solid var(--admin-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #FFFFFF;
+      transition: border-color 0.15s ease;
+    }
+    .reset-option-card:hover {
+      border-color: #CBD5E1;
+    }
+    .reset-option-card.danger-section {
+      border-color: #FECACA;
+      background: #FEF2F2;
+    }
+    .reset-option-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .reset-checkbox {
+      width: 17px;
+      height: 17px;
+      accent-color: var(--admin-primary);
+      margin-top: 2px;
+      cursor: pointer;
+    }
+    .reset-option-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--admin-text-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-count-pill {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: #F3F4F6;
+      color: #4B5563;
+      font-weight: 600;
+    }
+    .reset-option-desc {
+      font-size: 0.78rem;
+      color: var(--admin-text-muted);
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .reset-sub-options {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #F1F5F9;
+      padding-left: 29px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .reset-radio-label, .reset-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--admin-text-dark);
+      cursor: pointer;
+    }
+    .reset-radio-label input, .reset-checkbox-label input {
+      accent-color: var(--admin-primary);
+      cursor: pointer;
+    }
+
+    /* Modal Footer */
+    .modal-footer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--admin-border);
+    }
+    .btn-danger-reset {
+      background: #DC2626;
+      color: #FFFFFF;
+      border: none;
+      padding: 0.65rem 1.4rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .btn-danger-reset:hover:not(:disabled) {
+      background: #B91C1C;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+    }
+    .btn-danger-reset:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Preview & Financial Box */
+    .reset-preview-summary-box {
+      background: #FAF9F6;
+      border: 1px solid var(--admin-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 1rem;
+    }
+    .reset-preview-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.84rem;
+      color: var(--admin-text-dark);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .reset-preview-financial-box {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 1rem;
+    }
+    .live-paid-alert-box {
+      background: #FEF2F2;
+      border: 1.5px solid #FCA5A5;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 1rem 0;
+    }
+
+    /* Step 3 Box */
+    .confirm-security-box {
+      text-align: center;
+      padding: 1rem 0.5rem;
+      position: relative;
+    }
+    .security-shield-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #FEE2E2;
+      color: #DC2626;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 0.75rem;
+    }
+    .form-group-confirm {
+      text-align: left;
+    }
+    .admin-input-styled {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      border: 1px solid var(--admin-border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+      box-sizing: border-box;
+    }
+    .admin-input-styled:focus {
+      border-color: var(--admin-primary);
+    }
+    .executing-spinner-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    /* Toast */
+    .admin-reset-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999999;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      opacity: 0;
+      transform: translateY(15px);
+      transition: all 0.25s ease;
+    }
+    .admin-reset-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .admin-reset-toast.toast-success {
+      background: #065F46;
+      color: #FFFFFF;
+    }
+    .admin-reset-toast.toast-error {
+      background: #991B1B;
+      color: #FFFFFF;
+    }
+  </style>
 </head>
 <body class="admin-body">
 
@@ -208,11 +589,32 @@
       <% } %>
 
       <!-- Hero Welcome Banner -->
-      <div class="admin-welcome-hero">
+      <div class="admin-welcome-hero" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div class="welcome-hero-text">
-          <span style="font-size: 0.72rem; letter-spacing: 1.5px; font-weight: 700; color: var(--admin-primary); text-transform: uppercase;">LIVE STORE DASHBOARD</span>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span style="font-size: 0.72rem; letter-spacing: 1.5px; font-weight: 700; color: var(--admin-primary); text-transform: uppercase;">LIVE STORE DASHBOARD</span>
+            <% if (typeof paymentConfig !== 'undefined' && paymentConfig && (paymentConfig.mode === 'test' || (paymentConfig.keyId && paymentConfig.keyId.startsWith('rzp_test_')))) { %>
+              <span class="badge-test-mode" title="Razorpay is operating in TEST mode. Payments will not process real funds.">
+                <i class="fa-solid fa-flask"></i> TEST MODE
+              </span>
+            <% } %>
+          </div>
           <h1>Admin Overview</h1>
           <p>Real-time data from your store database.<br>Live products, paid revenues, orders and customer activities.</p>
+        </div>
+
+        <div class="hero-actions-group" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <!-- Include Test Data Toggle -->
+          <label class="test-data-toggle" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); cursor: pointer; background: #FFFFFF; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--admin-border); user-select: none;" title="Toggle between real store data only and including test-mode transactions">
+            <input type="checkbox" id="toggleIncludeTestData" <%= (typeof includeTestData !== 'undefined' && includeTestData) ? 'checked' : '' %> style="cursor: pointer; width: 15px; height: 15px; accent-color: var(--admin-primary);">
+            <span>Include Test Data</span>
+          </label>
+
+          <!-- Reset Data Button (Red outline with reset icon) -->
+          <button type="button" id="btnOpenResetModal" class="btn-reset-data-outline" title="Selectively clear test data, demo designs, and operational counters">
+            <i class="fa-solid fa-arrow-rotate-left"></i>
+            <span>Reset Data</span>
+          </button>
         </div>
       </div>
 
@@ -223,13 +625,25 @@
           <div class="card-icon-badge"><i class="fa-solid fa-box-archive"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Total Products</div>
-            <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= stats.totalDesigns || 0 %></span>
-              <span class="stat-trend" style="color: <%= stats.designsTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
-                <i class="fa-solid fa-arrow-<%= stats.designsTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.designsTrend.text %>
-              </span>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span class="stat-num"><%= (stats.designsBreakdown ? stats.designsBreakdown.total : stats.totalDesigns) || 0 %></span>
+              <% if (stats.designsTrend && stats.designsTrend.text) { %>
+                <span class="stat-trend" style="color: <%= stats.designsTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <% if (stats.designsTrend.text === 'New') { %>
+                    <span style="background: #E8F5E9; color: #2E7D32; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; font-weight: 700;">New</span>
+                  <% } else { %>
+                    <i class="fa-solid fa-arrow-<%= stats.designsTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.designsTrend.text %>
+                  <% } %>
+                </span>
+              <% } %>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">active in catalog</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">
+              <% if (stats.designsBreakdown) { %>
+                <%= stats.designsBreakdown.active %> active &bull; <%= stats.designsBreakdown.inactive %> inactive
+              <% } else { %>
+                active in catalog
+              <% } %>
+            </span>
           </div>
         </div>
 
@@ -238,13 +652,21 @@
           <div class="card-icon-badge"><i class="fa-solid fa-bag-shopping"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Total Orders</div>
-            <div style="display: flex; align-items: baseline;">
+            <div style="display: flex; align-items: baseline; gap: 6px;">
               <span class="stat-num"><%= stats.totalOrders || 0 %></span>
-              <span class="stat-trend" style="color: <%= stats.ordersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
-                <i class="fa-solid fa-arrow-<%= stats.ordersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.ordersTrend.text %>
-              </span>
+              <% if (stats.ordersTrend && stats.ordersTrend.text) { %>
+                <span class="stat-trend" style="color: <%= stats.ordersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <% if (stats.ordersTrend.text === 'New') { %>
+                    <span style="background: #E8F5E9; color: #2E7D32; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; font-weight: 700;">New</span>
+                  <% } else { %>
+                    <i class="fa-solid fa-arrow-<%= stats.ordersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.ordersTrend.text %>
+                  <% } %>
+                </span>
+              <% } %>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">all-time orders</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">
+              <%= (typeof includeTestData !== 'undefined' && includeTestData) ? 'all orders (including test)' : 'real orders only' %>
+            </span>
           </div>
         </div>
 
@@ -253,13 +675,21 @@
           <div class="card-icon-badge"><i class="fa-solid fa-indian-rupee-sign"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Paid Revenue</div>
-            <div style="display: flex; align-items: baseline;">
+            <div style="display: flex; align-items: baseline; gap: 6px;">
               <span class="stat-num">₹<%= parseFloat(stats.totalSales || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }) %></span>
-              <span class="stat-trend" style="color: <%= stats.salesTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
-                <i class="fa-solid fa-arrow-<%= stats.salesTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.salesTrend.text %>
-              </span>
+              <% if (stats.salesTrend && stats.salesTrend.text) { %>
+                <span class="stat-trend" style="color: <%= stats.salesTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <% if (stats.salesTrend.text === 'New') { %>
+                    <span style="background: #E8F5E9; color: #2E7D32; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; font-weight: 700;">New</span>
+                  <% } else { %>
+                    <i class="fa-solid fa-arrow-<%= stats.salesTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.salesTrend.text %>
+                  <% } %>
+                </span>
+              <% } %>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">paid orders only</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">
+              <%= (typeof includeTestData !== 'undefined' && includeTestData) ? 'all paid (including test)' : 'paid orders only' %>
+            </span>
           </div>
         </div>
 
@@ -268,11 +698,17 @@
           <div class="card-icon-badge"><i class="fa-solid fa-users"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Total Customers</div>
-            <div style="display: flex; align-items: baseline;">
+            <div style="display: flex; align-items: baseline; gap: 6px;">
               <span class="stat-num"><%= stats.totalCustomers || 0 %></span>
-              <span class="stat-trend" style="color: <%= stats.customersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
-                <i class="fa-solid fa-arrow-<%= stats.customersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.customersTrend.text %>
-              </span>
+              <% if (stats.customersTrend && stats.customersTrend.text) { %>
+                <span class="stat-trend" style="color: <%= stats.customersTrend.isPositive ? 'inherit' : 'var(--admin-primary)' %>;">
+                  <% if (stats.customersTrend.text === 'New') { %>
+                    <span style="background: #E8F5E9; color: #2E7D32; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; font-weight: 700;">New</span>
+                  <% } else { %>
+                    <i class="fa-solid fa-arrow-<%= stats.customersTrend.isPositive ? 'up' : 'down' %>"></i> <%= stats.customersTrend.text %>
+                  <% } %>
+                </span>
+              <% } %>
             </div>
             <span style="font-size: 0.72rem; color: var(--admin-text-muted);">registered customers</span>
           </div>
@@ -283,10 +719,10 @@
           <div class="card-icon-badge"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Custom Requests</div>
-            <div style="display: flex; align-items: baseline;">
+            <div style="display: flex; align-items: baseline; gap: 6px;">
               <span class="stat-num"><%= (stats.customRequests && stats.customRequests.total !== undefined) ? stats.customRequests.total : 0 %></span>
               <% const pendingCount = (stats.customRequests && stats.customRequests.pending) ? stats.customRequests.pending : 0; %>
-              <span class="stat-trend" style="color: <%= pendingCount > 0 ? '#F57F17' : '#2E7D32' %>;">
+              <span class="stat-trend" style="color: <%= pendingCount > 0 ? 'var(--admin-primary)' : '#2E7D32' %>;">
                 <%= pendingCount %> pending
               </span>
             </div>
@@ -567,6 +1003,305 @@
     <% } %>
   });
 </script>
+
+<!-- Reset Data Modal (Admin Only, Multi-Step Safety Flow) -->
+<div id="resetDataModal" class="admin-modal-backdrop" style="display: none;">
+  <div class="admin-modal-card">
+    <!-- Modal Header -->
+    <div class="admin-modal-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="modal-icon-badge" style="background: #FEE2E2; color: #DC2626;">
+          <i class="fa-solid fa-arrow-rotate-left"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark);">Reset Store Data</h3>
+          <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Remove test & dummy data to display only authentic store metrics</span>
+        </div>
+      </div>
+      <button type="button" id="closeResetModalBtn" class="modal-close-btn">&times;</button>
+    </div>
+
+    <!-- Step Progress Bar -->
+    <div class="modal-steps-indicator">
+      <div id="stepBadge1" class="step-badge active">
+        <span class="step-circle">1</span>
+        <span class="step-label">Select Items</span>
+      </div>
+      <div class="step-connector"></div>
+      <div id="stepBadge2" class="step-badge">
+        <span class="step-circle">2</span>
+        <span class="step-label">Preview Impact</span>
+      </div>
+      <div class="step-connector"></div>
+      <div id="stepBadge3" class="step-badge">
+        <span class="step-circle">3</span>
+        <span class="step-label">Confirm & Backup</span>
+      </div>
+    </div>
+
+    <!-- Step 1: Select Items -->
+    <div id="resetStep1" class="modal-step-body">
+      <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-bottom: 1rem;">
+        Select the specific categories of test/sample data you want to clear. <strong>Nothing is selected by default.</strong> A full database backup is created automatically before any deletion.
+      </p>
+
+      <div class="reset-options-list">
+        <!-- A) Test Orders & Payments -->
+        <div class="reset-option-card">
+          <label class="reset-option-header">
+            <input type="checkbox" id="chkEnableOrders" class="reset-checkbox">
+            <div class="reset-option-info">
+              <div class="reset-option-title">
+                Test Orders & Payments
+                <span class="badge-count-pill"><span id="cntTotalOrders">0</span> orders</span>
+              </div>
+              <div class="reset-option-desc">Remove order records, purchased items, payments, and customer download logs.</div>
+            </div>
+          </label>
+
+          <div id="ordersOptionsWrapper" class="reset-sub-options" style="display: none;">
+            <div style="font-size: 0.78rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Choose order deletion scope:</div>
+            
+            <label class="reset-radio-label">
+              <input type="radio" name="resetOrdersScope" value="test_mode" checked>
+              <span>Only test-mode payments & orders (<span id="cntTestModeOrders">0</span> test orders)</span>
+            </label>
+
+            <label class="reset-radio-label">
+              <input type="radio" name="resetOrdersScope" value="unpaid_pending">
+              <span>Only unpaid or pending orders (<span id="cntUnpaidOrders">0</span> pending)</span>
+            </label>
+
+            <label class="reset-radio-label">
+              <input type="radio" name="resetOrdersScope" value="all">
+              <span>All orders (includes test & live; live requires confirmation)</span>
+            </label>
+
+            <label class="reset-radio-label">
+              <input type="radio" name="resetOrdersScope" value="before_date">
+              <span>Orders created before a specific date</span>
+            </label>
+
+            <div id="ordersDateWrapper" style="display: none; margin-left: 1.5rem; margin-top: 6px;">
+              <input type="date" id="resetOrdersDateInput" class="admin-input-styled" style="width: auto;">
+            </div>
+
+            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--admin-border);">
+              <label class="reset-checkbox-label">
+                <input type="checkbox" id="resetRestartOrderNumbers">
+                <span style="font-size: 0.82rem; font-weight: 500;">Restart order numbers from #1 (resets table AUTO_INCREMENT if all orders cleared)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- B) Test Customers -->
+        <div class="reset-option-card">
+          <label class="reset-option-header">
+            <input type="checkbox" id="resetClearCustomers" class="reset-checkbox">
+            <div class="reset-option-info">
+              <div class="reset-option-title">
+                Test Customers
+                <span class="badge-count-pill"><span id="cntTestCustomers">0</span> accounts</span>
+              </div>
+              <div class="reset-option-desc">
+                Remove customer profiles with no completed paid orders. <strong>Admin accounts (<span id="cntAdminCustomers">1</span>) are strictly protected and NEVER deleted.</strong>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- C) Operational Data -->
+        <div class="reset-option-card">
+          <label class="reset-option-header">
+            <input type="checkbox" id="resetClearOperational" class="reset-checkbox">
+            <div class="reset-option-info">
+              <div class="reset-option-title">
+                Engagement & Operational Data
+              </div>
+              <div class="reset-option-desc">
+                Clear custom order requests (<span id="cntCustomOrders">0</span>), enquiries (<span id="cntContactMessages">0</span>), reviews (<span id="cntReviews">0</span>), wishlists (<span id="cntWishlists">0</span>), carts (<span id="cntCarts">0</span>), reset coupon usage counts (<span id="cntCoupons">0</span>), newsletter subscribers (<span id="cntSubscribers">0</span>), and campaign logs (<span id="cntEmailLogs">0</span>).
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- D) Statistics Counters & Logs -->
+        <div class="reset-option-card">
+          <label class="reset-option-header">
+            <input type="checkbox" id="resetClearStats" class="reset-checkbox">
+            <div class="reset-option-info">
+              <div class="reset-option-title">
+                Statistics Counters & System Logs
+              </div>
+              <div class="reset-option-desc">
+                Reset design download counters to 0 (<span id="cntDownloads">0</span> downloads), clear activity logs (<span id="cntActivityLogs">0</span>), import logs (<span id="cntImportJobs">0</span>), and bulk stitch/price update logs (<span id="cntStitchPriceLogs">0</span>).
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- E) Dummy / Demo Designs -->
+        <div class="reset-option-card">
+          <label class="reset-option-header">
+            <input type="checkbox" id="resetClearDemoDesigns" class="reset-checkbox">
+            <div class="reset-option-info">
+              <div class="reset-option-title">
+                Dummy / Demo Designs
+                <span class="badge-count-pill"><span id="cntDemoDesigns">0</span> demo designs</span>
+              </div>
+              <div class="reset-option-desc">
+                Only removes designs flagged <code>is_demo = 1</code>. <strong>NEVER deletes real catalog designs, categories, settings, banners, pages, or menus.</strong>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- F) DANGER SECTION: Delete All Designs -->
+        <div class="reset-option-card danger-section">
+          <div class="danger-section-header" style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color: #DC2626;"></i>
+            <strong style="color: #991B1B; font-size: 0.9rem;">DANGER SECTION: Delete ALL Catalog Designs & Files</strong>
+          </div>
+          <p style="font-size: 0.78rem; color: #991B1B; margin: 4px 0 8px;">
+            Permanently removes all <span id="cntDangerAllDesigns">0</span> designs, previews, and machine files from the store catalog. OFF by default.
+          </p>
+          <label class="reset-checkbox-label">
+            <input type="checkbox" id="resetClearAllDesignsDanger">
+            <span style="font-weight: 600; color: #DC2626;">Enable "Delete ALL designs" option</span>
+          </label>
+
+          <div id="dangerConfirmWrapper" style="display: none; margin-top: 8px; padding: 8px 12px; background: #FEE2E2; border-radius: 6px; border: 1px solid #FCA5A5;">
+            <label class="reset-checkbox-label" style="font-size: 0.8rem; color: #991B1B; font-weight: 700;">
+              <input type="checkbox" id="confirmDangerDesigns">
+              <span>I explicitly confirm I want to wipe all catalog designs and machine files.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer-actions">
+        <button type="button" id="btnCancelReset" class="btn btn-outline">Cancel</button>
+        <button type="button" id="btnToStep2" class="btn btn-primary" disabled>
+          Review Impact & Preview &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: Preview Impact -->
+    <div id="resetStep2" class="modal-step-body" style="display: none;">
+      <div id="resetPreviewContent"></div>
+
+      <!-- Live Paid Order Warning Alert (Red Banner) -->
+      <div id="livePaidWarningContainer" class="live-paid-alert-box" style="display: none;">
+        <div style="display: flex; gap: 10px; align-items: flex-start;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.25rem; color: #DC2626; margin-top: 2px;"></i>
+          <div>
+            <strong id="livePaidWarningText" style="color: #991B1B; font-size: 0.9rem; display: block; margin-bottom: 4px;">
+              Warning: Selected scope includes REAL paid orders.
+            </strong>
+            <span style="font-size: 0.8rem; color: #7F1D1D;">
+              Live orders represent authentic financial transactions. Deleting them affects financial records.
+            </span>
+            <div style="margin-top: 8px;">
+              <label class="reset-checkbox-label" style="font-weight: 700; color: #DC2626;">
+                <input type="checkbox" id="deleteRealPaidOrdersCheck">
+                <span>Delete real paid orders too (I confirm this financial impact)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer-actions">
+        <button type="button" id="btnBackToStep1" class="btn btn-outline">&larr; Back to Options</button>
+        <button type="button" id="btnToStep3" class="btn btn-primary" disabled>
+          Proceed to Security Confirmation &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 3: Security & Confirm -->
+    <div id="resetStep3" class="modal-step-body" style="display: none;">
+      <div class="confirm-security-box">
+        <div class="security-shield-icon">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h4 style="margin: 0 0 6px; font-size: 1.05rem; color: var(--admin-text-dark);">
+          Super Administrator Authorization Required
+        </h4>
+        <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin: 0 0 1rem;">
+          To prevent accidental execution, you must verify your identity and confirm this action.
+          An automated pre-reset backup (SQL dump + CSV export) will be created immediately before deleting.
+        </p>
+
+        <div id="confirmErrorMessage" class="alert alert-danger" style="display: none; margin-bottom: 1rem; font-size: 0.85rem;"></div>
+
+        <div class="form-group-confirm">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">
+            1. Type <span style="background: #FEE2E2; color: #DC2626; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: 700;">RESET</span> to confirm:
+          </label>
+          <input type="text" id="confirmResetTextInput" class="admin-input-styled" placeholder="Type RESET here" autocomplete="off" style="font-family: monospace; font-weight: 700; text-transform: uppercase;">
+        </div>
+
+        <div class="form-group-confirm" style="margin-top: 12px;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">
+            2. Enter your Admin Account Password:
+          </label>
+          <input type="password" id="adminPasswordInput" class="admin-input-styled" placeholder="Admin password" autocomplete="current-password">
+        </div>
+
+        <div style="margin-top: 14px; padding: 10px 12px; background: #FAF9F6; border: 1px solid var(--admin-border); border-radius: 8px;">
+          <label class="reset-checkbox-label" style="font-size: 0.83rem; font-weight: 600; color: var(--admin-text-dark);">
+            <input type="checkbox" id="confirmUnderstandCheck">
+            <span>I understand this cannot be undone and will permanently remove selected data.</span>
+          </label>
+        </div>
+
+        <!-- Spinner while running -->
+        <div id="resetExecutingSpinner" class="executing-spinner-overlay" style="display: none;">
+          <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: #DC2626;"></i>
+          <span style="font-weight: 600; font-size: 0.9rem; margin-top: 8px;">Creating pre-reset backup & executing transaction...</span>
+        </div>
+      </div>
+
+      <div class="modal-footer-actions">
+        <button type="button" id="btnBackToStep2" class="btn btn-outline">&larr; Back to Preview</button>
+        <button type="button" id="btnExecuteReset" class="btn btn-danger-reset" disabled>
+          <i class="fa-solid fa-trash-can"></i> Permanently Reset Data
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 4: Success Result -->
+    <div id="resetStepResult" class="modal-step-body" style="display: none; text-align: center; padding: 2rem 1rem;">
+      <div style="width: 64px; height: 64px; border-radius: 50%; background: #E8F5E9; color: #2E7D32; display: inline-flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 1rem;">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h3 style="font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 8px;">Store Reset Complete</h3>
+      <p id="resetSuccessMessage" style="font-size: 0.9rem; color: var(--admin-text-muted); max-width: 460px; margin: 0 auto 1.5rem;">
+        Data has been safely cleared and an automated backup was created.
+      </p>
+
+      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <a id="btnDownloadBackupSql" href="#" class="btn btn-outline" style="display: none; align-items: center; gap: 6px; font-size: 0.85rem;">
+          <i class="fa-solid fa-download"></i> Download Backup (SQL)
+        </a>
+        <a id="btnDownloadBackupCsv" href="#" class="btn btn-outline" style="display: none; align-items: center; gap: 6px; font-size: 0.85rem;">
+          <i class="fa-solid fa-file-csv"></i> Download CSV Summary
+        </a>
+      </div>
+
+      <div>
+        <button type="button" id="btnReloadDashboard" class="btn btn-primary" style="padding: 0.65rem 1.8rem;">
+          <i class="fa-solid fa-rotate"></i> Reload Live Dashboard
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/public/js/admin/dashboard-reset.js"></script>
 
 </body>
 </html>

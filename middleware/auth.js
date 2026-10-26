@@ -173,9 +173,9 @@ async function isAdmin(req, res, next) {
     const db = require('../config/db');
     if (db.isConnected()) {
       try {
-        const [[pOrd]] = await db.query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
-        const [[uMsg]] = await db.query("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'");
-        const [[pCust]] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
+        const [pOrd] = await db.query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
+        const [uMsg] = await db.query("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'");
+        const [pCust] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
         const pendingOrders = pOrd ? (pOrd.count || 0) : 0;
         const unreadMessages = uMsg ? (uMsg.count || 0) : 0;
         const pendingCustomOrders = pCust ? (pCust.count || 0) : 0;

@@ -190,24 +190,40 @@
             <thead>
               <tr style="background: #F9FAFB; border-bottom: 1px solid var(--admin-border); text-align: left;">
                 <th style="padding: 0.75rem 1rem;">Archive Filename</th>
+                <th style="padding: 0.75rem 1rem;">Type</th>
                 <th style="padding: 0.75rem 1rem;">Size</th>
                 <th style="padding: 0.75rem 1rem;">Created At</th>
-                <th style="padding: 0.75rem 1rem; text-align: right;">Download</th>
+                <th style="padding: 0.75rem 1rem; text-align: right;">Actions</th>
               </tr>
             </thead>
             <tbody>
               <% backups.forEach(b => { %>
+                <% const isSql = b.filename.endsWith('.sql'); %>
+                <% const isCsv = b.filename.endsWith('.csv'); %>
+                <% const isZip = b.filename.endsWith('.zip'); %>
                 <tr style="border-bottom: 1px solid var(--admin-border);">
                   <td style="padding: 0.75rem 1rem; font-family: monospace; font-weight: 600;">
-                    <i class="fa-solid fa-file-zipper" style="color: var(--admin-primary); margin-right: 6px;"></i>
+                    <i class="fa-solid fa-<%= isSql ? 'database' : (isCsv ? 'file-csv' : 'file-zipper') %>" style="color: <%= isSql ? '#2563EB' : (isCsv ? '#059669' : 'var(--admin-primary)') %>; margin-right: 6px;"></i>
                     <%= b.filename %>
+                  </td>
+                  <td style="padding: 0.75rem 1rem;">
+                    <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; font-weight: 700; text-transform: uppercase; background: <%= isSql ? '#EFF6FF' : (isCsv ? '#ECFDF5' : '#FFF1F2') %>; color: <%= isSql ? '#1D4ED8' : (isCsv ? '#047857' : '#BE123C') %>;">
+                      <%= isSql ? 'SQL Dump' : (isCsv ? 'CSV Export' : 'Full ZIP') %>
+                    </span>
                   </td>
                   <td style="padding: 0.75rem 1rem; color: var(--admin-text-dark); font-weight: 600;"><%= b.sizeMb %> MB</td>
                   <td style="padding: 0.75rem 1rem; color: var(--admin-text-muted);"><%= new Date(b.createdAt).toLocaleString() %></td>
                   <td style="padding: 0.75rem 1rem; text-align: right;">
-                    <a href="/admin/tools/backup/download/<%= b.filename %>" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.8rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                      <i class="fa-solid fa-download"></i> Download ZIP
-                    </a>
+                    <div style="display: inline-flex; align-items: center; gap: 6px;">
+                      <a href="/admin/tools/backup/download/<%= b.filename %>" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-download"></i> Download
+                      </a>
+                      <% if (isSql) { %>
+                        <button type="button" onclick="openRestoreModal('<%= b.filename %>')" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 6px; color: #2563EB; border-color: #93C5FD; background: #EFF6FF; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fa-solid fa-clock-rotate-left"></i> Restore
+                        </button>
+                      <% } %>
+                    </div>
                   </td>
                 </tr>
               <% }); %>
@@ -234,6 +250,54 @@
     </main>
   </div>
 </div>
+
+<!-- Restore Confirmation Modal -->
+<div id="restoreModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 999999; align-items: center; justify-content: center; padding: 1.5rem;">
+  <div style="background: #FFFFFF; border-radius: 14px; max-width: 480px; width: 100%; padding: 1.5rem; box-shadow: 0 20px 45px rgba(0,0,0,0.2); border: 1px solid var(--admin-border);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-clock-rotate-left" style="color: #2563EB;"></i>
+        Restore Database from Backup
+      </h3>
+      <button type="button" onclick="closeRestoreModal()" style="background: none; border: none; font-size: 1.5rem; color: var(--admin-text-muted); cursor: pointer;">&times;</button>
+    </div>
+
+    <p style="font-size: 0.84rem; color: var(--admin-text-muted); line-height: 1.5; margin-bottom: 1rem;">
+      Restoring from this backup will overwrite current table data with the snapshot in:
+      <br><code id="restoreFilenameDisplay" style="font-weight: 700; color: var(--admin-primary); word-break: break-all;"></code>
+    </p>
+
+    <form action="/admin/tools/backup/restore" method="POST">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <input type="hidden" id="restoreFilenameInput" name="filename" value="">
+
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-size: 0.84rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">
+          Enter Admin Password to Authorize Restore:
+        </label>
+        <input type="password" name="password" required class="form-control" style="width: 100%; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid var(--admin-border);" placeholder="Your password">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="closeRestoreModal()" class="btn btn-outline" style="padding: 0.5rem 1rem;">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background: #2563EB; border-color: #2563EB; padding: 0.5rem 1.2rem;">
+          <i class="fa-solid fa-rotate-left"></i> Confirm Restore
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openRestoreModal(filename) {
+    document.getElementById('restoreFilenameDisplay').textContent = filename;
+    document.getElementById('restoreFilenameInput').value = filename;
+    document.getElementById('restoreModal').style.display = 'flex';
+  }
+  function closeRestoreModal() {
+    document.getElementById('restoreModal').style.display = 'none';
+  }
+</script>
 
 </body>
 </html>

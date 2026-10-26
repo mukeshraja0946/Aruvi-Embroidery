@@ -424,7 +424,18 @@ class Design {
   static attachFileSummary(design) {
     if (!design) return design;
     const files = design.files || [];
-    const downloadFiles = files.filter(f => f.file_kind !== 'image' && f.is_preview !== 1 && f.is_preview !== true);
+    const seenIds = new Set();
+    const seenKeys = new Set();
+    const downloadFiles = [];
+    for (const f of files) {
+      if (f.file_kind === 'image' || f.is_preview === 1 || f.is_preview === true) continue;
+      const sig = f.checksum_sha256 ? `chk_${f.checksum_sha256}` : (f.storage_key || f.file_path || `id_${f.id}`);
+      if (!seenIds.has(f.id) && !seenKeys.has(sig)) {
+        seenIds.add(f.id);
+        seenKeys.add(sig);
+        downloadFiles.push(f);
+      }
+    }
     design.download_files = downloadFiles;
 
     const countsByExt = {};
@@ -456,7 +467,19 @@ class Design {
           const design = rows[0];
           design.images = await db.query('SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC', [design.id]) || [];
           design.preview_images = design.images;
-          design.files = await db.query('SELECT * FROM design_files WHERE design_id = ? ORDER BY sort_order ASC, id ASC', [design.id]) || [];
+
+          const rawFiles = await db.query('SELECT * FROM design_files WHERE design_id = ? ORDER BY sort_order ASC, id ASC', [design.id]) || [];
+          const seenFIds = new Set();
+          const seenFKeys = new Set();
+          design.files = [];
+          for (const f of rawFiles) {
+            const sig = f.checksum_sha256 ? `chk_${f.checksum_sha256}` : (f.storage_key || f.file_path || `id_${f.id}`);
+            if (!seenFIds.has(f.id) && !seenFKeys.has(sig)) {
+              seenFIds.add(f.id);
+              seenFKeys.add(sig);
+              design.files.push(f);
+            }
+          }
 
           // Determine primary image
           const previewFile = design.files.find(f => f.is_preview === 1 || f.is_preview === true || f.is_primary_preview === 1 || f.is_primary_preview === true);

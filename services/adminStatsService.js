@@ -4,8 +4,8 @@ function calculateTrend(currentCount, prevCount) {
   const current = Number(currentCount) || 0;
   const prev = Number(prevCount) || 0;
   if (prev === 0) {
-    if (current > 0) return { text: '+100%', isPositive: true, raw: 100 };
-    return { text: '0%', isPositive: true, raw: 0 };
+    if (current > 0) return { text: 'New', isNew: true, isPositive: true, raw: 0 };
+    return { text: '', isPositive: true, raw: 0 };
   }
   const diff = current - prev;
   const pct = Math.round((diff / prev) * 100);
@@ -17,8 +17,18 @@ function calculateTrend(currentCount, prevCount) {
 class AdminStatsService {
   /**
    * Fetches comprehensive dynamic stats for the main Admin Dashboard (/admin).
+   * @param {Object} options
+   * @param {boolean} [options.includeTestData=false] - When false (default), excludes test orders from sales & counts.
    */
-  static async getDashboardStats() {
+  static async getDashboardStats(options = {}) {
+    const { includeTestData = false } = options;
+
+    if (!db.isConnected()) {
+      try {
+        await db.initPool();
+      } catch (_) {}
+    }
+
     if (db.isConnected()) {
       try {
         const now = new Date();
@@ -26,44 +36,65 @@ class AdminStatsService {
         const firstDayPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-        // 1. Orders Count & Trend
-        const [totalOrdersRes] = await db.query("SELECT COUNT(*) as total FROM orders");
-        const [currMonthOrdersRes] = await db.query("SELECT COUNT(*) as total FROM orders WHERE created_at >= ?", [firstDayThisMonth]);
-        const [prevMonthOrdersRes] = await db.query("SELECT COUNT(*) as total FROM orders WHERE created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+        const orderWhereTest = includeTestData ? '' : 'WHERE (is_test = 0 OR is_test IS NULL)';
+        const orderAndTest = includeTestData ? '' : 'AND (is_test = 0 OR is_test IS NULL)';
+        const orderAndTestAlias = includeTestData ? '' : 'AND (o.is_test = 0 OR o.is_test IS NULL)';
 
-        const totalOrders = totalOrdersRes ? totalOrdersRes.total : 0;
-        const currOrders = currMonthOrdersRes ? currMonthOrdersRes.total : 0;
-        const prevOrders = prevMonthOrdersRes ? prevMonthOrdersRes.total : 0;
+        // 1. Orders Count & Trend
+        const [totalOrdersRes] = await db.query(`SELECT COUNT(*) as total FROM orders ${orderWhereTest}`);
+        const [currMonthOrdersRes] = await db.query(`SELECT COUNT(*) as total FROM orders WHERE created_at >= ? ${orderAndTest}`, [firstDayThisMonth]);
+        const [prevMonthOrdersRes] = await db.query(`SELECT COUNT(*) as total FROM orders WHERE created_at >= ? AND created_at <= ? ${orderAndTest}`, [firstDayPrevMonth, lastDayPrevMonth]);
+
+        const totalOrders = totalOrdersRes ? Number(totalOrdersRes.total || 0) : 0;
+        const currOrders = currMonthOrdersRes ? Number(currMonthOrdersRes.total || 0) : 0;
+        const prevOrders = prevMonthOrdersRes ? Number(prevMonthOrdersRes.total || 0) : 0;
         const ordersTrend = calculateTrend(currOrders, prevOrders);
 
-        // 2. Sales / Revenue & Trend
-        const [totalSalesRes] = await db.query("SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid')");
-        const [currMonthSalesRes] = await db.query("SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') AND created_at >= ?", [firstDayThisMonth]);
-        const [prevMonthSalesRes] = await db.query("SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') AND created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+        // 2. Sales / Revenue & Trend (Paid orders only)
+        const [totalSalesRes] = await db.query(`SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') ${orderAndTest}`);
+        const [currMonthSalesRes] = await db.query(`SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') AND created_at >= ? ${orderAndTest}`, [firstDayThisMonth]);
+        const [prevMonthSalesRes] = await db.query(`SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') AND created_at >= ? AND created_at <= ? ${orderAndTest}`, [firstDayPrevMonth, lastDayPrevMonth]);
 
         const totalSales = totalSalesRes ? parseFloat(totalSalesRes.total) : 0;
         const currSales = currMonthSalesRes ? parseFloat(currMonthSalesRes.total) : 0;
         const prevSales = prevMonthSalesRes ? parseFloat(prevMonthSalesRes.total) : 0;
         const salesTrend = calculateTrend(currSales, prevSales);
 
-        // 3. Customers Count & Trend
-        const [totalCustomersRes] = await db.query("SELECT COUNT(*) as total FROM users WHERE role = 'customer' OR role IS NULL");
-        const [currMonthCustRes] = await db.query("SELECT COUNT(*) as total FROM users WHERE (role = 'customer' OR role IS NULL) AND created_at >= ?", [firstDayThisMonth]);
-        const [prevMonthCustRes] = await db.query("SELECT COUNT(*) as total FROM users WHERE (role = 'customer' OR role IS NULL) AND created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+        // 3. Customers Count & Trend (Registered customers only, excluding admins & test/demo accounts)
+        const [totalCustomersRes] = await db.query(`SELECT COUNT(*) as total FROM users WHERE (role = 'customer' OR role IS NULL OR role = '') AND (is_demo = 0 OR is_demo IS NULL) AND role NOT IN ('admin', 'super_admin')`);
+        const [currMonthCustRes] = await db.query(`SELECT COUNT(*) as total FROM users WHERE (role = 'customer' OR role IS NULL OR role = '') AND (is_demo = 0 OR is_demo IS NULL) AND role NOT IN ('admin', 'super_admin') AND created_at >= ?`, [firstDayThisMonth]);
+        const [prevMonthCustRes] = await db.query(`SELECT COUNT(*) as total FROM users WHERE (role = 'customer' OR role IS NULL OR role = '') AND (is_demo = 0 OR is_demo IS NULL) AND role NOT IN ('admin', 'super_admin') AND created_at >= ? AND created_at <= ?`, [firstDayPrevMonth, lastDayPrevMonth]);
 
-        const totalCustomers = totalCustomersRes ? totalCustomersRes.total : 0;
-        const currCust = currMonthCustRes ? currMonthCustRes.total : 0;
-        const prevCust = prevMonthCustRes ? prevMonthCustRes.total : 0;
+        const totalCustomers = totalCustomersRes ? Number(totalCustomersRes.total || 0) : 0;
+        const currCust = currMonthCustRes ? Number(currMonthCustRes.total || 0) : 0;
+        const prevCust = prevMonthCustRes ? Number(prevMonthCustRes.total || 0) : 0;
         const customersTrend = calculateTrend(currCust, prevCust);
 
-        // 4. Designs / Products Count & Trend (Strictly non-deleted: is_active >= 0)
-        const [totalDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0");
-        const [currMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0 AND created_at >= ?", [firstDayThisMonth]);
-        const [prevMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE is_active >= 0 AND created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+        // 4. Designs / Products Count & Breakdown (Active vs Inactive/Draft)
+        const [designCountsRes] = await db.query(`
+          SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) as inactive
+          FROM designs 
+          WHERE deleted_at IS NULL AND (is_demo = 0 OR is_demo IS NULL)
+        `);
 
-        const totalDesigns = totalDesignsRes ? totalDesignsRes.total : 0;
-        const currDesigns = currMonthDesignsRes ? currMonthDesignsRes.total : 0;
-        const prevDesigns = prevMonthDesignsRes ? prevMonthDesignsRes.total : 0;
+        const totalDesigns = designCountsRes ? Number(designCountsRes.total || 0) : 0;
+        const activeDesigns = designCountsRes ? Number(designCountsRes.active || 0) : 0;
+        const inactiveDesigns = designCountsRes ? Number(designCountsRes.inactive || 0) : 0;
+        const designsBreakdown = {
+          total: totalDesigns,
+          active: activeDesigns,
+          inactive: inactiveDesigns,
+          draft: inactiveDesigns
+        };
+
+        const [currMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE deleted_at IS NULL AND (is_demo = 0 OR is_demo IS NULL) AND created_at >= ?", [firstDayThisMonth]);
+        const [prevMonthDesignsRes] = await db.query("SELECT COUNT(*) as total FROM designs WHERE deleted_at IS NULL AND (is_demo = 0 OR is_demo IS NULL) AND created_at >= ? AND created_at <= ?", [firstDayPrevMonth, lastDayPrevMonth]);
+
+        const currDesigns = currMonthDesignsRes ? Number(currMonthDesignsRes.total || 0) : 0;
+        const prevDesigns = prevMonthDesignsRes ? Number(prevMonthDesignsRes.total || 0) : 0;
         const designsTrend = calculateTrend(currDesigns, prevDesigns);
 
         // 5. Custom Requests Count & Pending
@@ -83,7 +114,7 @@ class AdminStatsService {
         }
 
         // 6. Orders by Status
-        const statusRows = await db.query("SELECT status, COUNT(*) as count FROM orders GROUP BY status");
+        const statusRows = await db.query(`SELECT status, COUNT(*) as count FROM orders ${orderWhereTest} GROUP BY status`);
         const statusMap = { pending: 0, processing: 0, completed: 0, cancelled: 0 };
         if (statusRows && statusRows.length > 0) {
           statusRows.forEach(r => {
@@ -112,7 +143,7 @@ class AdminStatsService {
           monthLabels.push(monthName);
 
           const [mRes] = await db.query(
-            "SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') AND created_at >= ? AND created_at <= ?",
+            `SELECT COALESCE(SUM(final_amount), 0) as total FROM orders WHERE status IN ('completed', 'paid') ${orderAndTest} AND created_at >= ? AND created_at <= ?`,
             [dStart, dEnd]
           );
           monthlySales.push(mRes ? parseFloat(mRes.total) : 0);
@@ -124,7 +155,7 @@ class AdminStatsService {
           const topCatRows = await db.query(`
             SELECT c.id, c.name as category_name, COUNT(oi.id) as items_sold
             FROM order_items oi
-            JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'paid')
+            JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'paid') ${orderAndTestAlias}
             JOIN designs d ON oi.design_id = d.id
             JOIN categories c ON d.category_id = c.id
             GROUP BY c.id, c.name
@@ -148,12 +179,13 @@ class AdminStatsService {
 
         // 9. Recent Orders (Latest 10 Real Orders)
         const recentOrdersSql = `
-          SELECT o.id, o.order_number, o.final_amount, o.status, o.created_at,
+          SELECT o.id, o.order_number, o.final_amount, o.status, o.created_at, o.is_test,
                  COALESCE(u.full_name, o.guest_name, 'Guest Customer') as customer_name,
                  (SELECT d.title FROM order_items oi JOIN designs d ON oi.design_id = d.id WHERE oi.order_id = o.id LIMIT 1) as item_title,
                  (SELECT di.image_url FROM order_items oi JOIN design_images di ON oi.design_id = di.design_id WHERE oi.order_id = o.id ORDER BY di.is_primary DESC, di.id ASC LIMIT 1) as item_image
           FROM orders o
           LEFT JOIN users u ON o.user_id = u.id
+          ${includeTestData ? '' : 'WHERE (o.is_test = 0 OR o.is_test IS NULL)'}
           ORDER BY o.created_at DESC
           LIMIT 10
         `;
@@ -169,7 +201,7 @@ class AdminStatsService {
                  ) as image_url
           FROM designs d
           JOIN order_items oi ON d.id = oi.design_id
-          JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'paid')
+          JOIN orders o ON oi.order_id = o.id AND o.status IN ('completed', 'paid') ${orderAndTestAlias}
           GROUP BY d.id, d.title, d.slug, d.price, d.sale_price
           ORDER BY sales_count DESC, d.id ASC
           LIMIT 5
@@ -188,6 +220,7 @@ class AdminStatsService {
           totalCustomers,
           customersTrend,
           totalDesigns,
+          designsBreakdown,
           designsTrend,
           customRequests,
           ordersByStatus,
@@ -196,7 +229,8 @@ class AdminStatsService {
           topCategories,
           recentOrders: recentOrders || [],
           topSellingDesigns: topSellingDesigns || [],
-          recentActivity: recentActivity || []
+          recentActivity: recentActivity || [],
+          includeTestData
         };
       } catch (err) {
         console.error('AdminStatsService.getDashboardStats error:', err);

@@ -1051,7 +1051,7 @@ exports.getBackupPage = async (req, res, next) => {
   try {
     ensureDir(backupsDir);
     const files = fs.readdirSync(backupsDir)
-      .filter(f => f.endsWith('.zip'))
+      .filter(f => f.endsWith('.zip') || f.endsWith('.sql') || f.endsWith('.csv'))
       .map(f => {
         const full = path.join(backupsDir, f);
         const stat = fs.statSync(full);
@@ -1109,6 +1109,23 @@ exports.downloadBackup = async (req, res, next) => {
     return res.download(targetPath, safeName);
   } catch (err) {
     next(err);
+  }
+};
+
+exports.postRestoreBackup = async (req, res, next) => {
+  try {
+    const { filename, password } = req.body;
+    if (!filename || !password) {
+      req.flash('error', 'Backup filename and admin password are required.');
+      return res.redirect('/admin/tools/backup');
+    }
+    const AdminResetService = require('../../services/adminResetService');
+    const result = await AdminResetService.restoreBackup(filename, req.user, password);
+    req.flash('success', result.message || 'Database restored successfully!');
+    res.redirect('/admin/tools/backup');
+  } catch (err) {
+    req.flash('error', `Restore failed: ${err.message}`);
+    res.redirect('/admin/tools/backup');
   }
 };
 
@@ -1372,4 +1389,74 @@ exports.downloadStitchHistoryCsv = async (req, res, next) => {
     res.redirect('/admin/tools/stitch-history');
   }
 };
+// =========================================================================
+// 7. REMOVE DUPLICATE FILES & IMAGES TOOL
+// =========================================================================
+
+const duplicateFilesService = require('../../services/duplicateFilesService');
+
+/**
+ * Render Remove Duplicate Files page with Dry-Run report
+ * GET /admin/tools/duplicate-files
+ */
+exports.getDuplicateFiles = async (req, res, next) => {
+  try {
+    const report = await duplicateFilesService.getDryRunReport();
+    const cleanups = duplicateFilesService.listCleanups();
+
+    res.render('admin/tools/duplicate-files', {
+      title: 'Remove Duplicate Files - Admin',
+      report,
+      cleanups,
+      csrfToken: req.csrfToken ? req.csrfToken() : '',
+      messages: {
+        success: req.flash('success')[0],
+        error: req.flash('error')[0]
+      }
+    });
+  } catch (err) {
+    console.error('getDuplicateFiles error:', err);
+    next(err);
+  }
+};
+
+/**
+ * Execute cleanup of duplicate files & images with backup & undo support
+ * POST /admin/tools/duplicate-files/clean
+ */
+exports.cleanDuplicateFiles = async (req, res, next) => {
+  try {
+    const result = await duplicateFilesService.cleanDuplicates({
+      adminId: req.user ? req.user.id : null,
+      adminEmail: req.user ? req.user.email : 'admin'
+    });
+
+    req.flash('success', result.message);
+    res.redirect('/admin/tools/duplicate-files');
+  } catch (err) {
+    console.error('cleanDuplicateFiles error:', err);
+    req.flash('error', err.message || 'Unable to clean duplicates.');
+    res.redirect('/admin/tools/duplicate-files');
+  }
+};
+
+/**
+ * Revert / Undo a Duplicate Cleanup within 7 days
+ * POST /admin/tools/duplicate-files/undo/:backupFileName
+ */
+exports.undoDuplicateFiles = async (req, res, next) => {
+  try {
+    const { backupFileName } = req.params;
+    const result = await duplicateFilesService.undoCleanup(backupFileName);
+
+    req.flash('success', result.message);
+    res.redirect('/admin/tools/duplicate-files');
+  } catch (err) {
+    console.error('undoDuplicateFiles error:', err);
+    req.flash('error', err.message || 'Unable to undo cleanup.');
+    res.redirect('/admin/tools/duplicate-files');
+  }
+};
+
 exports.matchFileToDesigns = matchFileToDesigns;
+

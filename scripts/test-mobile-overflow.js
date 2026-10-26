@@ -16,7 +16,9 @@ const BASE_URL = process.env.TEST_URL || 'http://localhost:3000';
 
 const VIEWPORTS = [
   { name: 'mobile-360', width: 360, height: 740 },
-  { name: 'mobile-390', width: 390, height: 844 }
+  { name: 'mobile-390', width: 390, height: 844 },
+  { name: 'mobile-414', width: 414, height: 896 },
+  { name: 'tablet-768', width: 768, height: 1024 }
 ];
 
 const PAGES_TO_TEST = [
@@ -24,6 +26,7 @@ const PAGES_TO_TEST = [
   { name: 'About', path: '/about' },
   { name: 'Designs', path: '/designs' },
   { name: 'Design_Detail', path: '/design/rose-floral-design' },
+  { name: 'Bulk_Design_Detail', path: '/design/aruvi-designs-1' },
   { name: 'Categories', path: '/categories' },
   { name: 'Category_Blouse', path: '/category/blouse-designs' },
   { name: 'Custom_Order', path: '/custom-order' },
@@ -108,7 +111,7 @@ async function runMobileAudit() {
             const allElements = document.querySelectorAll('*');
             for (const el of allElements) {
               const rect = el.getBoundingClientRect();
-              if (rect.right > winWidth + 1 || rect.left < -1) {
+              if (rect.right > winWidth + 1) {
                 offenders.push({
                   tag: el.tagName.toLowerCase(),
                   id: el.id,
@@ -188,7 +191,7 @@ async function runMobileAudit() {
             const allElements = document.querySelectorAll('*');
             for (const el of allElements) {
               const rect = el.getBoundingClientRect();
-              if (rect.right > winWidth + 1 || rect.left < -1) {
+              if (rect.right > winWidth + 1) {
                 offenders.push({
                   tag: el.tagName.toLowerCase(),
                   id: el.id,

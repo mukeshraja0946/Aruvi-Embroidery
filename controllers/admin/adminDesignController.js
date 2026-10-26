@@ -432,23 +432,37 @@ exports.postCreate = async (req, res, next) => {
             const key = sf.storage_key || sf.file_path;
             const orig = sf.original_name || sf.file_name || path.basename(key);
             const fmt = (sf.file_format || path.extname(orig).replace('.', '') || 'ZIP').toUpperCase();
-            await db.query(
-              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
-               VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-              [
-                designId,
-                sf.label || null,
-                orig,
-                key,
-                sf.mime_type || 'application/octet-stream',
-                orig,
-                key,
-                fmt,
-                sf.file_size || 0,
-                sf.checksum_sha256 || null,
-                idx
-              ]
-            );
+            const chk = sf.checksum_sha256 || null;
+
+            // Check if file already exists for this design
+            let existing = [];
+            if (chk) {
+              existing = await db.query('SELECT id FROM design_files WHERE design_id = ? AND checksum_sha256 = ? LIMIT 1', [designId, chk]);
+            }
+            if (existing.length === 0 && key) {
+              existing = await db.query('SELECT id FROM design_files WHERE design_id = ? AND storage_key = ? LIMIT 1', [designId, key]);
+            }
+
+            if (existing.length === 0) {
+              logDesignFileInsert('POST /admin/designs/create (postCreate)', designId, { original_name: orig, file_size: sf.file_size, checksum_sha256: chk });
+              await db.query(
+                `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+                 VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+                [
+                  designId,
+                  sf.label || null,
+                  orig,
+                  key,
+                  sf.mime_type || 'application/octet-stream',
+                  orig,
+                  key,
+                  fmt,
+                  sf.file_size || 0,
+                  chk,
+                  idx
+                ]
+              );
+            }
           }
         }
       }
@@ -770,51 +784,56 @@ exports.postEdit = async (req, res, next) => {
       reviews_count: parsedReviews
     });
 
-    // Save package files if uploaded directly without wiping existing files
+    // Save package files if uploaded directly without wiping existing files (only if not already present)
     if (packageFiles.length > 0) {
       for (const pkg of packageFiles) {
         if (fs.existsSync(pkg.path)) {
-          await Design.addFile(id, pkg.originalname, pkg.webPath, pkg.format || 'ZIP', pkg.size, 0);
-        }
-      }
-    }
-
-    // Process staged download files uploaded via Chunked Uploader
-    if (req.body.staged_files) {
-      let stagedFiles = req.body.staged_files;
-      if (typeof stagedFiles === 'string') {
-        try { stagedFiles = JSON.parse(stagedFiles); } catch (_) { stagedFiles = []; }
-      }
-      if (Array.isArray(stagedFiles)) {
-        for (let idx = 0; idx < stagedFiles.length; idx++) {
-          const sf = stagedFiles[idx];
-          if (sf && (sf.storage_key || sf.file_path) && db.isConnected()) {
-            const key = sf.storage_key || sf.file_path;
-            const orig = sf.original_name || sf.file_name || path.basename(key);
-            const fmt = (sf.file_format || path.extname(orig).replace('.', '') || 'ZIP').toUpperCase();
-            await db.query(
-              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
-               VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-              [
-                id,
-                sf.label || null,
-                orig,
-                key,
-                sf.mime_type || 'application/octet-stream',
-                orig,
-                key,
-                fmt,
-                sf.file_size || 0,
-                sf.checksum_sha256 || null,
-                idx
-              ]
-            );
+          const existing = await db.query(
+            'SELECT id FROM design_files WHERE design_id = ? AND (file_name = ? OR original_name = ?)',
+            [id, pkg.originalname, pkg.originalname]
+          );
+          if (!existing || existing.length === 0) {
+            logDesignFileInsert('POST /admin/designs/edit/:id (packageFiles direct)', id, { original_name: pkg.originalname, file_size: pkg.size });
+            await Design.addFile(id, pkg.originalname, pkg.webPath, pkg.format || 'ZIP', pkg.size, 0);
           }
         }
       }
     }
 
-    // Handle uploaded preview images
+    // Update labels and sort order of existing download files (Publish/Save must only UPDATE)
+    if (req.body.staged_files) {
+      let stagedFiles = req.body.staged_files;
+      if (typeof stagedFiles === 'string') {
+        try { stagedFiles = JSON.parse(stagedFiles); } catch (_) { stagedFiles = []; }
+      }
+      if (Array.isArray(stagedFiles) && db.isConnected()) {
+        for (let idx = 0; idx < stagedFiles.length; idx++) {
+          const sf = stagedFiles[idx];
+          if (sf) {
+            const fileId = sf.id || sf.file_id;
+            if (fileId && !String(fileId).startsWith('staged_')) {
+              await db.query(
+                'UPDATE design_files SET label = COALESCE(?, label), sort_order = ? WHERE id = ? AND design_id = ?',
+                [sf.label || null, idx, fileId, id]
+              );
+            } else if (sf.checksum_sha256 || sf.storage_key) {
+              const existing = await db.query(
+                'SELECT id FROM design_files WHERE design_id = ? AND (checksum_sha256 = ? OR storage_key = ?) LIMIT 1',
+                [id, sf.checksum_sha256 || '', sf.storage_key || '']
+              );
+              if (existing && existing.length > 0) {
+                await db.query(
+                  'UPDATE design_files SET label = COALESCE(?, label), sort_order = ? WHERE id = ?',
+                  [sf.label || null, idx, existing[0].id]
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Handle uploaded preview images directly via multipart form (only if not already present)
     if (req.files) {
       const allFilesList = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
       const imgFiles = allFilesList.filter(file => {
@@ -826,44 +845,27 @@ exports.postEdit = async (req, res, next) => {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
-        await Design.addFile(id, file.originalname, savedUrl, ext, file.size, 1);
+        const existingImg = await db.query('SELECT id FROM design_images WHERE design_id = ? AND image_url = ?', [id, savedUrl]);
+        if (!existingImg || existingImg.length === 0) {
+          logDesignFileInsert('POST /admin/designs/edit/:id (imgFiles direct)', id, { original_name: file.originalname, file_size: file.size });
+          await Design.addFile(id, file.originalname, savedUrl, ext, file.size, 1);
+        }
       }
     }
 
-    // Process staged preview images uploaded via Chunked Uploader
+    // Update display order of existing preview images (Publish/Save must only UPDATE)
     if (req.body.staged_images) {
       let stagedImages = req.body.staged_images;
       if (typeof stagedImages === 'string') {
         try { stagedImages = JSON.parse(stagedImages); } catch (_) { stagedImages = []; }
       }
-      if (Array.isArray(stagedImages)) {
+      if (Array.isArray(stagedImages) && db.isConnected()) {
         for (let idx = 0; idx < stagedImages.length; idx++) {
           const si = stagedImages[idx];
-          if (si && si.image_url && db.isConnected()) {
-            const isPrim = si.is_primary ? 1 : 0;
+          if (si && si.id) {
             await db.query(
-              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
-              [id, si.image_url, isPrim, idx]
-            );
-            const orig = si.original_name || path.basename(si.image_url);
-            const extName = (path.extname(orig).replace('.', '') || 'PNG').toUpperCase();
-            await db.query(
-              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
-               VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-              [
-                id,
-                si.label || null,
-                orig,
-                si.image_url,
-                `image/${extName.toLowerCase()}`,
-                orig,
-                si.image_url,
-                extName,
-                si.file_size || 0,
-                si.checksum_sha256 || null,
-                idx,
-                isPrim
-              ]
+              'UPDATE design_images SET display_order = ?, is_primary = ? WHERE id = ? AND design_id = ?',
+              [idx, si.is_primary ? 1 : 0, si.id, id]
             );
           }
         }
@@ -3450,7 +3452,31 @@ exports.uploadDesignFileChunk = async (req, res) => {
   }
 };
 
-// 2. Upload complete: assemble chunks, validate size + extensions + safety + checksum
+// Idempotency cache for upload-complete (stores completed upload responses by uploadId)
+const completedUploadsCache = new Map();
+function getCachedUpload(uploadId) {
+  if (!uploadId) return null;
+  const cached = completedUploadsCache.get(uploadId);
+  if (cached && (Date.now() - cached.time < 3600000)) { // 1 hour TTL
+    return cached.result;
+  }
+  return null;
+}
+function setCachedUpload(uploadId, result) {
+  if (!uploadId) return;
+  if (completedUploadsCache.size > 1000) {
+    const firstKey = completedUploadsCache.keys().next().value;
+    completedUploadsCache.delete(firstKey);
+  }
+  completedUploadsCache.set(uploadId, { result, time: Date.now() });
+}
+
+function logDesignFileInsert(routeName, designId, fileInfo, uploadId = null) {
+  const stack = new Error().stack.split('\n').slice(2, 6).join('\n    ');
+  console.log(`[DESIGN_FILE_INSERT] Route: ${routeName} | DesignId: ${designId} | UploadId: ${uploadId || 'N/A'} | File: ${fileInfo.original_name || fileInfo.file_name} | Size: ${fileInfo.file_size} | Hash: ${fileInfo.checksum_sha256 || 'N/A'}\n    Stack: ${stack}`);
+}
+
+// 2. Upload complete: assemble chunks, validate size + extensions + safety + checksum (Idempotent)
 exports.uploadDesignFileComplete = async (req, res) => {
   const uploadId = (req.body.uploadId || '').replace(/[^a-zA-Z0-9_\-]/g, '');
   const totalChunks = parseInt(req.body.totalChunks, 10);
@@ -3459,6 +3485,15 @@ exports.uploadDesignFileComplete = async (req, res) => {
   const designId = req.body.designId ? parseInt(req.body.designId, 10) : null;
   const label = (req.body.label || '').trim() || null;
   const replaceFileId = req.body.replaceFileId ? parseInt(req.body.replaceFileId, 10) : null;
+
+  // 1. Idempotency Check: if this uploadId has already completed, return the cached result immediately
+  if (uploadId) {
+    const cachedResult = getCachedUpload(uploadId);
+    if (cachedResult) {
+      console.log(`[IDEMPOTENT UPLOAD] Returning cached complete result for uploadId=${uploadId}`);
+      return res.json(cachedResult);
+    }
+  }
 
   const chunkDir = path.join(storage.getUploadsDir(), 'temp_chunks', uploadId);
   const tempCombinedDir = path.join(storage.getUploadsDir(), 'temp_combined');
@@ -3543,15 +3578,19 @@ exports.uploadDesignFileComplete = async (req, res) => {
     hash.update(fileBuffer);
     const checksum = hash.digest('hex');
 
-    // Duplicate detection warning (if same checksum exists in design_files for this design)
+    // Duplicate detection check
     let duplicateWarning = false;
+    let existingFileRecord = null;
     if (db.isConnected() && designId) {
       const existingRows = await db.query(
-        'SELECT id, original_name FROM design_files WHERE design_id = ? AND checksum_sha256 = ?',
+        'SELECT id, original_name, label, sort_order, storage_key FROM design_files WHERE design_id = ? AND checksum_sha256 = ?',
         [designId, checksum]
       );
       if (existingRows && existingRows.length > 0) {
         duplicateWarning = true;
+        if (!replaceFileId) {
+          existingFileRecord = existingRows[0];
+        }
       }
     }
 
@@ -3573,31 +3612,46 @@ exports.uploadDesignFileComplete = async (req, res) => {
           await db.query('UPDATE design_images SET image_url = ? WHERE id = ? AND design_id = ?', [savedUrl, replaceFileId, designId]);
           imageRecord = { id: replaceFileId, image_url: savedUrl };
         } else {
-          const existingImages = await db.query('SELECT COUNT(*) as cnt FROM design_images WHERE design_id = ?', [designId]);
-          const isPrimary = (existingImages && existingImages[0] && existingImages[0].cnt === 0) ? 1 : 0;
-          const dispOrder = (existingImages && existingImages[0]) ? existingImages[0].cnt : 0;
-
-          const imgRes = await db.query(
-            'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
-            [designId, savedUrl, isPrimary, dispOrder]
+          // Check if image already exists in design_images
+          const existingImgs = await db.query(
+            'SELECT id, image_url, is_primary, display_order FROM design_images WHERE design_id = ? AND image_url = ? LIMIT 1',
+            [designId, savedUrl]
           );
-          imageRecord = { id: imgRes.insertId, image_url: savedUrl, is_primary: isPrimary, display_order: dispOrder };
 
-          const dfRes = await db.query(
-            `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
-             VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-            [designId, label, originalName, savedUrl, mimeType, originalName, savedUrl, ext.replace('.', '').toUpperCase(), finalSize, checksum, dispOrder, isPrimary]
-          );
-          fileRecord = { id: dfRes.insertId };
+          if (existingImgs && existingImgs.length > 0) {
+            imageRecord = existingImgs[0];
+          } else {
+            const existingImagesCount = await db.query('SELECT COUNT(*) as cnt FROM design_images WHERE design_id = ?', [designId]);
+            const isPrimary = (existingImagesCount && existingImagesCount[0] && existingImagesCount[0].cnt === 0) ? 1 : 0;
+            const dispOrder = (existingImagesCount && existingImagesCount[0]) ? existingImagesCount[0].cnt : 0;
+
+            const imgRes = await db.query(
+              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+              [designId, savedUrl, isPrimary, dispOrder]
+            );
+            imageRecord = { id: imgRes.insertId, image_url: savedUrl, is_primary: isPrimary, display_order: dispOrder };
+
+            if (!existingFileRecord) {
+              logDesignFileInsert('POST /admin/api/designs/upload-complete (preview)', designId, { original_name: originalName, file_size: finalSize, checksum_sha256: checksum }, uploadId);
+              const dfRes = await db.query(
+                `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+                 VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+                [designId, label, originalName, savedUrl, mimeType, originalName, savedUrl, ext.replace('.', '').toUpperCase(), finalSize, checksum, dispOrder, isPrimary]
+              );
+              fileRecord = { id: dfRes.insertId };
+            } else {
+              fileRecord = { id: existingFileRecord.id };
+            }
+          }
         }
       }
 
-      return res.json({
+      const resData = {
         success: true,
         fileKind: 'preview',
         file: {
           id: imageRecord ? imageRecord.id : null,
-          file_id: fileRecord ? fileRecord.id : null,
+          file_id: fileRecord ? fileRecord.id : (existingFileRecord ? existingFileRecord.id : null),
           original_name: originalName,
           image_url: savedUrl,
           file_size: finalSize,
@@ -3605,7 +3659,10 @@ exports.uploadDesignFileComplete = async (req, res) => {
           is_primary: imageRecord ? Boolean(imageRecord.is_primary) : false,
           duplicateWarning
         }
-      });
+      };
+
+      if (uploadId) setCachedUpload(uploadId, resData);
+      return res.json(resData);
     } else {
       // Save private machine download file
       savedPath = await storage.savePrivateFile(combinedPath, originalName, mimeType, designId);
@@ -3622,10 +3679,15 @@ exports.uploadDesignFileComplete = async (req, res) => {
             [originalName, savedPath, originalName, savedPath, fmtUpper, finalSize, checksum, mimeType, replaceFileId, designId]
           );
           fileRecord = { id: replaceFileId };
+        } else if (existingFileRecord) {
+          // Idempotent: record already exists for this design with this exact checksum
+          fileRecord = { id: existingFileRecord.id };
+          console.log(`[IDEMPOTENT UPLOAD] File already exists (ID=${existingFileRecord.id}) for design #${designId}. Skipping duplicate insert.`);
         } else {
           const sortRes = await db.query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM design_files WHERE design_id = ? AND file_kind != "image"', [designId]);
           const nextOrder = sortRes && sortRes[0] ? sortRes[0].next_order : 0;
 
+          logDesignFileInsert('POST /admin/api/designs/upload-complete (machine)', designId, { original_name: originalName, file_size: finalSize, checksum_sha256: checksum }, uploadId);
           const insRes = await db.query(
             `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
              VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
@@ -3637,11 +3699,11 @@ exports.uploadDesignFileComplete = async (req, res) => {
         await Design.syncDesignFormats(designId);
       }
 
-      return res.json({
+      const resData = {
         success: true,
         fileKind: 'machine',
         file: {
-          id: fileRecord ? fileRecord.id : null,
+          id: fileRecord ? fileRecord.id : (existingFileRecord ? existingFileRecord.id : null),
           original_name: originalName,
           label: label || '',
           storage_key: savedPath,
@@ -3651,7 +3713,10 @@ exports.uploadDesignFileComplete = async (req, res) => {
           detectedFormats,
           duplicateWarning
         }
-      });
+      };
+
+      if (uploadId) setCachedUpload(uploadId, resData);
+      return res.json(resData);
     }
   } catch (err) {
     console.error('[Upload Complete Error]:', err);

@@ -240,6 +240,15 @@ exports.createRazorpayOrder = async (req, res, next) => {
     const finalTotal = Math.max(0, dbSubtotal - couponDiscount);
     const amountInPaise = Math.round(finalTotal * 100);
 
+    // Determine if order is created in test mode
+    let isTestOrder = 0;
+    try {
+      const rzpConfig = await Setting.getRazorpayConfig();
+      if (rzpConfig.mode === 'test' || (rzpConfig.keyId && rzpConfig.keyId.startsWith('rzp_test_'))) {
+        isTestOrder = 1;
+      }
+    } catch (_) {}
+
     // Create local order with status "pending"
     const { orderId, orderNumber } = await Order.createOrder({
       userId,
@@ -251,7 +260,8 @@ exports.createRazorpayOrder = async (req, res, next) => {
       discountAmount: totalDiscount,
       finalAmount: finalTotal,
       couponCode: appliedCoupon ? appliedCoupon.code : null,
-      paymentGateway: 'razorpay'
+      paymentGateway: 'razorpay',
+      isTest: isTestOrder
     });
 
     // Special Case: 100% Free Order (e.g. 100% coupon discount)
@@ -522,16 +532,18 @@ exports.verifyPayment = async (req, res, next) => {
     // Record transaction in payments table
     if (db.isConnected()) {
       try {
+        const isTestPayment = (order.is_test || (rzpConfig && (rzpConfig.mode === 'test' || (rzpConfig.keyId && rzpConfig.keyId.startsWith('rzp_test_'))))) ? 1 : 0;
         await db.query(
-          `INSERT INTO payments (order_id, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, status, payment_method, raw_payload)
-           VALUES (?, ?, ?, ?, ?, 'captured', 'razorpay', ?)`,
+          `INSERT INTO payments (order_id, razorpay_payment_id, razorpay_order_id, razorpay_signature, amount, status, payment_method, raw_payload, is_test)
+           VALUES (?, ?, ?, ?, ?, 'captured', 'razorpay', ?, ?)`,
           [
             order.id,
             razorpay_payment_id,
             razorpay_order_id || order.razorpay_order_id,
             razorpay_signature || null,
             order.final_amount,
-            JSON.stringify({ verified_at: new Date(), refId })
+            JSON.stringify({ verified_at: new Date(), refId }),
+            isTestPayment
           ]
         );
       } catch (payLogErr) {
@@ -608,9 +620,9 @@ exports.handleRazorpayWebhook = async (req, res, next) => {
               // Record payment row
               try {
                 await db.query(
-                  `INSERT INTO payments (order_id, razorpay_payment_id, razorpay_order_id, amount, status, payment_method, raw_payload)
-                   VALUES (?, ?, ?, ?, 'captured', 'razorpay', ?)`,
-                  [order.id, razorpayPaymentId, razorpayOrderId, order.final_amount, JSON.stringify(paymentEntity)]
+                  `INSERT INTO payments (order_id, razorpay_payment_id, razorpay_order_id, amount, status, payment_method, raw_payload, is_test)
+                   VALUES (?, ?, ?, ?, 'captured', 'razorpay', ?, ?)`,
+                  [order.id, razorpayPaymentId, razorpayOrderId, order.final_amount, JSON.stringify(paymentEntity), order.is_test || 0]
                 );
               } catch (_) {}
 

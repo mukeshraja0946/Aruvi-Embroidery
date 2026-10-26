@@ -28,18 +28,37 @@ router.get('/admin/logout', adminAuthController.logout);
 
 // 2. Role-Protected Admin Routes (strictly requires admin login)
 router.use('/admin', isAdmin);
+router.use('/api/admin', isAdmin);
+
+// Rate limiter for critical reset operations
+const rateLimit = require('express-rate-limit');
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many reset requests. Please wait 15 minutes before trying again.' }
+});
 
 // Dashboard
 router.get('/admin', adminDashboardController.getDashboard);
 router.get('/api/admin/dashboard/stats', async (req, res) => {
   try {
     const AdminStatsService = require('../services/adminStatsService');
-    const stats = await AdminStatsService.getDashboardStats();
+    const includeTestData = req.query.includeTestData === '1' || req.query.includeTestData === 'true' || Boolean(req.session && req.session.includeTestData);
+    const stats = await AdminStatsService.getDashboardStats({ includeTestData });
     res.json(stats);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Store Data Reset (Super Admin only, CSRF protected, rate limited, server-side)
+router.get('/api/admin/reset/counts', adminDashboardController.getResetCounts);
+router.post('/api/admin/reset/preview', adminDashboardController.postResetPreview);
+router.post('/api/admin/reset/execute', resetLimiter, adminDashboardController.postExecuteReset);
+router.get('/admin/reset/backup/download/:filename', adminDashboardController.downloadResetBackup);
+router.post('/api/admin/reset/restore', resetLimiter, adminDashboardController.postRestoreBackup);
 
 // Products / Designs Management (supports both /admin/products and /admin/designs)
 router.get('/admin/products', adminDesignController.getDesigns);
@@ -218,6 +237,7 @@ router.post('/admin/tools/bulk-file-relink/commit', adminToolsController.postBul
 router.get('/admin/tools/backup', adminToolsController.getBackupPage);
 router.post('/admin/tools/backup/run', adminToolsController.postRunBackup);
 router.get('/admin/tools/backup/download/:filename', adminToolsController.downloadBackup);
+router.post('/admin/tools/backup/restore', adminToolsController.postRestoreBackup);
 
 // Database & System Health Dashboard
 router.get('/admin/tools/system-health', adminToolsController.getSystemHealth);
@@ -237,4 +257,10 @@ router.get('/admin/tools/stitch-history/:id', adminToolsController.getStitchHist
 router.post('/admin/tools/stitch-history/undo/:id', adminToolsController.undoStitchHistory);
 router.get('/admin/tools/stitch-history/download/:id', adminToolsController.downloadStitchHistoryCsv);
 
+// Duplicate Files Detection & Cleanup
+router.get('/admin/tools/duplicate-files', adminToolsController.getDuplicateFiles);
+router.post('/admin/tools/duplicate-files/clean', adminToolsController.cleanDuplicateFiles);
+router.post('/admin/tools/duplicate-files/undo/:backupFileName', adminToolsController.undoDuplicateFiles);
+
 module.exports = router;
+

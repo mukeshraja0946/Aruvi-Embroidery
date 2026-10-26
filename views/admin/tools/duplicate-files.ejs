@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Remove Duplicate Files - Admin' %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .tools-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .tools-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .tools-stat-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .tools-stat-icon.green { background: #E8F5E9; color: #2E7D32; }
+    .tools-stat-icon.red { background: #FFEBEE; color: #C62828; }
+    .tools-stat-icon.amber { background: #FFF8E1; color: #F57F17; }
+    .tools-stat-icon.blue { background: #E3F2FD; color: #1565C0; }
+
+    .tools-stat-data strong {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--admin-text-dark);
+      line-height: 1.2;
+    }
+    .tools-stat-data span {
+      font-size: 0.78rem;
+      color: var(--admin-text-muted);
+      font-weight: 500;
+    }
+
+    .report-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 1.75rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .report-card h3 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--admin-text-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .report-card p {
+      color: var(--admin-text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .dupes-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .dupes-table th {
+      background: #FAF6F0;
+      color: var(--admin-text-dark);
+      font-weight: 700;
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--admin-border);
+    }
+    .dupes-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F1E9E0;
+      color: var(--admin-text-dark);
+      vertical-align: middle;
+    }
+    .badge-kept {
+      background: #E8F5E9;
+      color: #2E7D32;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge-remove {
+      background: #FFEBEE;
+      color: #C62828;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .sql-code-box {
+      background: #1A252C;
+      color: #E2E8F0;
+      padding: 1rem 1.2rem;
+      border-radius: 10px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body class="admin-body">
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <div class="admin-header-actions" style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+      <a href="/admin/tools/system-health" class="btn btn-sm" style="background: #F1E9E0; color: var(--admin-text-dark); font-weight: 600; padding: 6px 14px; border-radius: 8px; text-decoration: none; font-size: 0.82rem;">
+        <i class="fa-solid fa-heart-pulse"></i> System Health
+      </a>
+      <a href="/" target="_blank" class="btn btn-sm" style="background: #FAF6F0; color: var(--admin-primary); font-weight: 600; padding: 6px 14px; border-radius: 8px; text-decoration: none; font-size: 0.82rem; border: 1px solid var(--admin-border);">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> View Store
+      </a>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item">
+          <a href="/admin">
+            <span><i class="fa-solid fa-house"></i> Dashboard</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & RECOVERY</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/duplicate-files" class="active"><span><i class="fa-solid fa-clone"></i> Remove Duplicates</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-image-relink"><span><i class="fa-solid fa-images"></i> Bulk Image Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-file-relink"><span><i class="fa-solid fa-file-zipper"></i> Bulk File Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Storage</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">SYSTEM SETTINGS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
+        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main-content" style="padding: 2rem;">
+      <div class="admin-container">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem;">
+          <div>
+            <h1 style="font-family: var(--font-heading); font-size: 1.8rem; font-weight: 700; margin: 0 0 4px 0; color: var(--admin-text-dark);">
+              Remove Duplicate Files
+            </h1>
+            <p style="margin: 0; font-size: 0.88rem; color: var(--admin-text-muted);">
+              Detects and safely removes duplicated download files and preview images. Backs up database before applying, remaps download logs, keeps lowest IDs, and provides a 7-day undo.
+            </p>
+          </div>
+          <a href="/admin/tools/system-health" class="btn" style="background: #F1E9E0; color: var(--admin-text-dark); font-weight: 600; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 0.85rem;">
+            <i class="fa-solid fa-arrow-left"></i> Tools Dashboard
+          </a>
+        </div>
+
+        <!-- Flash messages -->
+        <% if (messages && messages.success) { %>
+          <div class="alert alert-success" style="background: #E8F5E9; color: #2E7D32; padding: 12px 16px; border-radius: 8px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-check"></i> <%= messages.success %>
+          </div>
+        <% } %>
+        <% if (messages && messages.error) { %>
+          <div class="alert alert-danger" style="background: #FFEBEE; color: #C62828; padding: 12px 16px; border-radius: 8px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-exclamation"></i> <%= messages.error %>
+          </div>
+        <% } %>
+
+        <!-- Overview Stat Cards -->
+        <div class="tools-stat-grid">
+          <div class="tools-stat-card">
+            <div class="tools-stat-icon <%= report.totalAffectedDesigns > 0 ? 'amber' : 'green' %>">
+              <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <div class="tools-stat-data">
+              <strong><%= report.totalAffectedDesigns %></strong>
+              <span>Designs Affected</span>
+            </div>
+          </div>
+          <div class="tools-stat-card">
+            <div class="tools-stat-icon <%= report.totalFilesToRemove > 0 ? 'red' : 'green' %>">
+              <i class="fa-solid fa-file-zipper"></i>
+            </div>
+            <div class="tools-stat-data">
+              <strong><%= report.totalFilesToRemove %></strong>
+              <span>Duplicate Download Files</span>
+            </div>
+          </div>
+          <div class="tools-stat-card">
+            <div class="tools-stat-icon <%= report.totalImagesToRemove > 0 ? 'red' : 'green' %>">
+              <i class="fa-solid fa-images"></i>
+            </div>
+            <div class="tools-stat-data">
+              <strong><%= report.totalImagesToRemove %></strong>
+              <span>Duplicate Preview Images</span>
+            </div>
+          </div>
+          <div class="tools-stat-card">
+            <div class="tools-stat-icon blue">
+              <i class="fa-solid fa-hard-drive"></i>
+            </div>
+            <div class="tools-stat-data">
+              <strong><%= report.totalSpaceToFreeFormatted %></strong>
+              <span>Estimated Space to Free</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action / Cleanup Section -->
+        <div class="report-card" style="border-left: 4px solid var(--admin-primary);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h3 style="margin: 0 0 4px 0;">Dry-Run Audit &amp; Cleanup Action</h3>
+              <span style="font-size: 0.82rem; color: var(--admin-text-muted);">
+                <%= (report.totalFilesToRemove > 0 || report.totalImagesToRemove > 0)
+                  ? 'Duplicates detected. Applying cleanup creates an SQL backup before executing and is safely reversible for 7 days.'
+                  : 'No duplicates detected! All design files and preview images are clean and unique.'
+                %>
+              </span>
+            </div>
+            <% if (report.totalFilesToRemove > 0 || report.totalImagesToRemove > 0) { %>
+              <form action="/admin/tools/duplicate-files/clean" method="POST" onsubmit="return confirm('Clean all identified duplicate rows? An automatic SQL backup will be created and stored with a 7-day undo option.');">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn" style="background: var(--admin-primary); color: #FFFFFF; font-weight: 700; padding: 10px 22px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-broom"></i> Remove <%= report.totalFilesToRemove + report.totalImagesToRemove %> Duplicate Rows Now
+                </button>
+              </form>
+            <% } else { %>
+              <span class="badge-kept" style="font-size: 0.85rem; padding: 6px 14px;">
+                <i class="fa-solid fa-circle-check"></i> System Is Clean
+              </span>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Recent Backups with 7-Day Undo -->
+        <% if (cleanups && cleanups.length > 0) { %>
+          <div class="report-card">
+            <h3><i class="fa-solid fa-clock-rotate-left" style="color: #1565C0;"></i> Cleanup Backups (7-Day Undo Available)</h3>
+            <p>You can revert any duplicate removal performed in the last 7 days. The SQL snapshot is preserved.</p>
+            <table class="dupes-table">
+              <thead>
+                <tr>
+                  <th>DATE &amp; TIME</th>
+                  <th>ADMIN</th>
+                  <th>REMOVED FILES</th>
+                  <th>REMOVED IMAGES</th>
+                  <th>EXPIRES</th>
+                  <th style="text-align: right;">ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% cleanups.forEach(c => { %>
+                  <tr>
+                    <td><strong><%= new Date(c.createdAt).toLocaleString() %></strong></td>
+                    <td><%= c.adminEmail || 'admin' %></td>
+                    <td><%= c.removedFilesCount %></td>
+                    <td><%= c.removedImagesCount %></td>
+                    <td>
+                      <% if (c.isExpired) { %>
+                        <span style="color: #C62828;">Expired</span>
+                      <% } else { %>
+                        <span style="color: #2E7D32;"><%= new Date(c.expiresAt).toLocaleDateString() %></span>
+                      <% } %>
+                    </td>
+                    <td style="text-align: right;">
+                      <% if (c.canUndo) { %>
+                        <form action="/admin/tools/duplicate-files/undo/<%= encodeURIComponent(c.backupFileName) %>" method="POST" style="display: inline-block;" onsubmit="return confirm('Restore the duplicate rows from this backup?');">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button type="submit" class="btn btn-sm" style="background: #E3F2FD; color: #1565C0; font-weight: 600; padding: 4px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.78rem;">
+                            <i class="fa-solid fa-rotate-left"></i> Undo Cleanup
+                          </button>
+                        </form>
+                        <a href="/admin/tools/backup/download/<%= encodeURIComponent(c.backupFileName) %>" class="btn btn-sm" style="background: #F1E9E0; color: var(--admin-text-dark); font-weight: 600; padding: 4px 10px; border-radius: 6px; text-decoration: none; font-size: 0.78rem; margin-left: 6px;">
+                          <i class="fa-solid fa-download"></i> SQL
+                        </a>
+                      <% } else { %>
+                        <span style="color: var(--admin-text-muted); font-size: 0.75rem;">Unavailable</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <!-- Detailed Dry-Run Report Tables -->
+        <% if (report.designFilesDuplicates && report.designFilesDuplicates.length > 0) { %>
+          <div class="report-card">
+            <h3><i class="fa-solid fa-file-zipper" style="color: var(--admin-primary);"></i> Duplicate Download Files Detailed Breakdown</h3>
+            <p>Every group keeps the lowest ID (preserving label and sort order). Additional IDs will be removed and their download logs remapped.</p>
+            <div style="overflow-x: auto;">
+              <table class="dupes-table">
+                <thead>
+                  <tr>
+                    <th>DESIGN</th>
+                    <th>ORIGINAL FILE</th>
+                    <th>KEPT RECORD (LOWEST ID)</th>
+                    <th>DUPLICATES TO REMOVE</th>
+                    <th>ACTION TO TAKE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% report.designFilesDuplicates.forEach(group => { %>
+                    <tr>
+                      <td>
+                        <strong>#<%= group.designId %></strong> — <%= group.designTitle %>
+                        <div style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= group.designSku %></div>
+                      </td>
+                      <td>
+                        <strong><%= group.originalName || 'Archive' %></strong>
+                        <div style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= (group.keptRow.file_size / 1024).toFixed(1) %> KB</div>
+                      </td>
+                      <td>
+                        <span class="badge-kept"><i class="fa-solid fa-check"></i> ID #<%= group.keptRow.id %></span>
+                        <div style="font-size: 0.72rem; color: var(--admin-text-muted); margin-top: 2px;">Label: "<%= group.keptRow.label || 'None' %>" (Order <%= group.keptRow.sort_order %>)</div>
+                      </td>
+                      <td>
+                        <% group.duplicatesToRemove.forEach(dup => { %>
+                          <span class="badge-remove" style="margin-right: 4px;"><i class="fa-solid fa-trash"></i> ID #<%= dup.id %></span>
+                        <% }) %>
+                      </td>
+                      <td>
+                        <span style="color: var(--admin-text-muted); font-size: 0.76rem;">Remap logs to #<%= group.keptRow.id %>, delete duplicate DB rows</span>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (report.designImagesDuplicates && report.designImagesDuplicates.length > 0) { %>
+          <div class="report-card">
+            <h3><i class="fa-solid fa-images" style="color: #2E7D32;"></i> Duplicate Preview Images Detailed Breakdown</h3>
+            <p>Duplicate rows in design_images for the same image_url will be consolidated to the lowest ID.</p>
+            <div style="overflow-x: auto;">
+              <table class="dupes-table">
+                <thead>
+                  <tr>
+                    <th>DESIGN</th>
+                    <th>IMAGE PREVIEW</th>
+                    <th>KEPT RECORD</th>
+                    <th>DUPLICATES TO REMOVE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% report.designImagesDuplicates.forEach(group => { %>
+                    <tr>
+                      <td>
+                        <strong>#<%= group.designId %></strong> — <%= group.designTitle %>
+                        <div style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= group.designSku %></div>
+                      </td>
+                      <td>
+                        <img src="<%= group.imageUrl %>" style="width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: #FAF6F0; border: 1px solid var(--admin-border);" alt="Thumb">
+                        <span style="font-size: 0.75rem; margin-left: 8px; color: var(--admin-text-muted);"><%= group.imageUrl.split('/').pop() %></span>
+                      </td>
+                      <td>
+                        <span class="badge-kept"><i class="fa-solid fa-check"></i> ID #<%= group.keptRow.id %></span>
+                      </td>
+                      <td>
+                        <% group.duplicatesToRemove.forEach(dup => { %>
+                          <span class="badge-remove" style="margin-right: 4px;"><i class="fa-solid fa-trash"></i> ID #<%= dup.id %></span>
+                        <% }) %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% } %>
+
+        <!-- Plain SQL for phpMyAdmin -->
+        <div class="report-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem;">
+            <h3 style="margin: 0;"><i class="fa-solid fa-terminal"></i> Plain SQL for phpMyAdmin</h3>
+            <button type="button" class="btn btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('sqlBox').textContent); alert('SQL copied to clipboard!');" style="background: #F1E9E0; color: var(--admin-text-dark); font-weight: 600; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.78rem;">
+              <i class="fa-regular fa-copy"></i> Copy SQL
+            </button>
+          </div>
+          <p>You can also execute this query directly in phpMyAdmin to clean duplicates and apply the unique rule.</p>
+          <div class="sql-code-box" id="sqlBox"><%= report.plainSql %></div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
+

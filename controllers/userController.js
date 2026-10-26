@@ -23,6 +23,23 @@ function createZipArchive(options = { zlib: { level: 6 } }) {
   throw new Error('Unable to initialize zip archiver stream');
 }
 
+function filterDistinctFiles(files) {
+  if (!Array.isArray(files)) return [];
+  const seenIds = new Set();
+  const seenSignatures = new Set();
+  const distinct = [];
+  for (const f of files) {
+    if (!f) continue;
+    const sig = f.checksum_sha256 ? `chk_${f.checksum_sha256}` : (f.storage_key || f.file_path || `id_${f.id}`);
+    if (!seenIds.has(f.id) && !seenSignatures.has(sig)) {
+      seenIds.add(f.id);
+      seenSignatures.add(sig);
+      distinct.push(f);
+    }
+  }
+  return distinct;
+}
+
 exports.getDashboard = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -35,10 +52,10 @@ exports.getDashboard = async (req, res, next) => {
       for (const item of purchasedDesigns) {
         const dId = item.design_id || item.id;
         const files = await db.query(
-          "SELECT id, label, original_name, storage_key, mime_type, file_size, file_format, file_name, file_path FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
+          "SELECT id, label, original_name, storage_key, mime_type, file_size, file_format, file_name, file_path, checksum_sha256 FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
           [dId]
         );
-        item.download_files = files || [];
+        item.download_files = filterDistinctFiles(files || []);
       }
     }
 
@@ -149,10 +166,10 @@ exports.getOrderDetail = async (req, res, next) => {
       for (const item of order.items) {
         const dId = item.design_id || item.id;
         const files = await db.query(
-          "SELECT id, label, original_name, storage_key, mime_type, file_size, file_format, file_name, file_path FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
+          "SELECT id, label, original_name, storage_key, mime_type, file_size, file_format, file_name, file_path, checksum_sha256 FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
           [dId]
         );
-        item.download_files = files || [];
+        item.download_files = filterDistinctFiles(files || []);
       }
     }
 
@@ -402,11 +419,12 @@ exports.downloadDesignAllZip = async (req, res, next) => {
       return res.redirect('/user/dashboard');
     }
 
-    // Retrieve all non-preview machine files for this design
-    const machineFiles = await db.query(
+    // Retrieve all non-preview machine files for this design (strictly distinct)
+    const rawFiles = await db.query(
       "SELECT * FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
       [targetDesignId]
     ) || [];
+    const machineFiles = filterDistinctFiles(rawFiles);
 
     const rawTitle = design.title || design.slug || `AED_${targetDesignId}`;
     const cleanFileName = (design.sku ? `${design.sku}_${rawTitle}` : rawTitle).replace(/[/\\?%*:|"<>]/g, '_').trim();
@@ -546,10 +564,11 @@ exports.downloadOrderAllZip = async (req, res, next) => {
       const dId = item.design_id || item.id;
       const cleanDesignDir = `${item.sku || `AED-${dId}`}_${(item.title || 'Design').replace(/[/\\?%*:|"<>]/g, '_').trim()}`;
 
-      const files = await db.query(
+      const rawFiles = await db.query(
         "SELECT * FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
         [dId]
       ) || [];
+      const files = filterDistinctFiles(rawFiles);
 
       for (const f of files) {
         const full = resolveFilePath(f.storage_key || f.file_path);
