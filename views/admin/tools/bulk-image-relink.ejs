@@ -166,28 +166,47 @@
               </span>
             </div>
 
-            <% if (preview.matchedCount > 0) { %>
-              <form action="/admin/tools/bulk-image-relink/commit" method="POST" onsubmit="return confirm('Commit these <%= preview.matchedCount %> matched images to persistent storage and update designs?');">
-                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                <input type="hidden" name="sessionId" value="<%= preview.sessionId %>">
-                <button type="submit" class="btn btn-primary" style="font-size: 0.9rem; padding: 0.6rem 1.5rem; border-radius: 8px; background: #2E7D32; border-color: #2E7D32;">
-                  <i class="fa-solid fa-check-double"></i> Apply & Relink <%= preview.matchedCount %> Images
-                </button>
-              </form>
-            <% } %>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <a href="/admin/tools/bulk-image-relink/export-report?sessionId=<%= preview.sessionId %>" class="btn" style="background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; font-size: 0.85rem; padding: 0.55rem 1.1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-file-csv"></i> Export CSV Report
+              </a>
+
+              <% if (preview.matchedCount > 0) { %>
+                <form action="/admin/tools/bulk-image-relink/commit" method="POST" style="display: inline-flex; gap: 8px; align-items: center;" onsubmit="return confirm('Commit these <%= preview.matchedCount %> matched images to persistent storage and update designs?');">
+                  <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                  <input type="hidden" name="sessionId" value="<%= preview.sessionId %>">
+
+                  <select name="mode" style="height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.82rem; background: #FFF; font-weight: 600;">
+                    <option value="append" selected>Mode: Append to Preview Images</option>
+                    <option value="replace">Mode: Replace All Preview Images</option>
+                  </select>
+
+                  <button type="submit" class="btn btn-primary" style="font-size: 0.88rem; padding: 0.55rem 1.4rem; border-radius: 8px; background: #2E7D32; border-color: #2E7D32;">
+                    <i class="fa-solid fa-check-double"></i> Apply & Relink <%= preview.matchedCount %> Images
+                  </button>
+                </form>
+              <% } %>
+            </div>
           </div>
 
           <!-- Summary Metric Pills -->
           <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
             <div style="background: #E8F5E9; color: #2E7D32; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
-              <i class="fa-solid fa-check"></i> <%= preview.matchedCount %> Matched Designs
+              <i class="fa-solid fa-check"></i> <%= preview.matchedCount %> Matched Images
             </div>
             <div style="background: #FFEBEE; color: #C62828; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
               <i class="fa-solid fa-xmark"></i> <%= preview.unmatchedCount %> Unmatched Files
             </div>
-            <div style="background: #FFF8E1; color: #F57F17; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
-              <i class="fa-solid fa-triangle-exclamation"></i> <%= preview.duplicatesCount %> Duplicate Conflicts
-            </div>
+            <% if (preview.ambiguousCount && preview.ambiguousCount > 0) { %>
+              <div style="background: #FEF3C7; color: #D97706; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
+                <i class="fa-solid fa-question-circle"></i> <%= preview.ambiguousCount %> Ambiguous Matches
+              </div>
+            <% } %>
+            <% if (preview.duplicatesCount && preview.duplicatesCount > 0) { %>
+              <div style="background: #FFF8E1; color: #F57F17; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i> <%= preview.duplicatesCount %> Duplicate Filenames Skipped
+              </div>
+            <% } %>
           </div>
 
           <!-- Matched Table -->
@@ -202,6 +221,7 @@
                 <thead style="background: #F9FAFB; position: sticky; top: 0;">
                   <tr style="text-align: left; border-bottom: 1px solid var(--admin-border);">
                     <th style="padding: 0.6rem 0.8rem;">Uploaded File</th>
+                    <th style="padding: 0.6rem 0.8rem;">Preview Role</th>
                     <th style="padding: 0.6rem 0.8rem;">Matched SKU</th>
                     <th style="padding: 0.6rem 0.8rem;">Target Product Title</th>
                     <th style="padding: 0.6rem 0.8rem;">Match Rule</th>
@@ -212,6 +232,13 @@
                   <% preview.matched.forEach(m => { %>
                     <tr style="border-bottom: 1px solid var(--admin-border);">
                       <td style="padding: 0.5rem 0.8rem; font-family: monospace;"><%= m.filename %></td>
+                      <td style="padding: 0.5rem 0.8rem;">
+                        <% if (m.isPrimary) { %>
+                          <span style="background: #FEF3C7; color: #B45309; padding: 2px 8px; border-radius: 12px; font-weight: 700; font-size: 0.75rem;">★ PRIMARY PREVIEW</span>
+                        <% } else { %>
+                          <span style="background: #F1F5F9; color: #475569; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem;">Gallery Preview</span>
+                        <% } %>
+                      </td>
                       <td style="padding: 0.5rem 0.8rem; font-weight: 700; color: var(--admin-primary);"><%= m.designSku %></td>
                       <td style="padding: 0.5rem 0.8rem;"><%= m.designTitle %> (#<%= m.designId %>)</td>
                       <td style="padding: 0.5rem 0.8rem; color: var(--admin-text-muted);"><%= m.method %></td>
@@ -220,6 +247,22 @@
                   <% }); %>
                 </tbody>
               </table>
+            </div>
+          <% } %>
+
+          <!-- Ambiguous Matches -->
+          <% if (preview.ambiguous && preview.ambiguous.length > 0) { %>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #D97706; margin-bottom: 0.75rem;">
+              ? Ambiguous Filename Matches (<%= preview.ambiguous.length %>)
+            </h3>
+            <div style="max-height: 180px; overflow-y: auto; border: 1px solid #FCD34D; border-radius: 8px; margin-bottom: 1.5rem; background: #FFFBEB; padding: 0.75rem 1rem;">
+              <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.82rem; color: #92400E;">
+                <% preview.ambiguous.forEach(a => { %>
+                  <li style="padding: 0.2rem 0;">
+                    <strong><%= a.filename %></strong> matches multiple designs (<%= a.candidates %>). Please rename file with exact SKU to resolve.
+                  </li>
+                <% }); %>
+              </ul>
             </div>
           <% } %>
 

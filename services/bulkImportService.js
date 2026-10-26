@@ -30,7 +30,9 @@ class BulkImportService {
         'Tags': 'rose, blouse, bridal, zari',
         'Status': 'Active',
         'Preview Image Filename': 'AED-BLO-01.jpg',
-        'Machine ZIP Filename': 'AED-BLO-01.zip'
+        'Extra Image Filenames': 'AED-BLO-01_2.jpg | AED-BLO-01_back.png',
+        'Machine ZIP Filename': 'AED-BLO-01.zip',
+        'Extra File Filenames': 'AED-BLO-01_2.zip | AED-BLO-01_dst.zip'
       },
       {
         'Design Name': 'Peacock Temple Border',
@@ -47,7 +49,9 @@ class BulkImportService {
         'Tags': 'peacock, temple, border, saree',
         'Status': 'Active',
         'Preview Image Filename': 'AED-BOR-02.jpg',
-        'Machine ZIP Filename': 'AED-BOR-02.zip'
+        'Extra Image Filenames': '',
+        'Machine ZIP Filename': 'AED-BOR-02.zip',
+        'Extra File Filenames': ''
       }
     ];
 
@@ -65,8 +69,10 @@ class BulkImportService {
       { 'Field Name': 'Description', 'Required': 'NO', 'Description': 'Full description displayed on customer product page.' },
       { 'Field Name': 'Tags', 'Required': 'NO', 'Description': 'Comma-separated keywords for search.' },
       { 'Field Name': 'Status', 'Required': 'NO', 'Description': '"Active" or "Draft" (default: Active).' },
-      { 'Field Name': 'Preview Image Filename', 'Required': 'RECOMMENDED', 'Description': 'Exact filename of preview photo (e.g. AED 1.png). Supports spaces.' },
-      { 'Field Name': 'Machine ZIP Filename', 'Required': 'RECOMMENDED', 'Description': 'Exact filename of machine ZIP (e.g. AED 1.zip). Supports spaces.' }
+      { 'Field Name': 'Preview Image Filename', 'Required': 'RECOMMENDED', 'Description': 'Exact filename of primary preview photo (e.g. AED-01.jpg). Supports spaces.' },
+      { 'Field Name': 'Extra Image Filenames', 'Required': 'NO', 'Description': 'Filenames of additional preview images, separated by | or ; (e.g. AED-01_2.png | AED-01_back.jpg).' },
+      { 'Field Name': 'Machine ZIP Filename', 'Required': 'RECOMMENDED', 'Description': 'Exact filename of primary machine file or ZIP (e.g. AED-01.zip). Supports spaces.' },
+      { 'Field Name': 'Extra File Filenames', 'Required': 'NO', 'Description': 'Filenames of additional downloadable machine files, separated by | or ; (e.g. AED-01_2.zip | AED-01_dst.zip).' }
     ];
 
     const wb = XLSX.utils.book_new();
@@ -146,10 +152,14 @@ class BulkImportService {
           ADD COLUMN IF NOT EXISTS \`stitch_count_back\` INT UNSIGNED NULL DEFAULT NULL,
           ADD COLUMN IF NOT EXISTS \`stitch_count_sleeve\` INT UNSIGNED NULL DEFAULT NULL,
           ADD COLUMN IF NOT EXISTS \`stitch_count_total\` INT UNSIGNED NULL DEFAULT NULL,
-          ADD COLUMN IF NOT EXISTS \`stitch_total_manual\` TINYINT NOT NULL DEFAULT 0
+          ADD COLUMN IF NOT EXISTS \`stitch_total_manual\` TINYINT NOT NULL DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS \`extra_image_filenames\` TEXT NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`extra_file_filenames\` TEXT NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`extra_images_stored\` LONGTEXT NULL DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS \`extra_files_stored\` LONGTEXT NULL DEFAULT NULL
       `).catch(async () => {
         const cols = await db.query(
-          "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'import_job_items' AND COLUMN_NAME LIKE 'stitch_%'"
+          "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'import_job_items'"
         ).catch(() => []);
         const existing = new Set(cols.map(c => c.COLUMN_NAME));
         if (!existing.has('stitch_count_front')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_front` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
@@ -157,6 +167,10 @@ class BulkImportService {
         if (!existing.has('stitch_count_sleeve')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_sleeve` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
         if (!existing.has('stitch_count_total')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_count_total` INT UNSIGNED NULL DEFAULT NULL").catch(() => {});
         if (!existing.has('stitch_total_manual')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `stitch_total_manual` TINYINT NOT NULL DEFAULT 0").catch(() => {});
+        if (!existing.has('extra_image_filenames')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `extra_image_filenames` TEXT NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('extra_file_filenames')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `extra_file_filenames` TEXT NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('extra_images_stored')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `extra_images_stored` LONGTEXT NULL DEFAULT NULL").catch(() => {});
+        if (!existing.has('extra_files_stored')) await db.query("ALTER TABLE `import_job_items` ADD COLUMN `extra_files_stored` LONGTEXT NULL DEFAULT NULL").catch(() => {});
       });
     } catch (err) {
       // non-fatal
@@ -248,7 +262,9 @@ class BulkImportService {
     const tagsAliases = ['tags', 'keywords', 'tag'];
     const statusAliases = ['status', 'active', 'is active', 'state'];
     const previewImageAliases = ['preview image filename', 'preview image', 'image filename', 'image', 'preview file', 'image name', 'photo filename'];
+    const extraImageAliases = ['extra image filenames', 'extra image filename', 'extra images', 'extra image files', 'additional images', 'additional image filenames', 'extra photos'];
     const machineZipAliases = ['machine zip filename', 'machine file', 'zip filename', 'machine zip', 'zip file', 'embroidery file', 'file filename'];
+    const extraFileAliases = ['extra file filenames', 'extra file filename', 'extra files', 'extra file', 'additional files', 'additional file filenames', 'extra zip filenames', 'additional zip filenames', 'additional machine files'];
 
     const stitchFrontAliases = ['stitch front', 'front stitch', 'front stitches', 'stitch_count_front', 'stitch count front', 'front'];
     const stitchBackAliases = ['stitch back', 'back stitch', 'back stitches', 'stitch_count_back', 'stitch count back', 'back'];
@@ -317,7 +333,9 @@ class BulkImportService {
       const tags = getVal(tagsAliases);
       const statusRaw = getVal(statusAliases) || 'Active';
       const previewImgRaw = getVal(previewImageAliases);
+      const extraImagesRaw = getVal(extraImageAliases);
       const machineZipRaw = getVal(machineZipAliases);
+      const extraFilesRaw = getVal(extraFileAliases);
 
       const rawFront = getVal(stitchFrontAliases);
       const rawBack = getVal(stitchBackAliases);
@@ -325,7 +343,7 @@ class BulkImportService {
       const rawTotal = getVal(stitchTotalAliases);
 
       // Skip completely blank rows
-      if (!title && !sku && !mrpRaw && !sellingRaw && !categoryName && !rawFront && !rawBack && !rawSleeve && !rawTotal) {
+      if (!title && !sku && !mrpRaw && !sellingRaw && !categoryName && !rawFront && !rawBack && !rawSleeve && !rawTotal && !extraImagesRaw && !extraFilesRaw) {
         continue;
       }
 
@@ -450,7 +468,9 @@ class BulkImportService {
         tags,
         status,
         imageFilename: previewImgRaw || (sku ? `${sku}.jpg` : null),
+        extra_image_filenames: extraImagesRaw || null,
         fileFilename: machineZipRaw || (sku ? `${sku}.zip` : null),
+        extra_file_filenames: extraFilesRaw || null,
         stitch_count_front: frontVal,
         stitch_count_back: backVal,
         stitch_count_sleeve: sleeveVal,
@@ -510,13 +530,15 @@ class BulkImportService {
           it.stitch_count_sleeve,
           it.stitch_count_total,
           it.stitch_total_manual,
+          it.extra_image_filenames,
+          it.extra_file_filenames,
           it.validationStatus,
           it.validationError
         ]);
 
         await db.query(`
           INSERT INTO \`import_job_items\` 
-            (\`job_id\`, \`row_no\`, \`sku\`, \`title\`, \`category_name\`, \`price\`, \`sale_price\`, \`formats\`, \`description\`, \`tags\`, \`status\`, \`image_filename\`, \`file_filename\`, \`stitch_count_front\`, \`stitch_count_back\`, \`stitch_count_sleeve\`, \`stitch_count_total\`, \`stitch_total_manual\`, \`validation_status\`, \`validation_error\`)
+            (\`job_id\`, \`row_no\`, \`sku\`, \`title\`, \`category_name\`, \`price\`, \`sale_price\`, \`formats\`, \`description\`, \`tags\`, \`status\`, \`image_filename\`, \`file_filename\`, \`stitch_count_front\`, \`stitch_count_back\`, \`stitch_count_sleeve\`, \`stitch_count_total\`, \`stitch_total_manual\`, \`extra_image_filenames\`, \`extra_file_filenames\`, \`validation_status\`, \`validation_error\`)
           VALUES ?
         `, [rows]);
       } else {
@@ -591,7 +613,7 @@ class BulkImportService {
     }
 
     const items = await db.query(
-      'SELECT `id`, `sku`, `title`, `row_no`, `image_filename`, `file_filename` FROM `import_job_items` WHERE `job_id` = ?',
+      'SELECT `id`, `sku`, `title`, `row_no`, `image_filename`, `file_filename`, `extra_image_filenames`, `extra_file_filenames`, `extra_images_stored`, `extra_files_stored` FROM `import_job_items` WHERE `job_id` = ?',
       [job.id]
     );
 
@@ -626,11 +648,11 @@ class BulkImportService {
 
         // Robust multi-tier matching for preview image:
         // 1. Exact or case-insensitive image_filename
-        // 2. Base filename without extension
-        // 3. Normalized key of image_filename
-        // 4. SKU match
-        // 5. Title match
-        // 6. Row number or AED sequence match
+        // 2. Extra image filenames (split by | or ;)
+        // 3. Base filename without extension
+        // 4. Normalized key of image_filename
+        // 5. SKU match
+        // 6. Title match
         let matchedItem = items.find(it => {
           if (it.image_filename) {
             const targetOrig = it.image_filename.trim();
@@ -656,7 +678,31 @@ class BulkImportService {
           matchedImages++;
           uploadedAssetResults.push({ filename: file.originalname, status: 'matched', type: 'image', sku: matchedItem.sku, rowNo: matchedItem.row_no });
         } else {
-          uploadedAssetResults.push({ filename: file.originalname, status: 'unmatched', type: 'image' });
+          // Check Extra Image Filenames
+          let matchedExtraItem = items.find(it => {
+            if (!it.extra_image_filenames) return false;
+            const extraList = it.extra_image_filenames.split(/[|;]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+            return extraList.includes(uploadOrigName.toLowerCase()) || extraList.includes(uploadBase.toLowerCase());
+          });
+
+          if (matchedExtraItem) {
+            let storedList = [];
+            try {
+              if (matchedExtraItem.extra_images_stored) storedList = JSON.parse(matchedExtraItem.extra_images_stored);
+            } catch (e) {}
+            if (!Array.isArray(storedList)) storedList = [];
+            storedList.push({ filename: file.originalname, url: savedUrl, size: file.size });
+            matchedExtraItem.extra_images_stored = JSON.stringify(storedList);
+
+            await db.query(
+              'UPDATE `import_job_items` SET `extra_images_stored` = ? WHERE `id` = ?',
+              [matchedExtraItem.extra_images_stored, matchedExtraItem.id]
+            );
+            matchedImages++;
+            uploadedAssetResults.push({ filename: file.originalname, status: 'matched_extra', type: 'image', sku: matchedExtraItem.sku, rowNo: matchedExtraItem.row_no });
+          } else {
+            uploadedAssetResults.push({ filename: file.originalname, status: 'unmatched', type: 'image' });
+          }
         }
       } else if (isMachine) {
         // Safe inspection against Zip Slip
@@ -679,12 +725,6 @@ class BulkImportService {
         const savedPath = await storage.savePrivateFile(file.path, file.originalname, file.mimetype);
 
         // Robust multi-tier matching for machine file:
-        // 1. Exact or case-insensitive file_filename
-        // 2. Base filename without extension
-        // 3. Normalized key of file_filename
-        // 4. SKU match
-        // 5. Title match
-        // 6. Row number or AED sequence match
         let matchedItem = items.find(it => {
           if (it.file_filename) {
             const targetOrig = it.file_filename.trim();
@@ -710,7 +750,31 @@ class BulkImportService {
           matchedFiles++;
           uploadedAssetResults.push({ filename: file.originalname, status: 'matched', type: 'machine', sku: matchedItem.sku, rowNo: matchedItem.row_no });
         } else {
-          uploadedAssetResults.push({ filename: file.originalname, status: 'unmatched', type: 'machine' });
+          // Check Extra File Filenames
+          let matchedExtraItem = items.find(it => {
+            if (!it.extra_file_filenames) return false;
+            const extraList = it.extra_file_filenames.split(/[|;]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+            return extraList.includes(uploadOrigName.toLowerCase()) || extraList.includes(uploadBase.toLowerCase());
+          });
+
+          if (matchedExtraItem) {
+            let storedList = [];
+            try {
+              if (matchedExtraItem.extra_files_stored) storedList = JSON.parse(matchedExtraItem.extra_files_stored);
+            } catch (e) {}
+            if (!Array.isArray(storedList)) storedList = [];
+            storedList.push({ filename: file.originalname, path: savedPath, size: file.size, format: ext.replace('.', '').toUpperCase() });
+            matchedExtraItem.extra_files_stored = JSON.stringify(storedList);
+
+            await db.query(
+              'UPDATE `import_job_items` SET `extra_files_stored` = ? WHERE `id` = ?',
+              [matchedExtraItem.extra_files_stored, matchedExtraItem.id]
+            );
+            matchedFiles++;
+            uploadedAssetResults.push({ filename: file.originalname, status: 'matched_extra', type: 'machine', sku: matchedExtraItem.sku, rowNo: matchedExtraItem.row_no });
+          } else {
+            uploadedAssetResults.push({ filename: file.originalname, status: 'unmatched', type: 'machine' });
+          }
         }
       }
     }
@@ -899,19 +963,70 @@ class BulkImportService {
             });
           }
 
-          // 3. Attach matched image (creates design_images & preview design_files + thumbnail)
+          // 3. Attach matched primary image (creates design_images & preview design_files + thumbnail)
           if (item.image_stored_url) {
             await Design.replacePrimaryImage(targetDesignId, item.image_stored_url, item.image_filename, 0);
           }
 
-          // 4. Attach matched machine design file
+          // 3b. Attach extra preview gallery images
+          if (item.extra_images_stored) {
+            try {
+              const extraImgs = JSON.parse(item.extra_images_stored);
+              if (Array.isArray(extraImgs)) {
+                let imgOrder = 1;
+                for (const exImg of extraImgs) {
+                  if (!exImg.url) continue;
+                  await db.query(
+                    'INSERT INTO `design_images` (`design_id`, `image_url`, `is_primary`, `display_order`) VALUES (?, ?, 0, ?)',
+                    [targetDesignId, exImg.url, imgOrder]
+                  );
+                  await db.query(
+                    `INSERT INTO \`design_files\` 
+                      (\`design_id\`, \`file_kind\`, \`label\`, \`original_name\`, \`storage_key\`, \`mime_type\`, \`file_size\`, \`checksum_sha256\`, \`sort_order\`, \`is_primary_preview\`, \`file_name\`, \`file_path\`, \`file_format\`, \`is_preview\`) 
+                     VALUES (?, 'image', 'Gallery Preview', ?, ?, 'image/jpeg', ?, '', ?, 0, ?, ?, 'JPG', 1)`,
+                    [targetDesignId, exImg.filename || 'extra.jpg', exImg.url, exImg.size || 0, imgOrder, exImg.filename || 'extra.jpg', exImg.url]
+                  );
+                  imgOrder++;
+                }
+              }
+            } catch (exErr) {
+              console.warn(`[Bulk Import] extra_images_stored warning for design #${targetDesignId}:`, exErr.message);
+            }
+          }
+
+          // 4. Attach matched primary machine design file
           if (item.file_stored_path) {
             const fileExt = path.extname(item.file_filename || '').replace('.', '').toUpperCase() || 'ZIP';
-            await db.query('DELETE FROM `design_files` WHERE `design_id` = ? AND `is_preview` = 0', [targetDesignId]);
+            await db.query("DELETE FROM `design_files` WHERE `design_id` = ? AND (file_kind != 'image' OR is_preview = 0)", [targetDesignId]);
             await db.query(
-              'INSERT INTO `design_files` (`design_id`, `file_name`, `file_path`, `file_format`, `is_preview`) VALUES (?, ?, ?, ?, 0)',
-              [targetDesignId, item.file_filename || `${finalSku}.zip`, item.file_stored_path, fileExt]
+              `INSERT INTO \`design_files\` 
+                (\`design_id\`, \`file_kind\`, \`label\`, \`original_name\`, \`storage_key\`, \`mime_type\`, \`file_size\`, \`checksum_sha256\`, \`sort_order\`, \`is_primary_preview\`, \`file_name\`, \`file_path\`, \`file_format\`, \`is_preview\`) 
+               VALUES (?, 'machine', ?, ?, ?, 'application/octet-stream', 0, '', 0, 0, ?, ?, ?, 0)`,
+              [targetDesignId, item.file_filename || `${finalSku}.zip`, item.file_filename || `${finalSku}.zip`, item.file_stored_path, item.file_filename || `${finalSku}.zip`, item.file_stored_path, fileExt]
             );
+          }
+
+          // 4b. Attach extra downloadable machine files
+          if (item.extra_files_stored) {
+            try {
+              const extraFils = JSON.parse(item.extra_files_stored);
+              if (Array.isArray(extraFils)) {
+                let sortOrd = 1;
+                for (const exFil of extraFils) {
+                  if (!exFil.path) continue;
+                  const fmt = exFil.format || path.extname(exFil.filename || '').replace('.', '').toUpperCase() || 'ZIP';
+                  await db.query(
+                    `INSERT INTO \`design_files\` 
+                      (\`design_id\`, \`file_kind\`, \`label\`, \`original_name\`, \`storage_key\`, \`mime_type\`, \`file_size\`, \`checksum_sha256\`, \`sort_order\`, \`is_primary_preview\`, \`file_name\`, \`file_path\`, \`file_format\`, \`is_preview\`) 
+                     VALUES (?, 'machine', ?, ?, ?, 'application/octet-stream', ?, '', ?, 0, ?, ?, ?, 0)`,
+                    [targetDesignId, exFil.filename || `File ${sortOrd}`, exFil.filename || 'file', exFil.path, exFil.size || 0, sortOrd, exFil.filename || 'file', exFil.path, fmt]
+                  );
+                  sortOrd++;
+                }
+              }
+            } catch (exErr) {
+              console.warn(`[Bulk Import] extra_files_stored warning for design #${targetDesignId}:`, exErr.message);
+            }
           }
 
           importedCount++;

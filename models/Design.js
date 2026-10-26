@@ -421,6 +421,27 @@ class Design {
     return design;
   }
 
+  static attachFileSummary(design) {
+    if (!design) return design;
+    const files = design.files || [];
+    const downloadFiles = files.filter(f => f.file_kind !== 'image' && f.is_preview !== 1 && f.is_preview !== true);
+    design.download_files = downloadFiles;
+
+    const countsByExt = {};
+    let totalBytes = 0;
+    for (const f of downloadFiles) {
+      const ext = (path.extname(f.original_name || f.file_name || f.storage_key || '').replace('.', '') || f.file_format || 'FILE').toUpperCase();
+      countsByExt[ext] = (countsByExt[ext] || 0) + 1;
+      totalBytes += parseInt(f.file_size || 0, 10);
+    }
+    const parts = Object.entries(countsByExt).map(([ext, count]) => `${count} ${ext}`);
+    const totalMb = (totalBytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '');
+    design.files_summary = parts.length > 0 ? `${parts.join(' + ')} (total ${totalMb} MB)` : '';
+    design.total_files_count = downloadFiles.length;
+    design.total_files_size_bytes = totalBytes;
+    return design;
+  }
+
   static async getBySlug(slug) {
     if (db.isConnected()) {
       try {
@@ -434,25 +455,27 @@ class Design {
         if (rows && rows[0]) {
           const design = rows[0];
           design.images = await db.query('SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC', [design.id]) || [];
-          design.files = await db.query('SELECT * FROM design_files WHERE design_id = ? ORDER BY id ASC', [design.id]) || [];
+          design.preview_images = design.images;
+          design.files = await db.query('SELECT * FROM design_files WHERE design_id = ? ORDER BY sort_order ASC, id ASC', [design.id]) || [];
 
           // Determine primary image
-          const previewFile = design.files.find(f => f.is_preview === 1 || f.is_preview === true);
+          const previewFile = design.files.find(f => f.is_preview === 1 || f.is_preview === true || f.is_primary_preview === 1 || f.is_primary_preview === true);
           const primaryImg = design.images.find(img => img.is_primary === 1 || img.is_primary === true);
 
           if (previewFile) {
-            design.primary_image = previewFile.file_path;
+            design.primary_image = previewFile.storage_key || previewFile.file_path;
           } else if (primaryImg) {
             design.primary_image = primaryImg.image_url;
           } else if (design.images.length > 0) {
             design.primary_image = design.images[0].image_url;
           } else {
-            const imgFile = design.files.find(f => ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((f.file_format || '').toUpperCase()));
-            design.primary_image = imgFile ? imgFile.file_path : null;
+            const imgFile = design.files.find(f => ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((f.file_format || '').toUpperCase()) || f.file_kind === 'image');
+            design.primary_image = imgFile ? (imgFile.storage_key || imgFile.file_path) : null;
           }
 
-          // Attach zipPackage metadata & sync formats
+          // Attach zipPackage metadata, file summary & sync formats
           this.attachZipPackage(design);
+          this.attachFileSummary(design);
           this.normalizePrimaryImage(design);
           this.normalizeStitchCounts(design);
 
@@ -466,6 +489,7 @@ class Design {
     const d = fallbackDesigns.find(item => item.slug === slug || item.id == slug);
     if (!d) return null;
     this.attachZipPackage(d);
+    this.attachFileSummary(d);
     this.normalizeStitchCounts(d);
     return d;
   }
@@ -1520,24 +1544,158 @@ class Design {
     return true;
   }
 
-  static async addFile(designId, fileName, filePath, fileFormat = 'ZIP', fileSize = 0, isPreview = 0) {
-    const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((fileFormat || '').toUpperCase());
+  static async getDownloadFiles(designId) {
+    if (db.isConnected()) {
+      try {
+        const rows = await db.query(
+          "SELECT * FROM design_files WHERE design_id = ? AND file_kind != 'image' AND (is_preview = 0 OR is_preview IS NULL) ORDER BY sort_order ASC, id ASC",
+          [designId]
+        );
+        return rows || [];
+      } catch (err) {
+        console.error('getDownloadFiles DB error:', err.message);
+      }
+    }
+    const d = fallbackDesigns.find(item => item.id == designId);
+    return (d && d.files) ? d.files.filter(f => f.file_kind !== 'image' && !f.is_preview) : [];
+  }
+
+  static async getPreviewImages(designId) {
+    if (db.isConnected()) {
+      try {
+        const imgs = await db.query(
+          "SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC",
+          [designId]
+        );
+        if (imgs && imgs.length > 0) return imgs;
+        const imgFiles = await db.query(
+          "SELECT * FROM design_files WHERE design_id = ? AND (file_kind = 'image' OR is_preview = 1) ORDER BY is_primary_preview DESC, sort_order ASC, id ASC",
+          [designId]
+        );
+        return imgFiles || [];
+      } catch (err) {
+        console.error('getPreviewImages DB error:', err.message);
+      }
+    }
+    const d = fallbackDesigns.find(item => item.id == designId);
+    return (d && d.images) ? d.images : [];
+  }
+
+  static async addDownloadFile(designId, {
+    original_name,
+    storage_key,
+    file_kind = 'machine',
+    label = null,
+    mime_type = null,
+    file_size = 0,
+    checksum_sha256 = null,
+    sort_order = 0
+  }) {
+    const ext = (path.extname(original_name || storage_key || '').replace('.', '') || 'ZIP').toUpperCase();
+    const cleanLabel = label || original_name || `${ext} file`;
+
+    if (db.isConnected()) {
+      try {
+        await db.query(
+          `INSERT INTO design_files 
+            (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+          [designId, file_kind, cleanLabel, original_name, storage_key, mime_type, original_name, storage_key, ext, file_size, checksum_sha256, sort_order]
+        );
+        await this.syncDesignFormats(designId);
+      } catch (err) {
+        console.error('Design.addDownloadFile DB error:', err.message);
+        throw err;
+      }
+    }
+
+    const d = fallbackDesigns.find(item => item.id == designId);
+    if (d) {
+      if (!d.files) d.files = [];
+      d.files.push({
+        id: Date.now(),
+        design_id: designId,
+        file_kind,
+        label: cleanLabel,
+        original_name,
+        storage_key,
+        file_name: original_name,
+        file_path: storage_key,
+        file_format: ext,
+        file_size,
+        checksum_sha256,
+        sort_order,
+        is_preview: 0
+      });
+      this.attachZipPackage(d);
+      this.attachFileSummary(d);
+    }
+    return true;
+  }
+
+  static async updateFile(fileId, { label, sort_order, original_name }) {
+    if (db.isConnected()) {
+      const sets = [];
+      const params = [];
+      if (label !== undefined) { sets.push('label = ?'); params.push(label); }
+      if (sort_order !== undefined) { sets.push('sort_order = ?'); params.push(sort_order); }
+      if (original_name !== undefined) {
+        sets.push('original_name = ?'); params.push(original_name);
+        sets.push('file_name = ?'); params.push(original_name);
+      }
+      if (sets.length > 0) {
+        params.push(fileId);
+        await db.query(`UPDATE design_files SET ${sets.join(', ')} WHERE id = ?`, params);
+      }
+    }
+    return true;
+  }
+
+  static async reorderFiles(designId, fileIdsOrdered) {
+    if (!fileIdsOrdered || !Array.isArray(fileIdsOrdered)) return true;
+    if (db.isConnected()) {
+      for (let i = 0; i < fileIdsOrdered.length; i++) {
+        await db.query('UPDATE design_files SET sort_order = ? WHERE id = ? AND design_id = ?', [i, fileIdsOrdered[i], designId]);
+      }
+    }
+    return true;
+  }
+
+  static async reorderImages(designId, imageIdsOrdered) {
+    if (!imageIdsOrdered || !Array.isArray(imageIdsOrdered)) return true;
+    if (db.isConnected()) {
+      for (let i = 0; i < imageIdsOrdered.length; i++) {
+        await db.query('UPDATE design_images SET display_order = ? WHERE id = ? AND design_id = ?', [i, imageIdsOrdered[i], designId]);
+      }
+    }
+    return true;
+  }
+
+  static async addFile(designId, fileName, filePath, fileFormat = 'ZIP', fileSize = 0, isPreview = 0, extraMeta = {}) {
+    const isImage = isPreview || ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((fileFormat || '').toUpperCase());
     const finalPreview = (isPreview || isImage) ? 1 : 0;
+    const fileKind = isImage ? 'image' : (extraMeta.file_kind || 'machine');
+    const label = extraMeta.label || fileName || `${fileFormat} file`;
+    const mimeType = extraMeta.mime_type || null;
+    const checksumSha256 = extraMeta.checksum_sha256 || extraMeta.checksum || null;
+    const sortOrder = extraMeta.sort_order || 0;
 
     if (db.isConnected()) {
       try {
         if (finalPreview === 1) {
-          await db.query('UPDATE design_files SET is_preview = 0 WHERE design_id = ? AND is_preview = 1', [designId]);
+          await db.query('UPDATE design_files SET is_preview = 0, is_primary_preview = 0 WHERE design_id = ? AND (is_preview = 1 OR is_primary_preview = 1)', [designId]);
           await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [designId]);
         }
         await db.query(
-          'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview) VALUES (?, ?, ?, ?, ?, ?)',
-          [designId, fileName, filePath, fileFormat, fileSize, finalPreview]
+          `INSERT INTO design_files 
+            (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [designId, fileKind, label, fileName, filePath, mimeType, fileName, filePath, fileFormat, fileSize, checksumSha256, sortOrder, finalPreview, finalPreview]
         );
         if (isImage) {
           await db.query(
             'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
-            [designId, filePath, finalPreview, 1]
+            [designId, filePath, finalPreview, sortOrder || 1]
           );
         }
         await this.syncDesignFormats(designId);
@@ -1552,20 +1710,28 @@ class Design {
       if (!target.images) target.images = [];
       if (finalPreview === 1) {
         target.primary_image = filePath;
-        target.files.forEach(f => f.is_preview = 0);
+        target.files.forEach(f => { f.is_preview = 0; f.is_primary_preview = 0; });
       }
-      target.files.unshift({
+      target.files.push({
         id: Date.now(),
+        file_kind: fileKind,
+        label: label,
+        original_name: fileName,
+        storage_key: filePath,
         file_name: fileName,
         file_path: filePath,
         file_format: fileFormat,
         file_size: fileSize,
+        checksum_sha256: checksumSha256,
+        sort_order: sortOrder,
+        is_primary_preview: finalPreview,
         is_preview: finalPreview
       });
       if (isImage) {
-        target.images.unshift({ id: Date.now(), image_url: filePath, is_primary: finalPreview });
+        target.images.push({ id: Date.now(), image_url: filePath, is_primary: finalPreview });
       }
       this.attachZipPackage(target);
+      this.attachFileSummary(target);
     }
     return true;
   }
@@ -1784,46 +1950,63 @@ class Design {
     if (!id) return false;
     if (db.isConnected()) {
       try {
-        // 1. Get associated design_files to clean up physical machine & preview files on disk
-        const files = await db.query('SELECT * FROM design_files WHERE design_id = ?', [id]) || [];
-        for (const f of files) {
-          if (f.file_path) {
-            const fullPath = storage.resolveFilePath(f.file_path);
-            if (fullPath && fs.existsSync(fullPath)) {
-              if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
-              try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical file:', fullPath, e.message); }
-            }
-          }
+        // 1. Check if design is referenced in customer orders
+        const orderItemsRes = await db.query('SELECT COUNT(*) as cnt FROM order_items WHERE design_id = ?', [id]);
+        const hasPurchases = orderItemsRes && orderItemsRes[0] && orderItemsRes[0].cnt > 0;
+
+        if (hasPurchases) {
+          // Soft-delete: retain order history, past buyers retain download access, prevent FK errors
+          await db.query(
+            "UPDATE designs SET is_active = -1, deleted_at = NOW(), sku = CONCAT(COALESCE(sku, 'AED'), '_DEL_', UNIX_TIMESTAMP()) WHERE id = ?",
+            [id]
+          );
+          return true;
         }
 
-        // 2. Get associated design_images to clean up physical preview images on disk
+        // 2. If no purchases, collect files & images before DB delete to check external references
+        const files = await db.query('SELECT * FROM design_files WHERE design_id = ?', [id]) || [];
         const images = await db.query('SELECT * FROM design_images WHERE design_id = ?', [id]) || [];
-        for (const img of images) {
-          if (img.image_url) {
-            const fullPath = storage.resolveFilePath(img.image_url);
-            if (fullPath && fs.existsSync(fullPath)) {
-              if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
-              try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical image:', fullPath, e.message); }
-            }
-          }
-        }
 
         // 3. Clean up database child records (files, images, cart_items, wishlist)
         await db.query('DELETE FROM design_files WHERE design_id = ?', [id]);
         await db.query('DELETE FROM design_images WHERE design_id = ?', [id]);
         await db.query('DELETE FROM cart_items WHERE design_id = ?', [id]);
         await db.query('DELETE FROM wishlist WHERE design_id = ?', [id]);
+        await db.query('DELETE FROM designs WHERE id = ?', [id]);
 
-        // 4. Safely handle designs referenced in completed/paid customer orders
-        const orderItemsRes = await db.query('SELECT COUNT(*) as cnt FROM order_items WHERE design_id = ?', [id]);
-        const hasPurchases = orderItemsRes && orderItemsRes[0] && orderItemsRes[0].cnt > 0;
+        // 4. Safely delete physical files ONLY AFTER DB commit, and only if not referenced elsewhere
+        for (const f of files) {
+          const filePath = f.storage_key || f.file_path;
+          if (filePath) {
+            const refs = await db.query(
+              'SELECT COUNT(*) as cnt FROM design_files WHERE (storage_key = ? OR file_path = ?) AND design_id != ?',
+              [filePath, filePath, id]
+            );
+            if (!refs || !refs[0] || refs[0].cnt === 0) {
+              const fullPath = storage.resolveFilePath(filePath);
+              if (fullPath && fs.existsSync(fullPath)) {
+                if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
+                try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical file:', fullPath, e.message); }
+              }
+            }
+          }
+        }
 
-        if (hasPurchases) {
-          // Soft-delete to preserve financial/order history and satisfy MySQL FK ON DELETE RESTRICT
-          await db.query("UPDATE designs SET is_active = -1, sku = CONCAT(COALESCE(sku, 'AED'), '_DEL_', UNIX_TIMESTAMP()) WHERE id = ?", [id]);
-        } else {
-          // Hard-delete row if design was never purchased
-          await db.query('DELETE FROM designs WHERE id = ?', [id]);
+        for (const img of images) {
+          const imgUrl = img.image_url;
+          if (imgUrl) {
+            const refs = await db.query(
+              'SELECT COUNT(*) as cnt FROM design_images WHERE image_url = ? AND design_id != ?',
+              [imgUrl, id]
+            );
+            if (!refs || !refs[0] || refs[0].cnt === 0) {
+              const fullPath = storage.resolveFilePath(imgUrl);
+              if (fullPath && fs.existsSync(fullPath)) {
+                if (fullPath.includes('/public/images/') || fullPath.includes('\\public\\images\\') || fullPath.includes('hero_embroidery.jpg') || fullPath.includes('logo.jpg')) continue;
+                try { fs.unlinkSync(fullPath); } catch (e) { console.warn('Could not delete physical image:', fullPath, e.message); }
+              }
+            }
+          }
         }
 
         return true;
@@ -1997,6 +2180,33 @@ class Design {
         }
       }
 
+      // 1b. Ensure design_files columns for multiple files support
+      const designFileCols = [
+        ['file_kind', "ENUM('machine','image','other') NOT NULL DEFAULT 'machine'"],
+        ['label', 'VARCHAR(255) NULL DEFAULT NULL'],
+        ['original_name', 'VARCHAR(255) NULL DEFAULT NULL'],
+        ['storage_key', 'VARCHAR(255) NULL DEFAULT NULL'],
+        ['mime_type', 'VARCHAR(100) NULL DEFAULT NULL'],
+        ['checksum_sha256', 'VARCHAR(64) NULL DEFAULT NULL'],
+        ['sort_order', 'INT NOT NULL DEFAULT 0'],
+        ['is_primary_preview', 'TINYINT(1) NOT NULL DEFAULT 0']
+      ];
+      for (const [col, typeDef] of designFileCols) {
+        try {
+          await db.query(`ALTER TABLE \`design_files\` ADD COLUMN IF NOT EXISTS \`${col}\` ${typeDef}`);
+        } catch (colErr) {
+          try {
+            const chk = await db.query(
+              'SELECT COUNT(*) as count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = "design_files" AND column_name = ?',
+              [col]
+            );
+            if (chk && chk[0] && chk[0].count === 0) {
+              await db.query(`ALTER TABLE \`design_files\` ADD COLUMN \`${col}\` ${typeDef}`);
+            }
+          } catch (ignore) {}
+        }
+      }
+
       // 2. Ensure import_job_items columns
       const [importJobTableCheck] = await db.query("SHOW TABLES LIKE 'import_job_items'") || [];
       if (importJobTableCheck) {
@@ -2118,7 +2328,78 @@ class Design {
     }
   }
 
+  /**
+
+   * Helper methods for Multiple Files Per Design management
+   */
+  static async getDownloadFiles(designId) {
+    if (!db.isConnected()) return [];
+    const rows = await db.query(
+      "SELECT * FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
+      [designId]
+    );
+    return rows || [];
+  }
+
+  static async getPreviewImages(designId) {
+    if (!db.isConnected()) return [];
+    const rows = await db.query(
+      "SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC",
+      [designId]
+    );
+    return rows || [];
+  }
+
+  static async setPrimaryImage(designId, imageUrl) {
+    if (!db.isConnected()) return;
+    const baseName = path.basename(imageUrl);
+    await db.query("UPDATE design_images SET is_primary = 0 WHERE design_id = ?", [designId]);
+    await db.query("UPDATE design_images SET is_primary = 1 WHERE design_id = ? AND (image_url = ? OR image_url LIKE ?)", [designId, imageUrl, `%${baseName}`]);
+    await db.query("UPDATE design_files SET is_primary_preview = 0, is_preview = 0 WHERE design_id = ?", [designId]);
+    await db.query("UPDATE design_files SET is_primary_preview = 1, is_preview = 1 WHERE design_id = ? AND (storage_key = ? OR file_path = ? OR original_name = ?)", [designId, imageUrl, imageUrl, baseName]);
+  }
+
+
+  static async reorderFiles(designId, orderedIds) {
+    if (!db.isConnected() || !Array.isArray(orderedIds)) return;
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.query("UPDATE design_files SET sort_order = ? WHERE id = ? AND design_id = ?", [i, orderedIds[i], designId]);
+    }
+  }
+
+  static async reorderImages(designId, orderedIds) {
+    if (!db.isConnected() || !Array.isArray(orderedIds)) return;
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.query("UPDATE design_images SET display_order = ? WHERE id = ? AND design_id = ?", [i, orderedIds[i], designId]);
+    }
+  }
+
+  static async updateFile(fileId, data) {
+    if (!db.isConnected()) return;
+    const sets = [];
+    const params = [];
+    if (data.label !== undefined) { sets.push("label = ?"); params.push(data.label); }
+    if (data.original_name !== undefined) { sets.push("original_name = ?"); params.push(data.original_name); }
+    if (data.storage_key !== undefined) { sets.push("storage_key = ?"); params.push(data.storage_key); }
+    if (data.sort_order !== undefined) { sets.push("sort_order = ?"); params.push(data.sort_order); }
+    if (sets.length === 0) return;
+    params.push(fileId);
+    await db.query(`UPDATE design_files SET ${sets.join(", ")} WHERE id = ?`, params);
+  }
+
+  static async deleteFile(fileId) {
+    if (!db.isConnected()) return;
+    const [file] = await db.query("SELECT * FROM design_files WHERE id = ? LIMIT 1", [fileId]);
+    if (file) {
+      await db.query("DELETE FROM design_files WHERE id = ?", [fileId]);
+      if (file.file_kind === "image" || file.is_preview) {
+        await db.query("DELETE FROM design_images WHERE design_id = ? AND image_url = ?", [file.design_id, file.storage_key || file.file_path]);
+      }
+    }
+  }
+
 }
+
 
 module.exports = Design;
 

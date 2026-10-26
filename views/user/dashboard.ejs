@@ -453,6 +453,91 @@
     margin-top: 0.45rem;
   }
 
+  /* Files list inside purchased card */
+  .dash-files-list-box {
+    background: #FAF6F0;
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--dash-border);
+  }
+  .dash-files-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--dash-text-dark);
+    margin-bottom: 0.5rem;
+  }
+  .dash-file-rows-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .dash-file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #FFFFFF;
+    border: 1px solid #EFE7DD;
+    border-radius: 8px;
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .dash-file-row-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .dash-file-ext-pill {
+    background: var(--dash-green-bg);
+    color: var(--dash-green-text);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-family: monospace;
+    flex-shrink: 0;
+  }
+  .dash-file-name-info {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dash-file-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--dash-text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dash-file-sub {
+    font-size: 0.72rem;
+    color: var(--dash-text-muted);
+  }
+  .dash-file-dl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--dash-primary);
+    color: #FFFFFF !important;
+    text-decoration: none;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+  }
+  .dash-file-dl-btn:hover {
+    background: var(--dash-primary-hover);
+  }
+
   /* Order History Table */
   .dash-table-header-flex {
     display: flex;
@@ -1086,14 +1171,52 @@
                     </div>
                   </div>
 
-                  <!-- SINGLE ZIP Download Button per Purchased Design -->
-                  <div>
-                    <a href="/user/download/<%= item.design_id || item.id %>" download class="dash-download-btn">
-                      <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
-                    </a>
-                    <div class="dash-file-count-subtitle">Contains <%= item.file_count || formatsList.length || 1 %> machine file(s)</div>
+                    <!-- All Files List for Pack / Multi-file Purchases -->
+                    <% if (item.download_files && item.download_files.length > 0) { %>
+                      <div class="dash-files-list-box">
+                        <div class="dash-files-list-header">
+                          <span><i class="fa-solid fa-folder-open" style="color: var(--dash-primary); margin-right: 4px;"></i> Files Included (<%= item.download_files.length %>)</span>
+                          <span style="font-weight: normal; color: var(--dash-text-muted); font-size: 0.72rem;">Individual Downloads</span>
+                        </div>
+                        <div class="dash-file-rows-wrap">
+                          <% item.download_files.forEach(f => { %>
+                            <%
+                              const fname = f.original_name || f.file_name || 'File';
+                              const ext = (f.file_format || fname.split('.').pop() || 'FILE').toUpperCase();
+                              const displayLabel = f.label || fname;
+                              const sz = f.file_size ? (f.file_size > 1048576 ? (f.file_size / 1048576).toFixed(1) + ' MB' : Math.round(f.file_size / 1024) + ' KB') : '';
+                            %>
+                            <div class="dash-file-row">
+                              <div class="dash-file-row-left">
+                                <span class="dash-file-ext-pill"><%= ext %></span>
+                                <div class="dash-file-name-info">
+                                  <div class="dash-file-title" title="<%= displayLabel %>"><%= displayLabel %></div>
+                                  <% if (sz) { %>
+                                    <div class="dash-file-sub"><%= sz %></div>
+                                  <% } %>
+                                </div>
+                              </div>
+                              <a href="/user/download/file/<%= f.id %>" download class="dash-file-dl-btn" title="Download <%= displayLabel %>">
+                                <i class="fa-solid fa-download"></i>
+                              </a>
+                            </div>
+                          <% }) %>
+                        </div>
+                      </div>
+                    <% } %>
+
+                    <!-- Combined Download All (ZIP) Button -->
+                    <div>
+                      <a href="/user/download/<%= item.design_id || item.id %>/all" download class="dash-download-btn">
+                        <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
+                      </a>
+                      <div class="dash-file-count-subtitle">
+                        Streams single ZIP containing all <%= (item.download_files && item.download_files.length) ? item.download_files.length : (item.file_count || 1) %> files
+                      </div>
+                    </div>
                   </div>
                 </div>
+
               <% }) %>
             </div>
           <% } %>

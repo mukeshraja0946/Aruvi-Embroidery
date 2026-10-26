@@ -81,10 +81,36 @@ class HealthCheckService {
     const queryParams = [...params, parseInt(limit, 10), parseInt(offset, 10)];
     const rawDesigns = await db.query(querySql, queryParams);
 
-    // 3. Check existence asynchronously for the current 50 rows in parallel
+    // 3. Check existence asynchronously for every row in design_files and design_images
     const checkedRows = await Promise.all(rawDesigns.map(async (row) => {
       const imageStatus = await this.checkAssetStatus(row.image_url);
-      const fileStatus = await this.checkAssetStatus(row.file_path);
+
+      // Check EVERY row in design_files for this design
+      const allFiles = await db.query(
+        "SELECT id, label, original_name, storage_key, file_name, file_path FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
+        [row.id]
+      ) || [];
+
+      let fileStatus = 'none';
+      let displayedFileName = row.file_name || null;
+      let displayedFilePath = row.file_path || null;
+
+      if (allFiles.length > 0) {
+        fileStatus = 'ok';
+        displayedFileName = allFiles.map(f => f.original_name || f.file_name).filter(Boolean).join(', ');
+        displayedFilePath = allFiles[0].storage_key || allFiles[0].file_path;
+
+        for (const f of allFiles) {
+          const loc = f.storage_key || f.file_path;
+          const status = await this.checkAssetStatus(loc);
+          if (status === 'missing') {
+            fileStatus = 'missing';
+            displayedFileName = `Missing: ${f.original_name || f.file_name || 'unnamed'} (${f.label || 'file'})`;
+            displayedFilePath = loc;
+            break;
+          }
+        }
+      }
 
       const hasImageIssue = imageStatus === 'missing' || imageStatus === 'none';
       const hasFileIssue = fileStatus === 'missing' || fileStatus === 'none';
@@ -100,8 +126,8 @@ class HealthCheckService {
         category_name: row.category_name || 'Uncategorized',
         image_url: row.image_url || null,
         image_status: imageStatus,
-        file_path: row.file_path || null,
-        file_name: row.file_name || null,
+        file_path: displayedFilePath,
+        file_name: displayedFileName,
         file_status: fileStatus,
         has_any_issue: hasAnyIssue,
         has_missing_both: (imageStatus === 'missing' || imageStatus === 'none') && (fileStatus === 'missing' || fileStatus === 'none')
@@ -268,7 +294,33 @@ class HealthCheckService {
 
         const evaluated = await Promise.all(rows.map(async (r) => {
           const imgStatus = await this.checkAssetStatus(r.image_url);
-          const fileStatus = await this.checkAssetStatus(r.file_path);
+
+          const allFiles = await db.query(
+            "SELECT id, label, original_name, storage_key, file_name, file_path FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0) ORDER BY sort_order ASC, id ASC",
+            [r.id]
+          ) || [];
+
+          let fileStatus = 'none';
+          let displayedFileName = r.file_name || null;
+          let displayedFilePath = r.file_path || null;
+
+          if (allFiles.length > 0) {
+            fileStatus = 'ok';
+            displayedFileName = allFiles.map(f => f.original_name || f.file_name).filter(Boolean).join(', ');
+            displayedFilePath = allFiles[0].storage_key || allFiles[0].file_path;
+
+            for (const f of allFiles) {
+              const loc = f.storage_key || f.file_path;
+              const status = await this.checkAssetStatus(loc);
+              if (status === 'missing') {
+                fileStatus = 'missing';
+                displayedFileName = `Missing: ${f.original_name || f.file_name || 'unnamed'} (${f.label || 'file'})`;
+                displayedFilePath = loc;
+                break;
+              }
+            }
+          }
+
           return {
             design_id: r.id,
             title: r.title || '',
@@ -278,8 +330,8 @@ class HealthCheckService {
             is_active: r.is_active || 1,
             image_url: r.image_url,
             image_status: imgStatus,
-            file_path: r.file_path,
-            file_name: r.file_name,
+            file_path: displayedFilePath,
+            file_name: displayedFileName,
             file_status: fileStatus
           };
         }));

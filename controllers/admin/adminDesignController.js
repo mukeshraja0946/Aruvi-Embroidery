@@ -412,10 +412,46 @@ exports.postCreate = async (req, res, next) => {
       reviews_count: parsedReviews
     });
 
-    // Save single ZIP package record in design_files
+    // Save single ZIP package record in design_files if uploaded directly
     if (packageFiles.length > 0) {
-      const pkg = packageFiles[0];
-      await Design.addFile(designId, pkg.originalname, pkg.webPath, 'ZIP', pkg.size, 0);
+      for (const pkg of packageFiles) {
+        await Design.addFile(designId, pkg.originalname, pkg.webPath, pkg.format || 'ZIP', pkg.size, 0);
+      }
+    }
+
+    // Process staged download files uploaded via Chunked Uploader
+    if (req.body.staged_files) {
+      let stagedFiles = req.body.staged_files;
+      if (typeof stagedFiles === 'string') {
+        try { stagedFiles = JSON.parse(stagedFiles); } catch (_) { stagedFiles = []; }
+      }
+      if (Array.isArray(stagedFiles)) {
+        for (let idx = 0; idx < stagedFiles.length; idx++) {
+          const sf = stagedFiles[idx];
+          if (sf && (sf.storage_key || sf.file_path) && db.isConnected()) {
+            const key = sf.storage_key || sf.file_path;
+            const orig = sf.original_name || sf.file_name || path.basename(key);
+            const fmt = (sf.file_format || path.extname(orig).replace('.', '') || 'ZIP').toUpperCase();
+            await db.query(
+              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+               VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+              [
+                designId,
+                sf.label || null,
+                orig,
+                key,
+                sf.mime_type || 'application/octet-stream',
+                orig,
+                key,
+                fmt,
+                sf.file_size || 0,
+                sf.checksum_sha256 || null,
+                idx
+              ]
+            );
+          }
+        }
+      }
     }
 
     // Handle uploaded preview images
@@ -431,6 +467,46 @@ exports.postCreate = async (req, res, next) => {
         const ext = extName.replace('.', '').toUpperCase();
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
         await Design.addFile(designId, file.originalname, savedUrl, ext, file.size, 1);
+      }
+    }
+
+    // Process staged preview images uploaded via Chunked Uploader
+    if (req.body.staged_images) {
+      let stagedImages = req.body.staged_images;
+      if (typeof stagedImages === 'string') {
+        try { stagedImages = JSON.parse(stagedImages); } catch (_) { stagedImages = []; }
+      }
+      if (Array.isArray(stagedImages)) {
+        for (let idx = 0; idx < stagedImages.length; idx++) {
+          const si = stagedImages[idx];
+          if (si && si.image_url && db.isConnected()) {
+            const isPrim = si.is_primary ? 1 : (idx === 0 ? 1 : 0);
+            await db.query(
+              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+              [designId, si.image_url, isPrim, idx]
+            );
+            const orig = si.original_name || path.basename(si.image_url);
+            const extName = (path.extname(orig).replace('.', '') || 'PNG').toUpperCase();
+            await db.query(
+              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+               VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+              [
+                designId,
+                si.label || null,
+                orig,
+                si.image_url,
+                `image/${extName.toLowerCase()}`,
+                orig,
+                si.image_url,
+                extName,
+                si.file_size || 0,
+                si.checksum_sha256 || null,
+                idx,
+                isPrim
+              ]
+            );
+          }
+        }
       }
     }
 
@@ -694,17 +770,47 @@ exports.postEdit = async (req, res, next) => {
       reviews_count: parsedReviews
     });
 
-    // Save single ZIP package record if new ZIP file uploaded
+    // Save package files if uploaded directly without wiping existing files
     if (packageFiles.length > 0) {
-      const pkg = packageFiles[0];
-      if (fs.existsSync(pkg.path)) {
-        const db = require('../../config/db');
-        if (db.isConnected()) {
-          await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [id]);
+      for (const pkg of packageFiles) {
+        if (fs.existsSync(pkg.path)) {
+          await Design.addFile(id, pkg.originalname, pkg.webPath, pkg.format || 'ZIP', pkg.size, 0);
         }
-        await Design.addFile(id, pkg.originalname, pkg.webPath, 'ZIP', pkg.size, 0);
-        const detectedFormatsStr = pkg.detectedFormats ? pkg.detectedFormats.join(', ') : 'DST';
-        await Design.update(id, { formats: detectedFormatsStr });
+      }
+    }
+
+    // Process staged download files uploaded via Chunked Uploader
+    if (req.body.staged_files) {
+      let stagedFiles = req.body.staged_files;
+      if (typeof stagedFiles === 'string') {
+        try { stagedFiles = JSON.parse(stagedFiles); } catch (_) { stagedFiles = []; }
+      }
+      if (Array.isArray(stagedFiles)) {
+        for (let idx = 0; idx < stagedFiles.length; idx++) {
+          const sf = stagedFiles[idx];
+          if (sf && (sf.storage_key || sf.file_path) && db.isConnected()) {
+            const key = sf.storage_key || sf.file_path;
+            const orig = sf.original_name || sf.file_name || path.basename(key);
+            const fmt = (sf.file_format || path.extname(orig).replace('.', '') || 'ZIP').toUpperCase();
+            await db.query(
+              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+               VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+              [
+                id,
+                sf.label || null,
+                orig,
+                key,
+                sf.mime_type || 'application/octet-stream',
+                orig,
+                key,
+                fmt,
+                sf.file_size || 0,
+                sf.checksum_sha256 || null,
+                idx
+              ]
+            );
+          }
+        }
       }
     }
 
@@ -721,6 +827,46 @@ exports.postEdit = async (req, res, next) => {
         const ext = extName.replace('.', '').toUpperCase();
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
         await Design.addFile(id, file.originalname, savedUrl, ext, file.size, 1);
+      }
+    }
+
+    // Process staged preview images uploaded via Chunked Uploader
+    if (req.body.staged_images) {
+      let stagedImages = req.body.staged_images;
+      if (typeof stagedImages === 'string') {
+        try { stagedImages = JSON.parse(stagedImages); } catch (_) { stagedImages = []; }
+      }
+      if (Array.isArray(stagedImages)) {
+        for (let idx = 0; idx < stagedImages.length; idx++) {
+          const si = stagedImages[idx];
+          if (si && si.image_url && db.isConnected()) {
+            const isPrim = si.is_primary ? 1 : 0;
+            await db.query(
+              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+              [id, si.image_url, isPrim, idx]
+            );
+            const orig = si.original_name || path.basename(si.image_url);
+            const extName = (path.extname(orig).replace('.', '') || 'PNG').toUpperCase();
+            await db.query(
+              `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+               VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+              [
+                id,
+                si.label || null,
+                orig,
+                si.image_url,
+                `image/${extName.toLowerCase()}`,
+                orig,
+                si.image_url,
+                extName,
+                si.file_size || 0,
+                si.checksum_sha256 || null,
+                idx,
+                isPrim
+              ]
+            );
+          }
+        }
       }
     }
 
@@ -3261,4 +3407,323 @@ exports.downloadBulkDetailsErrorReport = async (req, res, next) => {
   }
 };
 
+/**
+ * =========================================================================
+ * MULTIPLE FILES PER DESIGN - CHUNKED UPLOAD & MANAGEMENT APIS
+ * =========================================================================
+ */
 
+// 1. Upload chunk (2MB chunks)
+exports.uploadDesignFileChunk = async (req, res) => {
+  try {
+    const uploadId = (req.body.uploadId || '').replace(/[^a-zA-Z0-9_\-]/g, '');
+    const chunkIndex = parseInt(req.body.chunkIndex, 10);
+    const totalChunks = parseInt(req.body.totalChunks, 10);
+
+    if (!uploadId || isNaN(chunkIndex) || !req.file) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({ success: false, message: 'Invalid chunk parameters or missing chunk file.' });
+    }
+
+    const chunkDir = path.join(storage.getUploadsDir(), 'temp_chunks', uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      fs.mkdirSync(chunkDir, { recursive: true });
+    }
+
+    const targetChunkPath = path.join(chunkDir, `chunk_${chunkIndex}`);
+    try {
+      fs.renameSync(req.file.path, targetChunkPath);
+    } catch (_) {
+      fs.copyFileSync(req.file.path, targetChunkPath);
+      fs.unlinkSync(req.file.path);
+    }
+
+    return res.json({ success: true, uploadId, chunkIndex, totalChunks });
+  } catch (err) {
+    console.error('[Upload Chunk Error]:', err);
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 2. Upload complete: assemble chunks, validate size + extensions + safety + checksum
+exports.uploadDesignFileComplete = async (req, res) => {
+  const uploadId = (req.body.uploadId || '').replace(/[^a-zA-Z0-9_\-]/g, '');
+  const totalChunks = parseInt(req.body.totalChunks, 10);
+  const originalName = (req.body.originalName || 'file').trim();
+  const fileKind = (req.body.fileKind || 'machine').toLowerCase(); // 'preview' | 'machine' | 'other'
+  const designId = req.body.designId ? parseInt(req.body.designId, 10) : null;
+  const label = (req.body.label || '').trim() || null;
+  const replaceFileId = req.body.replaceFileId ? parseInt(req.body.replaceFileId, 10) : null;
+
+  const chunkDir = path.join(storage.getUploadsDir(), 'temp_chunks', uploadId);
+  const tempCombinedDir = path.join(storage.getUploadsDir(), 'temp_combined');
+  if (!fs.existsSync(tempCombinedDir)) fs.mkdirSync(tempCombinedDir, { recursive: true });
+
+  const safeName = path.basename(originalName).replace(/[/\\?%*:|"<>]/g, '_');
+  const combinedPath = path.join(tempCombinedDir, `${uploadId}_${safeName}`);
+
+  try {
+    if (!uploadId || isNaN(totalChunks) || totalChunks <= 0 || !fs.existsSync(chunkDir)) {
+      return res.status(400).json({ success: false, message: 'Upload session not found or chunks missing.' });
+    }
+
+    // Check all chunks exist
+    for (let i = 0; i < totalChunks; i++) {
+      const cPath = path.join(chunkDir, `chunk_${i}`);
+      if (!fs.existsSync(cPath)) {
+        return res.status(400).json({ success: false, message: `Missing chunk ${i} of ${totalChunks}. Please retry upload.` });
+      }
+    }
+
+    // Stream combine
+    const writeStream = fs.createWriteStream(combinedPath);
+    for (let i = 0; i < totalChunks; i++) {
+      const cPath = path.join(chunkDir, `chunk_${i}`);
+      const data = fs.readFileSync(cPath);
+      writeStream.write(data);
+    }
+    writeStream.end();
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    // Clean up chunks
+    try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch (_) {}
+
+    const fileStats = fs.statSync(combinedPath);
+    const finalSize = fileStats.size;
+
+    // Configurable Max size check from Settings (default 200MB)
+    const maxMb = parseInt(await Setting.get('max_file_size_mb', '200'), 10) || 200;
+    if (finalSize > maxMb * 1024 * 1024) {
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+      return res.status(400).json({
+        success: false,
+        message: `File size (${(finalSize / (1024 * 1024)).toFixed(1)} MB) exceeds maximum allowed limit (${maxMb} MB).`
+      });
+    }
+
+    // Extension check
+    const ext = path.extname(originalName).toLowerCase();
+    const isImage = ['.png', '.jpg', '.jpeg', '.webp'].includes(ext);
+    const isMachine = ['.dst', '.pes', '.jef', '.exp', '.zip', '.rar', '.png'].includes(ext);
+
+    if (fileKind === 'preview' && !isImage) {
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+      return res.status(400).json({ success: false, message: `Invalid preview image format (${ext}). Allowed: PNG, JPG, JPEG, WEBP.` });
+    }
+
+    if (fileKind === 'machine' && !isMachine) {
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+      return res.status(400).json({ success: false, message: `Invalid machine download file format (${ext}). Allowed: ZIP, RAR, DST, PES, JEF, EXP, PNG.` });
+    }
+
+    // Real content validation & Zip-Slip protection
+    let detectedFormats = [];
+    if (ext === '.zip') {
+      const validation = validateMachineFileOrZip(combinedPath, originalName);
+      if (!validation.isValid) {
+        try { fs.unlinkSync(combinedPath); } catch (_) {}
+        return res.status(400).json({ success: false, message: validation.reason || 'Invalid ZIP archive' });
+      }
+      detectedFormats = validation.detectedFormats || ['DST'];
+    } else if (['.dst', '.pes', '.jef', '.exp'].includes(ext)) {
+      detectedFormats = [ext.replace('.', '').toUpperCase()];
+    }
+
+    // Calculate SHA-256 Checksum
+    const hash = crypto.createHash('sha256');
+    const fileBuffer = fs.readFileSync(combinedPath);
+    hash.update(fileBuffer);
+    const checksum = hash.digest('hex');
+
+    // Duplicate detection warning (if same checksum exists in design_files for this design)
+    let duplicateWarning = false;
+    if (db.isConnected() && designId) {
+      const existingRows = await db.query(
+        'SELECT id, original_name FROM design_files WHERE design_id = ? AND checksum_sha256 = ?',
+        [designId, checksum]
+      );
+      if (existingRows && existingRows.length > 0) {
+        duplicateWarning = true;
+      }
+    }
+
+    let savedPath = null;
+    let savedUrl = null;
+    let mimeType = isImage ? `image/${ext.replace('.', '')}` : 'application/octet-stream';
+    if (ext === '.zip') mimeType = 'application/zip';
+    if (ext === '.rar') mimeType = 'application/x-rar-compressed';
+
+    if (fileKind === 'preview' || (fileKind !== 'machine' && isImage)) {
+      // Save public preview image
+      savedUrl = await storage.savePublicFile(combinedPath, originalName, mimeType);
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+
+      let imageRecord = null;
+      let fileRecord = null;
+      if (db.isConnected() && designId) {
+        if (replaceFileId) {
+          await db.query('UPDATE design_images SET image_url = ? WHERE id = ? AND design_id = ?', [savedUrl, replaceFileId, designId]);
+          imageRecord = { id: replaceFileId, image_url: savedUrl };
+        } else {
+          const existingImages = await db.query('SELECT COUNT(*) as cnt FROM design_images WHERE design_id = ?', [designId]);
+          const isPrimary = (existingImages && existingImages[0] && existingImages[0].cnt === 0) ? 1 : 0;
+          const dispOrder = (existingImages && existingImages[0]) ? existingImages[0].cnt : 0;
+
+          const imgRes = await db.query(
+            'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+            [designId, savedUrl, isPrimary, dispOrder]
+          );
+          imageRecord = { id: imgRes.insertId, image_url: savedUrl, is_primary: isPrimary, display_order: dispOrder };
+
+          const dfRes = await db.query(
+            `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+             VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            [designId, label, originalName, savedUrl, mimeType, originalName, savedUrl, ext.replace('.', '').toUpperCase(), finalSize, checksum, dispOrder, isPrimary]
+          );
+          fileRecord = { id: dfRes.insertId };
+        }
+      }
+
+      return res.json({
+        success: true,
+        fileKind: 'preview',
+        file: {
+          id: imageRecord ? imageRecord.id : null,
+          file_id: fileRecord ? fileRecord.id : null,
+          original_name: originalName,
+          image_url: savedUrl,
+          file_size: finalSize,
+          checksum_sha256: checksum,
+          is_primary: imageRecord ? Boolean(imageRecord.is_primary) : false,
+          duplicateWarning
+        }
+      });
+    } else {
+      // Save private machine download file
+      savedPath = await storage.savePrivateFile(combinedPath, originalName, mimeType, designId);
+      try { fs.unlinkSync(combinedPath); } catch (_) {}
+
+      let fileRecord = null;
+      const fmtUpper = (ext.replace('.', '') || 'ZIP').toUpperCase();
+
+      if (db.isConnected() && designId) {
+        if (replaceFileId) {
+          await db.query(
+            `UPDATE design_files SET original_name = ?, storage_key = ?, file_name = ?, file_path = ?, file_format = ?, file_size = ?, checksum_sha256 = ?, mime_type = ?
+             WHERE id = ? AND design_id = ?`,
+            [originalName, savedPath, originalName, savedPath, fmtUpper, finalSize, checksum, mimeType, replaceFileId, designId]
+          );
+          fileRecord = { id: replaceFileId };
+        } else {
+          const sortRes = await db.query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM design_files WHERE design_id = ? AND file_kind != "image"', [designId]);
+          const nextOrder = sortRes && sortRes[0] ? sortRes[0].next_order : 0;
+
+          const insRes = await db.query(
+            `INSERT INTO design_files (design_id, file_kind, label, original_name, storage_key, mime_type, file_name, file_path, file_format, file_size, checksum_sha256, sort_order, is_primary_preview, is_preview)
+             VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+            [designId, label, originalName, savedPath, mimeType, originalName, savedPath, fmtUpper, finalSize, checksum, nextOrder]
+          );
+          fileRecord = { id: insRes.insertId };
+        }
+
+        await Design.syncDesignFormats(designId);
+      }
+
+      return res.json({
+        success: true,
+        fileKind: 'machine',
+        file: {
+          id: fileRecord ? fileRecord.id : null,
+          original_name: originalName,
+          label: label || '',
+          storage_key: savedPath,
+          file_format: fmtUpper,
+          file_size: finalSize,
+          checksum_sha256: checksum,
+          detectedFormats,
+          duplicateWarning
+        }
+      });
+    }
+  } catch (err) {
+    console.error('[Upload Complete Error]:', err);
+    try { if (fs.existsSync(combinedPath)) fs.unlinkSync(combinedPath); } catch (_) {}
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 3. Update file label
+exports.updateFileLabel = async (req, res) => {
+  try {
+    const { designId, fileId } = req.params;
+    const label = (req.body.label || '').trim();
+    if (db.isConnected()) {
+      await db.query('UPDATE design_files SET label = ? WHERE id = ? AND design_id = ?', [label, fileId, designId]);
+    }
+    return res.json({ success: true, message: 'Label updated successfully.', label });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 4. Reorder machine download files
+exports.reorderDesignFiles = async (req, res) => {
+  try {
+    const { designId } = req.params;
+    const order = req.body.order; // Array of file IDs: [12, 15, 14]
+    if (Array.isArray(order) && db.isConnected()) {
+      await Design.reorderFiles(designId, order);
+    }
+    return res.json({ success: true, message: 'Files reordered successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 5. Reorder preview images
+exports.reorderDesignImages = async (req, res) => {
+  try {
+    const { designId } = req.params;
+    const order = req.body.order; // Array of image IDs: [5, 2, 7]
+    if (Array.isArray(order) && db.isConnected()) {
+      await Design.reorderImages(designId, order);
+    }
+    return res.json({ success: true, message: 'Preview images reordered successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 6. Admin test-download of a file
+exports.downloadAdminFile = async (req, res, next) => {
+  try {
+    const { fileId } = req.params;
+    if (!db.isConnected()) return res.status(404).send('Database not connected');
+
+    const rows = await db.query('SELECT * FROM design_files WHERE id = ? LIMIT 1', [fileId]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).send('Design file not found.');
+    }
+
+    const file = rows[0];
+    const fullPath = storage.resolveFilePath(file.storage_key || file.file_path);
+    if (!fullPath || !fs.existsSync(fullPath)) {
+      return res.status(404).send('Physical file missing from storage.');
+    }
+
+    const downloadName = file.original_name || file.file_name || path.basename(fullPath);
+    return res.download(fullPath, downloadName);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.validateMachineFileOrZip = validateMachineFileOrZip;

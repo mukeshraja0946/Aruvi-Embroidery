@@ -36,34 +36,88 @@ function normalizeKey(str) {
 
 /**
  * Helper to match an extracted filename to existing database designs
+ * Supports SKU suffixes: e.g. AED-BLO-01.zip, AED-BLO-01_2.zip, AED-BLO-01-front.zip, AED-BLO-01 (3).png, AED-BLO-01_main
  */
 function matchFileToDesigns(fileName, designs) {
   const ext = path.extname(fileName).toLowerCase();
-  const nameWithoutExt = path.basename(fileName, ext).trim();
-  const normBase = normalizeKey(nameWithoutExt);
+  const rawBase = path.basename(fileName, ext).trim();
+  const normBase = normalizeKey(rawBase);
 
-  // 1. Direct SKU match
+  // Check if filename indicates a main preview
+  const isMain = /(?:^|[_\-\s])main$/i.test(rawBase);
+
+  // 1. Direct SKU exact match
   for (const d of designs) {
     if (d.sku && normalizeKey(d.sku) === normBase) {
-      return { match: d, method: 'SKU Exact Match', confidence: 'High' };
+      return { match: d, method: 'SKU Exact Match', confidence: 'High', isMain, suffix: '', label: d.sku };
     }
   }
 
-  // 2. Direct Title match
+  // 2. Direct Title exact match
   for (const d of designs) {
     if (d.title && normalizeKey(d.title) === normBase) {
-      return { match: d, method: 'Design Title Match', confidence: 'High' };
+      return { match: d, method: 'Design Title Match', confidence: 'High', isMain, suffix: '', label: d.title };
     }
   }
 
-  // 3. Match SKU contained in filename (e.g. "AED-BLO-01_front.jpg" -> "AED-BLO-01")
-  for (const d of designs) {
-    if (d.sku) {
-      const normSku = normalizeKey(d.sku);
-      if (normSku && normBase.startsWith(normSku)) {
-        return { match: d, method: 'SKU Prefix Match', confidence: 'Medium' };
+  // 3. Suffix match on SKU
+  // Sort designs by SKU length descending so longer matching SKUs take precedence over substrings
+  const sortedDesigns = [...designs].filter(d => Boolean(d.sku)).sort((a, b) => b.sku.length - a.sku.length);
+
+  const matchedCandidates = [];
+  for (const d of sortedDesigns) {
+    const skuNorm = normalizeKey(d.sku);
+    if (!skuNorm) continue;
+
+    // Pattern A: SKU followed by separator (_, -, space, dot, parenthesis) and suffix
+    const escapedSku = d.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escapedSku}[_\\-\\s\\.\\(]+([^)]+)\\)?$`, 'i');
+    const m = rawBase.match(regex);
+    if (m) {
+      const suffix = m[1].trim();
+      let label = suffix;
+      if (/^\d+$/.test(suffix)) {
+        label = `Part ${suffix}`;
+      } else {
+        label = suffix.replace(/[-_.]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       }
+      matchedCandidates.push({
+        match: d,
+        method: 'SKU Suffix Match',
+        confidence: 'High',
+        isMain: isMain || /^main$/i.test(suffix),
+        suffix,
+        label
+      });
+      break;
     }
+
+    // Pattern B: Normalized prefix match if separator was stripped or spaced
+    if (normBase.startsWith(skuNorm) && normBase.length > skuNorm.length) {
+      const remainder = normBase.slice(skuNorm.length);
+      matchedCandidates.push({
+        match: d,
+        method: 'SKU Prefix Match',
+        confidence: 'Medium',
+        isMain,
+        suffix: remainder,
+        label: remainder.toUpperCase()
+      });
+      break;
+    }
+  }
+
+  if (matchedCandidates.length === 1) {
+    return matchedCandidates[0];
+  } else if (matchedCandidates.length > 1) {
+    return {
+      isAmbiguous: true,
+      candidates: matchedCandidates,
+      method: 'Ambiguous Prefix Match',
+      confidence: 'Low',
+      isMain,
+      label: rawBase
+    };
   }
 
   // 4. Match numeric design ID pattern (e.g., "AED 1" or "AED_1" or "design_1")
@@ -72,7 +126,7 @@ function matchFileToDesigns(fileName, designs) {
     const numId = parseInt(idMatch[1], 10);
     const byId = designs.find(d => d.id === numId);
     if (byId) {
-      return { match: byId, method: 'Design ID Match', confidence: 'Medium' };
+      return { match: byId, method: 'Design ID Match', confidence: 'Medium', isMain, suffix: '', label: byId.sku || `AED-${byId.id}` };
     }
   }
 
@@ -335,31 +389,52 @@ exports.postBulkImageRelinkPreview = async (req, res, next) => {
       return res.redirect('/admin/tools/bulk-image-relink');
     }
 
-    // Match files to designs
+    // Match files to designs supporting multiple preview images per design
     const matched = [];
     const unmatched = [];
+    const ambiguous = [];
     const duplicates = [];
-    const matchedDesignIds = new Set();
+    const seenFilenamesPerDesign = new Set();
+
+    // Group items by design to determine which image is primary:
+    // First image is primary unless a filename contains '_main'
+    const designGroups = new Map();
 
     for (const item of extractedFiles) {
       const result = matchFileToDesigns(item.filename, designs);
       if (result) {
-        if (matchedDesignIds.has(result.match.id)) {
-          duplicates.push({
+        if (result.isAmbiguous) {
+          ambiguous.push({
             filename: item.filename,
-            design: result.match,
-            method: result.method,
-            reason: 'Multiple images found targeting this design SKU/Title'
+            size: item.size,
+            candidates: (result.candidates || []).map(c => c.match.sku || c.match.title).join(', '),
+            method: result.method
           });
         } else {
-          matchedDesignIds.add(result.match.id);
-          matched.push({
+          const dId = result.match.id;
+          const dedupKey = `${dId}_${item.filename.toLowerCase()}`;
+          if (seenFilenamesPerDesign.has(dedupKey)) {
+            duplicates.push({
+              filename: item.filename,
+              design: result.match,
+              reason: 'Exact duplicate filename already assigned to this design'
+            });
+            continue;
+          }
+          seenFilenamesPerDesign.add(dedupKey);
+
+          if (!designGroups.has(dId)) {
+            designGroups.set(dId, []);
+          }
+          designGroups.get(dId).push({
             filename: item.filename,
-            designId: result.match.id,
+            designId: dId,
             designTitle: result.match.title,
-            designSku: result.match.sku || `AED-${result.match.id}`,
+            designSku: result.match.sku || `AED-${dId}`,
+            size: item.size,
             method: result.method,
-            confidence: result.confidence
+            confidence: result.confidence,
+            isExplicitMain: Boolean(result.isMain)
           });
         }
       } else {
@@ -370,18 +445,35 @@ exports.postBulkImageRelinkPreview = async (req, res, next) => {
       }
     }
 
+    // Resolve primary image for each design group:
+    // If any filename has '_main' or isExplicitMain, that one is primary. Otherwise, first is primary.
+    for (const [dId, groupItems] of designGroups.entries()) {
+      const mainIdx = groupItems.findIndex(it => it.isExplicitMain);
+      const primaryIndex = mainIdx !== -1 ? mainIdx : 0;
+
+      groupItems.forEach((it, idx) => {
+        matched.push({
+          ...it,
+          isPrimary: idx === primaryIndex,
+          displayOrder: idx
+        });
+      });
+    }
+
     // Save manifest in staging dir for commit step
     const manifestPath = path.join(sessionStaging, 'manifest.json');
-    fs.writeFileSync(manifestPath, JSON.stringify({ matched, sessionStaging }), 'utf8');
+    fs.writeFileSync(manifestPath, JSON.stringify({ matched, unmatched, ambiguous, sessionStaging }), 'utf8');
 
     const preview = {
       sessionId,
       totalExtracted: extractedFiles.length,
       matchedCount: matched.length,
       unmatchedCount: unmatched.length,
+      ambiguousCount: ambiguous.length,
       duplicatesCount: duplicates.length,
       matched,
       unmatched,
+      ambiguous,
       duplicates
     };
 
@@ -400,7 +492,9 @@ exports.postBulkImageRelinkPreview = async (req, res, next) => {
 
 exports.postBulkImageRelinkCommit = async (req, res, next) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, mode } = req.body;
+    const relinkMode = mode === 'replace' ? 'replace' : 'append';
+
     if (!sessionId) {
       return res.status(400).json({ success: false, message: 'Invalid session ID for relink commit.' });
     }
@@ -415,19 +509,57 @@ exports.postBulkImageRelinkCommit = async (req, res, next) => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     const matched = manifest.matched || [];
 
+    if (db.isConnected() && relinkMode === 'replace') {
+      const affectedDesignIds = [...new Set(matched.map(m => m.designId))];
+      for (const dId of affectedDesignIds) {
+        await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
+        await db.query("DELETE FROM design_files WHERE design_id = ? AND file_kind = 'image'", [dId]);
+      }
+    }
+
     let successCount = 0;
     for (const item of matched) {
       const filePath = path.join(sessionStaging, item.filename);
       if (fs.existsSync(filePath)) {
-        // Save to persistent storage
-        const savedUrl = await storage.savePublicFile(filePath, item.filename);
+        // Save to persistent public preview storage
+        const ext = path.extname(item.filename).toLowerCase();
+        const mimeType = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+        const savedUrl = await storage.savePublicFile(filePath, item.filename, mimeType);
+        const fileStat = fs.statSync(filePath);
+        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 
         if (db.isConnected()) {
-          // Set as primary image for design
-          await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [item.designId]);
+          // If this image is primary, clear previous primary flags for the design
+          if (item.isPrimary) {
+            await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [item.designId]);
+            await db.query("UPDATE design_files SET is_primary_preview = 0 WHERE design_id = ? AND file_kind = 'image'", [item.designId]);
+          }
+
+          // Insert into design_images
           await db.query(
-            'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)',
-            [item.designId, savedUrl]
+            'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+            [item.designId, savedUrl, item.isPrimary ? 1 : 0, item.displayOrder || 0]
+          );
+
+          // Also mirror in design_files for unified multi-file catalog
+          await db.query(
+            `INSERT INTO design_files 
+              (design_id, file_kind, label, original_name, storage_key, mime_type, file_size, checksum_sha256, sort_order, is_primary_preview, file_name, file_path, file_format, is_preview) 
+             VALUES (?, 'image', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+            [
+              item.designId,
+              item.isPrimary ? 'Main Preview' : 'Gallery Preview',
+              item.filename,
+              savedUrl,
+              mimeType,
+              fileStat.size,
+              fileHash,
+              item.displayOrder || 0,
+              item.isPrimary ? 1 : 0,
+              item.filename,
+              savedUrl,
+              ext.replace('.', '').toUpperCase(),
+            ]
           );
         }
         successCount++;
@@ -439,7 +571,7 @@ exports.postBulkImageRelinkCommit = async (req, res, next) => {
       fs.rmSync(sessionStaging, { recursive: true, force: true });
     } catch (e) {}
 
-    await ActivityLog.logFromReq(req, 'bulk_relink', 'design', null, `Bulk relinked ${successCount} images to products.`);
+    await ActivityLog.logFromReq(req, 'bulk_relink', 'design', null, `Bulk relinked ${successCount} images to products (Mode: ${relinkMode}).`);
 
     const msg = `Successfully relinked ${successCount} product preview images to their matching designs!`;
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
@@ -473,6 +605,7 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
   try {
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
     const designs = db.isConnected() ? await db.query('SELECT id, title, sku, slug FROM designs ORDER BY id ASC') : [];
+    const shouldUnpackInnerZip = req.body.unpack_zip === '1' || req.body.unpack_zip === 'true' || req.body.unpack_zip === true;
 
     const sessionId = crypto.randomBytes(8).toString('hex');
     const sessionStaging = path.join(stagingBaseDir, `file_${sessionId}`);
@@ -480,6 +613,16 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
 
     const extractedFiles = [];
     const validMachineExts = ['.dst', '.pes', '.jef', '.exp', '.zip', '.rar'];
+    const forbiddenExts = ['.exe', '.php', '.js', '.sh', '.bat', '.cmd', '.vbs', '.py'];
+
+    function safeExtractBuffer(filename, buffer) {
+      const ext = path.extname(filename).toLowerCase();
+      if (forbiddenExts.includes(ext)) return;
+      const safeName = path.basename(filename);
+      const outPath = path.join(sessionStaging, safeName);
+      fs.writeFileSync(outPath, buffer);
+      extractedFiles.push({ filename: safeName, fullPath: outPath, size: buffer.length, ext });
+    }
 
     if (req.file) {
       const zipPath = req.file.path;
@@ -488,12 +631,29 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
 
       for (const entry of entries) {
         if (entry.isDirectory) continue;
+        if (entry.entryName.includes('..')) continue; // Zip-Slip guard
         const entryExt = path.extname(entry.entryName).toLowerCase();
-        if (validMachineExts.includes(entryExt)) {
-          const safeName = path.basename(entry.entryName);
-          const outPath = path.join(sessionStaging, safeName);
-          fs.writeFileSync(outPath, entry.getData());
-          extractedFiles.push({ filename: safeName, fullPath: outPath, size: entry.header.size, ext: entryExt });
+
+        // If inner file is a ZIP and admin requested safe unpack into separate files:
+        if (shouldUnpackInnerZip && entryExt === '.zip') {
+          try {
+            const innerZip = new AdmZip(entry.getData());
+            const innerEntries = innerZip.getEntries();
+            for (const inEntry of innerEntries) {
+              if (inEntry.isDirectory) continue;
+              if (inEntry.entryName.includes('..')) continue;
+              const inExt = path.extname(inEntry.entryName).toLowerCase();
+              if (validMachineExts.includes(inExt)) {
+                safeExtractBuffer(inEntry.entryName, inEntry.getData());
+              }
+            }
+          } catch (unpackErr) {
+            console.warn(`[Bulk Relink] Inner ZIP unpack warning for ${entry.entryName}:`, unpackErr.message);
+            // Fall back to keeping the archive itself
+            safeExtractBuffer(entry.entryName, entry.getData());
+          }
+        } else if (validMachineExts.includes(entryExt)) {
+          safeExtractBuffer(entry.entryName, entry.getData());
         }
       }
     } else if (req.body.folder_path && req.body.folder_path.trim()) {
@@ -504,16 +664,29 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
           const fExt = path.extname(file).toLowerCase();
           if (validMachineExts.includes(fExt)) {
             const src = path.join(folder, file);
-            const out = path.join(sessionStaging, file);
-            fs.copyFileSync(src, out);
-            extractedFiles.push({ filename: file, fullPath: out, size: fs.statSync(src).size, ext: fExt });
+            if (shouldUnpackInnerZip && fExt === '.zip') {
+              try {
+                const innerZip = new AdmZip(src);
+                for (const inEntry of innerZip.getEntries()) {
+                  if (inEntry.isDirectory || inEntry.entryName.includes('..')) continue;
+                  const inExt = path.extname(inEntry.entryName).toLowerCase();
+                  if (validMachineExts.includes(inExt)) {
+                    safeExtractBuffer(inEntry.entryName, inEntry.getData());
+                  }
+                }
+              } catch {
+                safeExtractBuffer(file, fs.readFileSync(src));
+              }
+            } else {
+              safeExtractBuffer(file, fs.readFileSync(src));
+            }
           }
         }
       }
     }
 
     if (extractedFiles.length === 0) {
-      const errMsg = 'No valid machine files (.dst, .pes, .jef, .exp, .zip) found in the ZIP or folder.';
+      const errMsg = 'No valid machine files (.dst, .pes, .jef, .exp, .zip, .rar) found in the ZIP or folder.';
       if (isAjax) return res.status(400).json({ success: false, message: errMsg });
       req.flash('error', errMsg);
       return res.redirect('/admin/tools/bulk-file-relink');
@@ -521,30 +694,48 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
 
     const matched = [];
     const unmatched = [];
+    const ambiguous = [];
     const duplicates = [];
-    const matchedDesignIds = new Set();
+    const seenFilesPerDesign = new Set();
+    const orderPerDesign = new Map();
 
     for (const item of extractedFiles) {
       const result = matchFileToDesigns(item.filename, designs);
       if (result) {
-        if (matchedDesignIds.has(result.match.id)) {
-          duplicates.push({
+        if (result.isAmbiguous) {
+          ambiguous.push({
             filename: item.filename,
-            design: result.match,
-            method: result.method,
-            reason: 'Multiple machine files found targeting this design'
+            size: item.size,
+            candidates: (result.candidates || []).map(c => c.match.sku || c.match.title).join(', '),
+            method: result.method
           });
         } else {
-          matchedDesignIds.add(result.match.id);
+          const dId = result.match.id;
+          const dedupKey = `${dId}_${item.filename.toLowerCase()}`;
+          if (seenFilesPerDesign.has(dedupKey)) {
+            duplicates.push({
+              filename: item.filename,
+              design: result.match,
+              reason: 'Exact duplicate filename already staged for this design'
+            });
+            continue;
+          }
+          seenFilesPerDesign.add(dedupKey);
+
+          const currentOrder = orderPerDesign.get(dId) || 0;
+          orderPerDesign.set(dId, currentOrder + 1);
+
           matched.push({
             filename: item.filename,
-            designId: result.match.id,
+            designId: dId,
             designTitle: result.match.title,
-            designSku: result.match.sku || `AED-${result.match.id}`,
+            designSku: result.match.sku || `AED-${dId}`,
             format: item.ext.replace('.', '').toUpperCase(),
             size: item.size,
             method: result.method,
-            confidence: result.confidence
+            confidence: result.confidence,
+            label: result.label || result.match.sku || item.filename,
+            sortOrder: currentOrder
           });
         }
       } else {
@@ -556,16 +747,18 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
     }
 
     const manifestPath = path.join(sessionStaging, 'manifest.json');
-    fs.writeFileSync(manifestPath, JSON.stringify({ matched, sessionStaging }), 'utf8');
+    fs.writeFileSync(manifestPath, JSON.stringify({ matched, unmatched, ambiguous, sessionStaging }), 'utf8');
 
     const preview = {
       sessionId,
       totalExtracted: extractedFiles.length,
       matchedCount: matched.length,
       unmatchedCount: unmatched.length,
+      ambiguousCount: ambiguous.length,
       duplicatesCount: duplicates.length,
       matched,
       unmatched,
+      ambiguous,
       duplicates
     };
 
@@ -584,7 +777,9 @@ exports.postBulkFileRelinkPreview = async (req, res, next) => {
 
 exports.postBulkFileRelinkCommit = async (req, res, next) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, mode } = req.body;
+    const relinkMode = mode === 'replace' ? 'replace' : 'append';
+
     if (!sessionId) {
       return res.status(400).json({ success: false, message: 'Invalid session ID for file relink commit.' });
     }
@@ -599,24 +794,82 @@ exports.postBulkFileRelinkCommit = async (req, res, next) => {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     const matched = manifest.matched || [];
 
+    if (db.isConnected() && relinkMode === 'replace') {
+      const affectedDesignIds = [...new Set(matched.map(m => m.designId))];
+      for (const dId of affectedDesignIds) {
+        await db.query("DELETE FROM design_files WHERE design_id = ? AND (file_kind != 'image' OR is_preview = 0)", [dId]);
+      }
+    }
+
     let successCount = 0;
+    const formatsPerDesign = new Map();
+
     for (const item of matched) {
       const filePath = path.join(sessionStaging, item.filename);
       if (fs.existsSync(filePath)) {
-        // Save to private persistent storage
-        const savedPath = await storage.savePrivateFile(filePath, item.filename);
-        const fmt = item.format || 'ZIP';
+        const fileExt = path.extname(item.filename).toLowerCase();
+        let mimeType = 'application/octet-stream';
+        if (fileExt === '.zip') mimeType = 'application/zip';
+        else if (fileExt === '.rar') mimeType = 'application/x-rar-compressed';
+        else if (fileExt === '.dst') mimeType = 'application/x-tajima-dst';
+        else if (fileExt === '.pes') mimeType = 'application/x-brother-pes';
+        else if (fileExt === '.jef') mimeType = 'application/x-janome-jef';
+        else if (fileExt === '.exp') mimeType = 'application/x-melco-exp';
+
+        // Save to private persistent storage outside deploy directory
+        const savedPath = await storage.savePrivateFile(filePath, item.filename, mimeType);
+        const fmt = item.format || fileExt.replace('.', '').toUpperCase() || 'ZIP';
+        const fileStat = fs.statSync(filePath);
+        const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 
         if (db.isConnected()) {
-          // Replace existing machine file records for this design
-          await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [item.designId]);
+          // If appending, determine next sort_order
+          let sortOrder = item.sortOrder || 0;
+          if (relinkMode === 'append') {
+            const [orderRow] = await db.query(
+              'SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM design_files WHERE design_id = ?',
+              [item.designId]
+            );
+            sortOrder = (orderRow ? orderRow.max_order : -1) + 1;
+          }
+
           await db.query(
-            'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview) VALUES (?, ?, ?, ?, ?, 0)',
-            [item.designId, item.filename, savedPath, fmt, item.size || 0]
+            `INSERT INTO design_files 
+              (design_id, file_kind, label, original_name, storage_key, mime_type, file_size, checksum_sha256, sort_order, is_primary_preview, file_name, file_path, file_format, is_preview) 
+             VALUES (?, 'machine', ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0)`,
+            [
+              item.designId,
+              item.label || item.filename,
+              item.filename,
+              savedPath,
+              mimeType,
+              fileStat.size,
+              fileHash,
+              sortOrder,
+              item.filename,
+              savedPath,
+              fmt
+            ]
           );
-          await db.query('UPDATE designs SET formats = ? WHERE id = ?', [fmt, item.designId]);
+
+          if (!formatsPerDesign.has(item.designId)) {
+            formatsPerDesign.set(item.designId, new Set());
+          }
+          formatsPerDesign.get(item.designId).add(fmt);
         }
         successCount++;
+      }
+    }
+
+    // Update formats in designs table
+    if (db.isConnected()) {
+      for (const [dId, fmtSet] of formatsPerDesign.entries()) {
+        const [existing] = await db.query('SELECT formats FROM designs WHERE id = ?', [dId]);
+        const prevFmts = (existing && existing.formats) ? existing.formats.split(',').map(s => s.trim().toUpperCase()) : [];
+        const combined = [...new Set([...prevFmts, ...Array.from(fmtSet)])].filter(Boolean).join(', ');
+        if (combined) {
+          await db.query('UPDATE designs SET formats = ? WHERE id = ?', [combined, dId]);
+        }
       }
     }
 
@@ -624,7 +877,7 @@ exports.postBulkFileRelinkCommit = async (req, res, next) => {
       fs.rmSync(sessionStaging, { recursive: true, force: true });
     } catch (e) {}
 
-    await ActivityLog.logFromReq(req, 'bulk_file_relink', 'design', null, `Bulk relinked ${successCount} machine files to products.`);
+    await ActivityLog.logFromReq(req, 'bulk_file_relink', 'design', null, `Bulk relinked ${successCount} machine files to products (Mode: ${relinkMode}).`);
 
     const msg = `Successfully relinked ${successCount} machine design files to their matching products!`;
     const isAjax = req.xhr || (req.headers.accept && req.headers.accept.includes('json'));
@@ -634,6 +887,157 @@ exports.postBulkFileRelinkCommit = async (req, res, next) => {
 
     req.flash('success', msg);
     res.redirect('/admin/tools/missing-files');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * CSV Export for Bulk File Relink Report
+ * GET /admin/tools/bulk-file-relink/export-report
+ */
+exports.getBulkFileRelinkExport = async (req, res, next) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      return res.status(400).send('Session ID required.');
+    }
+    const sessionStaging = path.join(stagingBaseDir, `file_${sessionId}`);
+    const manifestPath = path.join(sessionStaging, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      return res.status(404).send('Session report not found or expired.');
+    }
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const matched = manifest.matched || [];
+    const unmatched = manifest.unmatched || [];
+    const ambiguous = manifest.ambiguous || [];
+
+    const headers = ['Status', 'Filename', 'Matched SKU', 'Target Design Title', 'Design ID', 'Format', 'File Size (Bytes)', 'Confidence', 'Match Rule', 'Assigned Label'];
+    const rows = [headers.join(',')];
+
+    for (const m of matched) {
+      rows.push([
+        'MATCHED',
+        `"${String(m.filename || '').replace(/"/g, '""')}"`,
+        `"${String(m.designSku || '').replace(/"/g, '""')}"`,
+        `"${String(m.designTitle || '').replace(/"/g, '""')}"`,
+        m.designId,
+        m.format || 'ZIP',
+        m.size || 0,
+        m.confidence || 'High',
+        `"${String(m.method || '').replace(/"/g, '""')}"`,
+        `"${String(m.label || '').replace(/"/g, '""')}"`
+      ].join(','));
+    }
+
+    for (const a of ambiguous) {
+      rows.push([
+        'AMBIGUOUS',
+        `"${String(a.filename || '').replace(/"/g, '""')}"`,
+        `"Possible: ${String(a.candidates || '').replace(/"/g, '""')}"`,
+        '',
+        '',
+        '',
+        a.size || 0,
+        'Low',
+        'Ambiguous Suffix/Prefix Match',
+        ''
+      ].join(','));
+    }
+
+    for (const u of unmatched) {
+      rows.push([
+        'UNMATCHED',
+        `"${String(u.filename || '').replace(/"/g, '""')}"`,
+        '',
+        '',
+        '',
+        '',
+        u.size || 0,
+        'None',
+        'No matching design SKU or Title',
+        ''
+      ].join(','));
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="bulk-file-relink-report-${Date.now()}.csv"`);
+    return res.send(rows.join('\r\n'));
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * CSV Export for Bulk Image Relink Report
+ * GET /admin/tools/bulk-image-relink/export-report
+ */
+exports.getBulkImageRelinkExport = async (req, res, next) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      return res.status(400).send('Session ID required.');
+    }
+    const sessionStaging = path.join(stagingBaseDir, `img_${sessionId}`);
+    const manifestPath = path.join(sessionStaging, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      return res.status(404).send('Session report not found or expired.');
+    }
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const matched = manifest.matched || [];
+    const unmatched = manifest.unmatched || [];
+    const ambiguous = manifest.ambiguous || [];
+
+    const headers = ['Status', 'Filename', 'Matched SKU', 'Target Design Title', 'Design ID', 'Is Primary', 'File Size (Bytes)', 'Confidence', 'Match Rule'];
+    const rows = [headers.join(',')];
+
+    for (const m of matched) {
+      rows.push([
+        'MATCHED',
+        `"${String(m.filename || '').replace(/"/g, '""')}"`,
+        `"${String(m.designSku || '').replace(/"/g, '""')}"`,
+        `"${String(m.designTitle || '').replace(/"/g, '""')}"`,
+        m.designId,
+        m.isPrimary ? 'YES (Primary)' : 'NO (Gallery)',
+        m.size || 0,
+        m.confidence || 'High',
+        `"${String(m.method || '').replace(/"/g, '""')}"`
+      ].join(','));
+    }
+
+    for (const a of ambiguous) {
+      rows.push([
+        'AMBIGUOUS',
+        `"${String(a.filename || '').replace(/"/g, '""')}"`,
+        `"Possible: ${String(a.candidates || '').replace(/"/g, '""')}"`,
+        '',
+        '',
+        '',
+        a.size || 0,
+        'Low',
+        'Ambiguous Suffix/Prefix Match'
+      ].join(','));
+    }
+
+    for (const u of unmatched) {
+      rows.push([
+        'UNMATCHED',
+        `"${String(u.filename || '').replace(/"/g, '""')}"`,
+        '',
+        '',
+        '',
+        '',
+        u.size || 0,
+        'None',
+        'No matching design SKU or Title'
+      ].join(','));
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="bulk-image-relink-report-${Date.now()}.csv"`);
+    return res.send(rows.join('\r\n'));
   } catch (err) {
     next(err);
   }
@@ -968,6 +1372,4 @@ exports.downloadStitchHistoryCsv = async (req, res, next) => {
     res.redirect('/admin/tools/stitch-history');
   }
 };
-
-
-
+exports.matchFileToDesigns = matchFileToDesigns;

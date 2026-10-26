@@ -19,7 +19,7 @@ const REQUIRED_SCHEMA = {
     'import_zip_filename', 'deleted_at', 'created_at'
   ],
   design_images: ['id', 'design_id', 'image_url', 'is_primary', 'display_order'],
-  design_files: ['id', 'design_id', 'file_name', 'file_path', 'file_format', 'file_size', 'checksum', 'is_preview', 'created_at'],
+  design_files: ['id', 'design_id', 'file_kind', 'label', 'original_name', 'storage_key', 'mime_type', 'file_size', 'checksum_sha256', 'sort_order', 'is_primary_preview', 'created_at'],
   cart_items: ['id', 'user_id', 'session_id', 'design_id', 'quantity', 'created_at'],
   orders: ['id', 'order_number', 'user_id', 'total_amount', 'discount_amount', 'final_amount', 'coupon_code', 'status', 'razorpay_order_id', 'razorpay_payment_id', 'payment_gateway', 'cashfree_order_id', 'cashfree_payment_id', 'created_at'],
   order_items: ['id', 'order_id', 'design_id', 'quantity', 'price_at_purchase', 'mrp', 'discount_amount', 'created_at'],

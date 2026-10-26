@@ -445,10 +445,28 @@
             <span style="background: #E3F2FD; color: #1565C0; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-file-zipper"></i> ZIP Engine</span>
           </div>
 
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.2rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
+                <i class="fa-solid fa-cloud-arrow-up" style="color: var(--admin-primary); margin-right: 4px;"></i> Max Allowed File Size per Upload (MB)
+              </label>
+              <input type="number" name="max_file_size_mb" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.max_file_size_mb) ? settings.max_file_size_mb : '200' %>" min="1" max="1000" required>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Configures maximum allowed file size per file across chunked uploaders (default: 200 MB).</small>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
+                <i class="fa-solid fa-shield-halved" style="color: #2E7D32; margin-right: 4px;"></i> Customer Download Limit per File
+              </label>
+              <input type="number" name="download_limit_per_file" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.download_limit_per_file !== undefined) ? settings.download_limit_per_file : '0' %>" min="0" max="1000" required>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Maximum times a buyer can download each file (0 = unlimited downloads).</small>
+            </div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
-                <i class="fa-solid fa-hard-drive" style="color: var(--admin-primary); margin-right: 4px;"></i> Max Allowed ZIP File Size (MB)
+                <i class="fa-solid fa-hard-drive" style="color: var(--admin-primary); margin-right: 4px;"></i> Bulk ZIP Upload Max Size (MB)
               </label>
               <input type="number" name="max_upload_zip_size_mb" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.max_upload_zip_size_mb) ? settings.max_upload_zip_size_mb : '100' %>" min="5" max="500" required>
               <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Configures maximum allowed file size per ZIP package in bulk upload (default: 100 MB).</small>

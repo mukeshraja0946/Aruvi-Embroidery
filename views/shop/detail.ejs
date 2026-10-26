@@ -147,6 +147,13 @@
               <span class="spec-value"><%= design.hoop_size.trim() %></span>
             </div>
           <% } %>
+          <% if (design.total_files_count && design.total_files_count > 1 && design.files_summary) { %>
+            <div class="spec-row">
+              <span class="spec-label">Files Included</span>
+              <span class="spec-colon">:</span>
+              <span class="spec-value highlight-bold"><%= design.files_summary %></span>
+            </div>
+          <% } %>
 
           <%
             const _stitchFmtLocale = (typeof siteSettings !== 'undefined' && siteSettings && siteSettings.stitch_number_format === 'international') ? 'en-US' : 'en-IN';
@@ -548,6 +555,46 @@
     document.body.style.overflow = '';
     isLightboxOpen = false;
   }
+
+  // Mobile swipe navigation for gallery
+  document.addEventListener('DOMContentLoaded', () => {
+    const mainWrapper = document.getElementById('mainImageDisplayWrapper');
+    if (!mainWrapper) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    mainWrapper.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    mainWrapper.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length === 1) {
+        const deltaX = e.changedTouches[0].clientX - touchStartX;
+        const deltaY = e.changedTouches[0].clientY - touchStartY;
+        // Check if horizontal swipe and larger than vertical movement
+        if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
+          const thumbs = Array.from(document.querySelectorAll('.thumbnails-stack .thumb-item'));
+          if (thumbs.length <= 1) return;
+          const activeIndex = thumbs.findIndex(t => t.classList.contains('active'));
+          let nextIndex = activeIndex;
+          if (deltaX < 0) {
+            // Swipe Left -> Next Image
+            nextIndex = (activeIndex + 1) % thumbs.length;
+          } else {
+            // Swipe Right -> Prev Image
+            nextIndex = (activeIndex - 1 + thumbs.length) % thumbs.length;
+          }
+          if (thumbs[nextIndex]) {
+            thumbs[nextIndex].click();
+          }
+        }
+      }
+    }, { passive: true });
+  });
 
   // Pinch & Double-tap Zoom handling
   document.addEventListener('DOMContentLoaded', () => {

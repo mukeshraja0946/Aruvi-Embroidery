@@ -47,7 +47,12 @@
         <h2 class="order-number-title">Order #<%= order.order_number %></h2>
         <span class="order-placed-date">Placed on <%= formatOrderDate(order.created_at) %></span>
       </div>
-      <div class="order-header-badge-wrap">
+      <div class="order-header-badge-wrap" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <% if (isPaid) { %>
+          <a href="/user/orders/<%= order.id %>/download-all" download class="btn btn-primary btn-sm" style="background: var(--primary); color: #fff; font-weight: 700; border-radius: 20px; padding: 8px 18px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(169, 50, 38, 0.2); text-decoration: none;">
+            <i class="fa-solid fa-file-zipper"></i> Download Everything (ZIP)
+          </a>
+        <% } %>
         <span class="order-status-pill <%= badgeClass %>">
           <i class="fa-solid fa-circle"></i> <%= badgeLabel %>
         </span>
@@ -65,7 +70,7 @@
             <th>Design</th>
             <th>Specs</th>
             <th>Price</th>
-            <th style="text-align: right;">Download File</th>
+            <th style="text-align: right; min-width: 260px;">Download Files</th>
           </tr>
         </thead>
         <tbody>
@@ -93,11 +98,33 @@
                 <td><strong>₹<%= unitPrice %></strong></td>
                 <td style="text-align: right;">
                   <% if (isPaid) { %>
-                    <a href="/user/download/<%= item.design_id || item.id %>" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
-                      <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
-                    </a>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                      <a href="/user/download/<%= item.design_id || item.id %>/all" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
+                        <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
+                      </a>
+                      <% if (item.download_files && item.download_files.length > 0) { %>
+                        <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; max-width: 280px; margin-top: 4px;">
+                          <% item.download_files.forEach(f => { %>
+                            <%
+                              const fname = f.original_name || f.file_name || 'File';
+                              const ext = (f.file_format || fname.split('.').pop() || 'FILE').toUpperCase();
+                              const displayLabel = f.label || fname;
+                              const sz = f.file_size ? (f.file_size > 1048576 ? (f.file_size / 1048576).toFixed(1) + ' MB' : Math.round(f.file_size / 1024) + ' KB') : '';
+                            %>
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: #FAF6F0; border: 1px solid #EFE7DD; border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; gap: 6px;">
+                              <span style="background: #E8F5E9; color: #2E7D32; font-size: 0.68rem; font-weight: 700; padding: 2px 5px; border-radius: 4px; font-family: monospace;"><%= ext %></span>
+                              <span style="color: #2C1810; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: left;" title="<%= displayLabel %>"><%= displayLabel %></span>
+                              <% if (sz) { %><span style="color: #8C7B72; font-size: 0.7rem;"><%= sz %></span><% } %>
+                              <a href="/user/download/file/<%= f.id %>" download style="color: var(--primary); font-size: 0.82rem; padding: 2px 6px;" title="Download <%= displayLabel %>">
+                                <i class="fa-solid fa-download"></i>
+                              </a>
+                            </div>
+                          <% }) %>
+                        </div>
+                      <% } %>
+                    </div>
                   <% } else { %>
-                    <span style="font-size: 0.82rem; color: var(--text-muted);">Unlocks after payment</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted);"><i class="fa-solid fa-lock"></i> Unlocks after payment</span>
                   <% } %>
                 </td>
               </tr>
@@ -134,9 +161,33 @@
             <!-- Download or Unlock Area below -->
             <div class="order-m-item-action">
               <% if (isPaid) { %>
-                <a href="/user/download/<%= item.design_id || item.id %>" download class="order-m-download-btn">
-                  <i class="fa-solid fa-download"></i> Download <%= cleanTitle %>.zip
+                <a href="/user/download/<%= item.design_id || item.id %>/all" download class="order-m-download-btn">
+                  <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
                 </a>
+                <% if (item.download_files && item.download_files.length > 0) { %>
+                  <div style="display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 8px;">
+                    <% item.download_files.forEach(f => { %>
+                      <%
+                        const fname = f.original_name || f.file_name || 'File';
+                        const ext = (f.file_format || fname.split('.').pop() || 'FILE').toUpperCase();
+                        const displayLabel = f.label || fname;
+                        const sz = f.file_size ? (f.file_size > 1048576 ? (f.file_size / 1048576).toFixed(1) + ' MB' : Math.round(f.file_size / 1024) + ' KB') : '';
+                      %>
+                      <div style="display: flex; align-items: center; justify-content: space-between; background: #FAF6F0; border: 1px solid #EFE7DD; border-radius: 8px; padding: 6px 10px; font-size: 0.8rem;">
+                        <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                          <span style="background: #E8F5E9; color: #2E7D32; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-family: monospace;"><%= ext %></span>
+                          <span style="color: #2C1810; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<%= displayLabel %>"><%= displayLabel %></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <% if (sz) { %><span style="color: #8C7B72; font-size: 0.72rem;"><%= sz %></span><% } %>
+                          <a href="/user/download/file/<%= f.id %>" download style="color: var(--primary); font-size: 0.9rem;" title="Download <%= displayLabel %>">
+                            <i class="fa-solid fa-download"></i>
+                          </a>
+                        </div>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } %>
               <% } else { %>
                 <div class="order-m-locked-text">
                   <i class="fa-solid fa-lock"></i> Unlocks after payment
@@ -147,6 +198,7 @@
         <% }) %>
       <% } %>
     </div>
+
 
     <!-- Summary Box -->
     <div class="order-summary-box">

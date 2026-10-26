@@ -66,6 +66,9 @@ const fallbackSettings = {
   upiMerchantName: 'ARUVI EMBROIDERY STUDIO',
   twitter_url: '',
   max_upload_zip_size_mb: '100',
+  max_file_size_mb: '200',
+  download_limit_per_file: '0',
+  allow_multiple_files_per_design: '1',
   auto_detect_formats_policy: 'fill_if_empty',
   razorpay_key_id: process.env.RAZORPAY_KEY_ID || '',
   razorpay_key_secret: process.env.RAZORPAY_KEY_SECRET || '',
@@ -281,7 +284,12 @@ class Setting {
     }
     return true;
   }
+
+  static async set(key, value) {
+    return this.updateAll({ [key]: String(value) });
+  }
 }
+
 
 Setting.encryptSecret = encryptSecret;
 Setting.decryptSecret = decryptSecret;

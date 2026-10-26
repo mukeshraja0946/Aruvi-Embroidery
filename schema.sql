@@ -99,13 +99,25 @@ CREATE TABLE IF NOT EXISTS `design_images` (
 CREATE TABLE IF NOT EXISTS `design_files` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `design_id` INT NOT NULL,
-  `file_name` VARCHAR(255) NOT NULL,
-  `file_path` VARCHAR(255) NOT NULL,
+  `file_kind` ENUM('machine', 'image', 'other') NOT NULL DEFAULT 'machine',
+  `label` VARCHAR(255) NULL DEFAULT NULL,
+  `original_name` VARCHAR(255) NULL DEFAULT NULL,
+  `storage_key` VARCHAR(255) NULL DEFAULT NULL,
+  `mime_type` VARCHAR(100) NULL DEFAULT NULL,
+  `file_name` VARCHAR(255) NULL DEFAULT NULL,
+  `file_path` VARCHAR(255) NULL DEFAULT NULL,
   `file_format` VARCHAR(20) DEFAULT 'ZIP',
-  `file_size` INT DEFAULT 0,
+  `file_size` BIGINT DEFAULT 0,
+  `checksum_sha256` VARCHAR(64) NULL DEFAULT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `is_primary_preview` TINYINT(1) NOT NULL DEFAULT 0,
+  `checksum` VARCHAR(64) NULL DEFAULT NULL,
+  `is_preview` TINYINT(1) DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`design_id`) REFERENCES `designs`(`id`) ON DELETE CASCADE,
-  INDEX idx_design_file (`design_id`)
+  INDEX idx_design_file (`design_id`),
+  INDEX idx_design_file_kind (`design_id`, `file_kind`),
+  INDEX idx_design_file_sort (`design_id`, `sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. Cart Items

@@ -81,8 +81,17 @@ router.post('/admin/designs/import-start-job', adminDesignController.postImportS
 router.get('/admin/designs/import-job-status/:batchId', adminDesignController.getImportJobStatus);
 router.post('/admin/designs/import-rollback/:batchId', adminDesignController.postImportRollback);
 router.get('/admin/designs/import-error-report/:batchId', adminDesignController.downloadImportErrorReport);
-router.post('/admin/designs/import-commit', adminDesignController.postImportCommit);
- 
+// Multiple Files per Design - Chunked Upload & File Management Endpoints
+router.post('/admin/api/designs/upload-chunk', bulkZipChunkMiddleware, adminDesignController.uploadDesignFileChunk);
+router.post('/admin/api/designs/upload-complete', adminDesignController.uploadDesignFileComplete);
+router.post('/admin/api/designs/:designId/files/update-label/:fileId', adminDesignController.updateFileLabel);
+router.post('/admin/api/designs/:designId/files/delete/:fileId', adminDesignController.deleteFile);
+router.post('/admin/api/designs/:designId/files/reorder', adminDesignController.reorderDesignFiles);
+router.post('/admin/api/designs/:designId/images/reorder', adminDesignController.reorderDesignImages);
+router.post('/admin/api/designs/:designId/images/set-primary/:imageId', adminDesignController.setPrimaryImage);
+router.post('/admin/api/designs/:designId/images/delete/:imageId', adminDesignController.deleteImage);
+router.get('/admin/api/designs/files/:fileId/download', adminDesignController.downloadAdminFile);
+
 // CSRF Token endpoint for client-side AJAX requests & dynamic refreshes
 router.get('/admin/api/csrf-token', (req, res) => {
   const token = typeof req.csrfToken === 'function' ? req.csrfToken() : (req.session?.csrfSecret || res.locals?.csrfToken || '');
@@ -197,10 +206,12 @@ router.get('/admin/tools/missing-files/export-csv', adminToolsController.exportM
 router.post('/admin/tools/replace-file-quick', upload.single('file'), adminToolsController.replaceDesignFileQuick);
 
 router.get('/admin/tools/bulk-image-relink', adminToolsController.getBulkImageRelink);
+router.get('/admin/tools/bulk-image-relink/export-report', adminToolsController.getBulkImageRelinkExport);
 router.post('/admin/tools/bulk-image-relink/preview', upload.single('zip_file'), adminToolsController.postBulkImageRelinkPreview);
 router.post('/admin/tools/bulk-image-relink/commit', adminToolsController.postBulkImageRelinkCommit);
 
 router.get('/admin/tools/bulk-file-relink', adminToolsController.getBulkFileRelink);
+router.get('/admin/tools/bulk-file-relink/export-report', adminToolsController.getBulkFileRelinkExport);
 router.post('/admin/tools/bulk-file-relink/preview', upload.single('zip_file'), adminToolsController.postBulkFileRelinkPreview);
 router.post('/admin/tools/bulk-file-relink/commit', adminToolsController.postBulkFileRelinkCommit);
 
