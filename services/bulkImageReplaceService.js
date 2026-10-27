@@ -562,17 +562,8 @@ class BulkImageReplaceService {
         const cleanName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
         const uniqueFilename = `${cleanName}_${Date.now()}_${hash}${ext}`;
 
-        let finalBuffer = inputBuffer;
-        if (shouldWatermark) {
-          try {
-            finalBuffer = await watermarkService.applyWatermark(inputBuffer, {
-              format: ext === '.webp' ? 'webp' : (ext === '.png' ? 'png' : 'jpeg')
-            });
-          } catch (wmErr) {
-            console.warn('[Bulk Watermark Warning]:', wmErr.message);
-            finalBuffer = inputBuffer;
-          }
-        }
+        // Save authentic image without logo watermark
+        const finalBuffer = inputBuffer;
 
         const publicUrl = await storage.savePublicFile(finalBuffer, uniqueFilename, file.mimetype || 'image/png');
         const checksum = crypto.createHash('sha256').update(finalBuffer).digest('hex');

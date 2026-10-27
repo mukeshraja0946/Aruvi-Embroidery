@@ -2431,54 +2431,58 @@
         </div>
 
         <!-- Completion Report Section -->
-        <div id="uploadReportSection" style="display: none; padding: 1.5rem 1rem; text-align: center;">
-          <div style="width: 54px; height: 54px; border-radius: 50%; background: #E8F5E9; color: #2E7D32; display: inline-flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 1rem;">
+        <div id="uploadReportSection" style="display: none; padding: 1.5rem 0.5rem; text-align: center;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: #E8F5E9; color: #2E7D32; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 0.75rem; box-shadow: 0 4px 14px rgba(46, 125, 50, 0.15);">
             <i class="fa-solid fa-circle-check"></i>
           </div>
-          <h3 style="font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
+          <h3 style="font-size: 1.35rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
             File Group Replacement Completed!
           </h3>
-          <p id="reportGroupSummaryText" style="font-size: 0.85rem; color: var(--admin-text-muted); margin: 0 0 1.5rem;">
+          <p id="reportGroupSummaryText" style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0 auto 1.5rem; max-width: 600px; line-height: 1.5;">
             Old files in this group have been removed, and the newly selected files are now active.
           </p>
 
-          <!-- Report Stats -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; max-width: 560px; margin: 0 auto 1.5rem;">
-            <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 10px; border-radius: 8px;">
-              <div id="reportCountReplacedImages" style="font-size: 1.3rem; font-weight: 700; color: #2E7D32;">0</div>
-              <div style="font-size: 0.74rem; color: #1B5E20; font-weight: 600;">Replaced Images</div>
+          <!-- Report Stats (4-Column Centered Grid) -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 580px; margin: 0 auto 1.5rem;">
+            <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 12px 6px; border-radius: 10px; text-align: center;">
+              <div id="reportCountReplacedImages" style="font-size: 1.4rem; font-weight: 700; color: #2E7D32;">0</div>
+              <div style="font-size: 0.74rem; color: #1B5E20; font-weight: 600; margin-top: 3px;">Replaced Images</div>
             </div>
-            <div style="background: #E0F7FA; border: 1px solid #B2EBF2; padding: 10px; border-radius: 8px;">
-              <div id="reportCountReplacedZips" style="font-size: 1.3rem; font-weight: 700; color: #00796B;">0</div>
-              <div style="font-size: 0.74rem; color: #004D40; font-weight: 600;">Replaced ZIPs</div>
+            <div style="background: #E0F7FA; border: 1px solid #B2EBF2; padding: 12px 6px; border-radius: 10px; text-align: center;">
+              <div id="reportCountReplacedZips" style="font-size: 1.4rem; font-weight: 700; color: #00796B;">0</div>
+              <div style="font-size: 0.74rem; color: #004D40; font-weight: 600; margin-top: 3px;">Replaced ZIPs</div>
             </div>
-            <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 10px; border-radius: 8px;">
-              <div id="reportCountRemovedOld" style="font-size: 1.3rem; font-weight: 700; color: #F57F17;">0</div>
-              <div style="font-size: 0.74rem; color: #795548; font-weight: 600;">Old Files Removed</div>
+            <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 12px 6px; border-radius: 10px; text-align: center;">
+              <div id="reportCountRemovedOld" style="font-size: 1.4rem; font-weight: 700; color: #F57F17;">0</div>
+              <div style="font-size: 0.74rem; color: #795548; font-weight: 600; margin-top: 3px;">Old Files Removed</div>
             </div>
-            <div style="background: #FFEBEE; border: 1px solid #FFCDD2; padding: 10px; border-radius: 8px;">
-              <div id="reportCountFailed" style="font-size: 1.3rem; font-weight: 700; color: #C62828;">0</div>
-              <div style="font-size: 0.74rem; color: #B71C1C; font-weight: 600;">Failed</div>
+            <div style="background: #FFEBEE; border: 1px solid #FFCDD2; padding: 12px 6px; border-radius: 10px; text-align: center;">
+              <div id="reportCountFailed" style="font-size: 1.4rem; font-weight: 700; color: #C62828;">0</div>
+              <div style="font-size: 0.74rem; color: #B71C1C; font-weight: 600; margin-top: 3px;">Failed</div>
             </div>
-          <!-- Per-File Operation Log Table -->
-          <div id="bulkReplaceFileLogContainer" style="margin-top: 1.25rem; margin-bottom: 1.5rem; text-align: left; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 10px; overflow: hidden;">
-            <div style="padding: 10px 16px; background: #FAF9F6; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center;">
-              <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">
+          </div>
+
+          <!-- Per-File Operation Log Table (Full Width) -->
+          <div id="bulkReplaceFileLogContainer" style="margin: 0 0 1.5rem 0; text-align: left; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); overflow: hidden; width: 100%;">
+            <div style="padding: 12px 18px; background: #FAF9F6; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <strong style="font-size: 0.88rem; color: var(--admin-text-dark); display: inline-flex; align-items: center; gap: 8px;">
                 <i class="fa-solid fa-list-check" style="color: #0284C7;"></i> Per-File Operation Log (<span id="bulkReplaceFileLogCount">0</span> files)
               </strong>
-              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Verified storage & database activation</span>
+              <span style="font-size: 0.76rem; color: #2E7D32; font-weight: 600; background: #E8F5E9; padding: 3px 10px; border-radius: 999px; border: 1px solid #C8E6C9; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="fa-solid fa-circle-check"></i> Verified storage & database activation
+              </span>
             </div>
             <div style="max-height: 260px; overflow-y: auto;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-                <thead style="background: #F8FAFC; position: sticky; top: 0; z-index: 2;">
-                  <tr style="border-bottom: 1px solid #E2E8F0; text-align: left; color: #475569;">
-                    <th style="padding: 8px 12px; width: 36px; text-align: center;">#</th>
-                    <th style="padding: 8px 12px;">File Name</th>
-                    <th style="padding: 8px 12px; width: 120px;">Type</th>
-                    <th style="padding: 8px 12px; width: 85px;">Size</th>
-                    <th style="padding: 8px 12px;">Storage Status</th>
-                    <th style="padding: 8px 12px;">Database Status</th>
-                    <th style="padding: 8px 12px; width: 95px; text-align: center;">Result</th>
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+                <thead style="background: #F8FAFC; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid #E2E8F0;">
+                  <tr style="text-align: left; color: #475569;">
+                    <th style="padding: 10px 14px; width: 45px; text-align: center;">#</th>
+                    <th style="padding: 10px 14px;">File Name</th>
+                    <th style="padding: 10px 14px; width: 110px;">Type</th>
+                    <th style="padding: 10px 14px; width: 95px;">Size</th>
+                    <th style="padding: 10px 14px; width: 125px;">Storage Status</th>
+                    <th style="padding: 10px 14px; width: 125px;">Database Status</th>
+                    <th style="padding: 10px 14px; width: 105px; text-align: center;">Result</th>
                   </tr>
                 </thead>
                 <tbody id="bulkReplaceFileLogTbody">
@@ -2488,22 +2492,22 @@
             </div>
           </div>
 
-          <!-- Actions -->
-          <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-            <button type="button" id="bulkReplaceRetryFailedBtn" onclick="window.bulkImageReplaceInstance.retryFailed()" class="btn btn-warning" style="display: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; cursor: pointer; align-items: center; gap: 6px; background: #FFF8E1; color: #B45309; border: 1px solid #FDE68A;">
+          <!-- Actions Bar -->
+          <div style="display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; padding-top: 0.25rem;">
+            <button type="button" id="bulkReplaceRetryFailedBtn" onclick="window.bulkImageReplaceInstance.retryFailed()" class="btn btn-warning" style="display: none; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; align-items: center; gap: 6px; background: #FFF8E1; color: #B45309; border: 1px solid #FDE68A; font-weight: 600;">
               <i class="fa-solid fa-arrows-rotate"></i> Retry Failed Files
             </button>
-            <a id="bulkReplaceDownloadCsvBtn" href="#" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <a id="bulkReplaceDownloadCsvBtn" href="#" class="btn btn-outline" style="font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #0284C7; border-color: #BAE6FD;">
               <i class="fa-solid fa-file-csv"></i> Download CSV Report
             </a>
-            <button type="button" id="bulkReplaceUndoBtn" class="btn" style="display: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; cursor: pointer; align-items: center; gap: 6px;">
+            <button type="button" id="bulkReplaceUndoBtn" class="btn" style="display: none; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; cursor: pointer; align-items: center; gap: 6px; font-weight: 600;">
               <i class="fa-solid fa-rotate-left"></i> Undo This Replacement (7 Days)
             </button>
-            <a href="/admin/tools/image-replace-history" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <a href="/admin/tools/image-replace-history" class="btn btn-outline" style="font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #475569;">
               <i class="fa-solid fa-clock-rotate-left"></i> View History
             </a>
-            <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 20px; border-radius: 8px; background: #2E7D32; border-color: #2E7D32; color: #FFF; cursor: pointer;">
-              Done & Refresh
+            <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="font-size: 0.85rem; padding: 9px 24px; border-radius: 8px; background: #16A34A; border-color: #16A34A; color: #FFF; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-check"></i> Done & Refresh
             </button>
           </div>
         </div>

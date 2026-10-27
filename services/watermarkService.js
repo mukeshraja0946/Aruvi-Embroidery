@@ -55,46 +55,15 @@ class WatermarkService {
       const width = metadata.width || 800;
       const height = metadata.height || 800;
 
-      // 1. Try brand logo file if present and suitable
-      const brandLogoPath = path.resolve(__dirname, '..', 'public', 'assets', 'brand', 'logo.png');
-      const composites = [];
-
-      if (fs.existsSync(brandLogoPath) && width >= 400 && height >= 400) {
-        try {
-          const logoWidth = Math.min(Math.round(width * 0.45), 450);
-          const resizedLogo = await sharp(brandLogoPath)
-            .resize(logoWidth, null, { fit: 'inside' })
-            .ensureAlpha()
-            .composite([{
-              input: Buffer.from([255, 255, 255, Math.round(255 * 0.35)]),
-              raw: { width: 1, height: 1, channels: 4 },
-              tile: true,
-              blend: 'dest-in'
-            }])
-            .toBuffer();
-
-          composites.push({
-            input: resizedLogo,
-            gravity: 'center',
-            blend: 'over'
-          });
-        } catch {
-          // Fall back to SVG watermark
-          composites.push({
-            input: this.generateWatermarkSvg(width, height),
-            top: 0,
-            left: 0,
-            blend: 'over'
-          });
-        }
-      } else {
-        composites.push({
+      // Do not stamp brand logo file in preview image
+      const composites = [
+        {
           input: this.generateWatermarkSvg(width, height),
           top: 0,
           left: 0,
           blend: 'over'
-        });
-      }
+        }
+      ];
 
       let pipeline = image.composite(composites);
 

@@ -136,7 +136,7 @@
           }
         }
         if (stepBody) stepBody.style.display = (s === this.currentStep) ? 'block' : 'none';
-        if (stepFooter) stepFooter.style.display = (s === this.currentStep) ? 'flex' : 'none';
+        if (stepFooter) stepFooter.style.display = (s === this.currentStep && s !== 4) ? 'flex' : 'none';
       }
     }
 
@@ -520,15 +520,15 @@
               : `<span style="background: #FEE2E2; color: #991B1B; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #FECACA; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || 'Failed')}"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
 
             tr.innerHTML = `
-              <td style="padding: 8px 12px; text-align: center; color: #94A3B8; font-weight: 500;">${idx + 1}</td>
-              <td style="padding: 8px 12px; font-weight: 600; color: #1E293B;">
+              <td style="padding: 10px 14px; text-align: center; color: #94A3B8; font-weight: 500;">${idx + 1}</td>
+              <td style="padding: 10px 14px; font-weight: 600; color: #1E293B; word-break: break-all;">
                 <span style="margin-right: 6px;">${typeIcon}</span>${this.escapeHtml(f.fileName)}
               </td>
-              <td style="padding: 8px 12px;">${typeBadge}</td>
-              <td style="padding: 8px 12px; color: #64748B;">${sizeText}</td>
-              <td style="padding: 8px 12px;">${storageBadge}</td>
-              <td style="padding: 8px 12px;">${dbBadge}</td>
-              <td style="padding: 8px 12px; text-align: center;">${resultBadge}</td>
+              <td style="padding: 10px 14px;">${typeBadge}</td>
+              <td style="padding: 10px 14px; color: #64748B;">${sizeText}</td>
+              <td style="padding: 10px 14px;">${storageBadge}</td>
+              <td style="padding: 10px 14px;">${dbBadge}</td>
+              <td style="padding: 10px 14px; text-align: center;">${resultBadge}</td>
             `;
             tbodyEl.appendChild(tr);
           });
