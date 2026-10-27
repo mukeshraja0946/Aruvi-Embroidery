@@ -191,14 +191,27 @@
           this.scopeCategories = data.categories || [];
           this.scopeDesigns = data.designs || [];
 
-          // Populate category select if empty
-          if (catSelect && catSelect.options.length <= 1) {
-            this.scopeCategories.forEach(c => {
-              const opt = document.createElement('option');
-              opt.value = c.id;
-              opt.textContent = `${c.name} (${c.design_count} designs)`;
-              catSelect.appendChild(opt);
-            });
+          // Populate or update category select
+          if (catSelect) {
+            const currentSelected = catSelect.value;
+            if (catSelect.options.length <= 1 && this.scopeCategories.length > 0) {
+              this.scopeCategories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.name} (${c.design_count || 0} designs)`;
+                catSelect.appendChild(opt);
+              });
+              if (currentSelected) catSelect.value = currentSelected;
+            } else if (this.scopeCategories.length > 0) {
+              Array.from(catSelect.options).forEach(opt => {
+                if (opt.value !== 'all') {
+                  const match = this.scopeCategories.find(c => String(c.id) === String(opt.value));
+                  if (match) {
+                    opt.textContent = `${match.name} (${match.design_count || 0} designs)`;
+                  }
+                }
+              });
+            }
           }
 
           let categoryLabel = 'All Categories';
@@ -206,7 +219,13 @@
             categoryLabel = `Checked Rows (${data.totalDesigns} selected)`;
           } else if (selectedCatIds.length === 1) {
             const foundCat = this.scopeCategories.find(c => String(c.id) === String(selectedCatIds[0]));
-            categoryLabel = foundCat ? foundCat.name : 'Selected Category';
+            if (foundCat) {
+              categoryLabel = foundCat.name;
+            } else if (catSelect && catSelect.selectedOptions && catSelect.selectedOptions[0]) {
+              categoryLabel = catSelect.selectedOptions[0].text.replace(/\s*\(\d+\s*designs\)/i, '').trim();
+            } else {
+              categoryLabel = 'Selected Category';
+            }
           } else if (selectedCatIds.length > 1) {
             categoryLabel = `${selectedCatIds.length} Categories Selected`;
           }

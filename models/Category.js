@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 const db = require('../config/db');
 
 const fallbackCategories = [
@@ -45,7 +47,26 @@ class Category {
         console.error('Category.getAll DB error:', err.message);
       }
     }
-    let list = fallbackCategories.map(cat => ({ ...cat, is_active: cat.is_active !== undefined ? cat.is_active : 1, design_count: 0 }));
+    let fallbackCounts = {};
+    try {
+      const fbPath = path.join(__dirname, '..', 'public', 'uploads', 'fallback_designs.json');
+      if (fs.existsSync(fbPath)) {
+        const raw = fs.readFileSync(fbPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(d => {
+            const cid = d.category_id;
+            if (cid) fallbackCounts[cid] = (fallbackCounts[cid] || 0) + 1;
+          });
+        }
+      }
+    } catch (_) {}
+
+    let list = fallbackCategories.map(cat => ({
+      ...cat,
+      is_active: cat.is_active !== undefined ? cat.is_active : 1,
+      design_count: fallbackCounts[cat.id] || 0
+    }));
     if (status === 'active') list = list.filter(c => c.is_active === 1);
     else if (status === 'inactive') list = list.filter(c => c.is_active === 0);
     if (search && search.trim()) {

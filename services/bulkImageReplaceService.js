@@ -5,6 +5,7 @@ const sharp = require('sharp');
 const db = require('../config/db');
 const storage = require('../config/storage');
 const Design = require('../models/Design');
+const Category = require('../models/Category');
 const Setting = require('../models/Setting');
 const watermarkService = require('./watermarkService');
 
@@ -20,18 +21,39 @@ class BulkImageReplaceService {
    * Returns categories with design counts and scoped designs
    */
   async getScopeSummary(options = {}) {
-    if (!db.isConnected()) await db.initPool();
+    if (!db.isConnected()) {
+      try {
+        await db.initPool();
+      } catch (_) {}
+    }
 
     const { categoryIds = [], status = 'all', search = '', checkedIds = [] } = options;
 
     // 1. Get all categories with design counts
-    const categories = (await db.query(`
-      SELECT c.id, c.name, COUNT(d.id) AS design_count
-      FROM categories c
-      LEFT JOIN designs d ON d.category_id = c.id
-      GROUP BY c.id, c.name
-      ORDER BY c.name ASC
-    `)) || [];
+    let categories = [];
+    if (db.isConnected()) {
+      try {
+        categories = (await db.query(`
+          SELECT c.id, c.name, c.slug, COUNT(d.id) AS design_count
+          FROM categories c
+          LEFT JOIN designs d ON d.category_id = c.id
+          GROUP BY c.id, c.name, c.slug
+          ORDER BY c.name ASC
+        `)) || [];
+      } catch (err) {
+        console.warn('BulkImageReplaceService categories DB query error:', err.message);
+      }
+    }
+
+    if (!categories || categories.length === 0) {
+      const allCats = await Category.getAll();
+      categories = (allCats || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        design_count: c.design_count || 0
+      }));
+    }
 
     // 2. Build where clause for scoped designs
     const whereConditions = [];
@@ -42,8 +64,20 @@ class BulkImageReplaceService {
       params.push(...checkedIds);
     } else {
       if (categoryIds && categoryIds.length > 0) {
-        whereConditions.push(`d.category_id IN (${categoryIds.map(() => '?').join(',')})`);
-        params.push(...categoryIds);
+        const numericIds = categoryIds.map(Number).filter(n => !isNaN(n) && n > 0);
+        const slugIds = categoryIds.filter(s => isNaN(Number(s)));
+        const catConds = [];
+        if (numericIds.length > 0) {
+          catConds.push(`d.category_id IN (${numericIds.map(() => '?').join(',')})`);
+          params.push(...numericIds);
+        }
+        if (slugIds.length > 0) {
+          catConds.push(`c.slug IN (${slugIds.map(() => '?').join(',')})`);
+          params.push(...slugIds);
+        }
+        if (catConds.length > 0) {
+          whereConditions.push(`(${catConds.join(' OR ')})`);
+        }
       }
       if (status === 'active') {
         whereConditions.push(`d.is_active = 1`);
@@ -58,15 +92,65 @@ class BulkImageReplaceService {
 
     const whereSql = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    const scopedDesigns = (await db.query(`
-      SELECT d.id, d.sku, d.title, d.category_id, d.primary_image, d.is_active,
-             c.name AS category_name,
-             (SELECT COUNT(*) FROM design_images di WHERE di.design_id = d.id) AS total_images
-      FROM designs d
-      LEFT JOIN categories c ON d.category_id = c.id
-      ${whereSql}
-      ORDER BY d.id ASC
-    `, params)) || [];
+    let scopedDesigns = [];
+    if (db.isConnected()) {
+      try {
+        scopedDesigns = (await db.query(`
+          SELECT d.id, d.sku, d.title, d.category_id, d.primary_image, d.is_active,
+                 c.name AS category_name, c.slug AS category_slug,
+                 (SELECT COUNT(*) FROM design_images di WHERE di.design_id = d.id) AS total_images
+          FROM designs d
+          LEFT JOIN categories c ON d.category_id = c.id
+          ${whereSql}
+          ORDER BY d.id ASC
+        `, params)) || [];
+      } catch (err) {
+        console.warn('BulkImageReplaceService scopedDesigns DB query error:', err.message);
+      }
+    }
+
+    if (!scopedDesigns || scopedDesigns.length === 0) {
+      // In-memory fallback
+      const allResult = await Design.getAll({ is_active_only: false, limit: 10000 });
+      let list = allResult.designs || [];
+
+      if (checkedIds && checkedIds.length > 0) {
+        const checkedSet = new Set(checkedIds.map(String));
+        list = list.filter(d => checkedSet.has(String(d.id)));
+      } else {
+        if (categoryIds && categoryIds.length > 0) {
+          const catSet = new Set(categoryIds.map(String).map(s => s.toLowerCase()));
+          list = list.filter(d => 
+            (d.category_id && catSet.has(String(d.category_id).toLowerCase())) || 
+            (d.category_slug && catSet.has(String(d.category_slug).toLowerCase()))
+          );
+        }
+        if (status === 'active') {
+          list = list.filter(d => d.is_active == 1 || d.is_active === true);
+        } else if (status === 'inactive') {
+          list = list.filter(d => d.is_active == 0 || d.is_active === false);
+        }
+        if (search && search.trim()) {
+          const q = search.trim().toLowerCase();
+          list = list.filter(d => 
+            (d.sku && d.sku.toLowerCase().includes(q)) || 
+            (d.title && d.title.toLowerCase().includes(q))
+          );
+        }
+      }
+
+      scopedDesigns = list.map(d => ({
+        id: d.id,
+        sku: d.sku,
+        title: d.title,
+        category_id: d.category_id,
+        category_slug: d.category_slug,
+        primary_image: d.primary_image,
+        is_active: d.is_active,
+        category_name: d.category_name || (categories.find(c => String(c.id) === String(d.category_id) || c.slug === d.category_slug)?.name) || 'General',
+        total_images: (d.images && Array.isArray(d.images)) ? d.images.length : (d.total_images || (d.primary_image ? 1 : 0))
+      }));
+    }
 
     return {
       categories,

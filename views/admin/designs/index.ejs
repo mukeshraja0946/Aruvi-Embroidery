@@ -2283,6 +2283,11 @@
                 <div style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 8px;">Select a specific category (e.g. "Bulk Designs") or multiple categories</div>
                 <select id="bulkReplaceCategorySelect" class="form-control" onchange="window.bulkImageReplaceInstance.loadScopeSummary()" style="font-size: 0.85rem; padding: 8px 12px; border-radius: 8px; width: 100%; max-width: 420px; background: #FFFFFF;">
                   <option value="all">-- All Categories --</option>
+                  <% if (typeof categories !== 'undefined' && categories && categories.length > 0) { %>
+                    <% categories.forEach(c => { %>
+                      <option value="<%= c.id %>" data-slug="<%= c.slug %>"><%= c.name %><%= (typeof c.design_count !== 'undefined' && c.design_count !== null) ? (' (' + c.design_count + ' designs)') : '' %></option>
+                    <% }) %>
+                  <% } %>
                 </select>
               </div>
             </label>
