@@ -4809,9 +4809,9 @@ textarea.form-control {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 36px !important;
+    width: 30px !important;
     height: 36px !important;
-    min-width: 36px !important;
+    min-width: 30px !important;
     min-height: 36px !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -4825,7 +4825,7 @@ textarea.form-control {
   .brand-logo {
     display: flex !important;
     align-items: center !important;
-    margin-left: 8px !important;
+    margin-left: 2px !important;
     padding: 0 !important;
     flex-shrink: 0 !important;
   }
@@ -6985,9 +6985,9 @@ textarea.form-control {
   }
 
   .mobile-menu-toggle {
-    min-width: 36px !important;
+    min-width: 30px !important;
     min-height: 36px !important;
-    width: 36px !important;
+    width: 30px !important;
     height: 36px !important;
     font-size: 18px !important;
   }
