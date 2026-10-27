@@ -4133,22 +4133,49 @@ exports.postBulkReplaceUploadChunk = async (req, res, next) => {
 };
 
 /**
+ * Retrieve detected existing folder groups for selected category
+ * GET /admin/designs/bulk-replace/groups
+ */
+exports.getBulkReplaceCategoryGroups = async (req, res, next) => {
+  try {
+    const categoryId = req.query.categoryId || 'all';
+    const result = await bulkImageReplaceService.getCategoryExistingFolderGroups(categoryId);
+    res.json(result);
+  } catch (err) {
+    console.error('getBulkReplaceCategoryGroups error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
  * Commit batch replacement in DB inside transactions
  * POST /admin/designs/bulk-replace/commit
  */
 exports.postBulkReplaceCommit = async (req, res, next) => {
   try {
-    const { categoryId, categoryName, scopeSummary, replacementMode, items } = req.body;
-    const result = await bulkImageReplaceService.commitReplacementBatch({
-      adminUser: req.user,
-      categoryId,
-      categoryName,
-      scopeSummary,
-      replacementMode,
-      items
-    });
+    const { categoryId, categoryName, scopeSummary, replacementMode, groupName, items } = req.body;
 
-    if (result.success && result.replacedCount > 0) {
+    let result;
+    if (groupName) {
+      result = await bulkImageReplaceService.replaceFileGroup({
+        adminUser: req.user,
+        categoryId,
+        categoryName,
+        groupName,
+        items
+      });
+    } else {
+      result = await bulkImageReplaceService.commitReplacementBatch({
+        adminUser: req.user,
+        categoryId,
+        categoryName,
+        scopeSummary,
+        replacementMode,
+        items
+      });
+    }
+
+    if (result.success && (result.replacedCount > 0 || result.replacedDesignsCount > 0)) {
       await ActivityLog.log({
         action: 'bulk_replace_images',
         entity: 'designs',
@@ -4156,9 +4183,10 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
         details: {
           logId: result.logId,
           categoryName,
-          replacementMode,
-          replacedCount: result.replacedCount,
-          failedCount: result.failedCount
+          groupName: groupName || null,
+          replacementMode: groupName ? 'replace_group' : replacementMode,
+          replacedCount: result.replacedCount || result.replacedDesignsCount,
+          failedCount: result.failedCount || 0
         },
         adminId: req.user ? req.user.id : null,
         adminEmail: req.user ? req.user.email : 'admin'

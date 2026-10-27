@@ -2249,14 +2249,14 @@
 
       <!-- Stepper Badges -->
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <div id="bulkReplaceStepHeader1" class="step-pill active" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; background: #E2E8F0; color: #475569; display: inline-flex; align-items: center; gap: 6px;">
-          <span>1</span> Scope & Filters
+        <div id="bulkReplaceStepHeader1" class="step-pill active" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; background: #0284C7; color: #FFFFFF; display: inline-flex; align-items: center; gap: 6px;">
+          <span>1</span> Category & Existing Group
         </div>
         <div id="bulkReplaceStepHeader2" class="step-pill" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; background: #E2E8F0; color: #475569; display: inline-flex; align-items: center; gap: 6px;">
-          <span>2</span> Select Files & Mode
+          <span>2</span> Select New Files
         </div>
         <div id="bulkReplaceStepHeader3" class="step-pill" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; background: #E2E8F0; color: #475569; display: inline-flex; align-items: center; gap: 6px;">
-          <span>3</span> Match Preview
+          <span>3</span> Confirmation Summary
         </div>
         <div id="bulkReplaceStepHeader4" class="step-pill" style="padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; background: #E2E8F0; color: #475569; display: inline-flex; align-items: center; gap: 6px;">
           <span>4</span> Apply & Report
@@ -2268,216 +2268,142 @@
     <div style="padding: 1.5rem 1.75rem; overflow-y: auto; flex-grow: 1;">
 
       <!-- ============================================== -->
-      <!-- STEP 1: SCOPE & CATEGORY                       -->
+      <!-- STEP 1: CATEGORY & EXISTING FOLDER GROUP       -->
       <!-- ============================================== -->
       <div id="bulkReplaceStepBody1">
         <div style="margin-bottom: 1.25rem;">
-          <label style="display: block; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.6rem;">
-            1. Choose Target Scope:
+          <label style="display: block; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.5rem;">
+            1. Select Product Category:
           </label>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <label id="scopeCategoryOption" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 12px; border: 1px solid var(--admin-border); border-radius: 10px; background: #FAF9F6;">
-              <input type="radio" name="scopeTarget" id="scopeCategoryRadio" value="category" checked onchange="window.bulkImageReplaceInstance.loadScopeSummary()" style="margin-top: 3px;">
-              <div style="flex-grow: 1;">
-                <div style="font-weight: 600; font-size: 0.88rem; color: var(--admin-text-dark);">Category Scope</div>
-                <div style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 8px;">Select a specific category (e.g. "Bulk Designs") or multiple categories</div>
-                <select id="bulkReplaceCategorySelect" class="form-control" onchange="window.bulkImageReplaceInstance.loadScopeSummary()" style="font-size: 0.85rem; padding: 8px 12px; border-radius: 8px; width: 100%; max-width: 420px; background: #FFFFFF;">
-                  <option value="all">-- All Categories --</option>
-                  <% if (typeof categories !== 'undefined' && categories && categories.length > 0) { %>
-                    <% categories.forEach(c => { %>
-                      <option value="<%= c.id %>" data-slug="<%= c.slug %>"><%= c.name %><%= (typeof c.design_count !== 'undefined' && c.design_count !== null) ? (' (' + c.design_count + ' designs)') : '' %></option>
-                    <% }) %>
-                  <% } %>
-                </select>
-              </div>
-            </label>
-
-            <label id="scopeCheckedRowsOption" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 12px; border: 1px solid var(--admin-border); border-radius: 10px; background: #FAF9F6;">
-              <input type="radio" name="scopeTarget" id="scopeCheckedRadio" value="checked" onchange="window.bulkImageReplaceInstance.loadScopeSummary()" style="margin-top: 3px;">
-              <div>
-                <div style="font-weight: 600; font-size: 0.88rem; color: var(--admin-text-dark);">
-                  Checked Rows Only (<span id="scopeCheckedCount">0</span> selected on table)
-                </div>
-                <div style="font-size: 0.78rem; color: var(--admin-text-muted);">Only replace images for the designs currently selected with checkboxes</div>
-              </div>
-            </label>
+          <div style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 8px;">
+            Choose the category to inspect its existing file storage paths and folder groups.
           </div>
+          <select id="bulkReplaceCategorySelect" class="form-control" onchange="window.bulkImageReplaceInstance.loadCategoryGroups(this.value)" style="font-size: 0.88rem; padding: 10px 14px; border-radius: 8px; width: 100%; max-width: 480px; background: #FFFFFF;">
+            <% if (typeof categories !== 'undefined' && categories && categories.length > 0) { %>
+              <% categories.forEach((c, idx) => { %>
+                <option value="<%= c.id %>" data-slug="<%= c.slug %>" <%= idx === 0 ? 'selected' : '' %>><%= c.name %><%= (typeof c.design_count !== 'undefined' && c.design_count !== null) ? (' (' + c.design_count + ' designs)') : '' %></option>
+              <% }) %>
+            <% } %>
+          </select>
         </div>
 
-        <!-- Optional Filters -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem;">
-          <div>
-            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-muted); margin-bottom: 4px;">Status Filter:</label>
-            <select id="bulkReplaceStatusFilter" class="form-control" onchange="window.bulkImageReplaceInstance.loadScopeSummary()" style="font-size: 0.84rem; padding: 6px 10px; border-radius: 8px;">
-              <option value="all">All Statuses (Active & Inactive)</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
-            </select>
-          </div>
-          <div>
-            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-muted); margin-bottom: 4px;">Search Keyword:</label>
-            <input type="text" id="bulkReplaceSearchFilter" placeholder="Filter by SKU or title..." oninput="window.bulkImageReplaceInstance.loadScopeSummary()" class="form-control" style="font-size: 0.84rem; padding: 6px 10px; border-radius: 8px;">
-          </div>
-        </div>
+        <!-- Existing Folder / File Group Selector -->
+        <div id="bulkReplaceGroupSection" style="margin-bottom: 1.5rem; background: #FAF9F6; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
+          <label style="display: block; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.4rem;">
+            <i class="fa-solid fa-folder-tree" style="color: #0284C7;"></i> 2. Existing Folder / File Group to Replace:
+          </label>
+          <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 0 0 10px;">
+            Identified by actual stored image and ZIP paths (e.g. <code>ARUVI BULK DESIGNS 2</code>). All old files in this group will be replaced.
+          </p>
 
-        <!-- Live Scope Summary Badge -->
-        <div style="padding: 1rem; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <i class="fa-solid fa-circle-check" style="color: #16A34A; font-size: 1.2rem;"></i>
-            <span id="scopeLiveCountBadge" style="font-weight: 600; font-size: 0.9rem; color: #15803D;">Loading scope...</span>
+          <select id="bulkReplaceGroupSelect" class="form-control" onchange="window.bulkImageReplaceInstance.selectGroup(this.value)" style="font-size: 0.88rem; padding: 10px 14px; border-radius: 8px; width: 100%; background: #FFFFFF; font-weight: 600; color: var(--admin-text-dark);">
+            <option value="">Scanning stored paths...</option>
+          </select>
+
+          <!-- Group Details Card -->
+          <div id="existingGroupSummaryBadge" style="margin-top: 14px; background: #F0F9FF; border: 1px solid #BAE6FD; padding: 12px 16px; border-radius: 10px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 0.84rem;">
+            <span><i class="fa-solid fa-folder"></i> Folder: <strong id="groupDetailName" style="color: #0369A1;">-</strong></span>
+            <span><i class="fa-solid fa-shirt"></i> Designs in Group: <strong id="groupDetailDesignsCount" style="color: #0284C7;">0</strong></span>
+            <span><i class="fa-solid fa-image"></i> Existing Images: <strong id="groupDetailImagesCount" style="color: #512DA8;">0</strong></span>
+            <span><i class="fa-solid fa-file-zipper"></i> Existing ZIPs: <strong id="groupDetailZipsCount" style="color: #00796B;">0</strong></span>
           </div>
         </div>
       </div>
 
       <!-- ============================================== -->
-      <!-- STEP 2: SELECT FILES & MODE                    -->
+      <!-- STEP 2: SELECT NEW FILES                       -->
       <!-- ============================================== -->
       <div id="bulkReplaceStepBody2" style="display: none;">
         <div style="margin-bottom: 1.25rem;">
           <label style="display: block; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.4rem;">
-            2. Select Replacement Images & ZIP Packages:
+            Select New Replacement Files:
           </label>
-          <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 10px;">
-            Select replacement preview images (.png, .jpg, .webp) and embroidery design packages (.zip), or choose an entire folder (e.g. <code>ARUVI BULK DESIGNS 2</code>). All files are matched against products belonging to your chosen category scope.
+          <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 12px;">
+            Select replacement files directly (PNG, JPG, JPEG, WebP and ZIP). You do not need to select an entire folder.
           </p>
 
-          <!-- Dropzone -->
-          <div id="bulkReplaceDropZone" style="border: 2px dashed #0284C7; border-radius: 12px; padding: 2rem 1.5rem; text-align: center; background: #F0F9FF; transition: all 0.2s; cursor: pointer;" onclick="document.getElementById('bulkReplaceFileInput').click()">
-            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.4rem; color: #0284C7; margin-bottom: 10px;"></i>
-            <div style="font-size: 0.95rem; font-weight: 600; color: #0369A1; margin-bottom: 4px;">
-              Drag and drop images & ZIP files here, or click to browse
+          <!-- Dropzone & Browse Button -->
+          <div id="bulkReplaceDropZone" style="border: 2px dashed #0284C7; border-radius: 12px; padding: 2.25rem 1.5rem; text-align: center; background: #F0F9FF; transition: all 0.2s; cursor: pointer;" onclick="document.getElementById('bulkReplaceFileInput').click()">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.6rem; color: #0284C7; margin-bottom: 10px;"></i>
+            <div style="font-size: 1rem; font-weight: 600; color: #0369A1; margin-bottom: 4px;">
+              Drag and drop replacement files directly here
             </div>
-            <div style="font-size: 0.78rem; color: #64748B; margin-bottom: 14px;">
-              PNG, JPG, WEBP, ZIP • Max 120 MB per file • Suffix support: <code>_main</code> (primary image) or <code>_2</code> (extra image)
+            <div style="font-size: 0.8rem; color: #64748B; margin-bottom: 16px;">
+              or click <strong>Select Files</strong> to choose multiple images and ZIP packages
             </div>
-            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;" onclick="event.stopPropagation()">
-              <button type="button" onclick="document.getElementById('bulkReplaceFileInput').click()" class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 14px; border-radius: 8px;">
-                <i class="fa-solid fa-file-import"></i> Select Files (.png, .jpg, .zip)
-              </button>
-              <button type="button" id="bulkReplaceFolderBtn" class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 14px; border-radius: 8px;">
-                <i class="fa-solid fa-folder-open"></i> Select Folder (e.g. ARUVI BULK DESIGNS 2)
-              </button>
-            </div>
+            <button type="button" onclick="document.getElementById('bulkReplaceFileInput').click()" class="btn btn-primary" style="font-size: 0.86rem; padding: 8px 20px; border-radius: 8px; background: #0284C7; border-color: #0284C7; color: #FFF; display: inline-flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-file-circle-plus"></i> Select Files (.png, .jpg, .webp, .zip)
+            </button>
           </div>
           <input type="file" id="bulkReplaceFileInput" multiple accept=".png,.jpg,.jpeg,.webp,.zip" style="display: none;">
-          <input type="file" id="bulkReplaceFolderInput" webkitdirectory directory multiple style="display: none;">
-
-          <!-- Subfolder selector if folder has nested folders -->
-          <div id="bulkReplaceSubfolderWrapper" style="display: none; margin-top: 10px; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 8px; padding: 10px 14px;">
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px; display: block;">
-              <i class="fa-solid fa-folder-tree"></i> Detected Subfolders (e.g. "ARUVI BULK DESIGNS 2"):
-            </label>
-            <select id="bulkReplaceSubfolderSelect" class="form-control" onchange="window.bulkImageReplaceInstance.handleSubfolderSelect(this.value)" style="font-size: 0.85rem; padding: 6px 10px; border-radius: 6px; width: 100%;">
-            </select>
-          </div>
 
           <!-- Selected Files Summary Badges -->
-          <div id="selectedFilesSummaryBadge" style="display: none; margin-top: 12px; font-size: 0.82rem; font-weight: 600; color: #0284C7; background: #E0F2FE; border: 1px solid #BAE6FD; padding: 8px 14px; border-radius: 8px; flex-wrap: wrap; gap: 14px; align-items: center;">
-            <span><i class="fa-solid fa-folder"></i> <strong id="summaryFolderName">Folder</strong></span>
-            <span><i class="fa-solid fa-image"></i> <strong id="summaryImagesCount">0</strong> Images</span>
-            <span><i class="fa-solid fa-file-zipper"></i> <strong id="summaryZipsCount">0</strong> ZIP Packages</span>
-            <span><i class="fa-solid fa-layer-group"></i> Total: <strong id="summaryTotalCount">0</strong> Files</span>
-          </div>
-        </div>
-
-        <!-- Mode Radio Options -->
-        <div style="margin-top: 1.5rem; background: #FAF9F6; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem;">
-          <label style="display: block; font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 0.8rem;">
-            Replacement Mode:
-          </label>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
-              <input type="radio" name="bulkReplaceMode" value="replace_matching" checked style="margin-top: 3px;">
-              <div>
-                <strong style="font-size: 0.86rem; color: var(--admin-text-dark);">Replace matching files only (Default)</strong>
-                <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 2px 0 0;">
-                  Replace only the file types selected and successfully matched (e.g. image, ZIP, or both). Preserves existing files when a file type is not selected.
-                </p>
-              </div>
-            </label>
-
-            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
-              <input type="radio" name="bulkReplaceMode" value="replace_all" style="margin-top: 3px;">
-              <div>
-                <strong style="font-size: 0.86rem; color: var(--admin-text-dark);">Replace all images and ZIP files for matched products</strong>
-                <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 2px 0 0;">
-                  Replaces existing preview/gallery images and ZIP packages with newly selected files for confirmed products.
-                </p>
-              </div>
-            </label>
-
-            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
-              <input type="radio" name="bulkReplaceMode" value="add_extra" style="margin-top: 3px;">
-              <div>
-                <strong style="font-size: 0.86rem; color: var(--admin-text-dark);">Add extra images & replace ZIP packages</strong>
-                <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 2px 0 0;">
-                  Appends selected images to gallery without replacing primary image. ZIP packages are replaced if matched.
-                </p>
-              </div>
-            </label>
+          <div id="selectedFilesSummaryBadge" style="display: none; margin-top: 14px; font-size: 0.84rem; font-weight: 600; color: #0284C7; background: #E0F2FE; border: 1px solid #BAE6FD; padding: 10px 16px; border-radius: 8px; flex-wrap: wrap; gap: 16px; align-items: center;">
+            <span><i class="fa-solid fa-image"></i> Newly Selected Images: <strong id="selectedNewImagesCount">0</strong></span>
+            <span><i class="fa-solid fa-file-zipper"></i> Newly Selected ZIPs: <strong id="selectedNewZipsCount">0</strong></span>
+            <span><i class="fa-solid fa-layer-group"></i> Total Selected Files: <strong id="selectedNewTotalCount">0</strong></span>
           </div>
         </div>
       </div>
 
       <!-- ============================================== -->
-      <!-- STEP 3: MATCH PREVIEW & OVERRIDES              -->
+      <!-- STEP 3: CONFIRMATION SUMMARY                   -->
       <!-- ============================================== -->
       <div id="bulkReplaceStepBody3" style="display: none;">
-        <!-- Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.25rem;">
-          <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 10px; border-radius: 8px; text-align: center;">
-            <div id="previewStatWillReplace" style="font-size: 1.3rem; font-weight: 700; color: #2E7D32;">0</div>
-            <div style="font-size: 0.74rem; color: #1B5E20; font-weight: 600;">Designs Matched</div>
-          </div>
-          <div style="background: #EDE7F6; border: 1px solid #D1C4E9; padding: 10px; border-radius: 8px; text-align: center;">
-            <div id="previewStatImages" style="font-size: 1.3rem; font-weight: 700; color: #512DA8;">0</div>
-            <div style="font-size: 0.74rem; color: #311B92; font-weight: 600;">Images Matched</div>
-          </div>
-          <div style="background: #E0F7FA; border: 1px solid #B2EBF2; padding: 10px; border-radius: 8px; text-align: center;">
-            <div id="previewStatZips" style="font-size: 1.3rem; font-weight: 700; color: #00796B;">0</div>
-            <div style="font-size: 0.74rem; color: #004D40; font-weight: 600;">ZIPs Matched</div>
-          </div>
-          <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 10px; border-radius: 8px; text-align: center;">
-            <div id="previewStatNoFile" style="font-size: 1.3rem; font-weight: 700; color: #F57F17;">0</div>
-            <div style="font-size: 0.74rem; color: #795548; font-weight: 600;">Designs Without Files</div>
-          </div>
-          <div style="background: #E0F2FE; border: 1px solid #BAE6FD; padding: 10px; border-radius: 8px; text-align: center;">
-            <div id="previewStatUnmatched" style="font-size: 1.3rem; font-weight: 700; color: #0369A1;">0</div>
-            <div style="font-size: 0.74rem; color: #0284C7; font-weight: 600;">Unmatched Files</div>
-          </div>
-          <div style="background: #FFEBEE; border: 1px solid #FFCDD2; padding: 10px; border-radius: 8px; text-align: center;">
-            <div id="previewStatAmbiguous" style="font-size: 1.3rem; font-weight: 700; color: #C62828;">0</div>
-            <div style="font-size: 0.74rem; color: #B71C1C; font-weight: 600;">Ambiguous / Multiple</div>
-          </div>
-        </div>
+        <div style="max-width: 580px; margin: 0 auto; text-align: left;">
+          <h4 style="font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 8px; text-align: center;">
+            <i class="fa-solid fa-clipboard-check" style="color: #0284C7;"></i> Confirmation Summary
+          </h4>
+          <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin: 0 0 1.25rem; text-align: center;">
+            Please review the replacement details below before replacing the existing files.
+          </p>
 
-        <!-- Filter Tabs -->
-        <div style="display: flex; gap: 8px; margin-bottom: 0.75rem; border-bottom: 1px solid var(--admin-border); padding-bottom: 8px; flex-wrap: wrap;">
-          <button type="button" id="filterTab_all" class="btn btn-outline btn-sm preview-filter-tab active" onclick="window.bulkImageReplaceInstance.filterPreviewRows('all')" style="font-size: 0.75rem;">Show All</button>
-          <button type="button" id="filterTab_both" class="btn btn-outline btn-sm preview-filter-tab" onclick="window.bulkImageReplaceInstance.filterPreviewRows('both')" style="font-size: 0.75rem;">Both Image & ZIP</button>
-          <button type="button" id="filterTab_image_only" class="btn btn-outline btn-sm preview-filter-tab" onclick="window.bulkImageReplaceInstance.filterPreviewRows('image_only')" style="font-size: 0.75rem;">Image Only</button>
-          <button type="button" id="filterTab_zip_only" class="btn btn-outline btn-sm preview-filter-tab" onclick="window.bulkImageReplaceInstance.filterPreviewRows('zip_only')" style="font-size: 0.75rem;">ZIP Only</button>
-          <button type="button" id="filterTab_unmatched" class="btn btn-outline btn-sm preview-filter-tab" onclick="window.bulkImageReplaceInstance.filterPreviewRows('unmatched')" style="font-size: 0.75rem;">Unmatched Files</button>
-          <button type="button" id="filterTab_no_file" class="btn btn-outline btn-sm preview-filter-tab" onclick="window.bulkImageReplaceInstance.filterPreviewRows('no_file')" style="font-size: 0.75rem;">Designs Without File</button>
-        </div>
+          <div style="background: #FAF9F6; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
+              <div>
+                <span style="font-size: 0.74rem; color: var(--admin-text-muted); text-transform: uppercase; font-weight: 600; display: block;">Selected Category</span>
+                <strong id="confCategoryName" style="font-size: 0.95rem; color: var(--admin-text-dark);">-</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.74rem; color: var(--admin-text-muted); text-transform: uppercase; font-weight: 600; display: block;">Existing Folder / Group</span>
+                <strong id="confGroupName" style="font-size: 0.95rem; color: #0284C7;">-</strong>
+              </div>
+            </div>
 
-        <!-- Interactive Preview Table -->
-        <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 8px;">
-          <table class="tools-table" style="width: 100%; margin: 0; font-size: 0.78rem;">
-            <thead>
-              <tr style="background: #F8F9FA; position: sticky; top: 0; z-index: 2;">
-                <th style="padding: 8px 6px; width: 35px; text-align: center;">Inc.</th>
-                <th style="padding: 8px; min-width: 140px;">Design Info (SKU / Name)</th>
-                <th style="padding: 8px; min-width: 160px;">Preview Image (Old → New)</th>
-                <th style="padding: 8px; min-width: 160px;">ZIP Package (Old → New)</th>
-                <th style="padding: 8px; width: 100px;">Image Status</th>
-                <th style="padding: 8px; width: 100px;">ZIP Status</th>
-                <th style="padding: 8px; width: 90px;">Confidence</th>
-                <th style="padding: 8px; min-width: 140px;">Manual Mapping</th>
-              </tr>
-            </thead>
-            <tbody id="bulkReplacePreviewTbody"></tbody>
-          </table>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
+              <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 10px; border-radius: 8px;">
+                <div style="font-size: 0.74rem; color: #795548; font-weight: 600;">Existing Images in Group</div>
+                <div id="confOldImagesCount" style="font-size: 1.2rem; font-weight: 700; color: #F57F17;">0</div>
+                <div style="font-size: 0.7rem; color: #B71C1C; margin-top: 2px;">Will be removed</div>
+              </div>
+              <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 10px; border-radius: 8px;">
+                <div style="font-size: 0.74rem; color: #795548; font-weight: 600;">Existing ZIPs in Group</div>
+                <div id="confOldZipsCount" style="font-size: 1.2rem; font-weight: 700; color: #F57F17;">0</div>
+                <div style="font-size: 0.7rem; color: #B71C1C; margin-top: 2px;">Will be removed</div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 10px; border-radius: 8px;">
+                <div style="font-size: 0.74rem; color: #1B5E20; font-weight: 600;">New Images Selected</div>
+                <div id="confNewImagesCount" style="font-size: 1.2rem; font-weight: 700; color: #2E7D32;">0</div>
+                <div style="font-size: 0.7rem; color: #2E7D32; margin-top: 2px;">Will be active</div>
+              </div>
+              <div style="background: #E0F7FA; border: 1px solid #B2EBF2; padding: 10px; border-radius: 8px;">
+                <div style="font-size: 0.74rem; color: #004D40; font-weight: 600;">New ZIPs Selected</div>
+                <div id="confNewZipsCount" style="font-size: 1.2rem; font-weight: 700; color: #00796B;">0</div>
+                <div style="font-size: 0.7rem; color: #00796B; margin-top: 2px;">Will be active</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Safety Notice -->
+          <div style="padding: 10px 14px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; font-size: 0.78rem; color: #166534; display: flex; align-items: flex-start; gap: 8px;">
+            <i class="fa-solid fa-shield-halved" style="font-size: 1rem; color: #16A34A; margin-top: 2px;"></i>
+            <div>
+              <strong>Safe File Replacement:</strong> Product IDs, SKUs, titles, descriptions, pricing, stitch counts, orders, and customer download permissions will remain completely intact. 7-Day rollback is backed up automatically.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2488,19 +2414,19 @@
         <!-- Upload Progress Section -->
         <div id="uploadProgressSection" style="text-align: center; padding: 2.5rem 1.5rem;">
           <div style="font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;">
-            Processing & Uploading Files...
+            Replacing Files in Group...
           </div>
           <p id="bulkReplaceProgressStatus" style="font-size: 0.85rem; color: var(--admin-text-muted); margin-bottom: 1.5rem;">
-            Uploading files in chunks (5 files per request, 3 in parallel)...
+            Uploading newly selected files in chunks (5 files per request)...
           </p>
 
           <div style="width: 100%; max-width: 500px; height: 16px; background: #E2E8F0; border-radius: 999px; margin: 0 auto 12px; overflow: hidden; position: relative;">
-            <div id="bulkReplaceProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0284C7, #0369A1); transition: width 0.3s ease;"></div>
+            <div id="bulkReplaceProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #16A34A, #22C55E); transition: width 0.3s ease;"></div>
           </div>
-          <div id="bulkReplaceProgressPercent" style="font-size: 0.95rem; font-weight: 700; color: #0284C7; margin-bottom: 1.5rem;">0%</div>
+          <div id="bulkReplaceProgressPercent" style="font-size: 0.95rem; font-weight: 700; color: #16A34A; margin-bottom: 1.5rem;">0%</div>
 
           <button type="button" onclick="window.bulkImageReplaceInstance.cancelUpload()" class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 16px; border-radius: 8px; color: #C62828; border-color: #FFCDD2;">
-            <i class="fa-solid fa-xmark"></i> Cancel Upload
+            <i class="fa-solid fa-xmark"></i> Cancel
           </button>
         </div>
 
@@ -2510,13 +2436,13 @@
             <i class="fa-solid fa-circle-check"></i>
           </div>
           <h3 style="font-size: 1.3rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
-            Bulk Replacement Completed!
+            File Group Replacement Completed!
           </h3>
-          <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin: 0 0 1.5rem;">
-            New preview images and ZIP packages have been safely verified and committed to the database.
+          <p id="reportGroupSummaryText" style="font-size: 0.85rem; color: var(--admin-text-muted); margin: 0 0 1.5rem;">
+            Old files in this group have been removed, and the newly selected files are now active.
           </p>
 
-          <!-- Report Stats (4-card breakdown) -->
+          <!-- Report Stats -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; max-width: 560px; margin: 0 auto 1.5rem;">
             <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 10px; border-radius: 8px;">
               <div id="reportCountReplacedImages" style="font-size: 1.3rem; font-weight: 700; color: #2E7D32;">0</div>
@@ -2527,8 +2453,8 @@
               <div style="font-size: 0.74rem; color: #004D40; font-weight: 600;">Replaced ZIPs</div>
             </div>
             <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 10px; border-radius: 8px;">
-              <div id="reportCountSkipped" style="font-size: 1.3rem; font-weight: 700; color: #F57F17;">0</div>
-              <div style="font-size: 0.74rem; color: #795548; font-weight: 600;">Skipped</div>
+              <div id="reportCountRemovedOld" style="font-size: 1.3rem; font-weight: 700; color: #F57F17;">0</div>
+              <div style="font-size: 0.74rem; color: #795548; font-weight: 600;">Old Files Removed</div>
             </div>
             <div style="background: #FFEBEE; border: 1px solid #FFCDD2; padding: 10px; border-radius: 8px;">
               <div id="reportCountFailed" style="font-size: 1.3rem; font-weight: 700; color: #C62828;">0</div>
@@ -2538,14 +2464,11 @@
 
           <!-- Actions -->
           <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-            <button type="button" id="bulkReplaceRetryFailedBtn" onclick="window.bulkImageReplaceInstance.retryFailed()" class="btn btn-warning" style="display: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; cursor: pointer; align-items: center; gap: 6px;">
-              <i class="fa-solid fa-arrows-rotate"></i> Retry Failed Replacements
-            </button>
             <a id="bulkReplaceDownloadCsvBtn" href="#" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
               <i class="fa-solid fa-file-csv"></i> Download CSV Report
             </a>
             <button type="button" id="bulkReplaceUndoBtn" class="btn" style="display: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; cursor: pointer; align-items: center; gap: 6px;">
-              <i class="fa-solid fa-rotate-left"></i> Undo This Bulk Replace (7 Days)
+              <i class="fa-solid fa-rotate-left"></i> Undo This Replacement (7 Days)
             </button>
             <a href="/admin/tools/image-replace-history" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
               <i class="fa-solid fa-clock-rotate-left"></i> View History
@@ -2564,19 +2487,19 @@
     <div id="bulkReplaceStepFooter1" style="padding: 1rem 1.75rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;">
       <button type="button" onclick="closeBulkReplaceImagesModal()" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">Cancel</button>
       <button type="button" id="bulkReplaceScopeNextBtn" onclick="window.bulkImageReplaceInstance.proceedToStep2()" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 20px; border-radius: 8px; background: #0284C7; border-color: #0284C7; color: #FFF; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-        Next: Select Files <i class="fa-solid fa-arrow-right"></i>
+        Next: Select New Files <i class="fa-solid fa-arrow-right"></i>
       </button>
     </div>
 
     <!-- Step 2 Footer -->
     <div id="bulkReplaceStepFooter2" style="display: none; padding: 1rem 1.75rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; justify-content: space-between; gap: 10px; flex-shrink: 0;">
       <button type="button" onclick="window.bulkImageReplaceInstance.currentStep = 1; window.bulkImageReplaceInstance.updateStepView();" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">
-        <i class="fa-solid fa-arrow-left"></i> Back to Scope
+        <i class="fa-solid fa-arrow-left"></i> Back to Group
       </button>
       <div style="display: flex; gap: 10px;">
         <button type="button" onclick="closeBulkReplaceImagesModal()" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">Cancel</button>
         <button type="button" id="bulkReplaceFilesNextBtn" disabled onclick="window.bulkImageReplaceInstance.proceedToStep3()" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 20px; border-radius: 8px; background: #0284C7; border-color: #0284C7; color: #FFF; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-          Next: Preview Matches <i class="fa-solid fa-arrow-right"></i>
+          Next: Review & Confirm <i class="fa-solid fa-arrow-right"></i>
         </button>
       </div>
     </div>
@@ -2588,8 +2511,8 @@
       </button>
       <div style="display: flex; gap: 10px;">
         <button type="button" onclick="closeBulkReplaceImagesModal()" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">Cancel</button>
-        <button type="button" onclick="window.bulkImageReplaceInstance.proceedToStep4Apply()" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 24px; border-radius: 8px; background: #2E7D32; border-color: #2E7D32; color: #FFF; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-          <i class="fa-solid fa-check"></i> Apply Bulk Replace
+        <button type="button" id="bulkReplaceConfirmBtn" onclick="window.bulkImageReplaceInstance.executeReplace()" class="btn btn-primary" style="font-size: 0.9rem; padding: 10px 24px; border-radius: 8px; background: #16A34A; border-color: #16A34A; color: #FFF; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+          <i class="fa-solid fa-bolt"></i> Replace Files Now
         </button>
       </div>
     </div>
