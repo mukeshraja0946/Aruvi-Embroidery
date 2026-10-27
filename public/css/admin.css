@@ -801,3 +801,20 @@ body.admin-body {
   }
 }
 
+/* Fullscreen Modal Overlay */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 999999 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem !important;
+  box-sizing: border-box !important;
+}
+

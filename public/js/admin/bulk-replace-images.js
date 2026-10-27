@@ -75,7 +75,10 @@
 
     async openModal() {
       const modal = document.getElementById('bulkReplaceImagesModal');
-      if (!modal) return;
+      if (!modal) {
+        console.error('[BulkReplace] Modal element #bulkReplaceImagesModal not found');
+        return;
+      }
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
 
@@ -88,7 +91,12 @@
       this.lastLogId = null;
 
       this.updateStepView();
-      await this.loadScopeSummary();
+
+      try {
+        await this.loadScopeSummary();
+      } catch (err) {
+        console.warn('[BulkReplace] Failed to load scope summary on modal open:', err);
+      }
     }
 
     closeModal() {
@@ -113,6 +121,17 @@
         if (stepHeader) {
           stepHeader.classList.toggle('active', s === this.currentStep);
           stepHeader.classList.toggle('completed', s < this.currentStep);
+
+          if (s === this.currentStep) {
+            stepHeader.style.background = '#0284C7';
+            stepHeader.style.color = '#FFFFFF';
+          } else if (s < this.currentStep) {
+            stepHeader.style.background = '#E0F2FE';
+            stepHeader.style.color = '#0369A1';
+          } else {
+            stepHeader.style.background = '#E2E8F0';
+            stepHeader.style.color = '#475569';
+          }
         }
         if (stepBody) stepBody.style.display = (s === this.currentStep) ? 'block' : 'none';
         if (stepFooter) stepFooter.style.display = (s === this.currentStep) ? 'flex' : 'none';
@@ -723,20 +742,56 @@
     }
   }
 
-  // Instantiate and expose globally
-  document.addEventListener('DOMContentLoaded', () => {
-    window.bulkImageReplaceInstance = new BulkImageReplace();
-  });
+  // Helper to ensure instance is initialized
+  function ensureInstance() {
+    if (!window.bulkImageReplaceInstance) {
+      window.bulkImageReplaceInstance = new BulkImageReplace();
+    }
+    return window.bulkImageReplaceInstance;
+  }
+
+  // Instantiate immediately if DOM is ready, or on DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureInstance);
+  } else {
+    ensureInstance();
+  }
 
   window.openBulkReplaceImagesModal = function () {
-    if (window.bulkImageReplaceInstance) {
-      window.bulkImageReplaceInstance.openModal();
+    try {
+      const inst = ensureInstance();
+      if (inst) {
+        inst.openModal();
+        return;
+      }
+    } catch (e) {
+      console.error('[BulkReplace] Error opening modal via instance:', e);
+    }
+
+    // Direct DOM fallback
+    const modal = document.getElementById('bulkReplaceImagesModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
     }
   };
 
   window.closeBulkReplaceImagesModal = function () {
-    if (window.bulkImageReplaceInstance) {
-      window.bulkImageReplaceInstance.closeModal();
+    try {
+      const inst = ensureInstance();
+      if (inst) {
+        inst.closeModal();
+        return;
+      }
+    } catch (e) {
+      console.error('[BulkReplace] Error closing modal via instance:', e);
+    }
+
+    // Direct DOM fallback
+    const modal = document.getElementById('bulkReplaceImagesModal');
+    if (modal) {
+      modal.style.display = 'none';
+      document.body.style.overflow = '';
     }
   };
 })();
