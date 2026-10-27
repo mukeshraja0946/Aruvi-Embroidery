@@ -167,8 +167,13 @@ class BulkImageReplaceService {
     if (db.isConnected()) {
       try {
         scopedDesigns = (await db.query(`
-          SELECT d.id, d.sku, d.title, d.category_id, d.primary_image, d.is_active,
+          SELECT d.id, d.sku, d.title, d.category_id, d.is_active,
                  c.name AS category_name, c.slug AS category_slug,
+                 COALESCE(
+                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY id ASC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND (is_preview = 1 OR file_kind = 'image') ORDER BY id DESC LIMIT 1)
+                 ) AS primary_image,
                  (SELECT COUNT(*) FROM design_images di WHERE di.design_id = d.id) AS total_images,
                  (SELECT df.file_name FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_name,
                  (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_path,
@@ -677,14 +682,7 @@ class BulkImageReplaceService {
       for (const dId of chunk) {
         const designFiles = itemsByDesign.get(dId);
         try {
-          let design = null;
-          if (db.isConnected()) {
-            const [row] = await db.query('SELECT id, sku, title, primary_image FROM designs WHERE id = ?', [dId]);
-            design = row;
-          }
-          if (!design) {
-            design = await Design.getById(dId);
-          }
+          let design = await Design.getById(dId);
           if (!design) {
             skippedCount++;
             continue;
@@ -719,7 +717,9 @@ class BulkImageReplaceService {
             if (replacementMode === 'replace_all') {
               if (db.isConnected()) {
                 await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
-                await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedPrimaryUrl, dId]);
+                try {
+                  await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedPrimaryUrl, dId]);
+                } catch (_) {}
                 for (let i = 0; i < imageFiles.length; i++) {
                   const f = imageFiles[i];
                   const isP = (f === primaryFile) ? 1 : 0;
@@ -943,7 +943,9 @@ class BulkImageReplaceService {
         const oldFilesJson = item.old_files_json;
 
         if (oldPrimary && db.isConnected()) {
-          await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [oldPrimary, dId]);
+          try {
+            await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [oldPrimary, dId]);
+          } catch (_) {}
         }
 
         let oldImages = [];
@@ -1161,8 +1163,12 @@ class BulkImageReplaceService {
     if (db.isConnected()) {
       try {
         let sql = `
-          SELECT d.id, d.sku, d.title, d.category_id, d.primary_image, d.import_zip_filename, d.import_image_filename,
-                 c.name as category_name
+          SELECT d.*, c.name as category_name,
+                 COALESCE(
+                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY id ASC LIMIT 1),
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND (is_preview = 1 OR file_kind = 'image') ORDER BY id DESC LIMIT 1)
+                 ) AS primary_image
           FROM designs d
           LEFT JOIN categories c ON d.category_id = c.id
         `;
@@ -1352,14 +1358,7 @@ class BulkImageReplaceService {
       const designSummary = groupDesigns[i];
       const dId = designSummary.id;
 
-      let fullDesign = null;
-      if (db.isConnected()) {
-        const [row] = await db.query('SELECT id, sku, title, primary_image FROM designs WHERE id = ?', [dId]);
-        fullDesign = row;
-      }
-      if (!fullDesign) {
-        fullDesign = await Design.getById(dId);
-      }
+      let fullDesign = await Design.getById(dId);
       if (!fullDesign) continue;
 
       // Collect old image records & old machine file records for backup

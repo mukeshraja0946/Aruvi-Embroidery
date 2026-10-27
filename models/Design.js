@@ -606,8 +606,10 @@ class Design {
           [designId, primaryRowId, imageUrl]
         );
 
-        // Update designs table primary_image
-        await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [imageUrl, designId]);
+        // Update designs table primary_image if column exists
+        try {
+          await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [imageUrl, designId]);
+        } catch (_) {}
 
         // Update preview record in design_files
         const existingPreviewFiles = await db.query(
@@ -644,8 +646,12 @@ class Design {
           if (oldUrl && oldUrl !== imageUrl && !oldUrl.startsWith('/public/images/')) {
             try {
               const [otherDi] = await db.query('SELECT COUNT(*) AS count FROM design_images WHERE image_url = ?', [oldUrl]);
-              const [otherD] = await db.query('SELECT COUNT(*) AS count FROM designs WHERE primary_image = ?', [oldUrl]);
-              if ((!otherDi || otherDi.count === 0) && (!otherD || otherD.count === 0)) {
+              let otherDCount = 0;
+              try {
+                const [otherD] = await db.query('SELECT COUNT(*) AS count FROM designs WHERE primary_image = ?', [oldUrl]);
+                otherDCount = (otherD && otherD.count) || 0;
+              } catch (_) {}
+              if ((!otherDi || otherDi.count === 0) && otherDCount === 0) {
                 const cleanOld = oldUrl.split('?')[0].replace(/^\//, '');
                 const oldPhysical = path.resolve(__dirname, '..', cleanOld);
                 if (fs.existsSync(oldPhysical) && fs.statSync(oldPhysical).isFile()) {

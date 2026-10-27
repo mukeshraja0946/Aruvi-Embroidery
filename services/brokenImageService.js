@@ -178,9 +178,13 @@ class BrokenImageService {
       );
       if (remaining && remaining.length > 0) {
         await db.query('UPDATE design_images SET is_primary = 1 WHERE id = ?', [remaining[0].id]);
-        await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [remaining[0].image_url, dId]);
+        try {
+          await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [remaining[0].image_url, dId]);
+        } catch (_) {}
       } else {
-        await db.query('UPDATE designs SET primary_image = NULL WHERE id = ?', [dId]);
+        try {
+          await db.query('UPDATE designs SET primary_image = NULL WHERE id = ?', [dId]);
+        } catch (_) {}
       }
     }
 
