@@ -465,7 +465,16 @@ class Design {
         const rows = await db.query(sql, [slug, isNaN(slug) ? 0 : parseInt(slug)]);
         if (rows && rows[0]) {
           const design = rows[0];
-          design.images = await db.query('SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC', [design.id]) || [];
+          const rawImages = await db.query('SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC', [design.id]) || [];
+          const seenImgKeys = new Set();
+          design.images = [];
+          for (const img of rawImages) {
+            const rawUrl = img.image_url ? String(img.image_url).trim() : '';
+            if (rawUrl && !seenImgKeys.has(rawUrl.toLowerCase())) {
+              seenImgKeys.add(rawUrl.toLowerCase());
+              design.images.push(img);
+            }
+          }
           design.preview_images = design.images;
 
           const rawFiles = await db.query('SELECT * FROM design_files WHERE design_id = ? ORDER BY sort_order ASC, id ASC', [design.id]) || [];
@@ -538,39 +547,121 @@ class Design {
     }
   }
 
-  static async replacePrimaryImage(designId, imageUrl, fileName = null, fileSize = 0) {
+  static async replacePrimaryImage(designId, imageUrl, fileName = null, fileSize = 0, checksum = null) {
     const finalFileName = fileName || path.basename(imageUrl);
     const ext = finalFileName.split('.').pop().toUpperCase();
     if (db.isConnected()) {
       try {
-        // Find existing primary image records to clean up after successful update
+        // Find existing primary image records before replacement
         const oldPrimaries = await db.query(
-          'SELECT id, image_url FROM design_images WHERE design_id = ? AND is_primary = 1',
+          'SELECT id, image_url FROM design_images WHERE design_id = ? AND is_primary = 1 ORDER BY id ASC',
           [designId]
+        ) || [];
+
+        let primaryRowId = null;
+        if (oldPrimaries.length > 0) {
+          primaryRowId = oldPrimaries[0].id;
+          // Update the SAME existing design_images record (keeps same ID, primary flag & order)
+          try {
+            await db.query(
+              'UPDATE design_images SET image_url = ?, is_primary = 1, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW() WHERE id = ?',
+              [imageUrl, fileSize || 0, checksum || null, primaryRowId]
+            );
+          } catch {
+            // Fallback if version/checksum columns not yet added
+            await db.query(
+              'UPDATE design_images SET image_url = ?, is_primary = 1 WHERE id = ?',
+              [imageUrl, primaryRowId]
+            );
+          }
+          // Remove duplicate primary rows for this design to prevent ghost thumbnails
+          if (oldPrimaries.length > 1) {
+            const extraIds = oldPrimaries.slice(1).map(r => r.id);
+            await db.query(`DELETE FROM design_images WHERE id IN (${extraIds.join(',')})`);
+          }
+        } else {
+          // Check if any row exists for this design in design_images
+          const anyRows = await db.query(
+            'SELECT id FROM design_images WHERE design_id = ? ORDER BY id ASC LIMIT 1',
+            [designId]
+          ) || [];
+          if (anyRows.length > 0) {
+            primaryRowId = anyRows[0].id;
+            await db.query(
+              'UPDATE design_images SET image_url = ?, is_primary = 1, display_order = 0 WHERE id = ?',
+              [imageUrl, primaryRowId]
+            );
+          } else {
+            const insertRes = await db.query(
+              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)',
+              [designId, imageUrl]
+            );
+            primaryRowId = insertRes.insertId;
+          }
+        }
+
+        // Clean up any extra rows for this design that have identical image_url
+        await db.query(
+          'DELETE FROM design_images WHERE design_id = ? AND id != ? AND image_url = ?',
+          [designId, primaryRowId, imageUrl]
         );
 
-        // Demote previous primary flags
-        await db.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ?', [designId]);
-        await db.query('UPDATE design_files SET is_preview = 0 WHERE design_id = ?', [designId]);
+        // Update designs table primary_image
+        await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [imageUrl, designId]);
 
-        // Check if image already exists in design_images
-        const existingImg = await db.query('SELECT id FROM design_images WHERE design_id = ? AND image_url = ?', [designId, imageUrl]);
-        if (existingImg && existingImg.length > 0) {
-          await db.query('UPDATE design_images SET is_primary = 1 WHERE id = ?', [existingImg[0].id]);
+        // Update preview record in design_files
+        const existingPreviewFiles = await db.query(
+          "SELECT id FROM design_files WHERE design_id = ? AND (is_preview = 1 OR file_kind = 'image') ORDER BY id ASC",
+          [designId]
+        ) || [];
+        if (existingPreviewFiles.length > 0) {
+          await db.query(
+            'UPDATE design_files SET file_name = ?, file_path = ?, file_format = ?, file_size = ?, is_preview = 1 WHERE id = ?',
+            [finalFileName, imageUrl, ext, fileSize || 0, existingPreviewFiles[0].id]
+          );
+          if (existingPreviewFiles.length > 1) {
+            const extraFIds = existingPreviewFiles.slice(1).map(f => f.id);
+            await db.query(`DELETE FROM design_files WHERE id IN (${extraFIds.join(',')})`);
+          }
         } else {
-          await db.query('INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)', [designId, imageUrl]);
+          await db.query(
+            'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview, file_kind) VALUES (?, ?, ?, ?, ?, 1, "image")',
+            [designId, finalFileName, imageUrl, ext, fileSize || 0]
+          );
         }
 
-        // Check if preview file exists in design_files
-        const existingFile = await db.query('SELECT id FROM design_files WHERE design_id = ? AND file_path = ?', [designId, imageUrl]);
-        if (existingFile && existingFile.length > 0) {
-          await db.query('UPDATE design_files SET is_preview = 1 WHERE id = ?', [existingFile[0].id]);
-        } else {
-          await db.query('INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview) VALUES (?, ?, ?, ?, ?, 1)', [designId, finalFileName, imageUrl, ext, fileSize]);
+        // Regenerate thumbnail
+        try {
+          await storage.buildThumbnailUrl(imageUrl);
+        } catch (tErr) {
+          console.warn('[Thumbnail Regen Warning]:', tErr.message);
         }
 
-        // Note: Do not automatically delete old physical files or records to protect user data.
-        // Previous images are simply demoted (is_primary = 0, is_preview = 0).
+        // Safe physical file cleanup:
+        // Delete old physical file only after DB commit and ONLY if no other row references it!
+        for (const oldRec of oldPrimaries) {
+          const oldUrl = oldRec.image_url;
+          if (oldUrl && oldUrl !== imageUrl && !oldUrl.startsWith('/public/images/')) {
+            try {
+              const [otherDi] = await db.query('SELECT COUNT(*) AS count FROM design_images WHERE image_url = ?', [oldUrl]);
+              const [otherD] = await db.query('SELECT COUNT(*) AS count FROM designs WHERE primary_image = ?', [oldUrl]);
+              if ((!otherDi || otherDi.count === 0) && (!otherD || otherD.count === 0)) {
+                const cleanOld = oldUrl.split('?')[0].replace(/^\//, '');
+                const oldPhysical = path.resolve(__dirname, '..', cleanOld);
+                if (fs.existsSync(oldPhysical) && fs.statSync(oldPhysical).isFile()) {
+                  fs.unlinkSync(oldPhysical);
+                }
+                const oldBase = path.basename(cleanOld, path.extname(cleanOld));
+                const oldThumb = path.join(storage.getThumbsDir(), `${oldBase}.webp`);
+                if (fs.existsSync(oldThumb)) {
+                  fs.unlinkSync(oldThumb);
+                }
+              }
+            } catch (unlinkErr) {
+              console.warn('[Old Image Cleanup Warning]:', unlinkErr.message);
+            }
+          }
+        }
 
         return true;
       } catch (err) {
@@ -581,9 +672,7 @@ class Design {
     const target = fallbackDesigns.find(d => d.id == designId);
     if (target) {
       target.primary_image = imageUrl;
-      if (!target.images) target.images = [];
-      target.images.forEach(img => { img.is_primary = 0; });
-      target.images.unshift({ id: Date.now(), image_url: imageUrl, is_primary: 1 });
+      target.images = [{ id: 1, image_url: imageUrl, is_primary: 1, display_order: 0 }];
       saveFallbackDesigns(fallbackDesigns);
     }
     return true;
@@ -629,11 +718,21 @@ class Design {
     return fallbackDesigns.filter(d => d.category_id == categoryId && d.id != currentDesignId).slice(0, limit);
   }
 
+  static appendVersionSuffix(url, stamp) {
+    if (!url || typeof url !== 'string') return url;
+    if (url.includes('?v=') || url.includes('&v=')) return url;
+    if (url.startsWith('/public/images/cat_')) return url;
+    const v = stamp || Date.now();
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}v=${v}`;
+  }
+
   static normalizePrimaryImage(d) {
     if (!d) return d;
     let img = d.primary_image ? String(d.primary_image).trim() : '';
     const ext = img ? img.split('.').pop().toLowerCase() : '';
     const nonImgExts = ['zip', 'dst', 'pes', 'jef', 'exp', 'hus', 'vip', 'vp3', 'xxx'];
+    const stamp = d.updated_at ? new Date(d.updated_at).getTime() : null;
 
     // Placeholder is used ONLY when a product has no image or an invalid non-image format.
     // Neutral placeholder is handled in UI; primary_image remains null.
@@ -644,14 +743,30 @@ class Design {
     } else {
       img = storage.buildPublicUrl(img);
       d.thumbnail_image = storage.buildThumbnailUrl(img);
+      if (stamp) {
+        img = this.appendVersionSuffix(img, stamp);
+        if (d.thumbnail_image) d.thumbnail_image = this.appendVersionSuffix(d.thumbnail_image, stamp);
+      }
     }
 
     d.primary_image = img;
 
     if (d.images && Array.isArray(d.images)) {
+      const validImages = [];
+      const seen = new Set();
       for (const im of d.images) {
-        if (im.image_url) im.image_url = storage.buildPublicUrl(im.image_url);
+        if (im && im.image_url) {
+          let pubUrl = storage.buildPublicUrl(im.image_url);
+          if (pubUrl && !seen.has(pubUrl.toLowerCase())) {
+            seen.add(pubUrl.toLowerCase());
+            const imStamp = im.updated_at ? new Date(im.updated_at).getTime() : stamp;
+            if (imStamp) pubUrl = this.appendVersionSuffix(pubUrl, imStamp);
+            im.image_url = pubUrl;
+            validImages.push(im);
+          }
+        }
       }
+      d.images = validImages;
     }
 
     return d;

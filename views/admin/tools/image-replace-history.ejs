@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <style>
+    .history-card-box {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+    .history-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .history-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .history-stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+    .badge-status-pill {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .badge-active-update {
+      background: #E8F5E9;
+      color: #2E7D32;
+      border: 1px solid #C8E6C9;
+    }
+    .badge-undone-update {
+      background: #ECEFF1;
+      color: #546E7A;
+      border: 1px solid #CFD8DC;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+
+    <div class="admin-search-bar">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" placeholder="Search replace logs...">
+    </div>
+
+    <div class="admin-header-right">
+      <a href="/admin/designs" class="btn btn-outline" style="height: 38px; font-size: 0.85rem; padding: 0 1rem; display: inline-flex; align-items: center; gap: 6px;">
+        <i class="fa-solid fa-arrow-left"></i> Manage Designs
+      </a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="admin-nav-list">
+        <li class="sidebar-nav-item"><a href="/admin"><span class="sidebar-nav-label"><i class="fa-solid fa-gauge-high"></i> Dashboard</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/designs"><span class="sidebar-nav-label"><i class="fa-solid fa-palette"></i> Manage Designs</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/categories"><span class="sidebar-nav-label"><i class="fa-solid fa-tags"></i> Categories</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/orders"><span class="sidebar-nav-label"><i class="fa-solid fa-bag-shopping"></i> Orders</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/users"><span class="sidebar-nav-label"><i class="fa-solid fa-users"></i> Users</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/tools/price-history"><span class="sidebar-nav-label"><i class="fa-solid fa-chart-line"></i> Price History</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/tools/image-replace-history" class="active"><span class="sidebar-nav-label"><i class="fa-solid fa-clock-rotate-left"></i> Image Replace History</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span class="sidebar-nav-label"><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+        <li class="sidebar-nav-item"><a href="/admin/settings"><span class="sidebar-nav-label"><i class="fa-solid fa-gear"></i> Settings</span></a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Bulk Image Replace History & Audit</h1>
+          <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">
+            Comprehensive audit log of category-scoped image replacements with 7-day rollback & undo support.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.6rem;">
+          <a href="/admin/designs" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-right-arrow-left"></i> Bulk Replace Images
+          </a>
+        </div>
+      </div>
+
+      <!-- Stat Grid -->
+      <%
+        const totalBatches = pagination.totalCount || (logs ? logs.length : 0);
+        const undoneCount = logs ? logs.filter(l => l.is_undone).length : 0;
+        const activeCount = totalBatches - undoneCount;
+        const totalImagesReplaced = logs ? logs.reduce((sum, l) => sum + (l.replaced_count || 0), 0) : 0;
+      %>
+      <div class="history-stat-grid">
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #E3F2FD; color: #1565C0;">
+            <i class="fa-solid fa-boxes-stacked"></i>
+          </div>
+          <div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #1565C0;"><%= totalBatches %></div>
+            <div style="font-size: 0.8rem; color: var(--admin-text-muted);">Total Bulk Batches</div>
+          </div>
+        </div>
+
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #E8F5E9; color: #2E7D32;">
+            <i class="fa-solid fa-images"></i>
+          </div>
+          <div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #2E7D32;"><%= totalImagesReplaced %></div>
+            <div style="font-size: 0.8rem; color: var(--admin-text-muted);">Designs Replaced</div>
+          </div>
+        </div>
+
+        <div class="history-stat-card">
+          <div class="history-stat-icon" style="background: #FFF3E0; color: #E65100;">
+            <i class="fa-solid fa-rotate-left"></i>
+          </div>
+          <div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #E65100;"><%= undoneCount %></div>
+            <div style="font-size: 0.8rem; color: var(--admin-text-muted);">Undone / Reverted</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Table -->
+      <div class="history-card-box">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--admin-border); background: #FAF6F0; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 1rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Replacement Batches</h3>
+          <span style="font-size: 0.8rem; color: var(--admin-text-muted);">Showing <%= logs ? logs.length : 0 %> records</span>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="tools-table" style="width: 100%; margin: 0; font-size: 0.85rem;">
+            <thead>
+              <tr style="background: #F8F9FA;">
+                <th style="padding: 10px 14px;">Batch ID</th>
+                <th style="padding: 10px 14px;">Date & Time</th>
+                <th style="padding: 10px 14px;">Category / Scope</th>
+                <th style="padding: 10px 14px;">Mode</th>
+                <th style="padding: 10px 14px;">Replaced</th>
+                <th style="padding: 10px 14px;">Admin User</th>
+                <th style="padding: 10px 14px;">Status</th>
+                <th style="padding: 10px 14px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!logs || logs.length === 0) { %>
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 2.5rem 1rem; color: var(--admin-text-muted);">
+                    <i class="fa-regular fa-image" style="font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.4;"></i>
+                    No bulk image replacements recorded yet.
+                  </td>
+                </tr>
+              <% } else { %>
+                <% logs.forEach(log => { %>
+                  <tr>
+                    <td style="font-weight: 700; padding: 10px 14px;">#<%= log.id %></td>
+                    <td style="padding: 10px 14px; color: #555;">
+                      <%= new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) %>
+                    </td>
+                    <td style="padding: 10px 14px; font-weight: 600;">
+                      <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 0.76rem;">
+                        <%= log.category_name || 'All Categories' %>
+                      </span>
+                      <div style="font-size: 0.74rem; color: var(--admin-text-muted); font-weight: normal; margin-top: 2px;">
+                        <%= log.scope_summary || '' %>
+                      </div>
+                    </td>
+                    <td style="padding: 10px 14px; font-size: 0.8rem; text-transform: capitalize;">
+                      <%= (log.replacement_mode || 'replace_primary').replace(/_/g, ' ') %>
+                    </td>
+                    <td style="padding: 10px 14px;">
+                      <strong style="color: #2E7D32;"><%= log.replaced_count %></strong>
+                      <% if (log.failed_count > 0) { %>
+                        <span style="color: #C62828; font-size: 0.75rem; margin-left: 4px;">(<%= log.failed_count %> failed)</span>
+                      <% } %>
+                    </td>
+                    <td style="padding: 10px 14px; color: #666; font-size: 0.8rem;">
+                      <%= log.admin_email || 'admin' %>
+                    </td>
+                    <td style="padding: 10px 14px;">
+                      <% if (log.is_undone) { %>
+                        <span class="badge-status-pill badge-undone-update">
+                          <i class="fa-solid fa-rotate-left"></i> Undone (<%= new Date(log.undone_at).toLocaleDateString('en-IN') %>)
+                        </span>
+                      <% } else { %>
+                        <span class="badge-status-pill badge-active-update">
+                          <i class="fa-solid fa-circle-check"></i> Applied
+                        </span>
+                      <% } %>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: right; white-space: nowrap;">
+                      <a href="/admin/designs/bulk-replace/export-csv/<%= log.id %>" class="btn btn-outline" style="font-size: 0.74rem; padding: 4px 8px; border-radius: 6px; text-decoration: none;" title="Download CSV Report">
+                        <i class="fa-solid fa-file-csv"></i> CSV
+                      </a>
+                      <% if (!log.is_undone) { %>
+                        <button type="button" onclick="undoBulkReplace('<%= log.id %>')" class="btn" style="font-size: 0.74rem; padding: 4px 10px; border-radius: 6px; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; margin-left: 4px; cursor: pointer;">
+                          <i class="fa-solid fa-rotate-left"></i> Undo
+                        </button>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  async function undoBulkReplace(logId) {
+    if (!confirm(`Are you sure you want to revert bulk replacement #${logId}? This will restore all affected designs to their previous primary images and gallery photos.`)) {
+      return;
+    }
+
+    try {
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+      const res = await fetch(`/admin/designs/bulk-replace/undo/${logId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrf
+        },
+        body: JSON.stringify({ _csrf: csrf })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || 'Bulk replace successfully reverted.');
+        window.location.reload();
+      } else {
+        alert('Undo error: ' + (data.message || 'Failed to revert'));
+      }
+    } catch (err) {
+      alert('Network error while reverting: ' + err.message);
+    }
+  }
+</script>
+</body>
+</html>

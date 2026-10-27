@@ -7689,6 +7689,45 @@ textarea.form-control {
     background: rgba(255, 255, 255, 0.35);
   }
 
+  .lightbox-download-btn {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #A32A38;
+    color: #FFFFFF;
+    font-family: var(--font-body, inherit);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0 16px;
+    height: 38px;
+    border-radius: 9999px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .lightbox-download-btn:hover {
+    background: #881D2A;
+    transform: translateY(-1px);
+    color: #FFFFFF;
+  }
+
+  .lightbox-download-btn:active {
+    transform: scale(0.96);
+  }
+
+  .lightbox-download-btn i {
+    font-size: 0.85rem;
+    color: #FFFFFF;
+  }
+
   .lightbox-footer-hint {
     position: absolute;
     bottom: 20px;

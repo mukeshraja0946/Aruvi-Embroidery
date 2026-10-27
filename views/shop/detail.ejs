@@ -18,13 +18,15 @@
         <button type="button" class="wishlist-round-btn wishlist-btn <%= isWish ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
           <i class="fa-<%= isWish ? 'solid' : 'regular' %> fa-heart"></i>
         </button>
-        <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img">
+        <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img" onerror="if (this.src !== '/public/images/cat_floral.jpg') { this.src = '/public/images/cat_floral.jpg'; }">
         
-        <!-- Preview PNG Download Pill (available on preview image for all visitors) -->
-        <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
-          <i class="fa-solid fa-download"></i>
-          <span>Download</span>
-        </button>
+        <% if (typeof siteSettings === 'undefined' || siteSettings.show_preview_download_button !== '0') { %>
+          <!-- Preview PNG Download Pill (available on preview image for all visitors) -->
+          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
+            <i class="fa-solid fa-download"></i>
+            <span>Download</span>
+          </button>
+        <% } %>
 
         <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass"></i> Tap to zoom</span>
       </div>
@@ -34,12 +36,12 @@
           <% if (design.images && design.images.length > 0) { %>
             <% design.images.forEach((img, idx) => { %>
               <div class="thumb-item <%= (img.is_primary || idx === 0) ? 'active' : '' %>" onclick="changeMainImage('<%= img.image_url %>', this)">
-                <img src="<%= img.image_url %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;">
+                <img src="<%= img.image_url %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;" onerror="this.closest('.thumb-item')?.remove(); console.warn('Missing thumbnail removed:', this.src);">
               </div>
             <% }) %>
           <% } else { %>
             <div class="thumb-item active" onclick="changeMainImage('<%= design.primary_image || '/public/images/cat_floral.jpg' %>', this)">
-              <img src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" style="object-fit: contain; background: #FAF6F0;">
+              <img src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" style="object-fit: contain; background: #FAF6F0;" onerror="this.closest('.thumb-item')?.remove();">
             </div>
           <% } %>
           <% if (design.images && design.images.length > 4) { %>
@@ -400,6 +402,12 @@
 <!-- Fullscreen Tap-to-Zoom / Pinch-Zoom Lightbox Modal -->
 <div id="imageLightboxModal" class="image-lightbox-modal" style="display: none;" onclick="closeLightbox(event)">
   <button type="button" class="lightbox-close-btn" onclick="closeLightbox(event)" aria-label="Close Lightbox">&times;</button>
+  <% if (typeof siteSettings === 'undefined' || siteSettings.show_preview_download_button !== '0') { %>
+    <button type="button" class="lightbox-download-btn" onclick="event.stopPropagation(); downloadPreviewImage(event, document.getElementById('lightboxImg')?.src);" aria-label="Download Preview" title="Download Preview">
+      <i class="fa-solid fa-download"></i>
+      <span>Download</span>
+    </button>
+  <% } %>
   <div class="lightbox-viewport" id="lightboxViewport" onclick="event.stopPropagation()">
     <img id="lightboxImg" src="" alt="Full Preview" draggable="false">
   </div>
@@ -413,32 +421,31 @@
     element.classList.add('active');
   }
 
-  // Download currently displayed preview as authentic PNG
-  async function downloadPreviewImage(e) {
+  // Download currently displayed preview as authentic watermarked preview PNG
+  async function downloadPreviewImage(e, explicitSrc) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
-    const btn = document.getElementById('downloadPreviewBtn');
-    const mainImg = document.getElementById('mainDisplayImg');
-    if (!mainImg || !mainImg.src) {
+    const clickedBtn = (e && e.currentTarget) ? e.currentTarget : document.getElementById('downloadPreviewBtn');
+    const targetImgSrc = explicitSrc || document.getElementById('mainDisplayImg')?.src;
+    if (!targetImgSrc) {
       alert('Preview image not available for download.');
       return;
     }
 
-    const designId = '<%= design.id %>';
+    const designSlug = '<%= design.slug || design.id %>';
     const rawSku = '<%= (design.sku || "").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
     const rawTitle = '<%= (design.title || "").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
     const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
-    const targetFilename = `${baseClean}.png`;
-    const imgSrc = mainImg.src;
+    const targetFilename = `${baseClean}-preview.png`;
 
-    const originalContent = btn ? btn.innerHTML : '';
-    if (btn) {
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Downloading...</span>';
-      btn.disabled = true;
-      btn.style.opacity = '0.85';
+    const originalContent = clickedBtn ? clickedBtn.innerHTML : '';
+    if (clickedBtn) {
+      clickedBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Downloading...</span>';
+      clickedBtn.disabled = true;
+      clickedBtn.style.opacity = '0.85';
     }
 
     function triggerDownload(blob, name) {
@@ -453,82 +460,40 @@
     }
 
     try {
-      let downloaded = false;
+      // Hit dedicated server preview-download route: /designs/:slug/preview-download?imgUrl=...
+      const downloadUrl = `/designs/${encodeURIComponent(designSlug)}/preview-download?imgUrl=${encodeURIComponent(targetImgSrc)}`;
+      const res = await fetch(downloadUrl);
 
-      // 1. If it is already a PNG and directly fetchable
-      if (imgSrc.toLowerCase().includes('.png')) {
-        try {
-          const fetchRes = await fetch(imgSrc, { mode: 'cors' });
-          if (fetchRes.ok) {
-            const blob = await fetchRes.blob();
-            if (blob && blob.size > 0 && (blob.type === 'image/png' || blob.type.startsWith('image/'))) {
-              const pngBlob = (blob.type === 'image/png') ? blob : new Blob([blob], { type: 'image/png' });
-              triggerDownload(pngBlob, targetFilename);
-              downloaded = true;
-            }
-          }
-        } catch (corsErr) {
-          // Fall through to canvas or server fallback
+      if (res.status === 401) {
+        if (typeof openLoginModal === 'function') {
+          openLoginModal(() => downloadPreviewImage(null, targetImgSrc));
+          return;
+        } else {
+          window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
+          return;
         }
       }
 
-      // 2. Client-side Canvas conversion to ensure authentic PNG without UI elements
-      if (!downloaded) {
-        try {
-          const tempImg = new Image();
-          tempImg.crossOrigin = 'anonymous';
-          await new Promise((resolve, reject) => {
-            if (tempImg.complete && tempImg.naturalWidth) return resolve();
-            tempImg.onload = resolve;
-            tempImg.onerror = reject;
-            tempImg.src = imgSrc;
-          });
-
-          const canvas = document.createElement('canvas');
-          canvas.width = tempImg.naturalWidth || tempImg.width || 800;
-          canvas.height = tempImg.naturalHeight || tempImg.height || 800;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(tempImg, 0, 0);
-
-          const pngBlob = await new Promise((resolve, reject) => {
-            canvas.toBlob(b => {
-              if (b) resolve(b);
-              else reject(new Error('Canvas PNG export returned empty'));
-            }, 'image/png', 1.0);
-          });
-
-          if (pngBlob && pngBlob.size > 0) {
-            triggerDownload(pngBlob, targetFilename);
-            downloaded = true;
-          }
-        } catch (canvasErr) {
-          console.warn('Canvas conversion failed, falling back to server-side converter:', canvasErr.message);
-        }
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Server returned status ${res.status}`);
       }
 
-      // 3. Fallback to server-side endpoint with sharp conversion (handles any CORS or cloud URLs)
-      if (!downloaded) {
-        const serverEndpoint = `/api/designs/${designId}/download-preview-png?imgUrl=${encodeURIComponent(imgSrc)}`;
-        const sRes = await fetch(serverEndpoint);
-        if (!sRes.ok) {
-          const errData = await sRes.json().catch(() => ({}));
-          throw new Error(errData.message || `Server returned HTTP ${sRes.status}`);
-        }
-        const sBlob = await sRes.blob();
-        if (!sBlob || sBlob.size === 0) {
-          throw new Error('Downloaded PNG was empty');
-        }
-        triggerDownload(sBlob, targetFilename);
-        downloaded = true;
+      const blob = await res.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error('Downloaded preview image was empty');
       }
+
+      triggerDownload(blob, targetFilename);
     } catch (err) {
-      console.error('Download preview error:', err);
-      alert('Unable to download preview image: ' + (err.message || 'Network error'));
+      console.warn('Preview download route error, trying direct fallback:', err);
+      // Fallback direct link
+      window.open(targetImgSrc, '_blank');
     } finally {
-      if (btn) {
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-        btn.style.opacity = '1';
+      if (clickedBtn) {
+        clickedBtn.innerHTML = originalContent;
+        clickedBtn.disabled = false;
+        clickedBtn.style.opacity = '1';
       }
     }
   }

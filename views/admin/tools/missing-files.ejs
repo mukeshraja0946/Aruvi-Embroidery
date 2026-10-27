@@ -287,6 +287,9 @@
           <a href="/admin/tools/bulk-file-relink" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-file-zipper"></i> Bulk File Relink
           </a>
+          <button type="button" onclick="openCleanBrokenImagesModal()" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; border-color: #D32F2F; color: #C62828; background: #FFEBEE; cursor: pointer;" title="Scan and remove broken or duplicate image rows">
+            <i class="fa-solid fa-broom"></i> Remove Broken Image Rows
+          </button>
           <a href="/admin/designs?fileFilter=missing_zip" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border-color: #2E7D32; color: #1B5E20; background: #E8F5E9;" title="Bulk upload machine files for designs missing a ZIP">
             <i class="fa-solid fa-cloud-arrow-up"></i> Bulk Upload Missing ZIPs
           </a>
@@ -521,6 +524,106 @@
   </div>
 </div>
 
+<!-- Modal: Remove Broken & Duplicate Image Rows -->
+<div id="cleanBrokenImagesModal" class="modal-overlay" style="display: none;">
+  <div class="modal-box" style="max-width: 820px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--admin-border); padding-bottom: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; width: 34px; height: 34px; border-radius: 8px; background: #FFEBEE; color: #C62828; align-items: center; justify-content: center; font-size: 1rem;">
+          <i class="fa-solid fa-broom"></i>
+        </span>
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Remove Broken & Duplicate Image Rows</h3>
+          <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 0;">Dry-run scan, safe automatic backup, and clean synchronizer</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeCleanBrokenImagesModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--admin-text-muted);">&times;</button>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="cleanLoadingArea" style="text-align: center; padding: 3rem 1rem;">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--admin-primary);"></i>
+      <p style="margin-top: 1rem; color: var(--admin-text-muted); font-size: 0.9rem;">Running real-time dry-run diagnostic on <code>design_images</code>...</p>
+    </div>
+
+    <!-- Summary & Actions Area -->
+    <div id="cleanSummaryArea" style="display: none; overflow-y: auto; padding-right: 4px;">
+      <!-- Stat Highlights -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+        <div style="background: #FFF8E1; border: 1px solid #FFE082; padding: 0.75rem; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: #F57F17;" id="statBrokenRows">0</div>
+          <div style="font-size: 0.75rem; color: #795548; font-weight: 500;">Missing File Rows</div>
+        </div>
+        <div style="background: #EDE7F6; border: 1px solid #D1C4E9; padding: 0.75rem; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: #512DA8;" id="statDuplicateRows">0</div>
+          <div style="font-size: 0.75rem; color: #4527A0; font-weight: 500;">Duplicate Image Rows</div>
+        </div>
+        <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 0.75rem; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.3rem; font-weight: 700; color: #2E7D32;" id="statTotalChecked">0</div>
+          <div style="font-size: 0.75rem; color: #1B5E20; font-weight: 500;">Total Rows Checked</div>
+        </div>
+      </div>
+
+      <!-- Preview Table -->
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--admin-text-dark);">
+          Detected Issues Preview (Sample):
+        </label>
+        <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--admin-border); border-radius: 6px;">
+          <table class="tools-table" style="width: 100%; margin: 0; font-size: 0.78rem;">
+            <thead>
+              <tr style="background: #F8F9FA;">
+                <th style="padding: 6px 10px;">Design</th>
+                <th style="padding: 6px 10px;">Image URL / Path</th>
+                <th style="padding: 6px 10px;">Issue</th>
+                <th style="padding: 6px 10px;">Primary</th>
+              </tr>
+            </thead>
+            <tbody id="brokenRowsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- phpMyAdmin SQL Box -->
+      <div style="margin-bottom: 1.25rem; background: #F8F9FA; border: 1px solid var(--admin-border); border-radius: 8px; padding: 0.85rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">
+            <i class="fa-solid fa-database"></i> Plain SQL for phpMyAdmin:
+          </label>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" id="copySqlBtn" onclick="copyPhpMyAdminSql()" class="btn btn-outline" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-radius: 4px;">
+              <i class="fa-solid fa-copy"></i> Copy SQL
+            </button>
+            <a href="/admin/tools/missing-files/clean-broken-images/download-sql" class="btn btn-outline" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-radius: 4px; text-decoration: none;">
+              <i class="fa-solid fa-download"></i> Download .sql
+            </a>
+          </div>
+        </div>
+        <textarea id="phpMyAdminSqlArea" readonly rows="4" style="width: 100%; font-family: monospace; font-size: 0.72rem; padding: 0.5rem; background: #FFFFFF; border: 1px solid #CCC; border-radius: 4px; resize: vertical;"></textarea>
+      </div>
+
+      <!-- Modal Footer Action -->
+      <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; border-top: 1px solid var(--admin-border); padding-top: 0.75rem;">
+        <button type="button" class="btn btn-outline" onclick="closeCleanBrokenImagesModal()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Cancel</button>
+        <button type="button" id="executeCleanBtn" onclick="executeCleanBrokenRows()" class="btn" style="font-size: 0.85rem; padding: 0.5rem 1.2rem; background: #D32F2F; color: #FFF; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-trash-can"></i> Remove Broken Image Rows Now
+        </button>
+      </div>
+    </div>
+
+    <!-- Success Result Box -->
+    <div id="cleanReportArea" style="display: none; padding: 1.5rem 1rem; text-align: center;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: #E8F5E9; color: #2E7D32; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div id="cleanReportMsg" style="font-size: 0.9rem; color: #333; line-height: 1.6; margin-bottom: 1.5rem;"></div>
+      <button type="button" class="btn btn-primary" onclick="window.location.reload()" style="font-size: 0.85rem; padding: 0.5rem 1.25rem;">
+        Done & Refresh Page
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
   let scanPollingInterval = null;
 
@@ -638,6 +741,124 @@
       btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Upload & Relink';
     }
   });
+
+  // Clean Broken & Duplicate Image Rows Modal Controller
+  let cachedBrokenSql = '';
+
+  async function openCleanBrokenImagesModal() {
+    const modal = document.getElementById('cleanBrokenImagesModal');
+    modal.style.display = 'flex';
+    document.getElementById('cleanReportArea').style.display = 'none';
+    document.getElementById('cleanLoadingArea').style.display = 'block';
+    document.getElementById('cleanSummaryArea').style.display = 'none';
+
+    try {
+      const res = await fetch('/admin/tools/missing-files/clean-broken-images/dry-run');
+      const data = await res.json();
+
+      document.getElementById('cleanLoadingArea').style.display = 'none';
+      if (!data.success) {
+        alert('Dry run error: ' + (data.message || 'Unknown error'));
+        return;
+      }
+
+      document.getElementById('cleanSummaryArea').style.display = 'block';
+      document.getElementById('statBrokenRows').textContent = data.summary.brokenRowsCount;
+      document.getElementById('statDuplicateRows').textContent = data.summary.duplicateRowsCount;
+      document.getElementById('statBrokenPreviews').textContent = data.summary.brokenPreviewFilesCount;
+      document.getElementById('statTotalChecked').textContent = data.summary.totalRowsChecked;
+
+      cachedBrokenSql = data.phpMyAdminSql || '';
+      document.getElementById('phpMyAdminSqlArea').value = cachedBrokenSql;
+
+      // Populate sample preview rows
+      const tbody = document.getElementById('brokenRowsTbody');
+      tbody.innerHTML = '';
+      const allRows = [...data.brokenRows, ...data.duplicateRows];
+      if (allRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #2E7D32; padding: 1rem;"><i class="fa-solid fa-circle-check"></i> Great news! No broken or duplicate image rows detected.</td></tr>';
+        document.getElementById('executeCleanBtn').disabled = true;
+      } else {
+        document.getElementById('executeCleanBtn').disabled = false;
+        allRows.slice(0, 50).forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="font-weight: 600;">#${r.id} (${r.sku || 'AED-' + r.design_id})</td>
+            <td style="font-size: 0.82rem; color: #555; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.image_url || ''}">${r.image_url || '<em>None</em>'}</td>
+            <td><span class="badge ${r.reason.includes('Duplicate') ? 'badge-warning' : 'badge-danger'}" style="font-size: 0.72rem;">${r.reason}</span></td>
+            <td>${r.is_primary ? '<span style="color: #2E7D32; font-weight: 600;">Yes</span>' : '<span style="color: #999;">No</span>'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    } catch (err) {
+      document.getElementById('cleanLoadingArea').style.display = 'none';
+      alert('Network error while running diagnostic: ' + err.message);
+    }
+  }
+
+  function closeCleanBrokenImagesModal() {
+    document.getElementById('cleanBrokenImagesModal').style.display = 'none';
+  }
+
+  async function executeCleanBrokenRows() {
+    if (!confirm('Are you sure you want to remove these broken image rows? A database backup will be created automatically before deleting.')) {
+      return;
+    }
+
+    const btn = document.getElementById('executeCleanBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removing rows & syncing...';
+
+    try {
+      const csrf = '<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>';
+      const res = await fetch('/admin/tools/missing-files/clean-broken-images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrf
+        },
+        body: JSON.stringify({ _csrf: csrf })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        document.getElementById('cleanSummaryArea').style.display = 'none';
+        const repArea = document.getElementById('cleanReportArea');
+        repArea.style.display = 'block';
+        document.getElementById('cleanReportMsg').innerHTML = `
+          <strong>Cleanup Successful!</strong><br>
+          • <strong>${data.removedCount}</strong> broken/duplicate rows removed.<br>
+          • Primary images safely synchronized to remaining valid pictures.<br>
+          • Backup saved at: <code>${data.backupFile || 'backups/backup_broken_images.sql'}</code>
+        `;
+      } else {
+        alert('Cleanup failed: ' + (data.message || 'Error executing cleanup'));
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Remove Broken Image Rows Now';
+      }
+    } catch (err) {
+      alert('Network error while cleaning rows: ' + err.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Remove Broken Image Rows Now';
+    }
+  }
+
+  function copyPhpMyAdminSql() {
+    const textarea = document.getElementById('phpMyAdminSqlArea');
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      const copyBtn = document.getElementById('copySqlBtn');
+      copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+      setTimeout(() => {
+        copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy SQL';
+      }, 2000);
+    }).catch(err => {
+      textarea.select();
+      document.execCommand('copy');
+      alert('SQL copied to clipboard!');
+    });
+  }
 </script>
 </body>
 </html>

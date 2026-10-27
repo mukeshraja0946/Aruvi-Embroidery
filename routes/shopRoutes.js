@@ -20,6 +20,8 @@ const userController = require('../controllers/userController');
 // Product detail page & API
 router.get('/design/:slug', shopController.getDesignDetail);
 router.get('/designs/:slug', shopController.getDesignDetail);
+router.get('/designs/:slug/preview-download/:imageId?', shopController.downloadPreviewImageRoute);
+router.get('/design/:slug/preview-download/:imageId?', shopController.downloadPreviewImageRoute);
 router.get('/api/designs/:id/download-preview-png', shopController.downloadPreviewPng);
 router.get('/api/designs/:designId/download', userController.downloadDesignApi);
 router.get('/api/customer/designs/:designId/download', userController.downloadDesignApi);

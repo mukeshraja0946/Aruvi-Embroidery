@@ -655,6 +655,42 @@
                 <input type="checkbox" name="show_design_related" value="1" <%= (typeof settings !== 'undefined' && settings.show_design_related === '1') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
               </label>
             </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">
+                    <i class="fa-solid fa-download" style="color: var(--admin-primary); margin-right: 5px;"></i> Show Preview Download Button
+                  </strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Shows the public PNG preview download pill on the main product image and lightbox (default: ON).</span>
+                </div>
+                <input type="checkbox" name="show_preview_download_button" value="1" <%= (typeof settings === 'undefined' || settings.show_preview_download_button !== '0') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
+            </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">
+                    <i class="fa-solid fa-lock" style="color: #6A1B9A; margin-right: 5px;"></i> Require Login to Download Previews
+                  </strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">When checked, visitors must be logged into a customer account to download previews (default: OFF).</span>
+                </div>
+                <input type="checkbox" name="require_login_preview_download" value="1" <%= (typeof settings !== 'undefined' && settings.require_login_preview_download === '1') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
+            </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; grid-column: span 2;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">
+                    <i class="fa-solid fa-stamp" style="color: #007791; margin-right: 5px;"></i> Add Aruvi Watermark to Preview Images
+                  </strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Automatically stamps the Aruvi brand watermark when generating preview downloads and bulk replacing images (default: ON).</span>
+                </div>
+                <input type="checkbox" name="watermark_preview_images" value="1" <%= (typeof settings === 'undefined' || settings.watermark_preview_images !== '0') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
+            </div>
           </div>
         </div>
 

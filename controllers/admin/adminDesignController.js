@@ -4073,4 +4073,171 @@ exports.downloadAdminFile = async (req, res, next) => {
   }
 };
 
+const bulkImageReplaceService = require('../../services/bulkImageReplaceService');
+
+/**
+ * Scope summary and design count for Bulk Image Replace modal
+ * GET /admin/designs/bulk-replace/scope-summary
+ */
+exports.getBulkReplaceScopeSummary = async (req, res, next) => {
+  try {
+    const categoryIds = req.query.categoryIds ? (Array.isArray(req.query.categoryIds) ? req.query.categoryIds : req.query.categoryIds.split(',').filter(Boolean)) : [];
+    const status = req.query.status || 'all';
+    const search = req.query.search || '';
+    const checkedIds = req.query.checkedIds ? (Array.isArray(req.query.checkedIds) ? req.query.checkedIds : req.query.checkedIds.split(',').filter(Boolean)) : [];
+
+    const summary = await bulkImageReplaceService.getScopeSummary({ categoryIds, status, search, checkedIds });
+    res.json({ success: true, ...summary });
+  } catch (err) {
+    console.error('getBulkReplaceScopeSummary error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Preview matching files against scoped designs BEFORE uploading
+ * POST /admin/designs/bulk-replace/preview-match
+ */
+exports.postBulkReplacePreviewMatch = async (req, res, next) => {
+  try {
+    const { files = [], categoryIds = [], status = 'all', search = '', checkedIds = [], mode = 'replace_primary' } = req.body;
+    const matchResult = await bulkImageReplaceService.matchFilesToScope(files, {
+      categoryIds,
+      status,
+      search,
+      checkedIds,
+      mode
+    });
+    res.json({ success: true, ...matchResult });
+  } catch (err) {
+    console.error('postBulkReplacePreviewMatch error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Chunked file upload endpoint (5 files per request, 3 parallel streams)
+ * POST /admin/designs/bulk-replace/upload-chunk
+ */
+exports.postBulkReplaceUploadChunk = async (req, res, next) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No files received in this chunk.' });
+    }
+    const processedFiles = await bulkImageReplaceService.processUploadChunk(req.files);
+    res.json({ success: true, files: processedFiles });
+  } catch (err) {
+    console.error('postBulkReplaceUploadChunk error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Commit batch replacement in DB inside transactions
+ * POST /admin/designs/bulk-replace/commit
+ */
+exports.postBulkReplaceCommit = async (req, res, next) => {
+  try {
+    const { categoryId, categoryName, scopeSummary, replacementMode, items } = req.body;
+    const result = await bulkImageReplaceService.commitReplacementBatch({
+      adminUser: req.user,
+      categoryId,
+      categoryName,
+      scopeSummary,
+      replacementMode,
+      items
+    });
+
+    if (result.success && result.replacedCount > 0) {
+      await ActivityLog.log({
+        action: 'bulk_replace_images',
+        entity: 'designs',
+        entityId: null,
+        details: {
+          logId: result.logId,
+          categoryName,
+          replacementMode,
+          replacedCount: result.replacedCount,
+          failedCount: result.failedCount
+        },
+        adminId: req.user ? req.user.id : null,
+        adminEmail: req.user ? req.user.email : 'admin'
+      });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('postBulkReplaceCommit error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Revert / Undo a bulk replacement
+ * POST /admin/designs/bulk-replace/undo/:id
+ */
+exports.postBulkReplaceUndo = async (req, res, next) => {
+  try {
+    const logId = req.params.id;
+    const result = await bulkImageReplaceService.undoBulkReplacement(logId);
+
+    await ActivityLog.log({
+      action: 'undo_bulk_replace_images',
+      entity: 'image_replace_logs',
+      entityId: logId,
+      details: result,
+      adminId: req.user ? req.user.id : null,
+      adminEmail: req.user ? req.user.email : 'admin'
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('postBulkReplaceUndo error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Render Update History page for Image Replacements
+ * GET /admin/tools/image-replace-history or GET /admin/designs/bulk-replace/history
+ */
+exports.getBulkReplaceHistory = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page || '1', 10);
+    const historyData = await bulkImageReplaceService.getHistory(page, 20);
+
+    res.render('admin/tools/image-replace-history', {
+      title: 'Image Replace History - Admin',
+      logs: historyData.logs,
+      pagination: {
+        page: historyData.page,
+        totalPages: historyData.totalPages,
+        totalCount: historyData.total
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Download CSV report of a bulk replacement
+ * GET /admin/designs/bulk-replace/export-csv/:id
+ */
+exports.getBulkReplaceExportCsv = async (req, res, next) => {
+  try {
+    const logId = req.params.id;
+    const { log, csv } = await bulkImageReplaceService.generateCsvReport(logId);
+
+    const filename = `bulk_replace_report_${logId}_${Date.now()}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch (err) {
+    console.error('getBulkReplaceExportCsv error:', err);
+    res.status(500).send('Error generating CSV: ' + err.message);
+  }
+};
+
 exports.validateMachineFileOrZip = validateMachineFileOrZip;
+

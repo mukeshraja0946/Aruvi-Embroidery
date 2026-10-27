@@ -44,7 +44,9 @@ const REQUIRED_SCHEMA = {
   price_update_logs: ['id', 'admin_id', 'admin_email', 'filter_summary', 'method_summary', 'total_affected', 'is_undone', 'created_at'],
   price_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_mrp', 'old_price', 'new_mrp', 'new_price', 'created_at'],
   stitch_update_logs: ['id', 'admin_id', 'admin_email', 'filter_summary', 'method_summary', 'total_affected', 'is_undone', 'created_at'],
-  stitch_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_front', 'old_back', 'old_sleeve', 'old_total', 'old_manual', 'new_front', 'new_back', 'new_sleeve', 'new_total', 'new_manual', 'created_at']
+  stitch_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_front', 'old_back', 'old_sleeve', 'old_total', 'old_manual', 'new_front', 'new_back', 'new_sleeve', 'new_total', 'new_manual', 'created_at'],
+  image_replace_logs: ['id', 'admin_id', 'admin_email', 'category_id', 'category_name', 'scope_summary', 'replacement_mode', 'total_files', 'matched_designs', 'replaced_count', 'skipped_count', 'failed_count', 'is_undone', 'created_at'],
+  image_replace_log_items: ['id', 'log_id', 'design_id', 'sku', 'title', 'old_primary_image', 'new_primary_image', 'old_images_json', 'new_images_json', 'status', 'created_at']
 };
 
 /**

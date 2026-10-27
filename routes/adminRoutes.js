@@ -84,6 +84,17 @@ router.post('/admin/designs/replace-image/:id', upload.any(), adminDesignControl
 router.post('/admin/designs/bulk-upload-images', bulkImageUploadMiddleware, adminDesignController.bulkUploadImages);
 router.get('/admin/designs/bulk-upload-check', adminDesignController.bulkUploadCheck);
 router.post('/admin/designs/bulk-link-single-image', adminDesignController.linkSingleImage);
+
+// Bulk Image Replace by Category (Task 2)
+router.get('/admin/designs/bulk-replace/scope-summary', adminDesignController.getBulkReplaceScopeSummary);
+router.post('/admin/designs/bulk-replace/preview-match', adminDesignController.postBulkReplacePreviewMatch);
+router.post('/admin/designs/bulk-replace/upload-chunk', upload.array('files', 10), adminDesignController.postBulkReplaceUploadChunk);
+router.post('/admin/designs/bulk-replace/commit', adminDesignController.postBulkReplaceCommit);
+router.post('/admin/designs/bulk-replace/undo/:id', adminDesignController.postBulkReplaceUndo);
+router.get('/admin/designs/bulk-replace/history', adminDesignController.getBulkReplaceHistory);
+router.get('/admin/designs/bulk-replace/export-csv/:id', adminDesignController.getBulkReplaceExportCsv);
+router.get('/admin/tools/image-replace-history', adminDesignController.getBulkReplaceHistory);
+
 router.get('/admin/designs/bulk-zip-check', adminDesignController.bulkZipCheck);
 router.post('/admin/designs/bulk-zip-dry-run', adminDesignController.bulkZipDryRun);
 router.post('/admin/designs/bulk-zip-chunk', bulkZipChunkMiddleware, adminDesignController.bulkZipChunk);
@@ -222,6 +233,9 @@ router.get('/admin/tools/missing-files', adminToolsController.getMissingFiles);
 router.post('/admin/tools/missing-files/trigger-scan', adminToolsController.triggerFullScan);
 router.get('/admin/tools/missing-files/scan-status', adminToolsController.getScanStatus);
 router.get('/admin/tools/missing-files/export-csv', adminToolsController.exportMissingFilesCsv);
+router.get('/admin/tools/missing-files/clean-broken-images/dry-run', adminToolsController.getBrokenImagesDryRun);
+router.post('/admin/tools/missing-files/clean-broken-images', adminToolsController.cleanBrokenImageRows);
+router.get('/admin/tools/missing-files/clean-broken-images/download-sql', adminToolsController.downloadCleanBrokenImagesSql);
 router.post('/admin/tools/replace-file-quick', upload.single('file'), adminToolsController.replaceDesignFileQuick);
 
 router.get('/admin/tools/bulk-image-relink', adminToolsController.getBulkImageRelink);

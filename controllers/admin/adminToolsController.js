@@ -1458,5 +1458,80 @@ exports.undoDuplicateFiles = async (req, res, next) => {
   }
 };
 
+const brokenImageService = require('../../services/brokenImageService');
+
+/**
+ * Dry-Run scan for broken and duplicate image rows
+ * GET /admin/tools/missing-files/clean-broken-images/dry-run
+ */
+exports.getBrokenImagesDryRun = async (req, res, next) => {
+  try {
+    const dryRun = await brokenImageService.getBrokenImageRowsDryRun();
+    const phpMyAdminSql = brokenImageService.generatePhpMyAdminSql(
+      dryRun.brokenRows.map(r => r.id),
+      dryRun.duplicateRows.map(r => r.id)
+    );
+    res.json({
+      success: true,
+      summary: dryRun.summary,
+      brokenRows: dryRun.brokenRows.slice(0, 100),
+      duplicateRows: dryRun.duplicateRows.slice(0, 100),
+      brokenPreviewFiles: dryRun.brokenPreviewFiles.slice(0, 100),
+      phpMyAdminSql
+    });
+  } catch (err) {
+    console.error('getBrokenImagesDryRun error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Execute cleanup of broken & duplicate design_images rows
+ * POST /admin/tools/missing-files/clean-broken-images
+ */
+exports.cleanBrokenImageRows = async (req, res, next) => {
+  try {
+    const result = await brokenImageService.removeBrokenImageRows();
+    if (result.removedCount > 0) {
+      await ActivityLog.log({
+        action: 'clean_broken_image_rows',
+        entity: 'design_images',
+        entityId: null,
+        details: {
+          removedCount: result.removedCount,
+          backupFile: result.backupFile
+        },
+        adminId: req.user ? req.user.id : null,
+        adminEmail: req.user ? req.user.email : 'admin'
+      });
+    }
+    res.json(result);
+  } catch (err) {
+    console.error('cleanBrokenImageRows error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Download phpMyAdmin SQL script
+ * GET /admin/tools/missing-files/clean-broken-images/download-sql
+ */
+exports.downloadCleanBrokenImagesSql = async (req, res, next) => {
+  try {
+    const dryRun = await brokenImageService.getBrokenImageRowsDryRun();
+    const sql = brokenImageService.generatePhpMyAdminSql(
+      dryRun.brokenRows.map(r => r.id),
+      dryRun.duplicateRows.map(r => r.id)
+    );
+    const filename = `clean_broken_design_images_${Date.now()}.sql`;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(sql);
+  } catch (err) {
+    console.error('downloadCleanBrokenImagesSql error:', err);
+    res.status(500).send('Error generating SQL: ' + err.message);
+  }
+};
+
 exports.matchFileToDesigns = matchFileToDesigns;
 
