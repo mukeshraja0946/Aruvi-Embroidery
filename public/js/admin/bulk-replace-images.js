@@ -454,7 +454,7 @@
         });
 
         const commitData = await commitRes.json();
-        if (!commitData.success) {
+        if (!commitData.success && (!commitData.fileLogs || commitData.fileLogs.length === 0)) {
           throw new Error(commitData.message || 'Database replacement commit failed');
         }
 
@@ -478,10 +478,75 @@
         const removedOldEl = document.getElementById('reportCountRemovedOld');
         const failedEl = document.getElementById('reportCountFailed');
 
-        if (replacedImgEl) replacedImgEl.textContent = commitData.replacedImagesCount || 0;
-        if (replacedZipEl) replacedZipEl.textContent = commitData.replacedZipsCount || 0;
-        if (removedOldEl) removedOldEl.textContent = commitData.removedOldFilesCount || 0;
-        if (failedEl) failedEl.textContent = commitData.failedCount || 0;
+        if (replacedImgEl) replacedImgEl.textContent = commitData.replacedImagesCount ?? 0;
+        if (replacedZipEl) replacedZipEl.textContent = commitData.replacedZipsCount ?? 0;
+        if (removedOldEl) removedOldEl.textContent = commitData.removedOldFilesCount ?? 0;
+        if (failedEl) failedEl.textContent = commitData.failedCount ?? 0;
+
+        // Populate Per-File Operation Log Table
+        const fileLogs = commitData.fileLogs || [];
+        const countEl = document.getElementById('bulkReplaceFileLogCount');
+        const tbodyEl = document.getElementById('bulkReplaceFileLogTbody');
+        if (countEl) countEl.textContent = fileLogs.length;
+
+        if (tbodyEl) {
+          tbodyEl.innerHTML = '';
+          fileLogs.forEach((f, idx) => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #F1F5F9';
+            const isZip = (f.fileType || '').toLowerCase().includes('zip');
+            const isVerified = f.result === 'Verified';
+
+            const typeIcon = isZip 
+              ? '<i class="fa-solid fa-file-zipper" style="color: #0891B2;"></i>' 
+              : '<i class="fa-solid fa-file-image" style="color: #0284C7;"></i>';
+
+            const typeBadge = isZip 
+              ? '<span style="background: #E0F7FA; color: #00796B; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">ZIP</span>'
+              : '<span style="background: #E0F2FE; color: #0369A1; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Image</span>';
+
+            const sizeText = this.formatFileSize(f.fileSize);
+
+            const storageBadge = f.storageStatus === 'Stored'
+              ? '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-circle-check"></i> Stored</span>'
+              : `<span style="color: #DC2626; font-weight: 600;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-circle-xmark"></i> Failed</span>`;
+
+            const dbBadge = f.dbStatus === 'Updated'
+              ? '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Updated</span>'
+              : '<span style="color: #DC2626; font-weight: 600;"><i class="fa-solid fa-xmark"></i> Failed</span>';
+
+            const resultBadge = isVerified
+              ? '<span style="background: #DCFCE7; color: #166534; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BBF7D0; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Verified</span>'
+              : `<span style="background: #FEE2E2; color: #991B1B; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #FECACA; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || 'Failed')}"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
+
+            tr.innerHTML = `
+              <td style="padding: 8px 12px; text-align: center; color: #94A3B8; font-weight: 500;">${idx + 1}</td>
+              <td style="padding: 8px 12px; font-weight: 600; color: #1E293B;">
+                <span style="margin-right: 6px;">${typeIcon}</span>${this.escapeHtml(f.fileName)}
+              </td>
+              <td style="padding: 8px 12px;">${typeBadge}</td>
+              <td style="padding: 8px 12px; color: #64748B;">${sizeText}</td>
+              <td style="padding: 8px 12px;">${storageBadge}</td>
+              <td style="padding: 8px 12px;">${dbBadge}</td>
+              <td style="padding: 8px 12px; text-align: center;">${resultBadge}</td>
+            `;
+            tbodyEl.appendChild(tr);
+          });
+        }
+
+        // Retry button if there are failures
+        const retryBtn = document.getElementById('bulkReplaceRetryFailedBtn');
+        if (retryBtn) {
+          if (commitData.failedCount > 0) {
+            retryBtn.style.display = 'inline-flex';
+            this.failedFiles = this.selectedFiles.filter(orig => 
+              fileLogs.some(l => l.fileName === orig.name && l.result === 'Failed')
+            );
+          } else {
+            retryBtn.style.display = 'none';
+            this.failedFiles = [];
+          }
+        }
 
         // CSV Report download link
         const csvBtn = document.getElementById('bulkReplaceDownloadCsvBtn');
@@ -507,6 +572,32 @@
         this.currentStep = 3;
         this.updateStepView();
       }
+    }
+
+    retryFailed() {
+      if (!this.failedFiles || this.failedFiles.length === 0) {
+        alert('No failed files to retry.');
+        return;
+      }
+      this.selectedFiles = [...this.failedFiles];
+      this.executeReplace();
+    }
+
+    formatFileSize(bytes) {
+      const b = parseInt(bytes, 10) || 0;
+      if (b >= 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+      if (b >= 1024) return Math.round(b / 1024) + ' KB';
+      return b + ' B';
+    }
+
+    escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     cancelUpload() {

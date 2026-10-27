@@ -4175,7 +4175,7 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
       });
     }
 
-    if (result.success && (result.replacedCount > 0 || result.replacedDesignsCount > 0)) {
+    if (result.success && (result.replacedCount > 0 || result.replacedDesignsCount > 0 || (result.replacedImagesCount || 0) > 0 || (result.replacedZipsCount || 0) > 0)) {
       await ActivityLog.log({
         action: 'bulk_replace_images',
         entity: 'designs',
@@ -4185,7 +4185,10 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
           categoryName,
           groupName: groupName || null,
           replacementMode: groupName ? 'replace_group' : replacementMode,
-          replacedCount: result.replacedCount || result.replacedDesignsCount,
+          replacedCount: result.replacedCount || result.replacedDesignsCount || ((result.replacedImagesCount || 0) + (result.replacedZipsCount || 0)),
+          replacedImagesCount: result.replacedImagesCount || 0,
+          replacedZipsCount: result.replacedZipsCount || 0,
+          removedOldFilesCount: result.removedOldFilesCount || 0,
           failedCount: result.failedCount || 0
         },
         adminId: req.user ? req.user.id : null,

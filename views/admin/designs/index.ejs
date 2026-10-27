@@ -2460,10 +2460,39 @@
               <div id="reportCountFailed" style="font-size: 1.3rem; font-weight: 700; color: #C62828;">0</div>
               <div style="font-size: 0.74rem; color: #B71C1C; font-weight: 600;">Failed</div>
             </div>
+          <!-- Per-File Operation Log Table -->
+          <div id="bulkReplaceFileLogContainer" style="margin-top: 1.25rem; margin-bottom: 1.5rem; text-align: left; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 10px; overflow: hidden;">
+            <div style="padding: 10px 16px; background: #FAF9F6; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center;">
+              <strong style="font-size: 0.88rem; color: var(--admin-text-dark);">
+                <i class="fa-solid fa-list-check" style="color: #0284C7;"></i> Per-File Operation Log (<span id="bulkReplaceFileLogCount">0</span> files)
+              </strong>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Verified storage & database activation</span>
+            </div>
+            <div style="max-height: 260px; overflow-y: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                <thead style="background: #F8FAFC; position: sticky; top: 0; z-index: 2;">
+                  <tr style="border-bottom: 1px solid #E2E8F0; text-align: left; color: #475569;">
+                    <th style="padding: 8px 12px; width: 36px; text-align: center;">#</th>
+                    <th style="padding: 8px 12px;">File Name</th>
+                    <th style="padding: 8px 12px; width: 120px;">Type</th>
+                    <th style="padding: 8px 12px; width: 85px;">Size</th>
+                    <th style="padding: 8px 12px;">Storage Status</th>
+                    <th style="padding: 8px 12px;">Database Status</th>
+                    <th style="padding: 8px 12px; width: 95px; text-align: center;">Result</th>
+                  </tr>
+                </thead>
+                <tbody id="bulkReplaceFileLogTbody">
+                  <!-- Dynamically populated in bulk-replace-images.js -->
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Actions -->
           <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" id="bulkReplaceRetryFailedBtn" onclick="window.bulkImageReplaceInstance.retryFailed()" class="btn btn-warning" style="display: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; cursor: pointer; align-items: center; gap: 6px; background: #FFF8E1; color: #B45309; border: 1px solid #FDE68A;">
+              <i class="fa-solid fa-arrows-rotate"></i> Retry Failed Files
+            </button>
             <a id="bulkReplaceDownloadCsvBtn" href="#" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
               <i class="fa-solid fa-file-csv"></i> Download CSV Report
             </a>

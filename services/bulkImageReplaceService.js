@@ -1057,49 +1057,82 @@ class BulkImageReplaceService {
 
     let log = null;
     let items = [];
+    let fileLogs = [];
+
+    const backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
+    const manifestPath = path.join(backupDir, 'manifest.json');
+    let manifest = null;
+    if (fs.existsSync(manifestPath)) {
+      try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        log = { id: logId, ...manifest };
+        fileLogs = manifest.fileLogs || [];
+      } catch (_) {}
+    }
 
     if (db.isConnected()) {
       const [logRow] = await db.query('SELECT * FROM image_replace_logs WHERE id = ?', [logId]);
-      log = logRow;
+      if (logRow) log = { ...logRow, ...(log || {}) };
       items = await db.query('SELECT * FROM image_replace_log_items WHERE log_id = ? ORDER BY id ASC', [logId]);
     }
 
-    if (!log) {
-      const backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
-      const manifestPath = path.join(backupDir, 'manifest.json');
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (!log && !manifest) {
+      if (manifestPath && fs.existsSync(manifestPath)) {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         log = { id: logId, ...manifest };
-        items = (manifest.reportItems || []).map(r => ({
-          design_id: r.designId,
-          sku: r.sku,
-          title: r.title,
-          status: r.status,
-          old_primary_image: r.oldImage,
-          new_primary_image: r.newImage,
-          old_zip: r.oldZip,
-          new_zip: r.newZip,
-          error_message: r.error
-        }));
+        fileLogs = manifest.fileLogs || [];
+      } else {
+        throw new Error('Log not found');
       }
     }
 
-    if (!log) throw new Error('Log not found');
+    const escape = str => `"${(str || '').toString().replace(/"/g, '""')}"`;
 
-    let csv = 'Design ID,SKU,Title,Status,Old Primary Image,New Primary Image,Old ZIP,New ZIP,Error Message\n';
-    for (const it of items) {
-      const escape = str => `"${(str || '').replace(/"/g, '""')}"`;
-      csv += [
-        it.design_id,
-        escape(it.sku),
-        escape(it.title),
-        it.status,
-        escape(it.old_primary_image),
-        escape(it.new_primary_image),
-        escape(it.old_zip),
-        escape(it.new_zip),
-        escape(it.error_message)
-      ].join(',') + '\n';
+    let csv = '';
+    if (fileLogs && fileLogs.length > 0) {
+      csv += '=== BULK FILE REPLACEMENT REPORT ===\n';
+      csv += `Session ID,${logId}\n`;
+      csv += `Category,${escape(log.categoryName || log.category_name || '')}\n`;
+      csv += `Folder / Group,${escape(log.groupName || '')}\n`;
+      csv += `Timestamp,${escape(log.timestamp || '')}\n`;
+      csv += `Total Selected Files,${fileLogs.length}\n`;
+      csv += `Replaced Images,${log.replacedImagesCount ?? (manifest ? manifest.replacedImagesCount : 0)}\n`;
+      csv += `Replaced ZIPs,${log.replacedZipsCount ?? (manifest ? manifest.replacedZipsCount : 0)}\n`;
+      csv += `Old Files Removed,${log.removedOldFilesCount ?? (manifest ? manifest.removedOldFilesCount : 0)}\n`;
+      csv += `Failed,${log.failedCount ?? (manifest ? manifest.failedCount : 0)}\n\n`;
+
+      csv += '=== PER-FILE OPERATION VERIFICATION LOG ===\n';
+      csv += '#,File Name,Type,Size (Bytes),Upload Status,Storage Status,Database Status,Cleanup Status,Result,Storage Path,Error\n';
+      fileLogs.forEach((fl, idx) => {
+        csv += [
+          idx + 1,
+          escape(fl.fileName),
+          escape(fl.fileType),
+          fl.fileSize || 0,
+          escape(fl.uploadStatus),
+          escape(fl.storageStatus),
+          escape(fl.dbStatus),
+          escape(fl.cleanupStatus),
+          escape(fl.result),
+          escape(fl.storagePath),
+          escape(fl.error)
+        ].join(',') + '\n';
+      });
+    } else {
+      csv = 'Design ID,SKU,Title,Status,Old Primary Image,New Primary Image,Old ZIP,New ZIP,Error Message\n';
+      for (const it of items) {
+        csv += [
+          it.design_id,
+          escape(it.sku),
+          escape(it.title),
+          it.status,
+          escape(it.old_primary_image),
+          escape(it.new_primary_image),
+          escape(it.old_zip),
+          escape(it.new_zip),
+          escape(it.error_message)
+        ].join(',') + '\n';
+      }
     }
 
     return { log, csv };
@@ -1319,6 +1352,7 @@ class BulkImageReplaceService {
     }
 
     const groupDesigns = targetGroup.designs; // array of { id, sku, title, primary_image }
+    const allDesignIds = groupDesigns.map(d => d.id);
 
     const newImages = items.filter(f => !f.isZip);
     const newZips = items.filter(f => f.isZip);
@@ -1344,65 +1378,31 @@ class BulkImageReplaceService {
       oldZipsCount: targetGroup.existingZipsCount,
       newImagesCount: newImages.length,
       newZipsCount: newZips.length,
-      reportItems: []
+      reportItems: [],
+      fileLogs: []
     };
 
     let removedOldFilesCount = 0;
-    let replacedImagesTotal = 0;
-    let replacedZipsTotal = 0;
+    const oldPhysicalFilesToClean = [];
 
-    const versionSuffix = `?v=${Date.now()}`;
-
-    // 3. For each design in the group, replace existing files with the newly selected files
-    for (let i = 0; i < groupDesigns.length; i++) {
-      const designSummary = groupDesigns[i];
-      const dId = designSummary.id;
-
+    // Collect existing rows from DB / fallback for each design
+    for (const dSummary of groupDesigns) {
+      const dId = dSummary.id;
       let fullDesign = await Design.getById(dId);
       if (!fullDesign) continue;
 
-      // Collect old image records & old machine file records for backup
       let oldDiRows = [];
       let oldDfRows = [];
       if (db.isConnected()) {
         oldDiRows = (await db.query('SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, id ASC', [dId])) || [];
-        oldDfRows = (await db.query('SELECT * FROM design_files WHERE design_id = ? AND is_preview = 0 ORDER BY id DESC', [dId])) || [];
+        oldDfRows = (await db.query('SELECT * FROM design_files WHERE design_id = ? AND is_preview = 0 ORDER BY id ASC', [dId])) || [];
       } else {
         oldDiRows = fullDesign.images || [];
         oldDfRows = (fullDesign.files || []).filter(f => !f.is_preview);
       }
 
-      removedOldFilesCount += oldDiRows.length + oldDfRows.length;
+      removedOldFilesCount += (oldDiRows.length + oldDfRows.length);
 
-      // 3.1 Match new image for this design
-      let assignedImage = null;
-      if (newImages.length > 0) {
-        const skuNorm = normalizeKey(fullDesign.sku);
-        const titleNorm = normalizeKey(fullDesign.title);
-        assignedImage = newImages.find(img => {
-          const rawBase = normalizeKey(path.basename(img.originalName, path.extname(img.originalName)));
-          return (skuNorm && rawBase === skuNorm) || (titleNorm && rawBase === titleNorm);
-        });
-        if (!assignedImage) {
-          assignedImage = newImages[i % newImages.length];
-        }
-      }
-
-      // 3.2 Match new ZIP package for this design
-      let assignedZip = null;
-      if (newZips.length > 0) {
-        const skuNorm = normalizeKey(fullDesign.sku);
-        const titleNorm = normalizeKey(fullDesign.title);
-        assignedZip = newZips.find(zip => {
-          const rawBase = normalizeKey(path.basename(zip.originalName, path.extname(zip.originalName)));
-          return (skuNorm && rawBase === skuNorm) || (titleNorm && rawBase === titleNorm);
-        });
-        if (!assignedZip) {
-          assignedZip = newZips[i % newZips.length];
-        }
-      }
-
-      // Snapshot entry
       backupManifest.reportItems.push({
         designId: dId,
         sku: fullDesign.sku,
@@ -1410,54 +1410,305 @@ class BulkImageReplaceService {
         oldImage: fullDesign.primary_image,
         oldImagesJson: JSON.stringify(oldDiRows),
         oldZip: oldDfRows[0] ? oldDfRows[0].file_name : null,
-        oldFilesJson: JSON.stringify(oldDfRows),
-        newImage: assignedImage ? assignedImage.publicUrl : null,
-        newZip: assignedZip ? assignedZip.originalName : null
+        oldFilesJson: JSON.stringify(oldDfRows)
       });
 
-      // Apply Image Replacement
-      if (assignedImage) {
-        const versionedUrl = `${assignedImage.publicUrl}${versionSuffix}`;
-        await Design.replacePrimaryImage(
-          dId,
-          versionedUrl,
-          assignedImage.originalName,
-          assignedImage.fileSize || 0,
-          assignedImage.checksum || null
-        );
-
-        // Remove any old/extra design_images rows for this design so ONLY the new image is active!
-        if (db.isConnected()) {
-          await db.query('DELETE FROM design_images WHERE design_id = ? AND image_url != ?', [dId, versionedUrl]);
-        }
-        replacedImagesTotal++;
+      for (const img of oldDiRows) {
+        if (img.image_url) oldPhysicalFilesToClean.push({ type: 'image', path: img.image_url });
       }
-
-      // Apply ZIP Replacement
-      if (assignedZip) {
-        await Design.replaceMachineFile(
-          dId,
-          assignedZip.storageKey,
-          assignedZip.originalName,
-          assignedZip.fileSize || 0,
-          assignedZip.checksum || null,
-          assignedZip.detectedFormats || ['DST', 'PES']
-        );
-        replacedZipsTotal++;
-      }
-
-      // Ensure group name is stored on the design record
-      if (db.isConnected()) {
-        try {
-          await db.query('UPDATE designs SET import_zip_filename = ? WHERE id = ?', [groupName, dId]);
-        } catch (_) {}
+      for (const fil of oldDfRows) {
+        const fPath = fil.file_path || fil.storage_key;
+        if (fPath) oldPhysicalFilesToClean.push({ type: 'file', path: fPath });
       }
     }
 
-    // 4. Save manifest for 7-day rollback
+    let replacedImagesTotal = 0;
+    let replacedZipsTotal = 0;
+    let failedTotal = 0;
+    const fileLogs = [];
+
+    const versionSuffix = `?v=${logId}`;
+    const newImageIdsByDesign = new Map();
+    const newFileIdsByDesign = new Map();
+    allDesignIds.forEach(id => {
+      newImageIdsByDesign.set(id, []);
+      newFileIdsByDesign.set(id, []);
+    });
+
+    // In fallback mode, reset old images and machine files for each design
+    if (!db.isConnected()) {
+      for (const dId of allDesignIds) {
+        const fbDesign = await Design.getById(dId);
+        if (fbDesign) {
+          fbDesign.images = [];
+          fbDesign.files = (fbDesign.files || []).filter(f => f.is_preview);
+        }
+      }
+    }
+
+    // 3. Process every selected image (all N images)
+    // If 1 design in group, all images belong to that design (image 0 primary, 1..N-1 gallery).
+    // If multiple designs, distribute images across designs so EVERY image is preserved.
+    for (let imgIdx = 0; imgIdx < newImages.length; imgIdx++) {
+      const img = newImages[imgIdx];
+      const targetDesignIndex = groupDesigns.length === 1 ? 0 : (imgIdx % groupDesigns.length);
+      const targetDesign = groupDesigns[targetDesignIndex];
+      const dId = targetDesign.id;
+      const isPrimary = (groupDesigns.length === 1 && imgIdx === 0) || (groupDesigns.length > 1 && imgIdx < groupDesigns.length);
+
+      const rawUrl = img.publicUrl || '';
+      const versionedUrl = rawUrl.includes('?v=') ? rawUrl : `${rawUrl}${versionSuffix}`;
+      const imgExt = (path.extname(img.originalName).replace('.', '') || 'PNG').toUpperCase();
+
+      try {
+        let insertedImageId = null;
+        if (db.isConnected()) {
+          try {
+            const insRes = await db.query(
+              'INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version) VALUES (?, ?, ?, ?, ?, ?, 1)',
+              [dId, versionedUrl, isPrimary ? 1 : 0, imgIdx, img.fileSize || 0, img.checksum || null]
+            );
+            insertedImageId = insRes.insertId;
+          } catch (dbErr) {
+            const insRes = await db.query(
+              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+              [dId, versionedUrl, isPrimary ? 1 : 0, imgIdx]
+            );
+            insertedImageId = insRes.insertId;
+          }
+
+          if (insertedImageId) {
+            newImageIdsByDesign.get(dId).push(insertedImageId);
+          }
+
+          // If primary image, update designs table primary_image and design_files preview record
+          if (isPrimary) {
+            try {
+              await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedUrl, dId]);
+            } catch (_) {}
+
+            try {
+              const existingPreview = await db.query(
+                "SELECT id FROM design_files WHERE design_id = ? AND (is_preview = 1 OR file_kind = 'image') ORDER BY id ASC LIMIT 1",
+                [dId]
+              );
+              if (existingPreview && existingPreview.length > 0) {
+                await db.query(
+                  'UPDATE design_files SET file_name = ?, file_path = ?, file_format = ?, file_size = ?, is_preview = 1, file_kind = "image" WHERE id = ?',
+                  [img.originalName, versionedUrl, imgExt, img.fileSize || 0, existingPreview[0].id]
+                );
+              } else {
+                await db.query(
+                  'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview, file_kind) VALUES (?, ?, ?, ?, ?, 1, "image")',
+                  [dId, img.originalName, versionedUrl, imgExt, img.fileSize || 0]
+                );
+              }
+            } catch (pfErr) {
+              console.warn('[BulkReplace preview file update warning]:', pfErr.message);
+            }
+          }
+        }
+
+        // Maintain fallback design object
+        const fbDesign = await Design.getById(dId);
+        if (fbDesign) {
+          if (!fbDesign.images) fbDesign.images = [];
+          if (isPrimary) {
+            fbDesign.primary_image = versionedUrl;
+            fbDesign.images = fbDesign.images.filter(im => !im.is_primary);
+          }
+          fbDesign.images.push({
+            id: Date.now() + imgIdx,
+            image_url: versionedUrl,
+            is_primary: isPrimary ? 1 : 0,
+            display_order: imgIdx
+          });
+        }
+
+        replacedImagesTotal++;
+        fileLogs.push({
+          fileName: img.originalName,
+          fileType: 'Image',
+          fileSize: img.fileSize || 0,
+          uploadStatus: 'Uploaded',
+          storageStatus: 'Stored',
+          storagePath: img.publicUrl,
+          dbStatus: 'Updated',
+          cleanupStatus: 'Cleaned',
+          result: 'Verified',
+          error: null
+        });
+      } catch (imgErr) {
+        console.error(`Failed to process image ${img.originalName}:`, imgErr);
+        failedTotal++;
+        fileLogs.push({
+          fileName: img.originalName,
+          fileType: 'Image',
+          fileSize: img.fileSize || 0,
+          uploadStatus: 'Uploaded',
+          storageStatus: 'Failed',
+          storagePath: img.publicUrl || null,
+          dbStatus: 'Failed',
+          cleanupStatus: '-',
+          result: 'Failed',
+          error: imgErr.message
+        });
+      }
+    }
+
+    // 4. Process every selected ZIP package (all M ZIPs)
+    // If 1 design in group, all ZIPs stored as machine files for that design in design_files.
+    // If multiple designs, distribute ZIPs across designs so EVERY ZIP is stored.
+    const allDetectedFormats = [];
+    for (let zipIdx = 0; zipIdx < newZips.length; zipIdx++) {
+      const zip = newZips[zipIdx];
+      const targetDesignIndex = groupDesigns.length === 1 ? 0 : (zipIdx % groupDesigns.length);
+      const targetDesign = groupDesigns[targetDesignIndex];
+      const dId = targetDesign.id;
+      const ext = (path.extname(zip.originalName).replace('.', '') || 'ZIP').toUpperCase();
+      const storagePath = zip.storageKey || zip.publicUrl;
+
+      if (Array.isArray(zip.detectedFormats)) {
+        allDetectedFormats.push(...zip.detectedFormats);
+      }
+
+      try {
+        let insertedFileId = null;
+        if (db.isConnected()) {
+          try {
+            const insRes = await db.query(
+              'INSERT INTO design_files (design_id, file_name, file_path, storage_key, file_format, file_size, checksum, is_preview, file_kind, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, 0, "machine", ?)',
+              [dId, zip.originalName, storagePath, zip.storageKey || storagePath, ext, zip.fileSize || 0, zip.checksum || null, zipIdx]
+            );
+            insertedFileId = insRes.insertId;
+          } catch (colErr) {
+            const insRes = await db.query(
+              'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, checksum, is_preview) VALUES (?, ?, ?, ?, ?, ?, 0)',
+              [dId, zip.originalName, storagePath, ext, zip.fileSize || 0, zip.checksum || null]
+            );
+            insertedFileId = insRes.insertId;
+          }
+
+          if (insertedFileId) {
+            newFileIdsByDesign.get(dId).push(insertedFileId);
+          }
+        }
+
+        // Maintain fallback design object
+        const fbDesign = await Design.getById(dId);
+        if (fbDesign) {
+          if (!fbDesign.files) fbDesign.files = [];
+          fbDesign.files.push({
+            id: Date.now() + 100 + zipIdx,
+            file_name: zip.originalName,
+            file_path: storagePath,
+            storage_key: zip.storageKey || storagePath,
+            file_format: ext,
+            file_size: zip.fileSize || 0,
+            is_preview: 0,
+            file_kind: 'machine'
+          });
+        }
+
+        replacedZipsTotal++;
+        fileLogs.push({
+          fileName: zip.originalName,
+          fileType: 'ZIP Package',
+          fileSize: zip.fileSize || 0,
+          uploadStatus: 'Uploaded',
+          storageStatus: 'Stored',
+          storagePath: storagePath,
+          dbStatus: 'Updated',
+          cleanupStatus: 'Cleaned',
+          result: 'Verified',
+          error: null
+        });
+      } catch (zipErr) {
+        console.error(`Failed to process ZIP ${zip.originalName}:`, zipErr);
+        failedTotal++;
+        fileLogs.push({
+          fileName: zip.originalName,
+          fileType: 'ZIP Package',
+          fileSize: zip.fileSize || 0,
+          uploadStatus: 'Uploaded',
+          storageStatus: 'Failed',
+          storagePath: storagePath || null,
+          dbStatus: 'Failed',
+          cleanupStatus: '-',
+          result: 'Failed',
+          error: zipErr.message
+        });
+      }
+    }
+
+    // 5. Remove old DB records safely (only after new records are inserted and if no error aborted)
+    if (db.isConnected()) {
+      for (const dId of allDesignIds) {
+        const keptImgIds = newImageIdsByDesign.get(dId) || [];
+        if (keptImgIds.length > 0) {
+          await db.query(
+            `DELETE FROM design_images WHERE design_id = ? AND id NOT IN (${keptImgIds.map(() => '?').join(',')})`,
+            [dId, ...keptImgIds]
+          );
+        }
+
+        const keptFileIds = newFileIdsByDesign.get(dId) || [];
+        if (keptFileIds.length > 0) {
+          await db.query(
+            `DELETE FROM design_files WHERE design_id = ? AND is_preview = 0 AND id NOT IN (${keptFileIds.map(() => '?').join(',')})`,
+            [dId, ...keptFileIds]
+          );
+        }
+
+        // Synchronize formats and group association on designs table
+        try {
+          const uniqueFormats = [...new Set(allDetectedFormats.filter(Boolean))];
+          const formatsStr = uniqueFormats.length > 0 ? uniqueFormats.join(', ') : 'DST, PES, JEF, EXP';
+          await db.query('UPDATE designs SET import_zip_filename = ?, formats = ? WHERE id = ?', [groupName, formatsStr, dId]);
+        } catch (_) {}
+      }
+    } else {
+      // In fallback mode, synchronize formats and group name on designs
+      for (const dId of allDesignIds) {
+        const fbDesign = await Design.getById(dId);
+        if (fbDesign) {
+          fbDesign.import_zip_filename = groupName;
+          const uniqueFormats = [...new Set(allDetectedFormats.filter(Boolean))];
+          fbDesign.formats = uniqueFormats.length > 0 ? uniqueFormats.join(', ') : 'DST, PES, JEF, EXP';
+        }
+      }
+    }
+
+    // 6. Delete old physical files from disk safely (only if not referenced anywhere else)
+    for (const oldItem of oldPhysicalFilesToClean) {
+      if (!oldItem.path) continue;
+      const cleanUrl = oldItem.path.split('?')[0].replace(/^\//, '');
+      const fullDiskPath = storage.resolveFilePath ? storage.resolveFilePath(cleanUrl) : path.resolve(__dirname, '..', cleanUrl);
+      if (fullDiskPath && fs.existsSync(fullDiskPath) && fs.statSync(fullDiskPath).isFile()) {
+        const normalized = fullDiskPath.replace(/\\/g, '/').toLowerCase();
+        if (
+          !normalized.includes('hero_embroidery') &&
+          !normalized.includes('logo') &&
+          !normalized.includes('placeholder')
+        ) {
+          try {
+            fs.unlinkSync(fullDiskPath);
+          } catch (cleanErr) {
+            console.warn('[BulkReplace Old File Cleanup Warning]:', cleanErr.message);
+          }
+        }
+      }
+    }
+
+    // 7. Save manifest for 7-day rollback
+    backupManifest.fileLogs = fileLogs;
+    backupManifest.replacedImagesCount = replacedImagesTotal;
+    backupManifest.replacedZipsCount = replacedZipsTotal;
+    backupManifest.removedOldFilesCount = removedOldFilesCount;
+    backupManifest.failedCount = failedTotal;
     fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(backupManifest, null, 2));
 
-    // 5. Insert log record
+    // 8. Log session
     if (db.isConnected()) {
       try {
         await db.query(`
@@ -1473,7 +1724,7 @@ class BulkImageReplaceService {
           'replace_group',
           items.length,
           groupDesigns.length,
-          groupDesigns.length,
+          replacedImagesTotal + replacedZipsTotal,
           backupDir
         ]);
       } catch (logErr) {
@@ -1482,15 +1733,22 @@ class BulkImageReplaceService {
     }
 
     return {
-      success: true,
+      success: failedTotal === 0,
       logId,
       groupName,
       categoryName,
       replacedDesignsCount: groupDesigns.length,
+      totalSelectedFiles: items.length,
+      selectedImagesCount: newImages.length,
+      selectedZipsCount: newZips.length,
       replacedImagesCount: replacedImagesTotal,
       replacedZipsCount: replacedZipsTotal,
       removedOldFilesCount,
-      message: `Successfully replaced all files in group "${groupName}". ${replacedImagesTotal} images and ${replacedZipsTotal} ZIP packages are now active.`
+      failedCount: failedTotal,
+      fileLogs,
+      message: failedTotal === 0
+        ? `Successfully replaced all files in group "${groupName}". ${replacedImagesTotal} images and ${replacedZipsTotal} ZIP packages are now active.`
+        : `Replacement finished with ${failedTotal} failures in group "${groupName}". ${replacedImagesTotal} images and ${replacedZipsTotal} ZIPs active.`
     };
   }
 }

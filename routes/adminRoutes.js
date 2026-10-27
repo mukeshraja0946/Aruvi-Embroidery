@@ -89,7 +89,7 @@ router.post('/admin/designs/bulk-link-single-image', adminDesignController.linkS
 router.get('/admin/designs/bulk-replace/scope-summary', adminDesignController.getBulkReplaceScopeSummary);
 router.get('/admin/designs/bulk-replace/groups', adminDesignController.getBulkReplaceCategoryGroups);
 router.post('/admin/designs/bulk-replace/preview-match', adminDesignController.postBulkReplacePreviewMatch);
-router.post('/admin/designs/bulk-replace/upload-chunk', upload.array('files', 10), adminDesignController.postBulkReplaceUploadChunk);
+router.post('/admin/designs/bulk-replace/upload-chunk', upload.array('files', 50), adminDesignController.postBulkReplaceUploadChunk);
 router.post('/admin/designs/bulk-replace/commit', adminDesignController.postBulkReplaceCommit);
 router.post('/admin/designs/bulk-replace/undo/:id', adminDesignController.postBulkReplaceUndo);
 router.get('/admin/designs/bulk-replace/history', adminDesignController.getBulkReplaceHistory);
