@@ -20,13 +20,11 @@
         </button>
         <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img">
         
-        <% if (typeof hasPurchased !== 'undefined' && hasPurchased) { %>
-          <!-- Paid Download Pill (only for verified purchasers) -->
-          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
-            <i class="fa-solid fa-download"></i>
-            <span>Download</span>
-          </button>
-        <% } %>
+        <!-- Preview PNG Download Pill (available on preview image for all visitors) -->
+        <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
+          <i class="fa-solid fa-download"></i>
+          <span>Download</span>
+        </button>
 
         <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass"></i> Tap to zoom</span>
       </div>
@@ -430,8 +428,10 @@
     }
 
     const designId = '<%= design.id %>';
-    const rawName = '<%= (design.sku || design.title || "design").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
-    const targetFilename = `${rawName}.png`;
+    const rawSku = '<%= (design.sku || "").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
+    const rawTitle = '<%= (design.title || "").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
+    const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
+    const targetFilename = `${baseClean}.png`;
     const imgSrc = mainImg.src;
 
     const originalContent = btn ? btn.innerHTML : '';
@@ -478,6 +478,7 @@
           const tempImg = new Image();
           tempImg.crossOrigin = 'anonymous';
           await new Promise((resolve, reject) => {
+            if (tempImg.complete && tempImg.naturalWidth) return resolve();
             tempImg.onload = resolve;
             tempImg.onerror = reject;
             tempImg.src = imgSrc;

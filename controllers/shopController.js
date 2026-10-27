@@ -402,7 +402,7 @@ exports.downloadPreviewPng = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Design not found' });
     }
 
-    const reqImgUrl = req.query.imgUrl || design.primary_image;
+    const reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/cat_floral.jpg';
     if (!reqImgUrl) {
       return res.status(404).json({ success: false, message: 'No preview image available for this design' });
     }
@@ -482,8 +482,10 @@ exports.downloadPreviewPng = async (req, res, next) => {
         .toBuffer();
     }
 
-    const rawSkuOrTitle = (design.sku || design.title || 'design').replace(/[/\\?%*:|"<>]/g, '-').trim();
-    const downloadFilename = `${rawSkuOrTitle}.png`;
+    const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
+    const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
+    const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
+    const downloadFilename = `${baseClean}.png`;
 
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);

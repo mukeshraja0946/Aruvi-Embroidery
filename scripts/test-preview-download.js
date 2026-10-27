@@ -24,9 +24,18 @@ async function runTests() {
   console.log('Database connection ready.');
 
   try {
+    const Design = require('../models/Design');
+    const allDesigns = await Design.getAll({ limit: 1 });
+    const targetDesign = (allDesigns && allDesigns.designs && allDesigns.designs.length > 0)
+      ? allDesigns.designs[0]
+      : { id: 713, slug: 'modern-geometric-border' };
+    const testSlug = targetDesign.slug || targetDesign.id;
+    const testId = targetDesign.id;
+    console.log(`Using test design #${testId} (slug: "${testSlug}")`);
+
     // 1. Test design detail page HTML rendering
     console.log('\n[TEST 1]: Verifying Design Detail Page HTML & Button Markup...');
-    const detailRes = await fetch(`${baseUrl}/design/aed-100`);
+    const detailRes = await fetch(`${baseUrl}/design/${testSlug}`);
     const detailHtml = await detailRes.text();
 
     assert.strictEqual(detailRes.status, 200, `Expected HTTP 200 for design detail page, got ${detailRes.status}`);
@@ -40,8 +49,8 @@ async function runTests() {
 
     // 2. Test server-side endpoint with JPG input -> Conversion to authentic PNG
     console.log('\n[TEST 2]: Testing JPG to authentic PNG conversion via /api/designs/:id/download-preview-png...');
-    // We know design 3225 has JPG preview '/public/uploads/previews/preview-1791824449573-3f54472ba6c2d136.jpg'
-    const jpgDownloadRes = await fetch(`${baseUrl}/api/designs/3225/download-preview-png`);
+    const jpgUrl = '/public/images/cat_floral.jpg';
+    const jpgDownloadRes = await fetch(`${baseUrl}/api/designs/${testId}/download-preview-png?imgUrl=${encodeURIComponent(jpgUrl)}`);
     assert.strictEqual(jpgDownloadRes.status, 200, `Expected HTTP 200, got ${jpgDownloadRes.status}`);
 
     const contentType = jpgDownloadRes.headers.get('content-type');
@@ -58,27 +67,27 @@ async function runTests() {
     assert.strictEqual(isPngMagic, true, 'Downloaded file does NOT have authentic PNG magic bytes (0x89 0x50 0x4E 0x47)!');
     console.log(`✓ TEST 2 PASSED: Successfully converted JPG to valid PNG (${buffer.length} bytes) with authentic PNG magic bytes`);
 
-    // 3. Test with explicit imgUrl parameter (e.g. switching thumbnail)
-    console.log('\n[TEST 3]: Testing download with explicit imgUrl parameter (thumbnail switching)...');
-    const thumbUrl = '/public/uploads/previews/preview-1791824449516-c3e8c8084f82dc41.png';
-    const thumbDownloadRes = await fetch(`${baseUrl}/api/designs/3225/download-preview-png?imgUrl=${encodeURIComponent(thumbUrl)}`);
-    assert.strictEqual(thumbDownloadRes.status, 200, `Expected HTTP 200, got ${thumbDownloadRes.status}`);
-    const thumbBuffer = Buffer.from(await thumbDownloadRes.arrayBuffer());
-    const isThumbPngMagic = thumbBuffer[0] === 0x89 && thumbBuffer[1] === 0x50 && thumbBuffer[2] === 0x4E && thumbBuffer[3] === 0x47;
-    assert.strictEqual(isThumbPngMagic, true, 'Thumbnail download does not have PNG magic bytes');
-    console.log(`✓ TEST 3 PASSED: Custom thumbnail preview download succeeded with authentic PNG (${thumbBuffer.length} bytes)`);
+    // 3. Test with PNG input -> Preserves authentic PNG
+    console.log('\n[TEST 3]: Testing download with explicit PNG input...');
+    const pngUrl = '/public/assets/brand/logo.png';
+    const pngDownloadRes = await fetch(`${baseUrl}/api/designs/${testId}/download-preview-png?imgUrl=${encodeURIComponent(pngUrl)}`);
+    assert.strictEqual(pngDownloadRes.status, 200, `Expected HTTP 200, got ${pngDownloadRes.status}`);
+    const pngBuffer = Buffer.from(await pngDownloadRes.arrayBuffer());
+    const isThumbPngMagic = pngBuffer[0] === 0x89 && pngBuffer[1] === 0x50 && pngBuffer[2] === 0x4E && pngBuffer[3] === 0x47;
+    assert.strictEqual(isThumbPngMagic, true, 'PNG download does not have PNG magic bytes');
+    console.log(`✓ TEST 3 PASSED: PNG preview download succeeded with authentic PNG (${pngBuffer.length} bytes)`);
 
     // 4. Test Security: Attempt to access machine file (ZIP, DST, PES)
     console.log('\n[TEST 4]: Testing Security: Blocking machine embroidery files (.zip, .dst, .pes)...');
-    const zipAttempt = await fetch(`${baseUrl}/api/designs/3225/download-preview-png?imgUrl=/storage/designs/machine.zip`);
+    const zipAttempt = await fetch(`${baseUrl}/api/designs/${testId}/download-preview-png?imgUrl=/storage/designs/machine.zip`);
     assert.strictEqual(zipAttempt.status, 403, `Expected HTTP 403 for .zip attempt, got ${zipAttempt.status}`);
     const zipJson = await zipAttempt.json();
     assert.strictEqual(zipJson.success, false, 'Expected success: false for zip attempt');
 
-    const dstAttempt = await fetch(`${baseUrl}/api/designs/3225/download-preview-png?imgUrl=/storage/designs/machine.dst`);
+    const dstAttempt = await fetch(`${baseUrl}/api/designs/${testId}/download-preview-png?imgUrl=/storage/designs/machine.dst`);
     assert.strictEqual(dstAttempt.status, 403, `Expected HTTP 403 for .dst attempt, got ${dstAttempt.status}`);
 
-    const pathTraversalAttempt = await fetch(`${baseUrl}/api/designs/3225/download-preview-png?imgUrl=../../.env`);
+    const pathTraversalAttempt = await fetch(`${baseUrl}/api/designs/${testId}/download-preview-png?imgUrl=../../.env`);
     assert.strictEqual(pathTraversalAttempt.status, 403, `Expected HTTP 403 for path traversal attempt, got ${pathTraversalAttempt.status}`);
     console.log('✓ TEST 4 PASSED: Security guards properly blocked ZIP, DST, and directory traversal attempts with HTTP 403');
 
