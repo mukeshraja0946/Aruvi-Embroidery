@@ -1808,189 +1808,380 @@ function calculateSimilarity(str1, str2) {
 }
 
 /**
- * Robust Multi-Tier Image Matching Engine
- * Priority Order (First Match Wins):
- *   a) Exact SKU, case-insensitive (AED-BLO-01.png, AED 1.PNG)
- *   b) Product ID (1.png)
- *   c) Exact Title after normalization (lowercase, trimmed, extension removed case-insensitively, spaces/hyphens/underscores collapsed)
- *   d) Preview Image Filename column stored from bulk import (designs.import_image_filename)
- *   e) Slug
- *   f) Fallback AED numeric prefix (e.g. AED 1 -> ID 1)
- *
- * Excludes only permanently deleted designs (matches active, draft, inactive).
- * Flags ambiguous files if multiple designs match.
+ * Validates actual image file content using magic bytes header.
+ * Supports PNG, JPEG, WebP, and AVIF.
  */
-async function findMatchingDesign(filename, allDesignsCache = null) {
-  if (!filename || !db.isConnected()) {
-    return { status: 'unmatched', reason: 'Database is offline or filename is empty', suggestions: [] };
+function validateImageFileContent(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { valid: false, error: 'File does not exist on disk' };
+    }
+    const stat = fs.statSync(filePath);
+    if (stat.size === 0) {
+      return { valid: false, error: 'File is empty (0 bytes)' };
+    }
+    const fd = fs.openSync(filePath, 'r');
+    const buffer = Buffer.alloc(16);
+    const bytesRead = fs.readSync(fd, buffer, 0, Math.min(16, stat.size), 0);
+    fs.closeSync(fd);
+
+    if (bytesRead < 4) {
+      return { valid: false, error: 'File header is too small or corrupted' };
+    }
+
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+      return { valid: true, mime: 'image/png', ext: '.png' };
+    }
+    // JPEG: FF D8 FF
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+      return { valid: true, mime: 'image/jpeg', ext: '.jpg' };
+    }
+    // WebP: RIFF ... WEBP (bytes 0-3 = "RIFF", bytes 8-11 = "WEBP")
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+        buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+      return { valid: true, mime: 'image/webp', ext: '.webp' };
+    }
+    // AVIF: bytes 4-11 contain 'ftypavif' or 'ftypavis'
+    const brand = buffer.toString('utf8', 4, 12);
+    if (brand === 'ftypavif' || brand === 'ftypavis') {
+      return { valid: true, mime: 'image/avif', ext: '.avif' };
+    }
+
+    return { valid: false, error: 'File content does not match a valid PNG, JPEG, WebP, or AVIF image' };
+  } catch (err) {
+    return { valid: false, error: `Image validation failed: ${err.message}` };
+  }
+}
+
+/**
+ * Normalizes design record candidate by attaching formatted public thumbnail URL
+ */
+function normalizeCandidateRecord(row) {
+  if (!row) return null;
+  let thumb = row.image_url;
+  if (thumb) {
+    thumb = storage.buildThumbnailUrl(thumb);
+  }
+  return {
+    id: row.id,
+    sku: row.sku || '',
+    title: row.title || `Design #${row.id}`,
+    category_name: row.category_name || 'Uncategorized',
+    image_url: thumb || '/public/images/logo.jpg'
+  };
+}
+
+/**
+ * Query helper to fetch active design candidates with categories and thumbnails
+ */
+const BASE_CANDIDATE_SQL = `
+  SELECT d.id, d.title, d.sku, d.slug, d.import_image_filename, d.is_active,
+         COALESCE(c.name, 'Uncategorized') as category_name,
+         COALESCE(
+           (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1 ORDER BY di.id DESC LIMIT 1),
+           (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id ORDER BY di.is_primary DESC, di.id DESC LIMIT 1),
+           (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 1 AND UPPER(df.file_format) IN ('PNG','JPG','JPEG','WEBP','AVIF') ORDER BY df.id DESC LIMIT 1)
+         ) as image_url
+  FROM designs d
+  LEFT JOIN categories c ON d.category_id = c.id
+  WHERE d.deleted_at IS NULL
+`;
+
+/**
+ * Robust Multi-Tier Image Matching Engine
+ *
+ * Priority 1 — Exact SKU:
+ *   - Match filenames containing the exact product SKU (ignore case & ext, no partial matches).
+ * Priority 2 — Exact Product ID:
+ *   - Filenames explicitly containing a valid documented product ID (pure digits, id-X, product-X).
+ * Priority 3 — Exact Product Title:
+ *   - Normalized title uniquely identifying exactly one product.
+ * Priority 4 — Legacy Numbered Filenames:
+ *   - Verified legacy mappings from designs.import_image_filename or import_job_items.
+ *   - Does not assume AED 2 means product ID 2 or SKU 2.
+ */
+async function findMatchingDesign(filename, allDesignsCache = null, confirmedMappings = {}) {
+  if (!filename) {
+    return { status: 'unmatched', reason: 'Filename is empty', suggestions: [] };
   }
 
-  // 1. Case-insensitive extension extraction
   const rawExt = path.extname(filename || '');
-  const ext = rawExt.toLowerCase();
   const rawBaseName = (rawExt ? filename.slice(0, -rawExt.length) : filename).trim();
-
   if (!rawBaseName) {
     return { status: 'unmatched', reason: 'Invalid or empty filename', suggestions: [] };
   }
 
   const cleanLower = rawBaseName.toLowerCase();
-  const cleanAlphaNum = rawBaseName.replace(/[^a-z0-9]/gi, '').toLowerCase();
   const cleanCollapsed = rawBaseName.replace(/[\s\-_]+/g, ' ').trim().toLowerCase();
-  const numericId = /^\d+$/.test(rawBaseName) ? parseInt(rawBaseName, 10) : null;
-  const aedMatch = rawBaseName.match(/^AED[\s\-_]*0*(\d+)$/i);
-  const aedNumericId = aedMatch ? parseInt(aedMatch[1], 10) : null;
+  const isLegacyNumberedPattern = /^AED[\s\-_]*\d+$/i.test(rawBaseName);
 
-  console.log(`[Bulk Image Matcher] Checking "${filename}": Base="${rawBaseName}", AlphaNum="${cleanAlphaNum}", NumericID=${numericId}`);
-
-  // Helper to query and evaluate single vs ambiguous match
-  async function checkCandidates(querySql, params, matchedBy) {
-    const rows = await db.query(querySql, params);
-    if (!rows || rows.length === 0) return null;
-    if (rows.length === 1) {
-      return { status: 'matched', design: rows[0], matchedBy };
-    }
-    return { status: 'ambiguous', candidates: rows, matchedBy };
-  }
+  console.log(`[Bulk Image Matcher] Checking "${filename}": Base="${rawBaseName}", Collapsed="${cleanCollapsed}", IsLegacyPattern=${isLegacyNumberedPattern}`);
 
   // --------------------------------------------------------------------------
-  // a) Exact SKU, case-insensitive (AED-BLO-01.png, AED 1.PNG)
+  // Priority 0: Confirmed batch mapping (remembered manual confirmations)
   // --------------------------------------------------------------------------
-  const matchSku = await checkCandidates(
-    `SELECT id, title, sku, slug, import_image_filename, is_active 
-     FROM designs 
-     WHERE LOWER(sku) = ? 
-        OR REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') = ?`,
-    [cleanLower, cleanAlphaNum],
-    'sku'
-  );
-  if (matchSku) {
-    console.log(`[Bulk Image Matcher] Matched by SKU (${matchSku.matchedBy}): "${filename}" -> ID=${matchSku.design?.id || 'Ambiguous'}`);
-    return matchSku;
-  }
-
-  // --------------------------------------------------------------------------
-  // b) Product ID (1.png, 042.png)
-  // --------------------------------------------------------------------------
-  if (numericId !== null && numericId > 0) {
-    const matchId = await checkCandidates(
-      `SELECT id, title, sku, slug, import_image_filename, is_active 
-       FROM designs 
-       WHERE id = ?`,
-      [numericId],
-      'id'
-    );
-    if (matchId) {
-      console.log(`[Bulk Image Matcher] Matched by Product ID: "${filename}" -> ID=${matchId.design?.id || 'Ambiguous'}`);
-      return matchId;
+  if (confirmedMappings && typeof confirmedMappings === 'object') {
+    const confirmedId = confirmedMappings[cleanLower] || confirmedMappings[cleanCollapsed] || confirmedMappings[filename.toLowerCase()];
+    if (confirmedId) {
+      if (db.isConnected()) {
+        try {
+          const cRows = await db.query(`${BASE_CANDIDATE_SQL} AND d.id = ?`, [confirmedId]);
+          if (cRows && cRows.length > 0) {
+            console.log(`[Bulk Image Matcher] Matched by Confirmed Batch Mapping: "${filename}" -> ID=${cRows[0].id}`);
+            return { status: 'matched', design: normalizeCandidateRecord(cRows[0]), matchedBy: 'confirmed_batch_mapping' };
+          }
+        } catch (cErr) {}
+      } else if (allDesignsCache) {
+        const found = allDesignsCache.find(d => String(d.id) === String(confirmedId));
+        if (found) {
+          return { status: 'matched', design: normalizeCandidateRecord(found), matchedBy: 'confirmed_batch_mapping' };
+        }
+      }
     }
   }
 
   // --------------------------------------------------------------------------
-  // c) Exact Title after normalization (lowercase, trimmed, spaces/hyphens/underscores collapsed)
-  // "AED 1.PNG" = title "AED 1"
+  // DATABASE-CONNECTED MATCHING
   // --------------------------------------------------------------------------
-  const matchTitle = await checkCandidates(
-    `SELECT id, title, sku, slug, import_image_filename, is_active 
-     FROM designs 
-     WHERE LOWER(TRIM(title)) = ? 
-        OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?`,
-    [cleanLower, cleanAlphaNum],
-    'title'
-  );
-  if (matchTitle) {
-    console.log(`[Bulk Image Matcher] Matched by Title: "${filename}" -> ID=${matchTitle.design?.id || 'Ambiguous'}`);
-    return matchTitle;
-  }
+  if (db.isConnected()) {
+    try {
+      // ----------------------------------------------------------------------
+      // Priority 1 — Exact SKU (Only when filename is not a legacy numbered pattern like AED 1)
+      // ----------------------------------------------------------------------
+      if (!isLegacyNumberedPattern) {
+        // 1A. Direct exact SKU equality
+        const skuRows = await db.query(
+          `${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' AND (LOWER(TRIM(d.sku)) = ? OR LOWER(TRIM(d.sku)) = ?)`,
+          [cleanLower, cleanCollapsed]
+        );
+        if (skuRows && skuRows.length === 1) {
+          console.log(`[Bulk Image Matcher] Priority 1 (Exact SKU Direct): "${filename}" -> ID=${skuRows[0].id} (${skuRows[0].sku})`);
+          return { status: 'matched', design: normalizeCandidateRecord(skuRows[0]), matchedBy: 'exact_sku' };
+        }
+        if (skuRows && skuRows.length > 1) {
+          return {
+            status: 'ambiguous',
+            candidates: skuRows.map(normalizeCandidateRecord),
+            matchedBy: 'exact_sku',
+            reason: `Multiple products share SKU "${skuRows[0].sku}"`
+          };
+        }
 
-  // --------------------------------------------------------------------------
-  // d) Preview Image Filename column stored from bulk import (designs.import_image_filename)
-  // --------------------------------------------------------------------------
-  const matchImportFilename = await checkCandidates(
-    `SELECT id, title, sku, slug, import_image_filename, is_active 
-     FROM designs 
-     WHERE import_image_filename IS NOT NULL 
-       AND (
-         LOWER(import_image_filename) = ?
-         OR LOWER(import_image_filename) = ?
-         OR REPLACE(REPLACE(REPLACE(LOWER(import_image_filename), ' ', ''), '_', ''), '-', '') = ?
-       )`,
-    [filename.toLowerCase(), cleanLower, cleanAlphaNum],
-    'import_image_filename'
-  );
-  if (matchImportFilename) {
-    console.log(`[Bulk Image Matcher] Matched by import_image_filename: "${filename}" -> ID=${matchImportFilename.design?.id || 'Ambiguous'}`);
-    return matchImportFilename;
-  }
+        // 1B. Filename contains exact SKU surrounded by word/token boundaries (e.g. AED-BLO-01_front.png)
+        // Must NOT match partial SKU substrings (e.g. AED-BLO-1 inside AED-BLO-10)
+        let designsToCheck = allDesignsCache;
+        if (!designsToCheck) {
+          designsToCheck = await db.query(`${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' LIMIT 1500`);
+        }
 
-  // --------------------------------------------------------------------------
-  // e) Slug
-  // --------------------------------------------------------------------------
-  const matchSlug = await checkCandidates(
-    `SELECT id, title, sku, slug, import_image_filename, is_active 
-     FROM designs 
-     WHERE LOWER(slug) = ? 
-        OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?`,
-    [cleanLower, cleanAlphaNum],
-    'slug'
-  );
-  if (matchSlug) {
-    console.log(`[Bulk Image Matcher] Matched by Slug: "${filename}" -> ID=${matchSlug.design?.id || 'Ambiguous'}`);
-    return matchSlug;
-  }
+        if (designsToCheck && designsToCheck.length > 0) {
+          const tokenMatches = [];
+          for (const d of designsToCheck) {
+            if (!d.sku) continue;
+            const cleanSku = d.sku.trim();
+            if (cleanSku.length < 3) continue;
+            if (/^AED[\s\-_]*\d+$/i.test(cleanSku)) continue; // ignore legacy demo SKUs
 
-  // --------------------------------------------------------------------------
-  // Fallback: AED Number prefix (e.g. "AED 1.png" -> ID 1)
-  // --------------------------------------------------------------------------
-  if (aedNumericId !== null && aedNumericId > 0) {
-    const matchAedId = await checkCandidates(
-      `SELECT id, title, sku, slug, import_image_filename, is_active 
-       FROM designs 
-       WHERE id = ?`,
-      [aedNumericId],
-      'aed_id_fallback'
-    );
-    if (matchAedId) {
-      console.log(`[Bulk Image Matcher] Matched by AED ID fallback: "${filename}" -> ID=${matchAedId.design?.id || 'Ambiguous'}`);
-      return matchAedId;
+            const escaped = cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const boundaryRegex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+            if (boundaryRegex.test(rawBaseName)) {
+              tokenMatches.push(d);
+            }
+          }
+
+          if (tokenMatches.length === 1) {
+            console.log(`[Bulk Image Matcher] Priority 1 (Exact SKU Token): "${filename}" -> ID=${tokenMatches[0].id} (${tokenMatches[0].sku})`);
+            return { status: 'matched', design: normalizeCandidateRecord(tokenMatches[0]), matchedBy: 'exact_sku_token' };
+          }
+          if (tokenMatches.length > 1) {
+            return {
+              status: 'ambiguous',
+              candidates: tokenMatches.map(normalizeCandidateRecord),
+              matchedBy: 'exact_sku_token',
+              reason: `Filename contains multiple matching product SKUs (${tokenMatches.length} candidates)`
+            };
+          }
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // Priority 2 — Exact Product ID
+      // Formats: pure number "42.png", explicit prefix "id-42.png", "product-42.png", "[42].png"
+      // NEVER treat "AED 2.png" as ID 2.
+      // ----------------------------------------------------------------------
+      let targetId = null;
+      if (/^\d+$/.test(rawBaseName)) {
+        targetId = parseInt(rawBaseName, 10);
+      } else {
+        const idPrefixMatch = rawBaseName.match(/^(?:id|product|prod|p)[\s\-_]+(\d+)$/i) || rawBaseName.match(/^[\[#](\d+)[\]]?$/);
+        if (idPrefixMatch) {
+          targetId = parseInt(idPrefixMatch[1], 10);
+        }
+      }
+
+      if (targetId !== null && targetId > 0) {
+        const idRows = await db.query(`${BASE_CANDIDATE_SQL} AND d.id = ?`, [targetId]);
+        if (idRows && idRows.length === 1) {
+          console.log(`[Bulk Image Matcher] Priority 2 (Product ID): "${filename}" -> ID=${idRows[0].id}`);
+          return { status: 'matched', design: normalizeCandidateRecord(idRows[0]), matchedBy: 'exact_product_id' };
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // Priority 3 — Exact Product Title
+      // Match only when the normalized title identifies exactly ONE product.
+      // ----------------------------------------------------------------------
+      const titleRows = await db.query(
+        `${BASE_CANDIDATE_SQL} AND (LOWER(TRIM(d.title)) = ? OR LOWER(TRIM(d.title)) = ?)`,
+        [cleanLower, cleanCollapsed]
+      );
+      if (titleRows && titleRows.length === 1) {
+        console.log(`[Bulk Image Matcher] Priority 3 (Unique Title): "${filename}" -> ID=${titleRows[0].id} ("${titleRows[0].title}")`);
+        return { status: 'matched', design: normalizeCandidateRecord(titleRows[0]), matchedBy: 'exact_title' };
+      }
+      if (titleRows && titleRows.length > 1) {
+        // Multiple products share this title -> Ambiguous
+        console.log(`[Bulk Image Matcher] Priority 3 (Ambiguous Title): "${filename}" matches ${titleRows.length} products`);
+        return {
+          status: 'ambiguous',
+          candidates: titleRows.map(normalizeCandidateRecord),
+          matchedBy: 'exact_title',
+          reason: `Multiple products (${titleRows.length}) share the title "${titleRows[0].title}"`
+        };
+      }
+
+      // ----------------------------------------------------------------------
+      // Priority 4 — Legacy Numbered Filenames & Verified Legacy Mappings
+      // Check designs.import_image_filename and import_job_items.image_filename
+      // ----------------------------------------------------------------------
+      const legacyDesigns = await db.query(
+        `SELECT DISTINCT d.id, d.title, d.sku, d.slug, d.import_image_filename, d.is_active,
+                COALESCE(c.name, 'Uncategorized') as category_name,
+                COALESCE(
+                  (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1 ORDER BY di.id DESC LIMIT 1),
+                  (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id ORDER BY di.is_primary DESC, di.id DESC LIMIT 1),
+                  (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 1 AND UPPER(df.file_format) IN ('PNG','JPG','JPEG','WEBP','AVIF') ORDER BY df.id DESC LIMIT 1)
+                ) as image_url
+         FROM designs d
+         LEFT JOIN categories c ON d.category_id = c.id
+         WHERE d.deleted_at IS NULL
+           AND (
+             (d.import_image_filename IS NOT NULL AND (LOWER(TRIM(d.import_image_filename)) = ? OR LOWER(TRIM(d.import_image_filename)) = ?))
+             OR d.id IN (
+               SELECT iji.imported_design_id 
+               FROM import_job_items iji 
+               WHERE iji.imported_design_id IS NOT NULL 
+                 AND (LOWER(TRIM(iji.image_filename)) = ? OR LOWER(TRIM(iji.image_filename)) = ?)
+             )
+           )`,
+        [filename.toLowerCase(), cleanLower, filename.toLowerCase(), cleanLower]
+      );
+
+      if (legacyDesigns && legacyDesigns.length === 1) {
+        console.log(`[Bulk Image Matcher] Priority 4 (Verified Legacy Import Mapping): "${filename}" -> ID=${legacyDesigns[0].id}`);
+        return { status: 'matched', design: normalizeCandidateRecord(legacyDesigns[0]), matchedBy: 'legacy_import_mapping' };
+      }
+      if (legacyDesigns && legacyDesigns.length > 1) {
+        return {
+          status: 'ambiguous',
+          candidates: legacyDesigns.map(normalizeCandidateRecord),
+          matchedBy: 'legacy_import_mapping',
+          reason: `Legacy import records mapped this filename to multiple products (${legacyDesigns.length} candidates)`
+        };
+      }
+
+      // If legacy pattern like AED 2 and no verified mapping, find candidate products sharing similar title or SKU pattern
+      if (isLegacyNumberedPattern) {
+        const candidateRows = await db.query(
+          `${BASE_CANDIDATE_SQL} AND (
+            LOWER(TRIM(d.title)) LIKE ?
+            OR LOWER(TRIM(d.sku)) = ?
+          ) LIMIT 10`,
+          [`${cleanLower}%`, cleanLower]
+        );
+        if (candidateRows && candidateRows.length > 1) {
+          return {
+            status: 'ambiguous',
+            candidates: candidateRows.map(normalizeCandidateRecord),
+            matchedBy: 'legacy_numbered_candidates',
+            reason: `Multiple candidate products found for legacy filename "${filename}"`
+          };
+        }
+      }
+
+    } catch (sqlErr) {
+      console.warn('[Bulk Image Matcher SQL Warning]:', sqlErr.message);
     }
   }
 
   // --------------------------------------------------------------------------
-  // Unmatched: Compute Top 3 Closest Suggestions
+  // FALLBACK IN-MEMORY MATCHING (When MySQL is offline or local testing)
+  // --------------------------------------------------------------------------
+  if (!db.isConnected() && allDesignsCache && allDesignsCache.length > 0) {
+    const activeDesigns = allDesignsCache.filter(d => !d.deleted_at);
+
+    // Priority 1: Exact SKU
+    if (!isLegacyNumberedPattern) {
+      const matchSku = activeDesigns.filter(d => d.sku && d.sku.trim().toLowerCase() === cleanLower);
+      if (matchSku.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchSku[0]), matchedBy: 'exact_sku' };
+      if (matchSku.length > 1) return { status: 'ambiguous', candidates: matchSku.map(normalizeCandidateRecord), matchedBy: 'exact_sku' };
+    }
+
+    // Priority 2: Product ID
+    if (/^\d+$/.test(rawBaseName)) {
+      const matchId = activeDesigns.find(d => Number(d.id) === parseInt(rawBaseName, 10));
+      if (matchId) return { status: 'matched', design: normalizeCandidateRecord(matchId), matchedBy: 'exact_product_id' };
+    }
+
+    // Priority 3: Exact Title
+    const matchTitle = activeDesigns.filter(d => d.title && d.title.trim().toLowerCase() === cleanCollapsed);
+    if (matchTitle.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchTitle[0]), matchedBy: 'exact_title' };
+    if (matchTitle.length > 1) return { status: 'ambiguous', candidates: matchTitle.map(normalizeCandidateRecord), matchedBy: 'exact_title' };
+
+    // Priority 4: Legacy Import Filename
+    const matchLegacy = activeDesigns.filter(d => d.import_image_filename && (d.import_image_filename.toLowerCase() === filename.toLowerCase() || d.import_image_filename.toLowerCase() === cleanLower));
+    if (matchLegacy.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchLegacy[0]), matchedBy: 'legacy_import_mapping' };
+    if (matchLegacy.length > 1) return { status: 'ambiguous', candidates: matchLegacy.map(normalizeCandidateRecord), matchedBy: 'legacy_import_mapping' };
+  }
+
+  // --------------------------------------------------------------------------
+  // Unmatched: Compute Top 3 Closest Suggestions with Thumbnails
   // --------------------------------------------------------------------------
   let suggestions = [];
   try {
     let designsList = allDesignsCache;
-    if (!designsList) {
-      designsList = await db.query('SELECT id, title, sku FROM designs LIMIT 500');
+    if (!designsList && db.isConnected()) {
+      designsList = await db.query(`${BASE_CANDIDATE_SQL} LIMIT 500`);
     }
 
     if (designsList && designsList.length > 0) {
       const scored = designsList.map(d => {
-        const skuSim = calculateSimilarity(cleanAlphaNum, d.sku);
-        const titleSim = calculateSimilarity(cleanAlphaNum, d.title);
+        const skuSim = calculateSimilarity(cleanLower, d.sku || '');
+        const titleSim = calculateSimilarity(cleanCollapsed, d.title || '');
         const maxSim = Math.max(skuSim, titleSim);
         return {
           id: d.id,
-          sku: d.sku,
-          title: d.title,
+          sku: d.sku || '',
+          title: d.title || '',
+          category_name: d.category_name || 'Uncategorized',
+          image_url: storage.buildThumbnailUrl(d.image_url) || '/public/images/logo.jpg',
           similarity: parseFloat(maxSim.toFixed(2))
         };
       });
 
       scored.sort((a, b) => b.similarity - a.similarity);
-      suggestions = scored.slice(0, 3).filter(s => s.similarity > 0.1);
+      suggestions = scored.slice(0, 3).filter(s => s.similarity > 0.15);
     }
   } catch (sugErr) {
     console.warn('[Suggestions warning]:', sugErr.message);
   }
 
-  console.log(`[Bulk Image Matcher] UNMATCHED: "${filename}". Top suggestions: ${JSON.stringify(suggestions)}`);
+  console.log(`[Bulk Image Matcher] UNMATCHED: "${filename}". Suggestions: ${suggestions.length}`);
 
   return {
     status: 'unmatched',
-    reason: 'No matching product found by SKU, Product ID, Title, Import Image Filename, or Slug.',
+    reason: 'No matching product found by SKU, Product ID, Title, or Legacy import records.',
     suggestions
   };
 }
@@ -2019,21 +2210,34 @@ function cleanupTempUnmatchedFiles() {
 }
 
 /**
- * Endpoint to check if database has designs before starting bulk upload
+ * Endpoint to check if database has designs before starting bulk upload.
+ * Returns catalog designs with thumbnails for real-time searching and filtering.
  */
 exports.bulkUploadCheck = async (req, res) => {
   try {
     if (!db.isConnected()) await db.initPool();
-    const rows = await db.query('SELECT COUNT(*) as count FROM designs');
-    const totalCount = rows && rows[0] ? rows[0].count : 0;
 
-    const designs = await db.query('SELECT id, sku, title FROM designs ORDER BY id ASC LIMIT 2000');
+    let totalCount = 0;
+    let designs = [];
+
+    if (db.isConnected()) {
+      const countRows = await db.query('SELECT COUNT(*) as count FROM designs WHERE deleted_at IS NULL');
+      totalCount = countRows && countRows[0] ? countRows[0].count : 0;
+
+      const rows = await db.query(`${BASE_CANDIDATE_SQL} ORDER BY d.id ASC LIMIT 5000`);
+      designs = (rows || []).map(normalizeCandidateRecord);
+    } else {
+      // Offline fallback mode
+      const allFallback = await Design.getAll({ limit: 5000, is_active_only: false });
+      totalCount = allFallback.total || (allFallback.designs ? allFallback.designs.length : 0);
+      designs = (allFallback.designs || []).map(normalizeCandidateRecord);
+    }
 
     return res.json({
       success: true,
       count: totalCount,
       isEmpty: totalCount === 0,
-      designs: designs || []
+      designs
     });
   } catch (err) {
     console.error('[Bulk Upload Check Error]:', err);
@@ -2042,9 +2246,11 @@ exports.bulkUploadCheck = async (req, res) => {
 };
 
 /**
- * Endpoint to manually link an unmatched or ambiguous image to a specific design
+ * Endpoint to manually link an unmatched or ambiguous image to a specific design.
+ * Includes rollback protection if database update fails.
  */
 exports.linkSingleImage = async (req, res) => {
+  let savedUrl = null;
   try {
     const { designId, tempToken, originalName } = req.body;
     if (!designId || !tempToken) {
@@ -2064,18 +2270,40 @@ exports.linkSingleImage = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Temporary file expired or not found. Please re-upload.' });
     }
 
+    // Validate file content magic bytes before linking
+    const validation = validateImageFileContent(tempPath);
+    if (!validation.valid) {
+      try { fs.unlinkSync(tempPath); } catch (e) {}
+      return res.status(400).json({ success: false, message: validation.error });
+    }
+
     const finalName = originalName || safeToken;
-    const ext = path.extname(finalName).toLowerCase();
-    const mimeType = ext === '.png' ? 'image/png' : (ext === '.webp' ? 'image/webp' : 'image/jpeg');
+    const mimeType = validation.mime || 'image/jpeg';
 
-    // Save to persistent storage and generate 300px WebP thumbnail
-    const savedUrl = await storage.savePublicFile(tempPath, finalName, mimeType);
+    // Save to persistent storage (generates 300px WebP thumbnail inside savePublicFile)
+    savedUrl = await storage.savePublicFile(tempPath, finalName, mimeType);
 
-    // Idempotently set as primary image
-    const stats = fs.statSync(tempPath);
-    await Design.replacePrimaryImage(design.id, savedUrl, finalName, stats.size);
+    // Update DB with rollback protection
+    try {
+      const stats = fs.statSync(tempPath);
+      await Design.replacePrimaryImage(design.id, savedUrl, finalName, stats.size);
+    } catch (dbErr) {
+      // Rollback physical saved file
+      if (savedUrl) {
+        try {
+          const phys = storage.resolveFilePath(savedUrl);
+          if (phys && fs.existsSync(phys)) fs.unlinkSync(phys);
+          const thumbUrl = storage.buildThumbnailUrl(savedUrl);
+          const thumbPhys = storage.resolveFilePath(thumbUrl);
+          if (thumbPhys && fs.existsSync(thumbPhys) && thumbPhys !== phys) fs.unlinkSync(thumbPhys);
+        } catch (cleanupErr) {
+          console.warn('[Manual Link Rollback Warning]:', cleanupErr.message);
+        }
+      }
+      throw new Error(`Database image update failed: ${dbErr.message}`);
+    }
 
-    // Delete temp file
+    // Delete temp file after successful DB update
     try { fs.unlinkSync(tempPath); } catch (e) {}
 
     await ActivityLog.logFromReq(req, 'link_bulk_image_manual', 'design', design.id, `Manually linked image "${finalName}" to design #${design.id} (${design.title})`);
@@ -2086,6 +2314,7 @@ exports.linkSingleImage = async (req, res) => {
       designId: design.id,
       sku: design.sku,
       title: design.title,
+      categoryName: design.category_name,
       imageUrl: savedUrl
     });
   } catch (err) {
@@ -2094,6 +2323,10 @@ exports.linkSingleImage = async (req, res) => {
   }
 };
 
+/**
+ * Bulk Image Upload Handler with 4-Tier Matching, Magic Bytes Validation,
+ * and Database Rollback Protection.
+ */
 exports.bulkUploadImages = async (req, res) => {
   try {
     const files = req.files ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat()) : [];
@@ -2111,10 +2344,27 @@ exports.bulkUploadImages = async (req, res) => {
     // Run temp file cleanup
     cleanupTempUnmatchedFiles();
 
-    // Cache design list for suggestions in this batch
+    // Parse confirmed mappings passed from frontend batch state
+    let confirmedMappings = {};
+    if (req.body.confirmed_mappings) {
+      try {
+        confirmedMappings = typeof req.body.confirmed_mappings === 'string'
+          ? JSON.parse(req.body.confirmed_mappings)
+          : req.body.confirmed_mappings;
+      } catch (pErr) {
+        console.warn('[Bulk Upload confirmed_mappings Parse Warning]:', pErr.message);
+      }
+    }
+
+    // Cache design list for suggestions and SKU matching in this batch
     let allDesignsCache = null;
     try {
-      allDesignsCache = await db.query('SELECT id, title, sku FROM designs LIMIT 500');
+      if (db.isConnected()) {
+        allDesignsCache = await db.query(`${BASE_CANDIDATE_SQL} LIMIT 2000`);
+      } else {
+        const fallbackRes = await Design.getAll({ limit: 2000, is_active_only: false });
+        allDesignsCache = fallbackRes.designs || [];
+      }
     } catch (cErr) {}
 
     const tempUnmatchedDir = path.join(storage.getUploadsDir(), 'temp_unmatched');
@@ -2130,30 +2380,62 @@ exports.bulkUploadImages = async (req, res) => {
     for (const file of files) {
       const originalName = file.originalname;
       try {
+        // 1. Extension check
         const rawExt = path.extname(originalName || '');
         const ext = rawExt.toLowerCase();
         if (!['.jpg', '.jpeg', '.png', '.webp', '.avif'].includes(ext)) {
           if (file.path && fs.existsSync(file.path)) {
             try { fs.unlinkSync(file.path); } catch (e) {}
           }
-          unmatched.push({
+          failed.push({
             filename: originalName,
-            reason: `Unsupported image format (${rawExt || 'none'}). Only JPG, PNG, WEBP, and AVIF are allowed.`,
-            suggestions: []
+            error: `Unsupported image format (${rawExt || 'none'}). Only PNG, JPG, JPEG, WEBP, and AVIF are allowed.`
           });
           continue;
         }
 
-        const matchResult = await findMatchingDesign(originalName, allDesignsCache);
+        // 2. Magic bytes file content validation
+        const contentValidation = validateImageFileContent(file.path);
+        if (!contentValidation.valid) {
+          if (file.path && fs.existsSync(file.path)) {
+            try { fs.unlinkSync(file.path); } catch (e) {}
+          }
+          failed.push({
+            filename: originalName,
+            error: contentValidation.error
+          });
+          continue;
+        }
+
+        // 3. Multi-tier product matching engine
+        const matchResult = await findMatchingDesign(originalName, allDesignsCache, confirmedMappings);
 
         if (matchResult.status === 'matched') {
           const matchedDesign = matchResult.design;
+          let savedUrl = null;
 
-          // Save to persistent storage (generates 300px WebP thumbnail inside savePublicFile)
-          const savedUrl = await storage.savePublicFile(file.path, originalName, file.mimetype);
+          try {
+            // Save to persistent storage (generates 300px WebP thumbnail inside savePublicFile)
+            const mimeType = contentValidation.mime || file.mimetype || 'image/jpeg';
+            savedUrl = await storage.savePublicFile(file.path, originalName, mimeType);
 
-          // Idempotently update DB: set as primary image in design_images and design_files
-          await Design.replacePrimaryImage(matchedDesign.id, savedUrl, originalName, file.size);
+            // Update DB primary image
+            await Design.replacePrimaryImage(matchedDesign.id, savedUrl, originalName, file.size);
+          } catch (dbErr) {
+            // Safe recovery: roll back newly saved physical file if DB update failed
+            if (savedUrl) {
+              try {
+                const phys = storage.resolveFilePath(savedUrl);
+                if (phys && fs.existsSync(phys)) fs.unlinkSync(phys);
+                const thumbUrl = storage.buildThumbnailUrl(savedUrl);
+                const thumbPhys = storage.resolveFilePath(thumbUrl);
+                if (thumbPhys && fs.existsSync(thumbPhys) && thumbPhys !== phys) fs.unlinkSync(thumbPhys);
+              } catch (cleanupErr) {
+                console.warn('[Bulk Upload Rollback Warning]:', cleanupErr.message);
+              }
+            }
+            throw new Error(`Database image update failed: ${dbErr.message}`);
+          }
 
           // Clean up multer temporary disk file
           if (file.path && fs.existsSync(file.path)) {
@@ -2170,7 +2452,7 @@ exports.bulkUploadImages = async (req, res) => {
           });
 
         } else if (matchResult.status === 'ambiguous') {
-          // File matches multiple designs: move to temp_unmatched folder and list candidates
+          // File matches multiple designs: move to temp_unmatched folder and list candidate cards
           const randomHex = crypto.randomBytes(6).toString('hex');
           const tempFilename = `ambiguous-${Date.now()}-${randomHex}${ext}`;
           const destTempPath = path.join(tempUnmatchedDir, tempFilename);
@@ -2182,13 +2464,13 @@ exports.bulkUploadImages = async (req, res) => {
           ambiguous.push({
             filename: originalName,
             tempToken: tempFilename,
-            reason: `Ambiguous match: multiple products share SKU or Title (${matchResult.candidates.length} candidates).`,
-            candidates: matchResult.candidates.map(c => ({ id: c.id, sku: c.sku, title: c.title })),
+            reason: matchResult.reason || `Ambiguous match: multiple products matched (${matchResult.candidates.length} candidates).`,
+            candidates: matchResult.candidates.map(normalizeCandidateRecord),
             matchedBy: matchResult.matchedBy
           });
 
         } else {
-          // Unmatched: move to temp_unmatched folder for 24h manual linking (avoid permanent storage clutter)
+          // Unmatched: move to temp_unmatched folder for 24h manual linking
           const randomHex = crypto.randomBytes(6).toString('hex');
           const tempFilename = `unmatched-${Date.now()}-${randomHex}${ext}`;
           const destTempPath = path.join(tempUnmatchedDir, tempFilename);

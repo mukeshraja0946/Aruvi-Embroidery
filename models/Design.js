@@ -569,23 +569,8 @@ class Design {
           await db.query('INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview) VALUES (?, ?, ?, ?, ?, 1)', [designId, finalFileName, imageUrl, ext, fileSize]);
         }
 
-        // Clean up previous replaced primary image to avoid duplicate clutter and free disk space
-        if (oldPrimaries && oldPrimaries.length > 0) {
-          for (const old of oldPrimaries) {
-            if (old.image_url && old.image_url !== imageUrl) {
-              await db.query('DELETE FROM design_images WHERE id = ?', [old.id]);
-              await db.query('DELETE FROM design_files WHERE design_id = ? AND file_path = ? AND is_preview = 0', [designId, old.image_url]);
-              try {
-                const oldPhysical = storage.resolveFilePath(old.image_url);
-                if (oldPhysical && fs.existsSync(oldPhysical)) {
-                  fs.unlinkSync(oldPhysical);
-                }
-              } catch (delErr) {
-                // Ignore missing file error
-              }
-            }
-          }
-        }
+        // Note: Do not automatically delete old physical files or records to protect user data.
+        // Previous images are simply demoted (is_primary = 0, is_preview = 0).
 
         return true;
       } catch (err) {
@@ -596,6 +581,10 @@ class Design {
     const target = fallbackDesigns.find(d => d.id == designId);
     if (target) {
       target.primary_image = imageUrl;
+      if (!target.images) target.images = [];
+      target.images.forEach(img => { img.is_primary = 0; });
+      target.images.unshift({ id: Date.now(), image_url: imageUrl, is_primary: 1 });
+      saveFallbackDesigns(fallbackDesigns);
     }
     return true;
   }

@@ -382,12 +382,13 @@ let bulkUploadState = {
   batches: [],            // Array of item arrays (5 items per batch)
   activeControllers: new Set(),
   activeStreams: 0,
-  maxConcurrency: 3,
+  maxConcurrency: 2,      // Default 2 parallel streams for Hostinger stability
   batchSize: 5,
   batchTimeoutMs: 60000,
   isUploading: false,
   isCancelled: false,
-  catalogDesigns: [],     // Cached designs for manual link dropdown
+  confirmedMappings: {},  // Remembered manual mappings: normalized filename -> designId
+  catalogDesigns: [],     // Cached designs with thumbnails for search/filter
   stats: {
     total: 0,
     processed: 0,
@@ -397,6 +398,19 @@ let bulkUploadState = {
     failed: 0
   }
 };
+
+/**
+ * Accurately derives stats directly from the items array to eliminate counter drift.
+ */
+function recalculateStats() {
+  const items = bulkUploadState.items;
+  bulkUploadState.stats.total = items.length;
+  bulkUploadState.stats.linked = items.filter(it => it.status === 'linked').length;
+  bulkUploadState.stats.ambiguous = items.filter(it => it.status === 'ambiguous').length;
+  bulkUploadState.stats.unmatched = items.filter(it => it.status === 'unmatched').length;
+  bulkUploadState.stats.failed = items.filter(it => it.status === 'failed').length;
+  bulkUploadState.stats.processed = items.filter(it => ['linked', 'ambiguous', 'unmatched', 'failed'].includes(it.status)).length;
+}
 
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, m => ({
@@ -421,18 +435,21 @@ async function openBulkImageUploadModal() {
   const modal = document.getElementById('bulkImageUploadModal');
   if (!modal) return;
 
-  // Reset state
+  // Reset state preserving cached catalog and confirmed mappings across session
+  const prevMappings = bulkUploadState.confirmedMappings || {};
+  const prevCatalog = bulkUploadState.catalogDesigns || [];
   bulkUploadState = {
     items: [],
     batches: [],
     activeControllers: new Set(),
     activeStreams: 0,
-    maxConcurrency: 3,
+    maxConcurrency: 2,
     batchSize: 5,
     batchTimeoutMs: 60000,
     isUploading: false,
     isCancelled: false,
-    catalogDesigns: bulkUploadState.catalogDesigns || [],
+    confirmedMappings: prevMappings,
+    catalogDesigns: prevCatalog,
     stats: { total: 0, processed: 0, linked: 0, unmatched: 0, ambiguous: 0, failed: 0 }
   };
 
@@ -761,6 +778,7 @@ function updateLiveItemRow(item) {
 }
 
 function updateProgressCounters() {
+  recalculateStats();
   const { total, processed, linked, unmatched, ambiguous, failed } = bulkUploadState.stats;
   const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
 
@@ -799,7 +817,7 @@ async function startChunkedBulkImageUpload() {
     return;
   }
 
-  // Filter valid files that are not already linked or processed
+  // Filter valid files that are not already linked
   const pendingItems = bulkUploadState.items.filter(it => it.isValid && it.status !== 'linked');
   if (pendingItems.length === 0) {
     alert('No pending valid images to upload.');
@@ -808,14 +826,7 @@ async function startChunkedBulkImageUpload() {
 
   bulkUploadState.isUploading = true;
   bulkUploadState.isCancelled = false;
-  bulkUploadState.stats = {
-    total: bulkUploadState.items.length,
-    processed: bulkUploadState.items.filter(it => it.status === 'linked' || it.status === 'ambiguous' || it.status === 'unmatched' || (!it.isValid && it.status === 'failed')).length,
-    linked: bulkUploadState.items.filter(it => it.status === 'linked').length,
-    unmatched: bulkUploadState.items.filter(it => it.status === 'unmatched').length,
-    ambiguous: bulkUploadState.items.filter(it => it.status === 'ambiguous').length,
-    failed: bulkUploadState.items.filter(it => it.status === 'failed').length
-  };
+  recalculateStats();
 
   // Build batch queue (5 items per batch)
   const batches = [];
@@ -847,7 +858,7 @@ async function startChunkedBulkImageUpload() {
   renderLiveFileList();
   updateProgressCounters();
 
-  // Launch worker pool with max 3 concurrent streams
+  // Launch worker pool with max configured concurrent streams (default 2)
   const workerCount = Math.min(bulkUploadState.maxConcurrency, batches.length);
   const workerPromises = [];
   for (let w = 0; w < workerCount; w++) {
@@ -894,6 +905,7 @@ async function processSingleBatch(batch) {
   try {
     const formData = new FormData();
     formData.append('_csrf', getCsrfToken());
+    formData.append('confirmed_mappings', JSON.stringify(bulkUploadState.confirmedMappings || {}));
 
     // Process files through browser compressor before attaching to FormData
     for (const item of batch.items) {
@@ -918,7 +930,12 @@ async function processSingleBatch(batch) {
     if (!res.ok) {
       let errBody = {};
       try { errBody = await res.json(); } catch (e) {}
-      throw new Error(errBody.message || `Server returned HTTP ${res.status}`);
+      const errMsg = errBody.message || `Server returned HTTP ${res.status}`;
+      const isPermanent = [400, 401, 403, 404, 413, 415, 422].includes(res.status);
+      const batchErr = new Error(errMsg);
+      batchErr.isPermanent = isPermanent;
+      batchErr.status = res.status;
+      throw batchErr;
     }
 
     const data = await res.json();
@@ -939,33 +956,30 @@ async function processSingleBatch(batch) {
         item.status = 'linked';
         item.details = `Linked to #${matched.designId} (${matched.sku || matched.title})`;
         item.matchedDesign = matched;
-        bulkUploadState.stats.linked++;
       } else if (ambiguous) {
         item.status = 'ambiguous';
         item.tempToken = ambiguous.tempToken;
         item.candidates = ambiguous.candidates || [];
         item.details = ambiguous.reason || 'Multiple candidate designs found';
-        bulkUploadState.stats.ambiguous++;
       } else if (unmatched) {
         item.status = 'unmatched';
         item.tempToken = unmatched.tempToken;
         item.suggestions = unmatched.suggestions || [];
         item.details = unmatched.reason || 'No matching product found';
-        bulkUploadState.stats.unmatched++;
       } else if (failed) {
         item.status = 'failed';
         item.details = failed.error || 'Upload error';
         item.referenceId = failed.referenceId;
-        bulkUploadState.stats.failed++;
       } else {
         item.status = 'unmatched';
         item.details = 'No product matched';
-        bulkUploadState.stats.unmatched++;
       }
 
-      bulkUploadState.stats.processed++;
       updateLiveItemRow(item);
     });
+
+    recalculateStats();
+    updateProgressCounters();
 
   } catch (err) {
     clearTimeout(timeoutId);
@@ -977,12 +991,27 @@ async function processSingleBatch(batch) {
         item.details = 'Cancelled by user';
         updateLiveItemRow(item);
       });
+      recalculateStats();
+      updateProgressCounters();
       return;
     }
 
-    console.warn(`[Bulk Upload Batch #${batch.id} Failed]:`, err.message);
+    // Do NOT automatically retry permanent client / authorization / size errors
+    if (err.isPermanent) {
+      console.warn(`[Bulk Upload Batch #${batch.id} Permanent Error]:`, err.message);
+      batch.items.forEach(item => {
+        item.status = 'failed';
+        item.details = `Upload rejected (${err.status}): ${err.message}`;
+        updateLiveItemRow(item);
+      });
+      recalculateStats();
+      updateProgressCounters();
+      return;
+    }
 
-    // Auto-retry up to 3 times with progressive delay
+    console.warn(`[Bulk Upload Batch #${batch.id} Transient Failure]:`, err.message);
+
+    // Auto-retry up to 3 times for temporary network / server errors with progressive backoff
     if (batch.retries < 3) {
       batch.retries++;
       const delayMs = batch.retries * 1200;
@@ -999,13 +1028,11 @@ async function processSingleBatch(batch) {
     batch.items.forEach(item => {
       item.status = 'failed';
       item.details = `Failed after 3 retries: ${err.message}`;
-      bulkUploadState.stats.failed++;
-      bulkUploadState.stats.processed++;
       updateLiveItemRow(item);
     });
+    recalculateStats();
+    updateProgressCounters();
   }
-
-  updateProgressCounters();
 }
 
 function abortBulkImageUpload() {
@@ -1094,21 +1121,41 @@ function onBulkUploadFinished() {
     ambiguousList.innerHTML = ambiguousItems.map(it => {
       const candidates = it.candidates || [];
       const candidatesHtml = candidates.map(cand => `
-        <button type="button" 
-          onclick="linkSingleBulkImage('${it.tempToken}', ${cand.id}, '${escapeHtml(it.originalName)}', '${it.id}', this)"
-          style="padding: 4px 10px; background: #FFF; border: 1px solid #BF360C; color: #BF360C; border-radius: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-          <i class="fa-solid fa-link"></i> Link to #${cand.id} ${escapeHtml(cand.sku || '')} (${escapeHtml(cand.title)})
-        </button>
-      `).join(' ');
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #FFFFFF; border: 1px solid #FFE082; border-radius: 8px; padding: 8px 12px;">
+          <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+            <img src="${cand.image_url || '/public/images/logo.jpg'}" alt="Preview" 
+                 style="width: 46px; height: 46px; object-fit: contain; border-radius: 6px; border: 1px solid #E0E0E0; background: #FAFAFA; flex-shrink: 0;"
+                 onerror="this.src='/public/images/logo.jpg'">
+            <div style="overflow: hidden;">
+              <div style="font-weight: 700; color: #212121; font-size: 0.82rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                ${escapeHtml(cand.title)}
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center; margin-top: 3px; font-size: 0.72rem; flex-wrap: wrap;">
+                <span style="background: #EFEBE9; color: #5D4037; padding: 1px 6px; border-radius: 4px; font-weight: 600;">SKU: ${escapeHtml(cand.sku || 'N/A')}</span>
+                <span style="background: #E3F2FD; color: #1565C0; padding: 1px 6px; border-radius: 4px; font-weight: 600;">ID: #${cand.id}</span>
+                ${cand.category_name ? `<span style="background: #F3E5F5; color: #7B1FA2; padding: 1px 6px; border-radius: 4px;">${escapeHtml(cand.category_name)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <button type="button" 
+            onclick="linkSingleBulkImage('${it.tempToken}', ${cand.id}, '${escapeHtml(it.originalName)}', '${it.id}', this)"
+            style="padding: 6px 14px; background: #2E7D32; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;">
+            <i class="fa-solid fa-check"></i> Confirm Link
+          </button>
+        </div>
+      `).join('');
 
       return `
-        <div id="ambiguous-item-box-${it.id}" style="background: #FFF; border: 1px solid #FFE0B2; border-radius: 6px; padding: 8px 10px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <strong style="color: var(--admin-text-dark);">${escapeHtml(it.originalName)}</strong>
-            <span style="color: #BF360C; font-size: 0.74rem;">${escapeHtml(it.details)}</span>
+        <div id="ambiguous-item-box-${it.id}" style="background: #FFFDF9; border: 1px solid #FFCCBC; border-radius: 8px; padding: 10px 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #FFE0B2; padding-bottom: 6px;">
+            <strong style="color: var(--admin-text-dark); font-size: 0.82rem;">
+              <i class="fa-solid fa-file-image" style="color: #BF360C;"></i> ${escapeHtml(it.originalName)}
+              <span style="color: var(--admin-text-muted); font-size: 0.72rem; font-weight: normal;">(${it.formattedSize})</span>
+            </strong>
+            <span style="color: #BF360C; font-size: 0.74rem; font-weight: 600;">${escapeHtml(it.details)}</span>
           </div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            ${candidatesHtml || '<em>No candidate details available</em>'}
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${candidatesHtml || '<em style="color: var(--admin-text-muted);">No candidate details available</em>'}
           </div>
         </div>
       `;
@@ -1118,24 +1165,21 @@ function onBulkUploadFinished() {
     ambiguousBox.style.display = 'none';
   }
 
-  // Unmatched names & suggestions list with manual dropdown
+  // Unmatched files with Searchable Product Selector & Suggestions
   const unmatchedBox = document.getElementById('bulkUnmatchedDetailsBox');
   const unmatchedList = document.getElementById('bulkUnmatchedNamesList');
   const unmatchedItems = bulkUploadState.items.filter(it => it.status === 'unmatched');
 
   if (unmatchedItems.length > 0 && unmatchedBox && unmatchedList) {
-    const catalogDesigns = bulkUploadState.catalogDesigns || [];
-    const optionsHtml = catalogDesigns.map(d => `<option value="${d.id}">#${d.id} - ${escapeHtml(d.sku || '')} (${escapeHtml(d.title)})</option>`).join('');
-
     unmatchedList.innerHTML = unmatchedItems.map(it => {
       const suggestions = it.suggestions || [];
       const suggestionsHtml = suggestions.length > 0 ? `
-        <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+        <div style="margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
           <span style="font-size: 0.74rem; font-weight: 600; color: #E65100;">Suggestions:</span>
           ${suggestions.map(s => `
             <button type="button" 
               onclick="linkSingleBulkImage('${it.tempToken}', ${s.id}, '${escapeHtml(it.originalName)}', '${it.id}', this)"
-              style="padding: 3px 8px; background: #FFF; border: 1px solid #E65100; color: #E65100; border-radius: 6px; font-size: 0.74rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              style="padding: 3px 8px; background: #FFF; border: 1px solid #E65100; color: #E65100; border-radius: 6px; font-size: 0.73rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
               <i class="fa-solid fa-link"></i> #${s.id} ${escapeHtml(s.sku || '')} (${escapeHtml(s.title)}) [${Math.round((s.similarity || 0) * 100)}%]
             </button>
           `).join('')}
@@ -1143,24 +1187,39 @@ function onBulkUploadFinished() {
       ` : '';
 
       return `
-        <div id="unmatched-item-box-${it.id}" style="background: #FFF; border: 1px solid #FFE082; border-radius: 6px; padding: 8px 10px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="color: var(--admin-text-dark);">${escapeHtml(it.originalName)}</strong>
+        <div id="unmatched-item-box-${it.id}" style="background: #FFFFFF; border: 1px solid #FFE082; border-radius: 8px; padding: 10px 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: var(--admin-text-dark); font-size: 0.82rem;">
+              <i class="fa-solid fa-circle-question" style="color: #E65100;"></i> ${escapeHtml(it.originalName)}
+              <span style="color: var(--admin-text-muted); font-size: 0.72rem; font-weight: normal;">(${it.formattedSize})</span>
+            </strong>
             <span style="color: #E65100; font-size: 0.74rem;">${escapeHtml(it.details)}</span>
           </div>
+
           ${suggestionsHtml}
-          <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
-            <select id="manual-select-${it.id}" style="flex: 1; padding: 5px 8px; font-size: 0.78rem; border: 1px solid var(--admin-border); border-radius: 6px; background: #FAFAFA;">
-              <option value="">-- Manually select design to link --</option>
-              ${optionsHtml}
-            </select>
-            <button type="button" onclick="handleManualLinkDropdown('${it.id}', '${it.tempToken}', '${escapeHtml(it.originalName)}', this)" style="padding: 5px 12px; background: var(--admin-primary); color: #FFF; border: none; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-              <i class="fa-solid fa-link"></i> Link
-            </button>
+
+          <!-- Searchable Product Selector -->
+          <div style="margin-top: 6px;">
+            <div style="position: relative;">
+              <input type="text" 
+                     placeholder="Search product by title, SKU, or ID..." 
+                     oninput="filterUnmatchedCatalog(this.value, '${it.id}', '${it.tempToken}', '${escapeHtml(it.originalName)}')"
+                     style="width: 100%; padding: 6px 10px 6px 28px; font-size: 0.78rem; border: 1px solid var(--admin-border); border-radius: 6px; background: #FAFAFA;">
+              <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 0.74rem; color: var(--admin-text-muted);"></i>
+            </div>
+            <div id="unmatched-results-${it.id}" style="max-height: 180px; overflow-y: auto; margin-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Initially populated by filterUnmatchedCatalog -->
+            </div>
           </div>
         </div>
       `;
     }).join('');
+
+    // Pre-populate initial top candidates for each unmatched item
+    unmatchedItems.forEach(it => {
+      filterUnmatchedCatalog('', it.id, it.tempToken, it.originalName);
+    });
+
     unmatchedBox.style.display = 'block';
   } else if (unmatchedBox) {
     unmatchedBox.style.display = 'none';
@@ -1177,11 +1236,12 @@ function onBulkUploadFinished() {
     failedBox.style.display = 'none';
   }
 
-  // Retry Failed Button
+  // Retry Failed Button (Only show if retryable failed items exist)
   const retryBtn = document.getElementById('bulkRetryFailedBtn');
   const retryCountSpan = document.getElementById('bulkRetryBtnCount');
-  if (failedItems.length > 0 && retryBtn) {
-    if (retryCountSpan) retryCountSpan.textContent = failedItems.length;
+  const retryableItems = failedItems.filter(it => it.isValid);
+  if (retryableItems.length > 0 && retryBtn) {
+    if (retryCountSpan) retryCountSpan.textContent = retryableItems.length;
     retryBtn.style.display = 'inline-flex';
   } else if (retryBtn) {
     retryBtn.style.display = 'none';
@@ -1191,7 +1251,62 @@ function onBulkUploadFinished() {
 }
 
 /**
- * Manually link an unmatched or ambiguous image to a selected product design
+ * Live instant search filter for unmatched images against cached catalog designs
+ */
+function filterUnmatchedCatalog(query, itemId, tempToken, originalName) {
+  const container = document.getElementById(`unmatched-results-${itemId}`);
+  if (!container) return;
+
+  const catalog = bulkUploadState.catalogDesigns || [];
+  const q = String(query || '').trim().toLowerCase();
+
+  let matches = [];
+  if (!q) {
+    matches = catalog.slice(0, 4);
+  } else {
+    matches = catalog.filter(d => {
+      const sId = String(d.id);
+      const sSku = (d.sku || '').toLowerCase();
+      const sTitle = (d.title || '').toLowerCase();
+      const sCat = (d.category_name || '').toLowerCase();
+      return sId.includes(q) || sSku.includes(q) || sTitle.includes(q) || sCat.includes(q);
+    }).slice(0, 6);
+  }
+
+  if (matches.length === 0) {
+    container.innerHTML = `<div style="color: var(--admin-text-muted); font-size: 0.74rem; padding: 6px; text-align: center;">No products match "${escapeHtml(query)}". Try another SKU or title.</div>`;
+    return;
+  }
+
+  container.innerHTML = matches.map(cand => `
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #FAFAFA; border: 1px solid var(--admin-border); border-radius: 6px; padding: 6px 10px;">
+      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+        <img src="${cand.image_url || '/public/images/logo.jpg'}" alt="Preview" 
+             style="width: 38px; height: 38px; object-fit: contain; border-radius: 4px; border: 1px solid #E0E0E0; background: #FFF; flex-shrink: 0;"
+             onerror="this.src='/public/images/logo.jpg'">
+        <div style="overflow: hidden;">
+          <div style="font-weight: 700; color: #212121; font-size: 0.79rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+            ${escapeHtml(cand.title)}
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center; margin-top: 1px; font-size: 0.71rem; flex-wrap: wrap;">
+            <span style="background: #EFEBE9; color: #5D4037; padding: 1px 5px; border-radius: 3px; font-weight: 600;">SKU: ${escapeHtml(cand.sku || 'N/A')}</span>
+            <span style="background: #E3F2FD; color: #1565C0; padding: 1px 5px; border-radius: 3px; font-weight: 600;">#${cand.id}</span>
+            ${cand.category_name ? `<span style="color: var(--admin-text-muted); font-size: 0.7rem;">${escapeHtml(cand.category_name)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <button type="button" 
+        onclick="linkSingleBulkImage('${tempToken}', ${cand.id}, '${escapeHtml(originalName)}', '${itemId}', this)"
+        style="padding: 5px 12px; background: var(--admin-primary); color: #FFF; border: none; border-radius: 6px; font-size: 0.74rem; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+        <i class="fa-solid fa-link"></i> Link
+      </button>
+    </div>
+  `).join('');
+}
+
+/**
+ * Manually link an unmatched or ambiguous image to a selected product design.
+ * Remembers confirmed mapping for the current session.
  */
 async function linkSingleBulkImage(tempToken, designId, originalName, itemId, triggerBtn) {
   if (!designId || !tempToken) {
@@ -1222,33 +1337,33 @@ async function linkSingleBulkImage(tempToken, designId, originalName, itemId, tr
       throw new Error(data.message || 'Failed to link image');
     }
 
+    // Save confirmed mapping for this batch session
+    const rawExt = originalName.lastIndexOf('.') !== -1 ? originalName.slice(originalName.lastIndexOf('.')) : '';
+    const baseName = (rawExt ? originalName.slice(0, -rawExt.length) : originalName).trim().toLowerCase();
+    const cleanCollapsed = baseName.replace(/[\s\-_]+/g, ' ').trim().toLowerCase();
+
+    bulkUploadState.confirmedMappings[baseName] = data.designId;
+    bulkUploadState.confirmedMappings[cleanCollapsed] = data.designId;
+    bulkUploadState.confirmedMappings[originalName.toLowerCase()] = data.designId;
+
     // Update item in state
     const item = bulkUploadState.items.find(it => String(it.id) === String(itemId));
     if (item) {
-      const prevStatus = item.status;
       item.status = 'linked';
       item.details = `Linked to #${data.designId} (${data.sku || data.title})`;
       item.matchedDesign = { designId: data.designId, sku: data.sku, title: data.title, imageUrl: data.imageUrl };
-
-      if (prevStatus === 'unmatched') {
-        bulkUploadState.stats.unmatched = Math.max(0, bulkUploadState.stats.unmatched - 1);
-      } else if (prevStatus === 'ambiguous') {
-        bulkUploadState.stats.ambiguous = Math.max(0, bulkUploadState.stats.ambiguous - 1);
-      }
-      bulkUploadState.stats.linked++;
-
       updateLiveItemRow(item);
-      updateProgressCounters();
     }
 
-    // Replace the box with a success badge
+    // Replace the specific candidate box with a success badge
     const unmatchedBox = document.getElementById(`unmatched-item-box-${itemId}`);
     if (unmatchedBox) {
       unmatchedBox.style.background = '#E8F5E9';
       unmatchedBox.style.border = '1px solid #C8E6C9';
       unmatchedBox.innerHTML = `
-        <div style="color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-          <i class="fa-solid fa-circle-check"></i> Linked "${escapeHtml(originalName)}" to #${data.designId} (${escapeHtml(data.sku || data.title)})!
+        <div style="color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 8px; padding: 4px;">
+          <i class="fa-solid fa-circle-check" style="font-size: 1rem;"></i>
+          <span>Linked "${escapeHtml(originalName)}" to <strong>#${data.designId} (${escapeHtml(data.sku || data.title)})</strong></span>
         </div>
       `;
     }
@@ -1258,11 +1373,15 @@ async function linkSingleBulkImage(tempToken, designId, originalName, itemId, tr
       ambiguousBox.style.background = '#E8F5E9';
       ambiguousBox.style.border = '1px solid #C8E6C9';
       ambiguousBox.innerHTML = `
-        <div style="color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-          <i class="fa-solid fa-circle-check"></i> Linked "${escapeHtml(originalName)}" to #${data.designId} (${escapeHtml(data.sku || data.title)})!
+        <div style="color: #2E7D32; font-weight: 600; display: flex; align-items: center; gap: 8px; padding: 4px;">
+          <i class="fa-solid fa-circle-check" style="font-size: 1rem;"></i>
+          <span>Linked "${escapeHtml(originalName)}" to <strong>#${data.designId} (${escapeHtml(data.sku || data.title)})</strong></span>
         </div>
       `;
     }
+
+    recalculateStats();
+    updateProgressCounters();
 
     // Update Report Summary Text counts
     const linkedCount = bulkUploadState.items.filter(it => it.status === 'linked').length;
@@ -1299,14 +1418,22 @@ function handleManualLinkDropdown(itemId, tempToken, originalName, triggerBtn) {
   linkSingleBulkImage(tempToken, sel.value, originalName, itemId, triggerBtn);
 }
 
+/**
+ * Retry failed files without re-uploading already successful or linked images.
+ */
 function retryFailedBulkImages() {
-  const failedItems = bulkUploadState.items.filter(it => it.status === 'failed');
-  if (failedItems.length === 0) return;
+  const failedItems = bulkUploadState.items.filter(it => it.status === 'failed' && it.isValid);
+  if (failedItems.length === 0) {
+    alert('No retryable failed images found.');
+    return;
+  }
 
+  // Reset status of failed items to pending
   failedItems.forEach(it => {
     it.status = 'pending';
-    it.details = 'Retrying upload...';
+    it.details = 'Queued for retry...';
     it.retryCount = 0;
+    updateLiveItemRow(it);
   });
 
   const reportCard = document.getElementById('bulkImageReportCard');
