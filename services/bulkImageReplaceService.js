@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp');
+const AdmZip = require('adm-zip');
 const db = require('../config/db');
 const storage = require('../config/storage');
 const Design = require('../models/Design');
@@ -98,7 +99,10 @@ class BulkImageReplaceService {
         scopedDesigns = (await db.query(`
           SELECT d.id, d.sku, d.title, d.category_id, d.primary_image, d.is_active,
                  c.name AS category_name, c.slug AS category_slug,
-                 (SELECT COUNT(*) FROM design_images di WHERE di.design_id = d.id) AS total_images
+                 (SELECT COUNT(*) FROM design_images di WHERE di.design_id = d.id) AS total_images,
+                 (SELECT df.file_name FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_name,
+                 (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_path,
+                 (SELECT df.file_size FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_size
           FROM designs d
           LEFT JOIN categories c ON d.category_id = c.id
           ${whereSql}
@@ -148,7 +152,10 @@ class BulkImageReplaceService {
         primary_image: d.primary_image,
         is_active: d.is_active,
         category_name: d.category_name || (categories.find(c => String(c.id) === String(d.category_id) || c.slug === d.category_slug)?.name) || 'General',
-        total_images: (d.images && Array.isArray(d.images)) ? d.images.length : (d.total_images || (d.primary_image ? 1 : 0))
+        total_images: (d.images && Array.isArray(d.images)) ? d.images.length : (d.total_images || (d.primary_image ? 1 : 0)),
+        machine_file_name: d.machine_file_name || (d.files && d.files.find(f => !f.is_preview)?.file_name) || null,
+        machine_file_path: d.machine_file_path || (d.files && d.files.find(f => !f.is_preview)?.file_path) || null,
+        machine_file_size: d.machine_file_size || (d.files && d.files.find(f => !f.is_preview)?.file_size) || 0
       }));
     }
 
@@ -160,18 +167,20 @@ class BulkImageReplaceService {
   }
 
   /**
-   * Matches uploaded filenames against designs in the chosen scope
+   * Matches uploaded filenames against designs in the chosen scope (Images & ZIP packages)
    */
   async matchFilesToScope(files = [], options = {}) {
     const scopeData = await this.getScopeSummary(options);
     const designs = scopeData.designs;
 
-    const matchedDesigns = new Map(); // designId -> { design, matchedFiles: [] }
+    const matchedDesigns = new Map(); // designId -> { design, imageFiles: [], zipFiles: [], files: [] }
     const unmatchedFiles = [];
     const ambiguousFiles = [];
     const invalidFiles = [];
 
-    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.webp'];
+    const allowedImageExtensions = ['.png', '.jpg', '.jpeg', '.webp'];
+    const allowedZipExtensions = ['.zip'];
+    const allowedExtensions = [...allowedImageExtensions, ...allowedZipExtensions];
 
     for (const file of files) {
       const fileName = file.name || file.originalname || '';
@@ -181,16 +190,20 @@ class BulkImageReplaceService {
         invalidFiles.push({
           fileName,
           size: file.size || 0,
-          reason: `Invalid format (${ext || 'unknown'}). Only PNG, JPG, and WEBP supported.`
+          reason: `Unsupported format (${ext || 'no extension'}). Supported: PNG, JPG, WEBP (Images) and ZIP (Design Packages).`
         });
         continue;
       }
 
-      if (file.size && file.size > 10 * 1024 * 1024) {
+      const isZip = allowedZipExtensions.includes(ext);
+
+      // File size validation (15MB for images, 120MB for ZIP packages)
+      const maxLimit = isZip ? 120 * 1024 * 1024 : 15 * 1024 * 1024;
+      if (file.size && file.size > maxLimit) {
         invalidFiles.push({
           fileName,
           size: file.size,
-          reason: `File exceeds 10 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB)`
+          reason: `File exceeds limit of ${isZip ? '120 MB' : '15 MB'} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`
         });
         continue;
       }
@@ -200,56 +213,76 @@ class BulkImageReplaceService {
       let cleanBase = rawBase;
       let isPrimary = true;
       let imageIndex = 1;
+      let matchMethod = 'Automatic Match';
 
-      // Check if rawBase directly matches an exact design SKU in scope
-      const directSkuMatch = designs.find(d => d.sku && normalizeKey(d.sku) === normRawBase);
-      if (directSkuMatch) {
-        cleanBase = rawBase;
-        isPrimary = true;
-        imageIndex = 1;
+      if (isZip) {
+        // For ZIP files, check if there's a trailing _zip or _package or _all
+        const zipSuffixMatch = rawBase.match(/[_\-\s\.]+(?:zip|package|all|machine)$/i);
+        if (zipSuffixMatch) {
+          cleanBase = rawBase.slice(0, zipSuffixMatch.index).trim();
+        }
       } else {
-        // Suffix detection: _main, _1, _2, _3, (2), etc.
-        const suffixMatch = rawBase.match(/[_\-\s\.\(]+(main|\d+)\)?$/i);
-        if (suffixMatch) {
-          const sfx = suffixMatch[1].toLowerCase();
-          const parsedNum = parseInt(sfx, 10);
-          cleanBase = rawBase.slice(0, suffixMatch.index).trim();
-          if (sfx === 'main' || parsedNum === 1) {
-            isPrimary = true;
-            imageIndex = 1;
-          } else {
-            isPrimary = false;
-            imageIndex = parsedNum || 2;
+        // Image suffix detection: _main, _1, _2, _3, (2), etc.
+        const directSkuMatch = designs.find(d => d.sku && normalizeKey(d.sku) === normRawBase);
+        if (directSkuMatch) {
+          cleanBase = rawBase;
+          isPrimary = true;
+          imageIndex = 1;
+        } else {
+          const suffixMatch = rawBase.match(/[_\-\s\.\(]+(main|\d+)\)?$/i);
+          if (suffixMatch) {
+            const sfx = suffixMatch[1].toLowerCase();
+            const parsedNum = parseInt(sfx, 10);
+            cleanBase = rawBase.slice(0, suffixMatch.index).trim();
+            if (sfx === 'main' || parsedNum === 1) {
+              isPrimary = true;
+              imageIndex = 1;
+            } else {
+              isPrimary = false;
+              imageIndex = parsedNum || 2;
+            }
           }
         }
       }
 
       const normCleanBase = normalizeKey(cleanBase);
 
-      // 1. Match Priority 1: Exact SKU
+      // 1. Priority 1: Exact SKU Match
       let matches = designs.filter(d => d.sku && (normalizeKey(d.sku) === normCleanBase || normalizeKey(d.sku) === normRawBase));
+      if (matches.length === 1) {
+        matchMethod = 'Exact SKU (100%)';
+      }
 
-      // 2. Match Priority 2: Product ID (e.g. 3225.png, id-3225.png)
+      // 2. Priority 2: Product ID Match (e.g. 102.png, id-102.zip)
       if (matches.length === 0) {
-        const idMatch = rawBase.match(/^(?:id[-_\s]*)?(\d+)$/i);
+        const idMatch = rawBase.match(/^(?:id[-_\s]*)?(\d+)$/i) || cleanBase.match(/^(?:id[-_\s]*)?(\d+)$/i);
         if (idMatch) {
           const candidateId = parseInt(idMatch[1], 10);
           matches = designs.filter(d => d.id === candidateId);
+          if (matches.length === 1) {
+            matchMethod = 'Product ID (95%)';
+          }
         }
       }
 
-      // 3. Match Priority 3: Title exact normalized match
+      // 3. Priority 3: Title exact normalized match
       if (matches.length === 0) {
         matches = designs.filter(d => d.title && (normalizeKey(d.title) === normCleanBase || normalizeKey(d.title) === normRawBase));
+        if (matches.length === 1) {
+          matchMethod = 'Normalized Title (90%)';
+        }
       }
 
-      // 4. Match Priority 4: Suffix / prefix match on SKU
+      // 4. Priority 4: Suffix / prefix match on SKU
       if (matches.length === 0) {
         matches = designs.filter(d => {
           if (!d.sku) return false;
           const skuNorm = normalizeKey(d.sku);
           return normRawBase.startsWith(skuNorm) || normCleanBase.startsWith(skuNorm);
         });
+        if (matches.length === 1) {
+          matchMethod = 'SKU Prefix Match (85%)';
+        }
       }
 
       if (matches.length === 1) {
@@ -257,26 +290,38 @@ class BulkImageReplaceService {
         if (!matchedDesigns.has(matched.id)) {
           matchedDesigns.set(matched.id, {
             design: matched,
+            imageFiles: [],
+            zipFiles: [],
             files: []
           });
         }
-        matchedDesigns.get(matched.id).files.push({
+        const fileRecord = {
           fileName,
           fileSize: file.size || 0,
-          isPrimary,
-          imageIndex,
-          matchMethod: 'Automatic Match'
-        });
+          isZip,
+          isPrimary: isZip ? false : isPrimary,
+          imageIndex: isZip ? 0 : imageIndex,
+          matchMethod
+        };
+        if (isZip) {
+          matchedDesigns.get(matched.id).zipFiles.push(fileRecord);
+        } else {
+          matchedDesigns.get(matched.id).imageFiles.push(fileRecord);
+        }
+        matchedDesigns.get(matched.id).files.push(fileRecord);
       } else if (matches.length > 1) {
         ambiguousFiles.push({
           fileName,
+          fileSize: file.size || 0,
+          isZip,
           candidates: matches.map(m => ({ id: m.id, sku: m.sku, title: m.title })),
-          reason: `Ambiguous: matches ${matches.length} designs in selected scope`
+          reason: `Ambiguous: matches ${matches.length} designs in selected category scope`
         });
       } else {
         unmatchedFiles.push({
           fileName,
           fileSize: file.size || 0,
+          isZip,
           reason: 'No matching design found in selected category scope'
         });
       }
@@ -291,19 +336,50 @@ class BulkImageReplaceService {
         sku: d.sku,
         title: d.title,
         categoryName: d.category_name,
-        primaryImage: d.primary_image
+        primaryImage: d.primary_image,
+        currentZipName: d.machine_file_name || null,
+        currentZipPath: d.machine_file_path || null,
+        currentZipSize: d.machine_file_size || 0
       }));
 
     const previewList = [];
+    let matchedImagesTotal = 0;
+    let matchedZipsTotal = 0;
+
     for (const [designId, entry] of matchedDesigns.entries()) {
+      const hasImage = entry.imageFiles.length > 0;
+      const hasZip = entry.zipFiles.length > 0;
+      matchedImagesTotal += entry.imageFiles.length;
+      matchedZipsTotal += entry.zipFiles.length;
+
+      let imageStatus = 'Keep existing image';
+      if (hasImage) {
+        imageStatus = entry.imageFiles.some(f => f.isPrimary) ? 'Will replace primary image' : 'Will add gallery image';
+      }
+
+      let zipStatus = 'Keep existing ZIP';
+      if (hasZip) {
+        zipStatus = 'Will replace ZIP package';
+      }
+
       previewList.push({
         designId,
         sku: entry.design.sku,
         title: entry.design.title,
         categoryName: entry.design.category_name,
         currentPrimaryImage: entry.design.primary_image,
+        currentZipName: entry.design.machine_file_name || null,
+        currentZipPath: entry.design.machine_file_path || null,
+        currentZipSize: entry.design.machine_file_size || 0,
+        imageFiles: entry.imageFiles,
+        zipFiles: entry.zipFiles,
         files: entry.files,
-        status: 'Will replace'
+        hasNewImage: hasImage,
+        hasNewZip: hasZip,
+        imageStatus,
+        zipStatus,
+        matchConfidence: (entry.imageFiles[0]?.matchMethod) || (entry.zipFiles[0]?.matchMethod) || 'Automatic Match',
+        status: (hasImage && hasZip) ? 'Will replace Image & ZIP' : (hasImage ? 'Will replace Image' : 'Will replace ZIP')
       });
     }
 
@@ -311,6 +387,8 @@ class BulkImageReplaceService {
       summary: {
         totalDesignsInScope: designs.length,
         matchedDesignsCount: previewList.length,
+        matchedImagesCount: matchedImagesTotal,
+        matchedZipsCount: matchedZipsTotal,
         designsWithoutFilesCount: designsWithoutFiles.length,
         unmatchedFilesCount: unmatchedFiles.length,
         ambiguousFilesCount: ambiguousFiles.length,
@@ -321,12 +399,17 @@ class BulkImageReplaceService {
       unmatchedFiles,
       ambiguousFiles,
       invalidFiles,
-      scopeDesigns: designs.map(d => ({ id: d.id, sku: d.sku, title: d.title }))
+      scopeDesigns: designs.map(d => ({
+        id: d.id,
+        sku: d.sku,
+        title: d.title,
+        machine_file_name: d.machine_file_name || null
+      }))
     };
   }
 
   /**
-   * Processes a chunk of uploaded files: watermarks & generates thumbnails
+   * Processes a chunk of uploaded files: watermarks images & stores ZIP design packages safely
    */
   async processUploadChunk(files = [], options = {}) {
     const settings = await Setting.getAll();
@@ -335,110 +418,173 @@ class BulkImageReplaceService {
     const processedFiles = [];
 
     for (const file of files) {
-      const originalName = file.originalname || file.name || 'image.png';
-      const ext = path.extname(originalName).toLowerCase() || '.png';
+      const originalName = file.originalname || file.name || 'file';
+      const ext = path.extname(originalName).toLowerCase();
       const inputBuffer = file.buffer || (file.path ? fs.readFileSync(file.path) : null);
 
       if (!inputBuffer || inputBuffer.length === 0) {
         throw new Error(`Empty file received: ${originalName}`);
       }
 
-      // 1. Magic bytes validation
-      const isPng = inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 && inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
-      const isJpg = inputBuffer[0] === 0xFF && inputBuffer[1] === 0xD8 && inputBuffer[2] === 0xFF;
-      const isWebp = inputBuffer.length > 12 && inputBuffer.toString('utf8', 8, 12) === 'WEBP';
+      const isZip = ext === '.zip';
 
-      if (!isPng && !isJpg && !isWebp) {
-        throw new Error(`Invalid image content for ${originalName}. Authentic PNG, JPG, or WEBP required.`);
-      }
-
-      // 2. Generate unique filename
-      const hash = crypto.randomBytes(8).toString('hex');
-      const cleanName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-      const uniqueFilename = `${cleanName}_${Date.now()}_${hash}${ext}`;
-
-      // 3. Apply watermark if enabled
-      let finalBuffer = inputBuffer;
-      if (shouldWatermark) {
-        try {
-          finalBuffer = await watermarkService.applyWatermark(inputBuffer, {
-            format: ext === '.webp' ? 'webp' : (ext === '.png' ? 'png' : 'jpeg')
-          });
-        } catch (wmErr) {
-          console.warn('[Bulk Watermark Warning]:', wmErr.message);
-          finalBuffer = inputBuffer;
+      if (isZip) {
+        // 1. Validate ZIP magic bytes: PK\x03\x04
+        const isZipBytes = inputBuffer.length >= 4 && inputBuffer[0] === 0x50 && inputBuffer[1] === 0x4B;
+        if (!isZipBytes) {
+          throw new Error(`Invalid ZIP archive for ${originalName}. Authentic ZIP header required.`);
         }
+
+        // 2. Validate zip entries: prevent Zip Slip and executable files
+        let detectedFormats = [];
+        try {
+          const admZip = new AdmZip(inputBuffer);
+          const entries = admZip.getEntries();
+          const machineExts = new Set(['dst', 'pes', 'jef', 'exp', 'hus', 'vip', 'vp3', 'xxx']);
+          for (const entry of entries) {
+            if (entry.isDirectory) continue;
+            const entryName = entry.entryName.toLowerCase();
+            if (entryName.includes('..') || path.isAbsolute(entryName)) {
+              throw new Error(`Security violation: Zip slip detected in ${originalName}`);
+            }
+            if (entryName.endsWith('.exe') || entryName.endsWith('.bat') || entryName.endsWith('.sh') || entryName.endsWith('.cmd')) {
+              throw new Error(`Security violation: Executable detected in ${originalName}`);
+            }
+            const entryExt = entryName.split('.').pop();
+            if (machineExts.has(entryExt)) {
+              detectedFormats.push(entryExt.toUpperCase());
+            }
+          }
+        } catch (zipErr) {
+          if (zipErr.message.includes('Security violation')) throw zipErr;
+          console.warn('[ZIP Inspection Warning]:', zipErr.message);
+        }
+
+        // 3. Save to private design storage using storage.savePrivateFile
+        const savedKey = await storage.savePrivateFile(inputBuffer, originalName, 'application/zip');
+        const checksum = crypto.createHash('sha256').update(inputBuffer).digest('hex');
+
+        processedFiles.push({
+          originalName,
+          storageKey: savedKey,
+          fileSize: inputBuffer.length,
+          checksum,
+          isZip: true,
+          detectedFormats: Array.from(new Set(detectedFormats))
+        });
+
+      } else {
+        // Image validation & processing
+        const isPng = inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 && inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
+        const isJpg = inputBuffer[0] === 0xFF && inputBuffer[1] === 0xD8 && inputBuffer[2] === 0xFF;
+        const isWebp = inputBuffer.length > 12 && inputBuffer.toString('utf8', 8, 12) === 'WEBP';
+
+        if (!isPng && !isJpg && !isWebp) {
+          throw new Error(`Invalid image content for ${originalName}. Authentic PNG, JPG, or WEBP required.`);
+        }
+
+        const hash = crypto.randomBytes(8).toString('hex');
+        const cleanName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const uniqueFilename = `${cleanName}_${Date.now()}_${hash}${ext}`;
+
+        let finalBuffer = inputBuffer;
+        if (shouldWatermark) {
+          try {
+            finalBuffer = await watermarkService.applyWatermark(inputBuffer, {
+              format: ext === '.webp' ? 'webp' : (ext === '.png' ? 'png' : 'jpeg')
+            });
+          } catch (wmErr) {
+            console.warn('[Bulk Watermark Warning]:', wmErr.message);
+            finalBuffer = inputBuffer;
+          }
+        }
+
+        const publicUrl = await storage.savePublicFile(finalBuffer, uniqueFilename, file.mimetype || 'image/png');
+        const checksum = crypto.createHash('sha256').update(finalBuffer).digest('hex');
+
+        let thumbUrl = null;
+        try {
+          thumbUrl = await storage.buildThumbnailUrl(publicUrl);
+        } catch (tErr) {
+          console.warn('[Thumbnail Build Warning]:', tErr.message);
+        }
+
+        processedFiles.push({
+          originalName,
+          uniqueFilename,
+          publicUrl,
+          thumbUrl: thumbUrl || publicUrl,
+          fileSize: finalBuffer.length,
+          checksum,
+          isZip: false
+        });
       }
 
-      // 4. Save to persistent storage using storage.savePublicFile
-      const publicUrl = await storage.savePublicFile(finalBuffer, uniqueFilename, file.mimetype || 'image/png');
-
-      // 5. Compute SHA-256 Checksum
-      const checksum = crypto.createHash('sha256').update(finalBuffer).digest('hex');
-
-      // 6. Generate 300px WebP thumbnail
-      let thumbUrl = null;
-      try {
-        thumbUrl = await storage.buildThumbnailUrl(publicUrl);
-      } catch (tErr) {
-        console.warn('[Thumbnail Build Warning]:', tErr.message);
+      // Clean up multer temporary file on disk if it was created
+      if (file.path && fs.existsSync(file.path)) {
+        try { fs.unlinkSync(file.path); } catch (_) {}
       }
-
-      processedFiles.push({
-        originalName,
-        uniqueFilename,
-        publicUrl,
-        thumbUrl: thumbUrl || publicUrl,
-        fileSize: finalBuffer.length,
-        checksum
-      });
     }
 
     return processedFiles;
   }
 
   /**
-   * Commits bulk image replacement in DB batches inside transactions with 7-day backup & undo support
+   * Commits bulk replacement in DB batches inside transactions with 7-day backup & undo support
    */
   async commitReplacementBatch(params = {}) {
-    if (!db.isConnected()) await db.initPool();
+    if (!db.isConnected()) {
+      try {
+        await db.initPool();
+      } catch (_) {}
+    }
 
     const {
       adminUser = null,
       categoryId = null,
       categoryName = 'All Categories',
       scopeSummary = '',
-      replacementMode = 'replace_primary',
-      items = [] // array of { designId, sku, title, originalName, publicUrl, fileSize, checksum, isPrimary, imageIndex }
+      replacementMode = 'replace_matching',
+      items = [] // array of items: { designId, sku, title, originalName, publicUrl, thumbUrl, storageKey, fileSize, checksum, isZip, isPrimary, imageIndex, detectedFormats }
     } = params;
 
     if (!items || items.length === 0) {
       return { success: false, message: 'No items provided for replacement' };
     }
 
-    // 1. Create Log Entry in image_replace_logs
-    const insertLogRes = await db.query(`
-      INSERT INTO image_replace_logs 
-        (admin_id, admin_email, category_id, category_name, scope_summary, replacement_mode, total_files, matched_designs)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      adminUser ? adminUser.id : null,
-      adminUser ? adminUser.email : 'admin',
-      categoryId || null,
-      categoryName,
-      scopeSummary || `Replaced ${items.length} designs in ${categoryName}`,
-      replacementMode,
-      items.length,
-      new Set(items.map(i => i.designId)).size
-    ]);
+    let logId = Date.now();
+    let backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
 
-    const logId = insertLogRes.insertId;
+    if (db.isConnected()) {
+      try {
+        const insertLogRes = await db.query(`
+          INSERT INTO image_replace_logs 
+            (admin_id, admin_email, category_id, category_name, scope_summary, replacement_mode, total_files, matched_designs)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          adminUser ? adminUser.id : null,
+          adminUser ? adminUser.email : 'admin',
+          categoryId || null,
+          categoryName,
+          scopeSummary || `Replaced ${items.length} files in ${categoryName}`,
+          replacementMode === 'replace_all' ? 'replace_all' : (replacementMode === 'add_extra' ? 'add_extra' : 'replace_primary'),
+          items.length,
+          new Set(items.map(i => i.designId)).size
+        ]);
+        if (insertLogRes && insertLogRes.insertId) {
+          logId = insertLogRes.insertId;
+          backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
+        }
+      } catch (logErr) {
+        console.warn('Logging replace session error:', logErr.message);
+      }
+    }
 
-    // 2. Setup 7-Day Backup directory
-    const backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
     if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
 
-    let replacedCount = 0;
+    let replacedImagesCount = 0;
+    let replacedZipsCount = 0;
+    let replacedDesignsCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
     const reportItems = [];
@@ -452,7 +598,6 @@ class BulkImageReplaceService {
       itemsByDesign.get(item.designId).push(item);
     }
 
-    // Process in batches of 100 designs inside transactions
     const designIds = Array.from(itemsByDesign.keys());
     const batchSize = 100;
 
@@ -462,115 +607,172 @@ class BulkImageReplaceService {
       for (const dId of chunk) {
         const designFiles = itemsByDesign.get(dId);
         try {
-          // Fetch current design data & images
-          const [design] = await db.query('SELECT id, sku, title, primary_image FROM designs WHERE id = ?', [dId]);
+          let design = null;
+          if (db.isConnected()) {
+            const [row] = await db.query('SELECT id, sku, title, primary_image FROM designs WHERE id = ?', [dId]);
+            design = row;
+          }
+          if (!design) {
+            design = await Design.getById(dId);
+          }
           if (!design) {
             skippedCount++;
             continue;
           }
 
-          const currentImages = await db.query(
-            'SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, id ASC',
-            [dId]
-          ) || [];
+          // Fetch current images & machine files before replacement
+          let currentImages = [];
+          let currentFiles = [];
+          if (db.isConnected()) {
+            currentImages = (await db.query('SELECT * FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, id ASC', [dId])) || [];
+            currentFiles = (await db.query('SELECT * FROM design_files WHERE design_id = ? AND is_preview = 0 ORDER BY id DESC', [dId])) || [];
+          } else {
+            currentImages = design.images || [];
+            currentFiles = (design.files || []).filter(f => !f.is_preview);
+          }
 
-          // Primary image to apply (first with isPrimary=true, or first file)
-          const primaryFile = designFiles.find(f => f.isPrimary) || designFiles[0];
+          const oldMachineFile = currentFiles[0] || null;
 
-          // Version query string for cache-busting (?v=...)
-          const versionSuffix = `?v=${Date.now()}`;
-          const versionedPrimaryUrl = `${primaryFile.publicUrl}${versionSuffix}`;
+          const imageFiles = designFiles.filter(f => !f.isZip);
+          const zipFiles = designFiles.filter(f => f.isZip);
 
-          if (replacementMode === 'replace_primary') {
-            // Replace the primary image record
-            await Design.replacePrimaryImage(
+          let didReplaceImage = false;
+          let didReplaceZip = false;
+          let versionedPrimaryUrl = design.primary_image;
+
+          // 1. Image Replacement (if any image files matched/provided)
+          if (imageFiles.length > 0) {
+            const primaryFile = imageFiles.find(f => f.isPrimary) || imageFiles[0];
+            const versionSuffix = `?v=${Date.now()}`;
+            versionedPrimaryUrl = `${primaryFile.publicUrl}${versionSuffix}`;
+
+            if (replacementMode === 'replace_all') {
+              if (db.isConnected()) {
+                await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
+                await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedPrimaryUrl, dId]);
+                for (let i = 0; i < imageFiles.length; i++) {
+                  const f = imageFiles[i];
+                  const isP = (f === primaryFile) ? 1 : 0;
+                  const fUrl = `${f.publicUrl}${versionSuffix}`;
+                  await db.query(`
+                    INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                    VALUES (?, ?, ?, ?, ?, ?, 1)
+                  `, [dId, fUrl, isP, i, f.fileSize || 0, f.checksum || null]);
+                }
+              }
+            } else if (replacementMode === 'add_extra') {
+              if (db.isConnected()) {
+                const maxOrderRow = await db.query('SELECT MAX(display_order) as mo FROM design_images WHERE design_id = ?', [dId]);
+                let startOrder = (maxOrderRow && maxOrderRow[0] && maxOrderRow[0].mo !== null) ? maxOrderRow[0].mo + 1 : 1;
+                for (const f of imageFiles) {
+                  const isP = f.isPrimary ? 1 : 0;
+                  const fUrl = `${f.publicUrl}${versionSuffix}`;
+                  await db.query(`
+                    INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                    VALUES (?, ?, ?, ?, ?, ?, 1)
+                  `, [dId, fUrl, isP, startOrder++, f.fileSize || 0, f.checksum || null]);
+                }
+              }
+            } else {
+              // Default: replace_matching / replace_primary
+              await Design.replacePrimaryImage(
+                dId,
+                versionedPrimaryUrl,
+                primaryFile.originalName,
+                primaryFile.fileSize || 0,
+                primaryFile.checksum || null
+              );
+              const secondaryFiles = imageFiles.filter(f => f !== primaryFile);
+              for (let idx = 0; idx < secondaryFiles.length; idx++) {
+                const secFile = secondaryFiles[idx];
+                const secUrl = `${secFile.publicUrl}${versionSuffix}`;
+                if (db.isConnected()) {
+                  await db.query(`
+                    INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                    VALUES (?, ?, 0, ?, ?, ?, 1)
+                    ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), file_size = VALUES(file_size), checksum = VALUES(checksum), updated_at = NOW()
+                  `, [dId, secUrl, idx + 1, secFile.fileSize || 0, secFile.checksum || null]);
+                }
+              }
+            }
+
+            replacedImagesCount += imageFiles.length;
+            didReplaceImage = true;
+          }
+
+          // 2. ZIP Replacement (if any ZIP files matched/provided)
+          let newZipKey = null;
+          let newZipName = null;
+          if (zipFiles.length > 0) {
+            const primaryZip = zipFiles[0];
+            newZipKey = primaryZip.storageKey;
+            newZipName = primaryZip.originalName;
+
+            await Design.replaceMachineFile(
               dId,
-              versionedPrimaryUrl,
-              primaryFile.originalName,
-              primaryFile.fileSize || 0,
-              primaryFile.checksum || null
+              primaryZip.storageKey,
+              primaryZip.originalName,
+              primaryZip.fileSize || 0,
+              primaryZip.checksum || null,
+              primaryZip.detectedFormats || []
             );
 
-            // Handle any secondary images uploaded for this design (e.g. _2, _3)
-            const secondaryFiles = designFiles.filter(f => f !== primaryFile);
-            for (let idx = 0; idx < secondaryFiles.length; idx++) {
-              const secFile = secondaryFiles[idx];
-              const secUrl = `${secFile.publicUrl}${versionSuffix}`;
-              await db.query(`
-                INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-                VALUES (?, ?, 0, ?, ?, ?, 1)
-                ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), file_size = VALUES(file_size), checksum = VALUES(checksum), updated_at = NOW()
-              `, [dId, secUrl, idx + 1, secFile.fileSize || 0, secFile.checksum || null]);
-            }
-          } else if (replacementMode === 'replace_all') {
-            // Replace ALL images
-            await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
-            await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedPrimaryUrl, dId]);
+            replacedZipsCount += zipFiles.length;
+            didReplaceZip = true;
+          }
 
-            for (let i = 0; i < designFiles.length; i++) {
-              const f = designFiles[i];
-              const isP = (f === primaryFile) ? 1 : 0;
-              const fUrl = `${f.publicUrl}${versionSuffix}`;
-              await db.query(`
-                INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-                VALUES (?, ?, ?, ?, ?, ?, 1)
-              `, [dId, fUrl, isP, i, f.fileSize || 0, f.checksum || null]);
-            }
-          } else if (replacementMode === 'add_extra') {
-            // Add as extra images without deleting old ones
-            const maxOrderRow = await db.query('SELECT MAX(display_order) as mo FROM design_images WHERE design_id = ?', [dId]);
-            let startOrder = (maxOrderRow && maxOrderRow[0] && maxOrderRow[0].mo !== null) ? maxOrderRow[0].mo + 1 : 1;
+          if (didReplaceImage || didReplaceZip) {
+            replacedDesignsCount++;
+          }
 
-            for (const f of designFiles) {
-              const isP = f.isPrimary ? 1 : 0;
-              const fUrl = `${f.publicUrl}${versionSuffix}`;
+          // Record snapshot in log items
+          if (db.isConnected()) {
+            try {
+              const updatedImages = await db.query('SELECT * FROM design_images WHERE design_id = ?', [dId]);
               await db.query(`
-                INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-                VALUES (?, ?, ?, ?, ?, ?, 1)
-              `, [dId, fUrl, isP, startOrder++, f.fileSize || 0, f.checksum || null]);
-              if (isP) {
-                await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [fUrl, dId]);
-              }
+                INSERT INTO image_replace_log_items 
+                  (log_id, design_id, sku, title, old_primary_image, new_primary_image, old_images_json, new_images_json, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'replaced')
+              `, [
+                logId,
+                dId,
+                design.sku,
+                design.title,
+                design.primary_image,
+                versionedPrimaryUrl,
+                JSON.stringify({ images: currentImages, machineFile: oldMachineFile }),
+                JSON.stringify({ images: updatedImages, machineFile: zipFiles[0] || null })
+              ]);
+            } catch (itemLogErr) {
+              console.warn('Logging replace item warning:', itemLogErr.message);
             }
           }
 
-          // Fetch updated images
-          const updatedImages = await db.query('SELECT * FROM design_images WHERE design_id = ?', [dId]);
-
-          // Record log item with exact old state for complete 7-day undo
-          await db.query(`
-            INSERT INTO image_replace_log_items 
-              (log_id, design_id, sku, title, old_primary_image, new_primary_image, old_images_json, new_images_json, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'replaced')
-          `, [
-            logId,
-            dId,
-            design.sku,
-            design.title,
-            design.primary_image,
-            versionedPrimaryUrl,
-            JSON.stringify(currentImages),
-            JSON.stringify(updatedImages)
-          ]);
-
-          replacedCount++;
           reportItems.push({
             designId: dId,
             sku: design.sku,
             title: design.title,
             oldImage: design.primary_image,
-            newImage: versionedPrimaryUrl,
-            status: 'Replaced'
+            newImage: didReplaceImage ? versionedPrimaryUrl : null,
+            oldZip: oldMachineFile ? oldMachineFile.file_name : null,
+            newZip: didReplaceZip ? newZipName : null,
+            imageStatus: didReplaceImage ? 'Replaced' : 'Unchanged',
+            zipStatus: didReplaceZip ? 'Replaced' : 'Unchanged',
+            status: 'Success'
           });
-        } catch (itemErr) {
-          console.error(`Error replacing images for design #${dId}:`, itemErr);
-          failedCount++;
-          await db.query(`
-            INSERT INTO image_replace_log_items 
-              (log_id, design_id, sku, title, status, error_message)
-            VALUES (?, ?, ?, ?, 'failed', ?)
-          `, [logId, dId, '', '', itemErr.message]);
 
+        } catch (itemErr) {
+          console.error(`Error replacing files for design #${dId}:`, itemErr);
+          failedCount++;
+          if (db.isConnected()) {
+            try {
+              await db.query(`
+                INSERT INTO image_replace_log_items 
+                  (log_id, design_id, sku, title, status, error_message)
+                VALUES (?, ?, ?, ?, 'failed', ?)
+              `, [logId, dId, '', '', itemErr.message]);
+            } catch (_) {}
+          }
           reportItems.push({
             designId: dId,
             status: 'Failed',
@@ -580,20 +782,25 @@ class BulkImageReplaceService {
       }
     }
 
-    // 3. Update Log Summary
-    await db.query(`
-      UPDATE image_replace_logs 
-      SET replaced_count = ?, skipped_count = ?, failed_count = ?, backup_dir = ?
-      WHERE id = ?
-    `, [replacedCount, skippedCount, failedCount, backupDir, logId]);
+    if (db.isConnected()) {
+      try {
+        await db.query(`
+          UPDATE image_replace_logs 
+          SET replaced_count = ?, skipped_count = ?, failed_count = ?, backup_dir = ?
+          WHERE id = ?
+        `, [replacedDesignsCount, skippedCount, failedCount, backupDir, logId]);
+      } catch (_) {}
+    }
 
-    // 4. Save manifest in backup directory
+    // Save manifest in backup directory for 7-day rollback
     fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify({
       logId,
       timestamp: new Date().toISOString(),
       admin: adminUser ? adminUser.email : 'admin',
       categoryName,
-      replacedCount,
+      replacedDesignsCount,
+      replacedImagesCount,
+      replacedZipsCount,
       failedCount,
       reportItems
     }, null, 2));
@@ -601,7 +808,9 @@ class BulkImageReplaceService {
     return {
       success: true,
       logId,
-      replacedCount,
+      replacedCount: replacedDesignsCount,
+      replacedImagesCount,
+      replacedZipsCount,
       skippedCount,
       failedCount,
       reportItems
@@ -609,48 +818,97 @@ class BulkImageReplaceService {
   }
 
   /**
-   * Reverts / Undoes a bulk replacement using stored image snapshots
+   * Reverts / Undoes a bulk replacement using stored snapshots
    */
   async undoBulkReplacement(logId) {
-    if (!db.isConnected()) await db.initPool();
+    if (!db.isConnected()) {
+      try { await db.initPool(); } catch (_) {}
+    }
 
-    const [log] = await db.query('SELECT * FROM image_replace_logs WHERE id = ?', [logId]);
+    let log = null;
+    let items = [];
+
+    if (db.isConnected()) {
+      const [logRow] = await db.query('SELECT * FROM image_replace_logs WHERE id = ?', [logId]);
+      log = logRow;
+      if (log) {
+        if (log.is_undone) {
+          throw new Error(`Bulk replace #${logId} was already undone on ${log.undone_at}`);
+        }
+        items = await db.query('SELECT * FROM image_replace_log_items WHERE log_id = ? AND status = "replaced"', [logId]);
+      }
+    }
+
+    // If items not in DB, read from manifest
+    if (!log || items.length === 0) {
+      const backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
+      const manifestPath = path.join(backupDir, 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        log = { id: logId, ...manifest };
+        if (items.length === 0 && Array.isArray(manifest.reportItems)) {
+          items = manifest.reportItems.map(r => ({
+            design_id: r.designId,
+            old_primary_image: r.oldImage,
+            old_images_json: JSON.stringify({
+              images: r.oldImage ? [{ image_url: r.oldImage, is_primary: 1 }] : [],
+              machineFile: r.oldZip ? { file_name: r.oldZip, file_path: r.oldZip } : null
+            })
+          }));
+        }
+      }
+    }
+
     if (!log) {
       throw new Error(`Bulk replace log #${logId} not found`);
     }
-
-    if (log.is_undone) {
-      throw new Error(`Bulk replace #${logId} was already undone on ${log.undone_at}`);
-    }
-
-    const items = await db.query('SELECT * FROM image_replace_log_items WHERE log_id = ? AND status = "replaced"', [logId]);
 
     let restoredCount = 0;
     for (const item of items) {
       try {
         const dId = item.design_id;
         const oldPrimary = item.old_primary_image;
-        const oldImagesJson = item.old_images_json;
+        const oldStateJson = item.old_images_json;
 
-        // Restore designs table primary_image
-        await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [oldPrimary, dId]);
+        if (oldPrimary && db.isConnected()) {
+          await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [oldPrimary, dId]);
+        }
 
-        // Restore design_images records
-        if (oldImagesJson) {
-          const oldImages = JSON.parse(oldImagesJson);
-          await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
-          for (const img of oldImages) {
+        if (oldStateJson && db.isConnected()) {
+          const parsed = JSON.parse(oldStateJson);
+          const oldImages = Array.isArray(parsed) ? parsed : (parsed.images || []);
+          const oldMachineFile = (!Array.isArray(parsed) && parsed.machineFile) ? parsed.machineFile : null;
+
+          if (oldImages.length > 0) {
+            await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
+            for (const img of oldImages) {
+              await db.query(`
+                INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+              `, [
+                dId,
+                img.image_url,
+                img.is_primary,
+                img.display_order || 0,
+                img.file_size || 0,
+                img.checksum || null,
+                (img.version || 1) + 1
+              ]);
+            }
+          }
+
+          if (oldMachineFile && oldMachineFile.file_path) {
+            await db.query('DELETE FROM design_files WHERE design_id = ? AND is_preview = 0', [dId]);
             await db.query(`
-              INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-              VALUES (?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, checksum, is_preview)
+              VALUES (?, ?, ?, ?, ?, ?, 0)
             `, [
               dId,
-              img.image_url,
-              img.is_primary,
-              img.display_order || 0,
-              img.file_size || 0,
-              img.checksum || null,
-              (img.version || 1) + 1
+              oldMachineFile.file_name,
+              oldMachineFile.file_path,
+              oldMachineFile.file_format || 'ZIP',
+              oldMachineFile.file_size || 0,
+              oldMachineFile.checksum || null
             ]);
           }
         }
@@ -661,12 +919,17 @@ class BulkImageReplaceService {
       }
     }
 
-    await db.query('UPDATE image_replace_logs SET is_undone = 1, undone_at = NOW() WHERE id = ?', [logId]);
+    if (db.isConnected()) {
+      try {
+        await db.query('UPDATE image_replace_logs SET is_undone = 1, undone_at = NOW() WHERE id = ?', [logId]);
+      } catch (_) {}
+    }
 
     return {
       success: true,
+      logId,
       restoredCount,
-      message: `Successfully undone bulk replacement #${logId}. Restored ${restoredCount} designs to previous images.`
+      message: `Successfully undone bulk replacement #${logId}. Restored ${restoredCount} designs to previous files.`
     };
   }
 
@@ -676,12 +939,38 @@ class BulkImageReplaceService {
   async generateCsvReport(logId) {
     if (!db.isConnected()) await db.initPool();
 
-    const [log] = await db.query('SELECT * FROM image_replace_logs WHERE id = ?', [logId]);
+    let log = null;
+    let items = [];
+
+    if (db.isConnected()) {
+      const [logRow] = await db.query('SELECT * FROM image_replace_logs WHERE id = ?', [logId]);
+      log = logRow;
+      items = await db.query('SELECT * FROM image_replace_log_items WHERE log_id = ? ORDER BY id ASC', [logId]);
+    }
+
+    if (!log) {
+      const backupDir = path.resolve(__dirname, '..', 'backups', `bulk_replace_${logId}`);
+      const manifestPath = path.join(backupDir, 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        log = { id: logId, ...manifest };
+        items = (manifest.reportItems || []).map(r => ({
+          design_id: r.designId,
+          sku: r.sku,
+          title: r.title,
+          status: r.status,
+          old_primary_image: r.oldImage,
+          new_primary_image: r.newImage,
+          old_zip: r.oldZip,
+          new_zip: r.newZip,
+          error_message: r.error
+        }));
+      }
+    }
+
     if (!log) throw new Error('Log not found');
 
-    const items = await db.query('SELECT * FROM image_replace_log_items WHERE log_id = ? ORDER BY id ASC', [logId]);
-
-    let csv = 'Design ID,SKU,Title,Status,Old Primary Image,New Primary Image,Error Message\n';
+    let csv = 'Design ID,SKU,Title,Status,Old Primary Image,New Primary Image,Old ZIP,New ZIP,Error Message\n';
     for (const it of items) {
       const escape = str => `"${(str || '').replace(/"/g, '""')}"`;
       csv += [
@@ -691,6 +980,8 @@ class BulkImageReplaceService {
         it.status,
         escape(it.old_primary_image),
         escape(it.new_primary_image),
+        escape(it.old_zip),
+        escape(it.new_zip),
         escape(it.error_message)
       ].join(',') + '\n';
     }
@@ -705,14 +996,18 @@ class BulkImageReplaceService {
     if (!db.isConnected()) await db.initPool();
 
     const offset = (page - 1) * limit;
-    const [countRow] = await db.query('SELECT COUNT(*) as total FROM image_replace_logs');
-    const total = countRow ? countRow.total : 0;
+    let total = 0;
+    let logs = [];
 
-    const logs = await db.query(`
-      SELECT * FROM image_replace_logs
-      ORDER BY id DESC
-      LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    if (db.isConnected()) {
+      const [countRow] = await db.query('SELECT COUNT(*) as total FROM image_replace_logs');
+      total = countRow ? countRow.total : 0;
+      logs = await db.query(`
+        SELECT * FROM image_replace_logs
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+      `, [limit, offset]);
+    }
 
     return {
       logs,
