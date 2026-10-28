@@ -24,13 +24,13 @@ async function fetchFreshCsrfToken() {
         window.CSRF_TOKEN = data.csrfToken;
         const meta = document.querySelector('meta[name="csrf-token"]');
         if (meta) meta.setAttribute('content', data.csrfToken);
-        return data.csrfToken;
+        return data;
       }
     }
   } catch (e) {
     console.warn('Unable to refresh CSRF token automatically:', e);
   }
-  return getCsrfToken();
+  return { csrfToken: getCsrfToken(), isAuthenticated: true };
 }
 
 // Global Toast Popup
@@ -405,7 +405,7 @@ let bulkUploadState = {
   activeControllers: new Set(),
   activeStreams: 0,
   maxConcurrency: 2,      // Default 2 parallel streams for Hostinger stability
-  batchSize: 5,
+  batchSize: 2,           // Safe 2-file chunks to prevent Hostinger payload limits
   batchTimeoutMs: 60000,
   isUploading: false,
   isCancelled: false,
@@ -618,7 +618,7 @@ function handleBulkImageFilesSelected(input) {
 
   if (preCount) preCount.textContent = validItems.length + (invalidCount > 0 ? ` (and ${invalidCount} invalid)` : '');
   if (preSize) preSize.textContent = formatBytes(totalBytes);
-  if (preBatches) preBatches.textContent = `${Math.ceil(validItems.length / bulkUploadState.batchSize)} batches planned (5 files/request)`;
+  if (preBatches) preBatches.textContent = `${Math.ceil(validItems.length / bulkUploadState.batchSize)} batches planned (safe chunks: 1-2 files, max 4MB)`;
 
   if (warnings.length > 0 && preWarnings) {
     preWarnings.innerHTML = `<strong><i class="fa-solid fa-triangle-exclamation"></i> Warnings:</strong><ul style="margin: 4px 0 0 16px; padding: 0;">` +
@@ -641,7 +641,8 @@ function handleBulkImageFilesSelected(input) {
 async function compressImageForUpload(file, maxDimension = 1600, quality = 0.85) {
   const shouldOptimize = document.getElementById('bulkImageOptimizeToggle')?.checked ?? true;
   if (!shouldOptimize) return file;
-  if (!file.type || !file.type.startsWith('image/')) return file;
+  const isImg = (file.type && file.type.startsWith('image/')) || /\.(jpe?g|png|webp|avif)$/i.test(file.name || '');
+  if (!isImg) return file;
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -732,14 +733,15 @@ function renderLiveFileList() {
       borderColor = '#FFCDD2';
     }
 
+    const fullTooltip = item.details || statusText;
     return `
-      <div id="bulk-file-item-${item.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;">
-        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+      <div id="bulk-file-item-${item.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;" title="${escapeHtml(fullTooltip)}">
+        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42%;">
           ${icon}
           <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
           <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
         </div>
-        <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <div style="font-size: 0.75rem; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fullTooltip)}">
           <span>${escapeHtml(statusText)}</span>
         </div>
       </div>
@@ -785,15 +787,17 @@ function updateLiveItemRow(item) {
     borderColor = '#FFCDD2';
   }
 
+  const fullTooltip = item.details || statusText;
   el.style.background = badgeColor;
   el.style.border = `1px solid ${borderColor}`;
+  el.setAttribute('title', fullTooltip);
   el.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42%;">
       ${icon}
       <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
       <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
     </div>
-    <div style="font-size: 0.75rem; text-align: right; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+    <div style="font-size: 0.75rem; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fullTooltip)}">
       <span>${escapeHtml(statusText)}</span>
     </div>
   `;
@@ -846,16 +850,46 @@ async function startChunkedBulkImageUpload() {
     return;
   }
 
+  // Refresh and verify CSRF and Admin session before launching upload
+  const csrfData = await fetchFreshCsrfToken();
+  if (csrfData && csrfData.isAuthenticated === false) {
+    alert('Your admin session has expired or the server was restarted. Please open a new tab, log in to the admin panel, then return here to click Start Chunked Upload.');
+    bulkUploadState.isUploading = false;
+    return;
+  }
+
   bulkUploadState.isUploading = true;
   bulkUploadState.isCancelled = false;
   recalculateStats();
 
-  // Build batch queue (5 items per batch)
+  // Build adaptive batches (max 2 items OR max 4MB per request to guarantee Hostinger payload limit safety)
+  const MAX_BATCH_BYTES = 4 * 1024 * 1024;
+  const MAX_BATCH_ITEMS = 2;
   const batches = [];
-  for (let i = 0; i < pendingItems.length; i += bulkUploadState.batchSize) {
+  let currentBatchItems = [];
+  let currentBatchBytes = 0;
+
+  for (const item of pendingItems) {
+    const itemSize = item.size || (item.file ? item.file.size : 0) || 0;
+    const wouldExceedSize = (currentBatchBytes + itemSize > MAX_BATCH_BYTES) && currentBatchItems.length > 0;
+    const wouldExceedCount = currentBatchItems.length >= MAX_BATCH_ITEMS;
+
+    if (wouldExceedSize || wouldExceedCount) {
+      batches.push({
+        id: batches.length + 1,
+        items: currentBatchItems,
+        retries: 0
+      });
+      currentBatchItems = [];
+      currentBatchBytes = 0;
+    }
+    currentBatchItems.push(item);
+    currentBatchBytes += itemSize;
+  }
+  if (currentBatchItems.length > 0) {
     batches.push({
-      id: Math.floor(i / bulkUploadState.batchSize) + 1,
-      items: pendingItems.slice(i, i + bulkUploadState.batchSize),
+      id: batches.length + 1,
+      items: currentBatchItems,
       retries: 0
     });
   }
@@ -879,9 +913,6 @@ async function startChunkedBulkImageUpload() {
 
   renderLiveFileList();
   updateProgressCounters();
-
-  // Refresh CSRF token before launching batch workers to prevent 403 on stale sessions
-  await fetchFreshCsrfToken();
 
   // Launch worker pool with max configured concurrent streams (default 2)
   const workerCount = Math.min(bulkUploadState.maxConcurrency, batches.length);
@@ -915,7 +946,7 @@ async function processSingleBatch(batch) {
   // Mark all items in this batch as uploading
   batch.items.forEach(it => {
     it.status = 'uploading';
-    it.details = `Uploading in batch #${batch.id}...`;
+    it.details = `Uploading batch #${batch.id}...`;
     updateLiveItemRow(it);
   });
 
@@ -930,11 +961,12 @@ async function processSingleBatch(batch) {
   try {
     let currentToken = getCsrfToken();
     if (!currentToken) {
-      currentToken = await fetchFreshCsrfToken();
+      const freshData = await fetchFreshCsrfToken();
+      currentToken = typeof freshData === 'string' ? freshData : freshData?.csrfToken;
     }
 
     const formData = new FormData();
-    formData.append('_csrf', currentToken);
+    formData.append('_csrf', currentToken || '');
     formData.append('confirmed_mappings', JSON.stringify(bulkUploadState.confirmedMappings || {}));
 
     // Process files through browser compressor before attaching to FormData
@@ -943,12 +975,12 @@ async function processSingleBatch(batch) {
       formData.append('images', fileToUpload, item.originalName);
     }
 
-    let res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(currentToken), {
+    let res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(currentToken || ''), {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': currentToken
+        'X-CSRF-Token': currentToken || ''
       },
       body: formData,
       signal: controller.signal
@@ -957,15 +989,23 @@ async function processSingleBatch(batch) {
     clearTimeout(timeoutId);
     bulkUploadState.activeControllers.delete(controller);
 
-    if (!res.ok) {
-      let errBody = {};
-      try { errBody = await res.json(); } catch (e) {}
+    let rawText = '';
+    let parsedBody = null;
 
-      // If rejected with 403 (e.g. server restarted or token expired), refresh token and retry batch once
-      if (res.status === 403 || errBody.isCsrf || errBody.code === 'EBADCSRF' || (errBody.error && errBody.error.code === 'CSRF_TOKEN_INVALID') || (errBody.message && errBody.message.toLowerCase().includes('token'))) {
-        console.warn(`[Batch #${batch.id} 403 Alert]: Token rejected. Refreshing CSRF token and retrying batch...`);
-        const freshToken = await fetchFreshCsrfToken();
-        if (freshToken) {
+    if (!res.ok) {
+      try {
+        rawText = await res.text();
+        parsedBody = JSON.parse(rawText);
+      } catch (e) {}
+
+      // If rejected with 403 (e.g. CSRF token mismatch), try refreshing CSRF token once and retry batch
+      if (res.status === 403 && !batch.hasRefreshedCsrf) {
+        batch.hasRefreshedCsrf = true;
+        console.warn(`[Batch #${batch.id} 403 Alert]: Token rejected. Refreshing CSRF token from server...`);
+        const freshData = await fetchFreshCsrfToken();
+        const freshToken = typeof freshData === 'string' ? freshData : freshData?.csrfToken;
+        if (freshToken && freshToken !== currentToken) {
+          currentToken = freshToken;
           formData.set('_csrf', freshToken);
           res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(freshToken), {
             method: 'POST',
@@ -974,27 +1014,65 @@ async function processSingleBatch(batch) {
               'X-Requested-With': 'XMLHttpRequest',
               'X-CSRF-Token': freshToken
             },
-            body: formData
+            body: formData,
+            signal: controller.signal
           });
           if (res.ok) {
-            errBody = {};
+            parsedBody = null;
+            rawText = '';
           } else {
-            try { errBody = await res.json(); } catch (e) {}
+            try {
+              rawText = await res.text();
+              parsedBody = JSON.parse(rawText);
+            } catch (e) {}
           }
         }
       }
 
       if (!res.ok) {
-        const errMsg = errBody.message || `Server returned HTTP ${res.status}`;
-        const isPermanent = [400, 401, 404, 413, 415, 422].includes(res.status);
+        let stage = 'Upload Request Stage';
+        let suggestedAction = 'Please try again.';
+        let errMsg = parsedBody?.message || parsedBody?.error?.message;
+
+        if (res.status === 401) {
+          stage = 'Authentication Stage';
+          errMsg = errMsg || 'Admin session expired.';
+          suggestedAction = 'Log into Admin in another tab, then click Retry Failed.';
+        } else if (res.status === 403) {
+          stage = 'CSRF Security / Permission Stage';
+          errMsg = errMsg || 'Security token mismatch or unauthorized request.';
+          suggestedAction = 'Ensure you are logged in as admin. Refresh page or re-login if session timed out.';
+        } else if (res.status === 413) {
+          stage = 'Payload Size Stage';
+          errMsg = errMsg || 'Uploaded batch exceeds server limit.';
+          suggestedAction = 'Enable "Optimize images in browser" toggle or upload smaller images.';
+        } else if (res.status === 504 || res.status === 408) {
+          stage = 'Gateway Timeout Stage';
+          errMsg = errMsg || 'Server took too long to process images.';
+          suggestedAction = 'Temporary server delay. Will automatically retry with backoff.';
+        } else if (res.status === 502 || res.status === 503) {
+          stage = 'Server Availability Stage';
+          errMsg = errMsg || 'Server temporarily restarting or unavailable.';
+          suggestedAction = 'Wait a few seconds for server to resume, then retry.';
+        } else if (res.status >= 500) {
+          stage = 'Server Processing Stage';
+          errMsg = errMsg || `Server internal error (HTTP ${res.status}).`;
+          suggestedAction = 'Check server logs for database or storage error details.';
+        } else {
+          errMsg = errMsg || (rawText && !rawText.includes('<html') ? rawText.slice(0, 150) : `Server returned HTTP ${res.status}`);
+        }
+
+        const isPermanent = [400, 401, 403, 404, 413, 415, 422].includes(res.status);
         const batchErr = new Error(errMsg);
         batchErr.isPermanent = isPermanent;
         batchErr.status = res.status;
+        batchErr.stage = stage;
+        batchErr.suggestedAction = suggestedAction;
         throw batchErr;
       }
     }
 
-    const data = await res.json();
+    const data = parsedBody || (await res.json());
 
     // Map response to batch items
     const matchedList = data.matched || [];
@@ -1024,8 +1102,16 @@ async function processSingleBatch(batch) {
         item.details = unmatched.reason || 'No matching product found';
       } else if (failed) {
         item.status = 'failed';
-        item.details = failed.error || 'Upload error';
+        item.details = `[${failed.stage || 'Processing'}] ${failed.error || 'Upload error'}`;
         item.referenceId = failed.referenceId;
+        item.errorObj = {
+          status: 'SERVER_PROCESSED',
+          message: failed.error || 'Upload error',
+          stage: failed.stage || 'Validation / Storage Stage',
+          suggestedAction: failed.suggestedAction || 'Check image format and database.',
+          referenceId: failed.referenceId,
+          filename: item.originalName
+        };
       } else {
         item.status = 'unmatched';
         item.details = 'No product matched';
@@ -1045,6 +1131,7 @@ async function processSingleBatch(batch) {
       batch.items.forEach(item => {
         item.status = 'failed';
         item.details = 'Cancelled by user';
+        item.errorObj = { status: 'CANCELLED', message: 'Cancelled by user', stage: 'User Action', suggestedAction: 'Re-upload if desired.' };
         updateLiveItemRow(item);
       });
       recalculateStats();
@@ -1052,12 +1139,23 @@ async function processSingleBatch(batch) {
       return;
     }
 
+    const stage = err.stage || 'Upload Stage';
+    const action = err.suggestedAction || 'Check file format and retry.';
+    const statusCode = err.status || (err.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR');
+
     // Do NOT automatically retry permanent client / authorization / size errors
     if (err.isPermanent) {
-      console.warn(`[Bulk Upload Batch #${batch.id} Permanent Error]:`, err.message);
+      console.warn(`[Bulk Upload Batch #${batch.id} Permanent Error] [${stage}] HTTP ${statusCode}:`, err.message);
       batch.items.forEach(item => {
         item.status = 'failed';
-        item.details = `Upload rejected (${err.status}): ${err.message}`;
+        item.details = `[${stage}] HTTP ${statusCode}: ${err.message}`;
+        item.errorObj = {
+          status: statusCode,
+          message: err.message,
+          stage: stage,
+          suggestedAction: action,
+          filename: item.originalName
+        };
         updateLiveItemRow(item);
       });
       recalculateStats();
@@ -1067,10 +1165,10 @@ async function processSingleBatch(batch) {
 
     console.warn(`[Bulk Upload Batch #${batch.id} Transient Failure]:`, err.message);
 
-    // Auto-retry up to 3 times for temporary network / server errors with progressive backoff
+    // Auto-retry up to 3 times ONLY for temporary network / 5xx / 429 server errors with progressive backoff
     if (batch.retries < 3) {
       batch.retries++;
-      const delayMs = batch.retries * 1200;
+      const delayMs = batch.retries * 1500;
       batch.items.forEach(item => {
         item.details = `Retry ${batch.retries}/3 in ${Math.round(delayMs / 1000)}s (${err.message})...`;
         updateLiveItemRow(item);
@@ -1083,7 +1181,14 @@ async function processSingleBatch(batch) {
     // Retries exhausted: mark items as failed
     batch.items.forEach(item => {
       item.status = 'failed';
-      item.details = `Failed after 3 retries: ${err.message}`;
+      item.details = `Failed after 3 retries [${stage}] HTTP ${statusCode}: ${err.message}`;
+      item.errorObj = {
+        status: statusCode,
+        message: err.message,
+        stage: stage,
+        suggestedAction: action,
+        filename: item.originalName
+      };
       updateLiveItemRow(item);
     });
     recalculateStats();
@@ -1281,12 +1386,35 @@ function onBulkUploadFinished() {
     unmatchedBox.style.display = 'none';
   }
 
-  // Failed reasons list
+  // Failed reasons list with rich diagnostics
   const failedBox = document.getElementById('bulkFailedDetailsBox');
   const failedList = document.getElementById('bulkFailedReasonsList');
   const failedItems = bulkUploadState.items.filter(it => it.status === 'failed');
   if (failedItems.length > 0 && failedBox && failedList) {
-    failedList.innerHTML = failedItems.map(it => `<div>• ${escapeHtml(it.originalName)}: ${escapeHtml(it.details)}${it.referenceId ? ` [Ref: ${escapeHtml(it.referenceId)}]` : ''}</div>`).join('');
+    failedList.innerHTML = failedItems.map(it => {
+      const errObj = it.errorObj || {};
+      const status = errObj.status || (it.status === 'failed' ? 'ERR' : '');
+      const stage = errObj.stage || (it.referenceId ? 'Database / Storage Stage' : 'Upload Request Stage');
+      const msg = errObj.message || it.details || 'Upload error';
+      const action = errObj.suggestedAction || 'Check file format and re-upload.';
+      return `
+        <div style="padding: 10px 12px; margin-bottom: 8px; background: #FFF; border: 1px solid #FFCDD2; border-left: 4px solid #C62828; border-radius: 6px; line-height: 1.45; font-family: inherit;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="color: #B71C1C; font-size: 0.85rem;"><i class="fa-solid fa-file-circle-xmark"></i> ${escapeHtml(it.originalName)}</strong>
+            <span style="font-size: 0.72rem; padding: 2px 7px; background: #C62828; color: #FFF; border-radius: 4px; font-weight: 700;">HTTP ${escapeHtml(String(status))}</span>
+          </div>
+          <div style="font-size: 0.76rem; color: #555; margin-bottom: 2px;">
+            <strong>Stage:</strong> <span style="color: var(--admin-text-dark);">${escapeHtml(stage)}</span>
+          </div>
+          <div style="font-size: 0.78rem; color: #B71C1C; margin-bottom: 4px;">
+            <strong>Error:</strong> ${escapeHtml(msg)}${it.referenceId ? ` <span style="color: #666; font-size: 0.72rem;">[Ref: ${escapeHtml(it.referenceId)}]</span>` : ''}
+          </div>
+          <div style="font-size: 0.76rem; color: #2E7D32; background: #F1F8E9; padding: 4px 8px; border-radius: 4px; border: 1px solid #DCEDC8;">
+            <i class="fa-solid fa-lightbulb"></i> <strong>Suggested Action:</strong> ${escapeHtml(action)}
+          </div>
+        </div>
+      `;
+    }).join('');
     failedBox.style.display = 'block';
   } else if (failedBox) {
     failedBox.style.display = 'none';

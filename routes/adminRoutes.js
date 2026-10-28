@@ -26,6 +26,16 @@ router.get('/admin/login', adminAuthController.getLogin);
 router.post('/admin/login', adminAuthController.postLogin);
 router.get('/admin/logout', adminAuthController.logout);
 
+// CSRF Token endpoint for client-side AJAX requests & dynamic refreshes
+router.get(['/admin/api/csrf-token', '/api/csrf-token'], (req, res) => {
+  const token = typeof req.csrfToken === 'function' ? req.csrfToken() : (req.session?.csrfSecret || res.locals?.csrfToken || '');
+  res.json({
+    success: true,
+    csrfToken: token,
+    isAuthenticated: Boolean(req.user && req.user.role === 'admin')
+  });
+});
+
 // 2. Role-Protected Admin Routes (strictly requires admin login)
 router.use('/admin', isAdmin);
 router.use('/api/admin', isAdmin);
@@ -122,12 +132,6 @@ router.post('/admin/api/designs/:designId/images/reorder', adminDesignController
 router.post('/admin/api/designs/:designId/images/set-primary/:imageId', adminDesignController.setPrimaryImage);
 router.post('/admin/api/designs/:designId/images/delete/:imageId', adminDesignController.deleteImage);
 router.get('/admin/api/designs/files/:fileId/download', adminDesignController.downloadAdminFile);
-
-// CSRF Token endpoint for client-side AJAX requests & dynamic refreshes
-router.get('/admin/api/csrf-token', (req, res) => {
-  const token = typeof req.csrfToken === 'function' ? req.csrfToken() : (req.session?.csrfSecret || res.locals?.csrfToken || '');
-  res.json({ success: true, csrfToken: token });
-});
 
 // Bulk Update Design Details (TXT, PDF, Word, Excel, Notes)
 router.get('/admin/designs/bulk-details', adminDesignController.getBulkDetails);

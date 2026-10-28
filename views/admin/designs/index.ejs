@@ -1006,7 +1006,7 @@
           <i class="fa-solid fa-circle-info"></i> How Automatic Matching Works:
         </div>
         <div>
-          Name files after product <strong>SKU</strong> (e.g. <code>AED-BLO-01.png</code>, <code>AED 1.png</code>), <strong>Product ID</strong> (e.g. <code>1.png</code>), or <strong>Title/Slug</strong>. Files are uploaded in reliable <strong>5-image chunks</strong> (up to 3 parallel requests) to avoid Hostinger timeouts.
+          Name files after product <strong>SKU</strong> (e.g. <code>AED-BLO-01.png</code>, <code>AED 1.png</code>), <strong>Product ID</strong> (e.g. <code>1.png</code>), or <strong>Title/Slug</strong>. Files are uploaded in reliable <strong>adaptive chunks</strong> (1-2 images, max 4MB per request) to prevent Hostinger payload limits and timeouts.
         </div>
       </div>
 
@@ -1135,7 +1135,7 @@
         <!-- Failed list details if any -->
         <div id="bulkFailedDetailsBox" style="display: none; margin-bottom: 12px; background: #FFEBEE; border: 1px solid #FFCDD2; border-radius: 8px; padding: 10px; font-size: 0.78rem;">
           <strong><i class="fa-solid fa-circle-exclamation"></i> Failed Files (with error reasons):</strong>
-          <div id="bulkFailedReasonsList" style="max-height: 90px; overflow-y: auto; margin-top: 4px; font-family: monospace; color: #B71C1C;"></div>
+          <div id="bulkFailedReasonsList" style="max-height: 280px; overflow-y: auto; margin-top: 6px; display: flex; flex-direction: column; gap: 4px;"></div>
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">

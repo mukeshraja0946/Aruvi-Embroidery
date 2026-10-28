@@ -2504,7 +2504,9 @@ exports.bulkUploadImages = async (req, res) => {
           }
           failed.push({
             filename: originalName,
-            error: `Unsupported image format (${rawExt || 'none'}). Only PNG, JPG, JPEG, WEBP, and AVIF are allowed.`
+            error: `Unsupported image format (${rawExt || 'none'}). Only PNG, JPG, JPEG, WEBP, and AVIF are allowed.`,
+            stage: 'Format Validation Stage',
+            suggestedAction: 'Save the image as PNG, JPG, or WebP.'
           });
           continue;
         }
@@ -2517,7 +2519,9 @@ exports.bulkUploadImages = async (req, res) => {
           }
           failed.push({
             filename: originalName,
-            error: contentValidation.error
+            error: contentValidation.error,
+            stage: 'Content Validation Stage',
+            suggestedAction: 'Ensure file is a valid non-empty image.'
           });
           continue;
         }
@@ -2615,9 +2619,12 @@ exports.bulkUploadImages = async (req, res) => {
 
         console.error(`[Bulk Image Error] [${refId}] File "${originalName}":`, fileErr.message);
 
+        const isDbErr = fileErr.message && fileErr.message.includes('Database');
         failed.push({
           filename: originalName,
           error: fileErr.message,
+          stage: isDbErr ? 'Database Update Stage' : 'Storage Stage',
+          suggestedAction: isDbErr ? 'Check design database connection.' : 'Check disk write permissions.',
           referenceId: refId
         });
       }
