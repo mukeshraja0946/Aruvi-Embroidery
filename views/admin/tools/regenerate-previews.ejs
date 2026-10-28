@@ -137,10 +137,10 @@
           <strong style="color: var(--admin-primary);">Regenerate Previews</strong>
         </div>
         <h1 style="font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 0 0.4rem; color: var(--admin-text-dark);">
-          <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary);"></i> Regenerate Watermarked Previews
+          <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary);"></i> Regenerate Previews (Clean — No Watermarks)
         </h1>
         <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">
-          Generates optimized, watermarked WebP large previews (max 1200px) and 300px thumbnails for designs. Prevents raw/original uploads from ever being served directly to public visitors.
+          Generates clean, un-watermarked WebP previews (large ~1200px, card 600px, thumbnail 300px) from authentic original uploads. Never composites SVG pills or missing font glyphs.
         </p>
       </div>
 
@@ -154,24 +154,24 @@
           </div>
         </div>
         <div class="regen-stat-card">
-          <div class="regen-stat-icon green"><i class="fa-solid fa-image"></i></div>
+          <div class="regen-stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
           <div class="regen-stat-data">
-            <strong><%= designsWithPreview %></strong>
-            <span>Active Previews</span>
+            <strong><%= typeof designsWithOriginal !== 'undefined' ? designsWithOriginal : 0 %></strong>
+            <span>Originals Available</span>
           </div>
         </div>
         <div class="regen-stat-card">
-          <div class="regen-stat-icon amber"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="regen-stat-icon amber"><i class="fa-solid fa-cloud-arrow-up"></i></div>
           <div class="regen-stat-data">
-            <strong><%= typeof designsPreviewProblems !== 'undefined' ? designsPreviewProblems : 0 %></strong>
-            <span>Missing Thumbnails / Problems</span>
+            <strong><%= typeof designsNeedingReupload !== 'undefined' ? designsNeedingReupload : 0 %></strong>
+            <span>Needs Re-upload</span>
           </div>
         </div>
         <div class="regen-stat-card">
           <div class="regen-stat-icon purple"><i class="fa-solid fa-shield-halved"></i></div>
           <div class="regen-stat-data">
             <strong>1200px / 600px / 300px</strong>
-            <span>Synchronized WebP</span>
+            <span>Clean Synchronized WebP</span>
           </div>
         </div>
       </div>
@@ -180,13 +180,13 @@
       <div style="background: linear-gradient(135deg, #FDF8F3 0%, #F5ECE0 100%); border: 1.5px solid #E0CEBE; border-radius: 14px; padding: 1.4rem 1.6rem; margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; box-shadow: 0 4px 15px rgba(168,124,79,0.06);">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--admin-primary); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; margin-bottom: 6px;">
-            <i class="fa-solid fa-bolt"></i> Recommended Action
+            <i class="fa-solid fa-bolt"></i> Clean Preview Engine
           </div>
           <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; margin: 0 0 4px; color: var(--admin-text-dark);">
-            Repair Broken Blouse Designs Previews (~<%= typeof blouseDesignsCount !== 'undefined' ? blouseDesignsCount : 100 %> designs)
+            Repair Blouse Designs Clean Previews (~<%= typeof blouseDesignsCount !== 'undefined' ? blouseDesignsCount : 100 %> designs)
           </h3>
           <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin: 0; line-height: 1.4;">
-            Bulk replace wrote the large preview image but left listing card thumbnails broken. Click below to automatically scan the Blouse Designs category, generate 300px thumbnails and 600px card sizes, enforce single primary flags, and refresh all listing cards.
+            Scans Blouse Designs for clean original uploads. Generates 1200px large, 600px card, and 300px thumbnails with NO watermark pills or missing font glyphs. Designs without clean originals will be safely flagged as "Needs re-upload" for category bulk replacement.
           </p>
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -210,9 +210,10 @@
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Scope</label>
               <select name="scope" id="scopeSelect" class="form-control" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.86rem; background: #FFF;">
-                <option value="preview_problems" selected>⚠️ Missing Thumbnails / Preview Problems (Recommended)</option>
+                <option value="all" selected>All Designs in Category / Database</option>
+                <option value="needs_reupload">⚠️ Only Designs Marked "Needs Re-upload"</option>
+                <option value="preview_problems">Missing Thumbnails / Preview Problems</option>
                 <option value="missing_only">Only Designs Missing Any Preview</option>
-                <option value="all">All Designs in Database / Category</option>
               </select>
             </div>
 
@@ -244,8 +245,8 @@
             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0;">
               <input type="checkbox" name="dry_run" id="dryRunCheck" value="1" checked style="width: 20px; height: 20px; accent-color: var(--admin-primary); cursor: pointer;">
               <div>
-                <strong style="font-size: 0.9rem; color: var(--admin-text-dark); display: block;">Dry Run First (Simulation Only)</strong>
-                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Inspect matched designs and target filenames without writing files or modifying the database.</span>
+                <strong style="font-size: 0.9rem; color: var(--admin-text-dark); display: block;">Dry Run First (Audit Simulation)</strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Inspect available original uploads vs watermarked designs needing re-upload without writing files or altering the database.</span>
               </div>
             </label>
           </div>
@@ -257,7 +258,10 @@
             <button type="button" id="startRealBtn" onclick="runProcess(false)" class="btn btn-primary" style="padding: 0.6rem 1.4rem; border-radius: 8px; font-weight: 600; cursor: pointer; background: var(--primary);">
               <i class="fa-solid fa-wand-magic-sparkles"></i> Regenerate Previews in Batches of 50
             </button>
-            <a id="downloadCsvBtn" href="/admin/tools/regenerate-previews/export-csv?scope=preview_problems" class="btn btn-outline" style="border: 1px solid var(--admin-border); color: var(--admin-text-dark); background: #FFF; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; text-decoration: none;">
+            <a id="downloadMissingCsvBtn" href="/admin/tools/regenerate-previews/export-missing-csv" class="btn btn-outline" style="border: 1.5px solid #FF7043; color: #D84315; background: #FFF; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; text-decoration: none;">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Download Designs Needing Re-upload (CSV)
+            </a>
+            <a id="downloadCsvBtn" href="/admin/tools/regenerate-previews/export-csv?scope=all" class="btn btn-outline" style="border: 1px solid var(--admin-border); color: var(--admin-text-dark); background: #FFF; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; text-decoration: none;">
               <i class="fa-solid fa-file-csv"></i> Download Audit CSV
             </a>
             <span id="processStatusText" style="font-size: 0.85rem; font-weight: 600; color: var(--admin-text-muted);"></span>
@@ -276,7 +280,7 @@
           <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; margin: 0; color: var(--admin-text-dark);" id="resultsHeader">
             Regeneration Results
           </h3>
-          <div id="resultsCounters" style="font-size: 0.85rem; display: flex; gap: 12px;"></div>
+          <div id="resultsCounters" style="font-size: 0.85rem; display: flex; gap: 12px; flex-wrap: wrap;"></div>
         </div>
 
         <div style="overflow-x: auto;">
@@ -286,7 +290,7 @@
                 <th style="width: 60px;">ID</th>
                 <th style="width: 100px;">SKU</th>
                 <th>Design Title</th>
-                <th style="width: 120px;">Status</th>
+                <th style="width: 130px;">Status</th>
                 <th>Action Details</th>
                 <th style="width: 80px; text-align: center;">Preview</th>
               </tr>
@@ -302,6 +306,7 @@
 
 <script>
 let totalUpdated = 0;
+let totalNeedsReupload = 0;
 let totalSkipped = 0;
 let totalFailed = 0;
 
@@ -311,7 +316,7 @@ function quickRepairBlouseDesigns(isDryRun) {
   if (blouseOpt) {
     catSelect.value = blouseOpt.value;
   }
-  document.getElementById('scopeSelect').value = 'preview_problems';
+  document.getElementById('scopeSelect').value = 'all';
   document.getElementById('batchSelect').value = '50';
   document.getElementById('dryRunCheck').checked = isDryRun;
   runProcess(isDryRun);
@@ -337,9 +342,10 @@ async function runProcess(isDryRun) {
   progressFill.style.width = '5%';
   tbody.innerHTML = '';
   resultsBox.style.display = 'block';
-  resultsHeader.textContent = isDryRun ? 'Dry Run Audit Simulation' : 'Live Preview Regeneration Progress';
+  resultsHeader.textContent = isDryRun ? 'Dry Run Audit Report (Clean Verification)' : 'Live Preview Regeneration Progress';
 
   totalUpdated = 0;
+  totalNeedsReupload = 0;
   totalSkipped = 0;
   totalFailed = 0;
 
@@ -348,9 +354,12 @@ async function runProcess(isDryRun) {
   const scope = document.getElementById('scopeSelect').value;
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-  // Update CSV download link
+  // Update CSV download links
   const downloadCsvBtn = document.getElementById('downloadCsvBtn');
   downloadCsvBtn.href = `/admin/tools/regenerate-previews/export-csv?scope=${encodeURIComponent(scope)}&category_id=${encodeURIComponent(categoryId)}`;
+
+  const downloadMissingCsvBtn = document.getElementById('downloadMissingCsvBtn');
+  downloadMissingCsvBtn.href = `/admin/tools/regenerate-previews/export-missing-csv?category_id=${encodeURIComponent(categoryId)}`;
 
   let offset = 0;
   let hasMore = true;
@@ -382,6 +391,7 @@ async function runProcess(isDryRun) {
       }
 
       totalUpdated += (data.updatedCount || 0);
+      totalNeedsReupload += (data.needsReuploadCount || 0);
       totalSkipped += (data.skippedCount || 0);
       totalFailed += (data.failedCount || 0);
 
@@ -389,13 +399,31 @@ async function runProcess(isDryRun) {
       if (data.items && data.items.length > 0) {
         data.items.forEach(item => {
           const tr = document.createElement('tr');
-          const badgeColor = item.status === 'regenerated' ? '#E8F5E9; color: #2E7D32;' : (item.status === 'ready' ? '#E3F2FD; color: #1565C0;' : (item.status === 'skipped' ? '#FFF3E0; color: #E65100;' : '#FFEBEE; color: #C62828;'));
+          let badgeStyle = '';
+          let badgeLabel = item.status;
+
+          if (item.status === 'regenerated') {
+            badgeStyle = 'background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7;';
+            badgeLabel = 'REGENERATED (CLEAN)';
+          } else if (item.status === 'ready') {
+            badgeStyle = 'background: #E3F2FD; color: #1565C0; border: 1px solid #90CAF9;';
+            badgeLabel = 'ORIGINAL READY';
+          } else if (item.status === 'needs_reupload') {
+            badgeStyle = 'background: #FFF3E0; color: #D84315; border: 1px solid #FFCCBC;';
+            badgeLabel = 'NEEDS RE-UPLOAD';
+          } else if (item.status === 'skipped') {
+            badgeStyle = 'background: #ECEFF1; color: #455A64; border: 1px solid #CFD8DC;';
+            badgeLabel = 'SKIPPED';
+          } else {
+            badgeStyle = 'background: #FFEBEE; color: #C62828; border: 1px solid #EF9A9A;';
+            badgeLabel = 'FAILED';
+          }
 
           tr.innerHTML = `
             <td><strong>#${item.id}</strong></td>
             <td><code style="font-size: 0.8rem;">${item.sku || 'N/A'}</code></td>
             <td><strong>${item.title}</strong></td>
-            <td><span style="background: ${badgeColor}; padding: 3px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase;">${item.status}</span></td>
+            <td><span style="${badgeStyle} padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;">${badgeLabel}</span></td>
             <td style="font-size: 0.82rem; color: #4A3E39;">${item.action}</td>
             <td style="text-align: center;">
               ${item.previewUrl ? `<img src="${item.previewUrl}" alt="thumb" style="width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: #FAF6F0; border: 1px solid #EFE6D9;" onerror="this.src='/public/images/placeholder-preview.svg'">` : '<span style="color: #999; font-size: 0.75rem;">None</span>'}
@@ -407,9 +435,10 @@ async function runProcess(isDryRun) {
 
       // Update counters
       resultsCounters.innerHTML = `
-        <span style="color: #2E7D32; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ${isDryRun ? 'Ready' : 'Updated'}: ${totalUpdated}</span>
-        <span style="color: #E65100; font-weight: 700;"><i class="fa-solid fa-forward"></i> Skipped: ${totalSkipped}</span>
-        <span style="color: #C62828; font-weight: 700;"><i class="fa-solid fa-circle-xmark"></i> Failed: ${totalFailed}</span>
+        <span style="color: #2E7D32; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ${isDryRun ? 'Originals Ready' : 'Regenerated Clean'}: ${totalUpdated}</span>
+        <span style="color: #D84315; font-weight: 700;"><i class="fa-solid fa-cloud-arrow-up"></i> Needs Re-upload: ${totalNeedsReupload}</span>
+        ${totalSkipped > 0 ? `<span style="color: #455A64; font-weight: 700;"><i class="fa-solid fa-forward"></i> Skipped: ${totalSkipped}</span>` : ''}
+        ${totalFailed > 0 ? `<span style="color: #C62828; font-weight: 700;"><i class="fa-solid fa-circle-xmark"></i> Failed: ${totalFailed}</span>` : ''}
       `;
 
       if (data.totalMatching > 0) {

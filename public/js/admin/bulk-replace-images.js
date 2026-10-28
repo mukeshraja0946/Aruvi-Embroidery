@@ -361,73 +361,40 @@
 
       this.abortController = new AbortController();
 
-      const chunkSize = 5;
-      const chunks = [];
-      for (let i = 0; i < this.selectedFiles.length; i += chunkSize) {
-        chunks.push(this.selectedFiles.slice(i, i + chunkSize));
-      }
-
       let uploadedProcessedItems = [];
-      let completedChunks = 0;
 
       try {
-        const parallelLimit = 3;
-        let activeIdx = 0;
-
-        const uploadWorker = async () => {
-          while (activeIdx < chunks.length) {
-            const currentIdx = activeIdx++;
-            const chunkFiles = chunks[currentIdx];
-
-            const formData = new FormData();
-            formData.append('_csrf', this.getCSRF());
-            chunkFiles.forEach(file => {
-              formData.append('files', file, file.name);
-            });
-
-            const res = await fetch('/admin/designs/bulk-replace/upload-chunk', {
-              method: 'POST',
-              headers: {
-                'CSRF-Token': this.getCSRF()
-              },
-              body: formData,
-              signal: this.abortController.signal
-            });
-
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              throw new Error(err.message || `Server returned error status ${res.status}`);
-            }
-
-            const data = await res.json();
-            if (data.success && data.files) {
-              data.files.forEach(pfile => {
-                uploadedProcessedItems.push({
-                  originalName: pfile.originalName,
-                  publicUrl: pfile.publicUrl || null,
-                  thumbUrl: pfile.thumbUrl || null,
-                  storageKey: pfile.storageKey || null,
-                  fileSize: pfile.fileSize,
-                  checksum: pfile.checksum,
-                  isZip: pfile.isZip || false,
-                  detectedFormats: pfile.detectedFormats || []
-                });
-              });
-            }
-
-            completedChunks++;
-            const percent = Math.round((completedChunks / chunks.length) * 85);
+        const uploader = new ChunkUploader({
+          uploadType: 'bulk-replace',
+          onProgress: (p) => {
+            const percent = p.percent ? Math.round(p.percent * 0.85) : 0;
             if (progressBar) progressBar.style.width = `${percent}%`;
             if (progressPercent) progressPercent.textContent = `${percent}%`;
-            if (progressStatus) progressStatus.textContent = `Uploaded chunk ${completedChunks} of ${chunks.length}...`;
+            if (progressStatus) progressStatus.textContent = `Uploading file ${p.processed} of ${p.total} (${percent}%)...`;
+          },
+          onItemStatusChange: (item) => {
+            if (item.status === 'assembling') {
+              if (progressStatus) progressStatus.textContent = `Validating & storing ${item.name}...`;
+            }
           }
-        };
+        });
 
-        const workers = [];
-        for (let w = 0; w < Math.min(parallelLimit, chunks.length); w++) {
-          workers.push(uploadWorker());
+        this.uploader = uploader;
+        uploader.setFiles(this.selectedFiles, true);
+
+        await uploader.start();
+
+        // Collect processed files from completed items
+        uploader.items.forEach(it => {
+          if (it.processedFile) {
+            uploadedProcessedItems.push(it.processedFile);
+          }
+        });
+
+        if (uploader.items.some(it => it.status === 'failed')) {
+          const failedCount = uploader.items.filter(it => it.status === 'failed').length;
+          console.warn(`[BulkReplace] ${failedCount} files failed upload.`);
         }
-        await Promise.all(workers);
 
         // Commit replacement in database:
         // Removes old images and ZIPs belonging to this group, sets new files active
@@ -601,6 +568,9 @@
     }
 
     cancelUpload() {
+      if (this.uploader) {
+        this.uploader.abort();
+      }
       if (this.abortController) {
         this.abortController.abort();
       }

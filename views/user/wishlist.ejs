@@ -38,9 +38,6 @@
           </button>
           <div class="card-img-container">
             <img src="<%= thumbUrl %>" alt="<%= prev?.altText || design.title %>" width="300" height="300" loading="lazy" onerror="if (this.src !== '<%= largeUrl %>' && '<%= largeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrl %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
-            <div class="watermark-overlay">
-              <span class="watermark-text">Aruvi Embroidery</span>
-            </div>
           </div>
           <div class="card-body">
             <span class="card-category"><%= design.category_name %></span>

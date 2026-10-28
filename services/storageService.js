@@ -92,12 +92,21 @@ class StorageService {
     return dir;
   }
 
+  getOriginalsDir() {
+    const dir = path.join(this.getUploadsDir(), 'private', 'originals');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    }
+    return dir;
+  }
+
   initStorageDirs() {
     try {
       this.getPreviewsDir();
       this.getCardsDir();
       this.getThumbsDir();
       this.getDesignsDir();
+      this.getOriginalsDir();
       
       // Fallback local dirs inside project root
       const defaultPreviews = path.join(defaultUploadsDir, 'previews');
@@ -530,6 +539,9 @@ class StorageService {
 
     const persistentDesigns = path.join(this.getDesignsDir(), baseName);
     if (fs.existsSync(persistentDesigns)) return persistentDesigns;
+
+    const persistentOriginals = path.join(this.getOriginalsDir(), baseName);
+    if (fs.existsSync(persistentOriginals)) return persistentOriginals;
 
     // 4. Check by filename in default project uploads
     const inDefaultPreviews = path.join(defaultUploadsDir, 'previews', baseName);

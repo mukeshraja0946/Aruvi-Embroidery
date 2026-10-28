@@ -610,17 +610,13 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Preview image file not found on server' });
     }
 
-    // Apply watermark if enabled (default ON)
+    // Clean preview download - NO watermarking step
     let outputBuffer = inputBuffer;
-    if (settings.watermark_preview_images !== '0') {
-      outputBuffer = await watermarkService.applyWatermark(inputBuffer, { format: 'png' });
-    } else {
-      const isPng = inputBuffer.length > 8 &&
-                    inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 &&
-                    inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
-      if (!isPng) {
-        outputBuffer = await sharp(inputBuffer).png({ compressionLevel: 8 }).toBuffer();
-      }
+    const isPng = inputBuffer.length > 8 &&
+                  inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 &&
+                  inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
+    if (!isPng) {
+      outputBuffer = await sharp(inputBuffer).rotate().png({ compressionLevel: 8 }).toBuffer();
     }
 
     const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();

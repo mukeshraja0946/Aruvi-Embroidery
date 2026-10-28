@@ -36,9 +36,18 @@ router.get(['/admin/api/csrf-token', '/api/csrf-token'], (req, res) => {
   });
 });
 
+const adminUploadController = require('../controllers/admin/adminUploadController');
+
 // 2. Role-Protected Admin Routes (strictly requires admin login)
 router.use('/admin', isAdmin);
 router.use('/api/admin', isAdmin);
+
+// Unified Chunk Upload Engine Routes (supports 1MB application/octet-stream and multipart chunks)
+router.post('/admin/api/upload/init', adminUploadController.initUpload);
+router.post('/admin/api/upload/chunk', upload.single('chunk'), adminUploadController.uploadChunk);
+router.post('/admin/api/upload/complete', adminUploadController.completeUpload);
+router.post('/admin/api/upload/test-health', adminUploadController.testHealth);
+router.get('/admin/api/keep-alive', adminUploadController.keepAlive);
 
 // Rate limiter for critical reset operations
 const rateLimit = require('express-rate-limit');
@@ -246,6 +255,7 @@ router.post('/admin/tools/replace-file-quick', upload.single('file'), adminTools
 router.get('/admin/tools/regenerate-previews', adminToolsController.getRegeneratePreviews);
 router.post('/admin/tools/regenerate-previews', adminToolsController.postRegeneratePreviews);
 router.get('/admin/tools/regenerate-previews/export-csv', adminToolsController.exportRegeneratePreviewsCsv);
+router.get('/admin/tools/regenerate-previews/export-missing-csv', adminToolsController.exportMissingPreviewsCsv);
 
 router.get('/admin/tools/bulk-image-relink', adminToolsController.getBulkImageRelink);
 router.get('/admin/tools/bulk-image-relink/export-report', adminToolsController.getBulkImageRelinkExport);

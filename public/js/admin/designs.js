@@ -699,6 +699,13 @@ async function compressImageForUpload(file, maxDimension = 1600, quality = 0.85)
   });
 }
 
+function toggleFileErrorDetails(id) {
+  const el = document.getElementById(`bulk-file-details-${id}`);
+  if (el) {
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
 function renderLiveFileList() {
   const listContainer = document.getElementById('bulkImageLiveList');
   if (!listContainer) return;
@@ -709,11 +716,11 @@ function renderLiveFileList() {
     let borderColor = 'var(--admin-border)';
     let statusText = item.details || 'Pending';
 
-    if (item.status === 'uploading') {
+    if (item.status === 'uploading' || item.status === 'assembling' || item.status === 'optimizing') {
       icon = '<i class="fa-solid fa-spinner fa-spin" style="color: var(--admin-primary);"></i>';
       badgeColor = '#FFF8E1';
       borderColor = '#FFE082';
-      statusText = 'Uploading...';
+      statusText = item.details || 'Uploading...';
     } else if (item.status === 'linked') {
       icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
       badgeColor = '#E8F5E9';
@@ -733,16 +740,33 @@ function renderLiveFileList() {
       borderColor = '#FFCDD2';
     }
 
+    const errObj = item.errorObj || {};
     const fullTooltip = item.details || statusText;
+
     return `
-      <div id="bulk-file-item-${item.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;" title="${escapeHtml(fullTooltip)}">
-        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42%;">
-          ${icon}
-          <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
-          <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
+      <div id="bulk-file-item-${item.id}" style="padding: 7px 10px; background: ${badgeColor}; border: 1px solid ${borderColor}; border-radius: 6px; font-size: 0.78rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer;" onclick="toggleFileErrorDetails(${item.id})">
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 48%;">
+            ${icon}
+            <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName || item.name)}</strong>
+            <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize || ''})</span>
+          </div>
+          <div style="font-size: 0.75rem; text-align: right; max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fullTooltip)}">
+            <span>${escapeHtml(statusText)}</span>
+            ${item.status === 'failed' ? '<i class="fa-solid fa-chevron-down" style="font-size: 0.68rem; margin-left: 4px; color: #C62828;"></i>' : ''}
+          </div>
         </div>
-        <div style="font-size: 0.75rem; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fullTooltip)}">
-          <span>${escapeHtml(statusText)}</span>
+        <div id="bulk-file-details-${item.id}" style="display: ${item.status === 'failed' ? 'block' : 'none'}; margin-top: 6px; padding: 6px 8px; background: #FFF; border: 1px solid #FFCDD2; border-left: 3px solid #C62828; border-radius: 4px; line-height: 1.45; word-break: break-word; font-size: 0.74rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+            <span style="font-weight: 700; color: #B71C1C;">Stage: ${escapeHtml(item.stage || errObj.stage || 'Upload Stage')}</span>
+            <span style="background: #C62828; color: #FFF; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 0.7rem;">HTTP ${escapeHtml(String(errObj.status || (item.status === 'failed' ? 'ERR' : 'OK')))}</span>
+          </div>
+          <div style="color: #B71C1C; margin-bottom: 3px;">
+            <strong>Error:</strong> ${escapeHtml(errObj.message || item.details || 'Processing error')}${item.referenceId ? ` <span style="color: #666; font-size: 0.7rem;">[Ref: ${escapeHtml(item.referenceId)}]</span>` : ''}
+          </div>
+          <div style="color: #2E7D32; background: #F1F8E9; padding: 3px 6px; border-radius: 3px;">
+            <i class="fa-solid fa-lightbulb"></i> <strong>Action:</strong> ${escapeHtml(errObj.suggestedAction || 'Check file format and re-upload.')}
+          </div>
         </div>
       </div>
     `;
@@ -763,11 +787,11 @@ function updateLiveItemRow(item) {
   let borderColor = 'var(--admin-border)';
   let statusText = item.details || 'Pending';
 
-  if (item.status === 'uploading') {
+  if (item.status === 'uploading' || item.status === 'assembling' || item.status === 'optimizing') {
     icon = '<i class="fa-solid fa-spinner fa-spin" style="color: var(--admin-primary);"></i>';
     badgeColor = '#FFF8E1';
     borderColor = '#FFE082';
-    statusText = 'Uploading...';
+    statusText = item.details || 'Uploading...';
   } else if (item.status === 'linked') {
     icon = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
     badgeColor = '#E8F5E9';
@@ -787,18 +811,34 @@ function updateLiveItemRow(item) {
     borderColor = '#FFCDD2';
   }
 
+  const errObj = item.errorObj || {};
   const fullTooltip = item.details || statusText;
   el.style.background = badgeColor;
   el.style.border = `1px solid ${borderColor}`;
-  el.setAttribute('title', fullTooltip);
+
   el.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42%;">
-      ${icon}
-      <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName)}</strong>
-      <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize})</span>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer;" onclick="toggleFileErrorDetails(${item.id})">
+      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 48%;">
+        ${icon}
+        <strong style="color: var(--admin-text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(item.originalName || item.name)}</strong>
+        <span style="color: var(--admin-text-muted); font-size: 0.72rem;">(${item.formattedSize || ''})</span>
+      </div>
+      <div style="font-size: 0.75rem; text-align: right; max-width: 52%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fullTooltip)}">
+        <span>${escapeHtml(statusText)}</span>
+        ${item.status === 'failed' ? '<i class="fa-solid fa-chevron-down" style="font-size: 0.68rem; margin-left: 4px; color: #C62828;"></i>' : ''}
+      </div>
     </div>
-    <div style="font-size: 0.75rem; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fullTooltip)}">
-      <span>${escapeHtml(statusText)}</span>
+    <div id="bulk-file-details-${item.id}" style="display: ${item.status === 'failed' ? 'block' : 'none'}; margin-top: 6px; padding: 6px 8px; background: #FFF; border: 1px solid #FFCDD2; border-left: 3px solid #C62828; border-radius: 4px; line-height: 1.45; word-break: break-word; font-size: 0.74rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+        <span style="font-weight: 700; color: #B71C1C;">Stage: ${escapeHtml(item.stage || errObj.stage || 'Upload Stage')}</span>
+        <span style="background: #C62828; color: #FFF; font-weight: 700; padding: 1px 6px; border-radius: 3px; font-size: 0.7rem;">HTTP ${escapeHtml(String(errObj.status || (item.status === 'failed' ? 'ERR' : 'OK')))}</span>
+      </div>
+      <div style="color: #B71C1C; margin-bottom: 3px;">
+        <strong>Error:</strong> ${escapeHtml(errObj.message || item.details || 'Processing error')}${item.referenceId ? ` <span style="color: #666; font-size: 0.7rem;">[Ref: ${escapeHtml(item.referenceId)}]</span>` : ''}
+      </div>
+      <div style="color: #2E7D32; background: #F1F8E9; padding: 3px 6px; border-radius: 3px;">
+        <i class="fa-solid fa-lightbulb"></i> <strong>Action:</strong> ${escapeHtml(errObj.suggestedAction || 'Check file format and re-upload.')}
+      </div>
     </div>
   `;
 }
@@ -850,51 +890,6 @@ async function startChunkedBulkImageUpload() {
     return;
   }
 
-  // Refresh and verify CSRF and Admin session before launching upload
-  const csrfData = await fetchFreshCsrfToken();
-  if (csrfData && csrfData.isAuthenticated === false) {
-    alert('Your admin session has expired or the server was restarted. Please open a new tab, log in to the admin panel, then return here to click Start Chunked Upload.');
-    bulkUploadState.isUploading = false;
-    return;
-  }
-
-  bulkUploadState.isUploading = true;
-  bulkUploadState.isCancelled = false;
-  recalculateStats();
-
-  // Build adaptive batches (max 2 items OR max 4MB per request to guarantee Hostinger payload limit safety)
-  const MAX_BATCH_BYTES = 4 * 1024 * 1024;
-  const MAX_BATCH_ITEMS = 2;
-  const batches = [];
-  let currentBatchItems = [];
-  let currentBatchBytes = 0;
-
-  for (const item of pendingItems) {
-    const itemSize = item.size || (item.file ? item.file.size : 0) || 0;
-    const wouldExceedSize = (currentBatchBytes + itemSize > MAX_BATCH_BYTES) && currentBatchItems.length > 0;
-    const wouldExceedCount = currentBatchItems.length >= MAX_BATCH_ITEMS;
-
-    if (wouldExceedSize || wouldExceedCount) {
-      batches.push({
-        id: batches.length + 1,
-        items: currentBatchItems,
-        retries: 0
-      });
-      currentBatchItems = [];
-      currentBatchBytes = 0;
-    }
-    currentBatchItems.push(item);
-    currentBatchBytes += itemSize;
-  }
-  if (currentBatchItems.length > 0) {
-    batches.push({
-      id: batches.length + 1,
-      items: currentBatchItems,
-      retries: 0
-    });
-  }
-  bulkUploadState.batches = batches;
-
   // Toggle UI visibility
   document.getElementById('bulkImageFileSelectSection').style.display = 'none';
   document.getElementById('bulkImagePreUploadSummary').style.display = 'none';
@@ -905,294 +900,137 @@ async function startChunkedBulkImageUpload() {
   document.getElementById('bulkImageCancelCloseBtn').style.display = 'none';
   document.getElementById('bulkImageAbortBtn').style.display = 'inline-flex';
 
+  const pausedBanner = document.getElementById('bulkImagePausedBanner');
+  if (pausedBanner) pausedBanner.style.display = 'none';
+
   const statusBadge = document.getElementById('bulkImageStatusBadge');
   if (statusBadge) {
-    statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading batches...';
+    statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking health & uploading...';
     statusBadge.style.color = 'var(--admin-primary)';
   }
 
   renderLiveFileList();
   updateProgressCounters();
 
-  // Launch worker pool with max configured concurrent streams (default 2)
-  const workerCount = Math.min(bulkUploadState.maxConcurrency, batches.length);
-  const workerPromises = [];
-  for (let w = 0; w < workerCount; w++) {
-    workerPromises.push(runBatchWorker());
-  }
+  const shouldOptimize = document.getElementById('bulkImageOptimizeToggle')?.checked ?? true;
 
-  await Promise.all(workerPromises);
-  onBulkUploadFinished();
-}
-
-async function runBatchWorker() {
-  while (bulkUploadState.batches.length > 0 && !bulkUploadState.isCancelled) {
-    const batch = bulkUploadState.batches.shift();
-    if (!batch) break;
-
-    bulkUploadState.activeStreams++;
-    updateProgressCounters();
-
-    await processSingleBatch(batch);
-
-    bulkUploadState.activeStreams--;
-    updateProgressCounters();
-  }
-}
-
-async function processSingleBatch(batch) {
-  if (bulkUploadState.isCancelled) return;
-
-  // Mark all items in this batch as uploading
-  batch.items.forEach(it => {
-    it.status = 'uploading';
-    it.details = `Uploading batch #${batch.id}...`;
-    updateLiveItemRow(it);
+  // Initialize unified ChunkUploader
+  const uploader = new ChunkUploader({
+    uploadType: 'bulk-restore',
+    onItemStatusChange: (chunkItem) => {
+      // Find corresponding item in bulkUploadState.items
+      const original = bulkUploadState.items.find(it => it.originalName === chunkItem.name || it.id === chunkItem.id);
+      if (original) {
+        original.status = chunkItem.status;
+        original.details = chunkItem.details;
+        original.stage = chunkItem.stage;
+        original.referenceId = chunkItem.referenceId;
+        original.errorObj = chunkItem.errorObj;
+        original.formattedSize = chunkItem.formattedSize;
+        if (chunkItem.matchedDesign) original.matchedDesign = chunkItem.matchedDesign;
+        if (chunkItem.candidates) original.candidates = chunkItem.candidates;
+        if (chunkItem.suggestions) original.suggestions = chunkItem.suggestions;
+        if (chunkItem.tempToken) original.tempToken = chunkItem.tempToken;
+        updateLiveItemRow(original);
+      }
+      bulkUploadState.activeStreams = uploader.activeWorkers;
+      recalculateStats();
+      updateProgressCounters();
+    },
+    onProgress: () => {
+      bulkUploadState.activeStreams = uploader.activeWorkers;
+      recalculateStats();
+      updateProgressCounters();
+    },
+    onPaused: (reason) => {
+      const banner = document.getElementById('bulkImagePausedBanner');
+      const reasonEl = document.getElementById('bulkImagePausedReason');
+      if (banner) banner.style.display = 'block';
+      if (reasonEl) reasonEl.textContent = reason || 'Upload paused.';
+      if (statusBadge) {
+        statusBadge.innerHTML = '<i class="fa-solid fa-circle-pause"></i> Upload Paused';
+        statusBadge.style.color = '#E65100';
+      }
+      bulkUploadState.activeStreams = 0;
+      updateProgressCounters();
+    },
+    onResumed: () => {
+      const banner = document.getElementById('bulkImagePausedBanner');
+      if (banner) banner.style.display = 'none';
+      if (statusBadge) {
+        statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resumed uploading...';
+        statusBadge.style.color = 'var(--admin-primary)';
+      }
+    },
+    onFinished: () => {
+      bulkUploadState.activeStreams = 0;
+      updateProgressCounters();
+      onBulkUploadFinished();
+    },
+    onError: (err, meta) => {
+      console.error('[Bulk Restore] Uploader critical error:', err, meta);
+      alert(`Upload blocked: ${err.message}\n\nSuggested Action: ${meta?.suggestedAction || 'Check health status.'}`);
+    }
   });
 
-  const controller = new AbortController();
-  bulkUploadState.activeControllers.add(controller);
+  bulkUploadState.uploader = uploader;
+  bulkUploadState.isUploading = true;
+  bulkUploadState.isCancelled = false;
 
-  // 60-second request timeout per batch
-  const timeoutId = setTimeout(() => {
-    controller.abort(new Error('Batch request timed out after 60 seconds'));
-  }, bulkUploadState.batchTimeoutMs);
+  // Pass files to uploader
+  const filesToUpload = pendingItems.map(it => it.file);
+  uploader.setFiles(filesToUpload, shouldOptimize);
 
-  try {
-    let currentToken = getCsrfToken();
-    if (!currentToken) {
-      const freshData = await fetchFreshCsrfToken();
-      currentToken = typeof freshData === 'string' ? freshData : freshData?.csrfToken;
+  // Sync internal items back to bulkUploadState.items
+  uploader.items.forEach((uItem, i) => {
+    if (pendingItems[i]) {
+      pendingItems[i].chunkUploaderItem = uItem;
+      uItem.id = pendingItems[i].id;
     }
+  });
 
-    const formData = new FormData();
-    formData.append('_csrf', currentToken || '');
-    formData.append('confirmed_mappings', JSON.stringify(bulkUploadState.confirmedMappings || {}));
+  await uploader.start();
+}
 
-    // Process files through browser compressor before attaching to FormData
-    for (const item of batch.items) {
-      const fileToUpload = await compressImageForUpload(item.file);
-      formData.append('images', fileToUpload, item.originalName);
-    }
+function resumeBulkUpload() {
+  if (bulkUploadState.uploader && bulkUploadState.uploader.isPaused) {
+    bulkUploadState.uploader.resume();
+  }
+}
 
-    let res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(currentToken || ''), {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': currentToken || ''
-      },
-      body: formData,
-      signal: controller.signal
+function copyBulkErrorDetails() {
+  if (bulkUploadState.uploader) {
+    bulkUploadState.uploader.copyErrorDetails().then(ok => {
+      alert(ok ? 'Error details copied to clipboard!' : 'Failed to copy error details to clipboard.');
     });
-
-    clearTimeout(timeoutId);
-    bulkUploadState.activeControllers.delete(controller);
-
-    let rawText = '';
-    let parsedBody = null;
-
-    if (!res.ok) {
-      try {
-        rawText = await res.text();
-        parsedBody = JSON.parse(rawText);
-      } catch (e) {}
-
-      // If rejected with 403 (e.g. CSRF token mismatch), try refreshing CSRF token once and retry batch
-      if (res.status === 403 && !batch.hasRefreshedCsrf) {
-        batch.hasRefreshedCsrf = true;
-        console.warn(`[Batch #${batch.id} 403 Alert]: Token rejected. Refreshing CSRF token from server...`);
-        const freshData = await fetchFreshCsrfToken();
-        const freshToken = typeof freshData === 'string' ? freshData : freshData?.csrfToken;
-        if (freshToken && freshToken !== currentToken) {
-          currentToken = freshToken;
-          formData.set('_csrf', freshToken);
-          res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(freshToken), {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
-              'X-CSRF-Token': freshToken
-            },
-            body: formData,
-            signal: controller.signal
-          });
-          if (res.ok) {
-            parsedBody = null;
-            rawText = '';
-          } else {
-            try {
-              rawText = await res.text();
-              parsedBody = JSON.parse(rawText);
-            } catch (e) {}
-          }
-        }
-      }
-
-      if (!res.ok) {
-        let stage = 'Upload Request Stage';
-        let suggestedAction = 'Please try again.';
-        let errMsg = parsedBody?.message || parsedBody?.error?.message;
-
-        if (res.status === 401) {
-          stage = 'Authentication Stage';
-          errMsg = errMsg || 'Admin session expired.';
-          suggestedAction = 'Log into Admin in another tab, then click Retry Failed.';
-        } else if (res.status === 403) {
-          stage = 'CSRF Security / Permission Stage';
-          errMsg = errMsg || 'Security token mismatch or unauthorized request.';
-          suggestedAction = 'Ensure you are logged in as admin. Refresh page or re-login if session timed out.';
-        } else if (res.status === 413) {
-          stage = 'Payload Size Stage';
-          errMsg = errMsg || 'Uploaded batch exceeds server limit.';
-          suggestedAction = 'Enable "Optimize images in browser" toggle or upload smaller images.';
-        } else if (res.status === 504 || res.status === 408) {
-          stage = 'Gateway Timeout Stage';
-          errMsg = errMsg || 'Server took too long to process images.';
-          suggestedAction = 'Temporary server delay. Will automatically retry with backoff.';
-        } else if (res.status === 502 || res.status === 503) {
-          stage = 'Server Availability Stage';
-          errMsg = errMsg || 'Server temporarily restarting or unavailable.';
-          suggestedAction = 'Wait a few seconds for server to resume, then retry.';
-        } else if (res.status >= 500) {
-          stage = 'Server Processing Stage';
-          errMsg = errMsg || `Server internal error (HTTP ${res.status}).`;
-          suggestedAction = 'Check server logs for database or storage error details.';
-        } else {
-          errMsg = errMsg || (rawText && !rawText.includes('<html') ? rawText.slice(0, 150) : `Server returned HTTP ${res.status}`);
-        }
-
-        const isPermanent = [400, 401, 403, 404, 413, 415, 422].includes(res.status);
-        const batchErr = new Error(errMsg);
-        batchErr.isPermanent = isPermanent;
-        batchErr.status = res.status;
-        batchErr.stage = stage;
-        batchErr.suggestedAction = suggestedAction;
-        throw batchErr;
-      }
-    }
-
-    const data = parsedBody || (await res.json());
-
-    // Map response to batch items
-    const matchedList = data.matched || [];
-    const ambiguousList = data.ambiguous || [];
-    const unmatchedList = data.unmatched || [];
-    const failedList = data.failed || [];
-
-    batch.items.forEach(item => {
-      const matched = matchedList.find(m => m.filename.toLowerCase() === item.originalName.toLowerCase());
-      const ambiguous = ambiguousList.find(a => a.filename.toLowerCase() === item.originalName.toLowerCase());
-      const unmatched = unmatchedList.find(u => u.filename.toLowerCase() === item.originalName.toLowerCase());
-      const failed = failedList.find(f => f.filename.toLowerCase() === item.originalName.toLowerCase());
-
-      if (matched) {
-        item.status = 'linked';
-        item.details = `Linked to #${matched.designId} (${matched.sku || matched.title})`;
-        item.matchedDesign = matched;
-      } else if (ambiguous) {
-        item.status = 'ambiguous';
-        item.tempToken = ambiguous.tempToken;
-        item.candidates = ambiguous.candidates || [];
-        item.details = ambiguous.reason || 'Multiple candidate designs found';
-      } else if (unmatched) {
-        item.status = 'unmatched';
-        item.tempToken = unmatched.tempToken;
-        item.suggestions = unmatched.suggestions || [];
-        item.details = unmatched.reason || 'No matching product found';
-      } else if (failed) {
-        item.status = 'failed';
-        item.details = `[${failed.stage || 'Processing'}] ${failed.error || 'Upload error'}`;
-        item.referenceId = failed.referenceId;
-        item.errorObj = {
-          status: 'SERVER_PROCESSED',
-          message: failed.error || 'Upload error',
-          stage: failed.stage || 'Validation / Storage Stage',
-          suggestedAction: failed.suggestedAction || 'Check image format and database.',
-          referenceId: failed.referenceId,
-          filename: item.originalName
-        };
-      } else {
-        item.status = 'unmatched';
-        item.details = 'No product matched';
-      }
-
-      updateLiveItemRow(item);
-    });
-
-    recalculateStats();
-    updateProgressCounters();
-
-  } catch (err) {
-    clearTimeout(timeoutId);
-    bulkUploadState.activeControllers.delete(controller);
-
-    if (bulkUploadState.isCancelled) {
-      batch.items.forEach(item => {
-        item.status = 'failed';
-        item.details = 'Cancelled by user';
-        item.errorObj = { status: 'CANCELLED', message: 'Cancelled by user', stage: 'User Action', suggestedAction: 'Re-upload if desired.' };
-        updateLiveItemRow(item);
-      });
-      recalculateStats();
-      updateProgressCounters();
+  } else {
+    const failed = bulkUploadState.items.filter(it => it.status === 'failed');
+    if (failed.length === 0) {
+      alert('No failed files.');
       return;
     }
-
-    const stage = err.stage || 'Upload Stage';
-    const action = err.suggestedAction || 'Check file format and retry.';
-    const statusCode = err.status || (err.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR');
-
-    // Do NOT automatically retry permanent client / authorization / size errors
-    if (err.isPermanent) {
-      console.warn(`[Bulk Upload Batch #${batch.id} Permanent Error] [${stage}] HTTP ${statusCode}:`, err.message);
-      batch.items.forEach(item => {
-        item.status = 'failed';
-        item.details = `[${stage}] HTTP ${statusCode}: ${err.message}`;
-        item.errorObj = {
-          status: statusCode,
-          message: err.message,
-          stage: stage,
-          suggestedAction: action,
-          filename: item.originalName
-        };
-        updateLiveItemRow(item);
-      });
-      recalculateStats();
-      updateProgressCounters();
-      return;
-    }
-
-    console.warn(`[Bulk Upload Batch #${batch.id} Transient Failure]:`, err.message);
-
-    // Auto-retry up to 3 times ONLY for temporary network / 5xx / 429 server errors with progressive backoff
-    if (batch.retries < 3) {
-      batch.retries++;
-      const delayMs = batch.retries * 1500;
-      batch.items.forEach(item => {
-        item.details = `Retry ${batch.retries}/3 in ${Math.round(delayMs / 1000)}s (${err.message})...`;
-        updateLiveItemRow(item);
-      });
-      await new Promise(r => setTimeout(r, delayMs));
-      bulkUploadState.batches.unshift(batch); // Put back to front of queue
-      return;
-    }
-
-    // Retries exhausted: mark items as failed
-    batch.items.forEach(item => {
-      item.status = 'failed';
-      item.details = `Failed after 3 retries [${stage}] HTTP ${statusCode}: ${err.message}`;
-      item.errorObj = {
-        status: statusCode,
-        message: err.message,
-        stage: stage,
-        suggestedAction: action,
-        filename: item.originalName
-      };
-      updateLiveItemRow(item);
+    const text = failed.map((it, idx) => {
+      const err = it.errorObj || {};
+      return `[${idx + 1}] File: ${it.originalName || it.name} (${it.formattedSize})\n` +
+             `    Status: HTTP ${err.status || 'FAIL'}\n` +
+             `    Stage: ${it.stage || err.stage || 'N/A'}\n` +
+             `    Ref ID: ${it.referenceId || err.referenceId || 'N/A'}\n` +
+             `    Error: ${err.message || it.details}\n` +
+             `    Action: ${err.suggestedAction || 'Check file and re-upload'}`;
+    }).join('\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Error details copied to clipboard!');
+    }).catch(() => {
+      alert('Could not copy to clipboard.');
     });
-    recalculateStats();
-    updateProgressCounters();
+  }
+}
+
+function downloadBulkErrorCsv() {
+  if (bulkUploadState.uploader) {
+    bulkUploadState.uploader.downloadErrorReportCsv(`bulk_restore_errors_${Date.now()}.csv`);
+  } else {
+    downloadBulkUploadReportCsv();
   }
 }
 
@@ -1200,12 +1038,12 @@ function abortBulkImageUpload() {
   bulkUploadState.isCancelled = true;
   bulkUploadState.isUploading = false;
 
-  // Active cancellation via AbortControllers
-  bulkUploadState.activeControllers.forEach(ctrl => {
-    try { ctrl.abort(); } catch (e) {}
-  });
-  bulkUploadState.activeControllers.clear();
-  bulkUploadState.batches = [];
+  if (bulkUploadState.uploader) {
+    bulkUploadState.uploader.abort();
+  }
+
+  const pausedBanner = document.getElementById('bulkImagePausedBanner');
+  if (pausedBanner) pausedBanner.style.display = 'none';
 
   const statusBadge = document.getElementById('bulkImageStatusBadge');
   if (statusBadge) {
@@ -1213,17 +1051,16 @@ function abortBulkImageUpload() {
     statusBadge.style.color = '#C62828';
   }
 
-  // Update in-progress items
   bulkUploadState.items.forEach(it => {
-    if (it.status === 'uploading' || it.status === 'pending') {
+    if (it.status === 'uploading' || it.status === 'pending' || it.status === 'assembling') {
       it.status = 'failed';
       it.details = 'Cancelled by user';
-      bulkUploadState.stats.failed++;
-      bulkUploadState.stats.processed++;
+      it.errorObj = { status: 'CANCELLED', message: 'Cancelled by user', stage: 'User Action', suggestedAction: 'Re-upload if desired.' };
       updateLiveItemRow(it);
     }
   });
 
+  recalculateStats();
   updateProgressCounters();
   onBulkUploadFinished();
 }
@@ -1912,12 +1749,6 @@ async function startChunkedAssetUpload() {
 
   const allFiles = Array.from(input.files);
   const totalFiles = allFiles.length;
-  const batchSize = 8;
-  const batches = [];
-
-  for (let i = 0; i < totalFiles; i += batchSize) {
-    batches.push(allFiles.slice(i, i + batchSize));
-  }
 
   const startBtn = document.getElementById('startAssetUploadBtn');
   const cancelBtn = document.getElementById('cancelAssetUploadBtn');
@@ -1930,83 +1761,47 @@ async function startChunkedAssetUpload() {
   cancelBtn.style.display = 'inline-flex';
   progressContainer.style.display = 'block';
 
-  isAssetUploading = true;
-  assetUploadAbortController = new AbortController();
-
   let uploadedFilesCount = 0;
   let totalMatchedImgs = 0;
   let totalMatchedZIPs = 0;
   let totalUnmatched = 0;
 
-  const concurrency = 3;
-  let currentBatchIndex = 0;
-
-  async function uploadSingleBatch(batch, batchIdx) {
-    if (!isAssetUploading) return;
-    const formData = new FormData();
-    formData.append('batchId', currentImportBatchId);
-    batch.forEach(f => formData.append('assets', f));
-
-    let attempts = 0;
-    let success = false;
-    let resultData = null;
-
-    while (attempts < 3 && !success && isAssetUploading) {
-      attempts++;
-      try {
-        const res = await fetch('/admin/designs/import-upload-assets', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-Token': getCsrfToken()
-          },
-          body: formData,
-          signal: assetUploadAbortController.signal
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          success = true;
-          resultData = data;
-        } else {
-          console.warn(`Batch ${batchIdx + 1} attempt ${attempts} failed:`, data.message);
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-        console.warn(`Batch ${batchIdx + 1} attempt ${attempts} error:`, err);
-      }
-    }
-
-    if (success && resultData) {
-      uploadedFilesCount += batch.length;
-      totalMatchedImgs = resultData.totalMatchedImages || totalMatchedImgs;
-      totalMatchedZIPs = resultData.totalMatchedFiles || totalMatchedZIPs;
-      if (resultData.results) {
-        totalUnmatched += resultData.results.filter(r => r.status === 'unmatched').length;
-      }
-
-      const pct = Math.min(100, Math.round((uploadedFilesCount / totalFiles) * 100));
+  const uploader = new ChunkUploader({
+    uploadType: 'import-asset',
+    onProgress: (p) => {
+      const pct = p.percent || 0;
       progressBar.style.width = pct + '%';
       percentText.textContent = pct + '%';
-      statusText.textContent = `Uploaded ${uploadedFilesCount} / ${totalFiles} asset files...`;
+      statusText.textContent = `Uploaded ${p.processed} / ${p.total} asset files (${pct}%)...`;
+    },
+    onItemStatusChange: (item) => {
+      if (item.status === 'assembling') {
+        statusText.textContent = `Matching ${item.name} with spreadsheet rows...`;
+      }
     }
-  }
+  });
 
-  async function worker() {
-    while (currentBatchIndex < batches.length && isAssetUploading) {
-      const idx = currentBatchIndex++;
-      await uploadSingleBatch(batches[idx], idx);
+  uploader.options.batchId = currentImportBatchId;
+  window.assetChunkUploader = uploader;
+  uploader.setFiles(allFiles, true);
+
+  await uploader.start();
+
+  // Gather results from completed items
+  uploader.items.forEach(it => {
+    if (it.completeResult) {
+      const res = it.completeResult;
+      totalMatchedImgs = res.totalMatchedImages || totalMatchedImgs;
+      totalMatchedZIPs = res.totalMatchedFiles || totalMatchedZIPs;
+      if (res.results) {
+        totalUnmatched += res.results.filter(r => r.status === 'unmatched').length;
+      }
     }
-  }
+    if (it.status !== 'failed') {
+      uploadedFilesCount++;
+    }
+  });
 
-  const workers = [];
-  for (let w = 0; w < Math.min(concurrency, batches.length); w++) {
-    workers.push(worker());
-  }
-
-  await Promise.all(workers);
-
-  isAssetUploading = false;
   startBtn.disabled = false;
   cancelBtn.style.display = 'none';
 
@@ -2018,8 +1813,9 @@ async function startChunkedAssetUpload() {
 }
 
 function cancelAssetUpload() {
-  isAssetUploading = false;
-  if (assetUploadAbortController) assetUploadAbortController.abort();
+  if (window.assetChunkUploader) {
+    window.assetChunkUploader.abort();
+  }
   document.getElementById('cancelAssetUploadBtn').style.display = 'none';
   document.getElementById('startAssetUploadBtn').disabled = false;
   document.getElementById('assetUploadStatusText').textContent = 'Upload cancelled by user.';

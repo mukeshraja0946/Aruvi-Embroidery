@@ -88,7 +88,9 @@ class Design {
           whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) > 0 OR COALESCE(d.stitch_count_front, 0) > 0 OR COALESCE(d.stitch_count_back, 0) > 0 OR COALESCE(d.stitch_count_sleeve, 0) > 0)');
         }
 
-        if (activePreviewFilter === 'problems') {
+        if (activePreviewFilter === 'needs_reupload') {
+          whereClause.push('d.needs_reupload = 1');
+        } else if (activePreviewFilter === 'problems') {
           whereClause.push('((d.primary_image IS NULL OR d.thumbnail_image IS NULL OR NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1) OR (SELECT COUNT(*) FROM design_images di2 WHERE di2.design_id = d.id AND di2.is_primary = 1) != 1) AND (d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di3 WHERE di3.design_id = d.id)))');
         } else if (activePreviewFilter === 'missing_thumb') {
           whereClause.push('((d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id)) AND (d.thumbnail_image IS NULL OR d.thumbnail_image = \'\' OR EXISTS (SELECT 1 FROM design_images di2 WHERE di2.design_id = d.id AND (di2.is_primary = 1 OR di2.display_order = 0) AND (di2.thumb_key IS NULL OR di2.thumb_key = \'\'))))');
@@ -268,7 +270,9 @@ class Design {
       filtered = filtered.filter(d => (d.stitch_count_total && Number(d.stitch_count_total) > 0) || (d.stitch_count_front && Number(d.stitch_count_front) > 0) || (d.stitch_count_back && Number(d.stitch_count_back) > 0) || (d.stitch_count_sleeve && Number(d.stitch_count_sleeve) > 0));
     }
 
-    if (activePreviewFilter === 'problems' || activePreviewFilter === 'missing_thumb') {
+    if (activePreviewFilter === 'needs_reupload') {
+      filtered = filtered.filter(d => d.needs_reupload == 1 || d.needs_reupload === true);
+    } else if (activePreviewFilter === 'problems' || activePreviewFilter === 'missing_thumb') {
       filtered = filtered.filter(d => {
         const prev = previewService.getPrimaryPreview(d);
         return prev.hasPreview && !prev.has_thumbnail;
@@ -929,6 +933,8 @@ class Design {
         { name: 'reviews_count', def: 'INT NOT NULL DEFAULT 120' },
         { name: 'import_image_filename', def: 'VARCHAR(255) NULL DEFAULT NULL' },
         { name: 'import_zip_filename', def: 'VARCHAR(255) NULL DEFAULT NULL' },
+        { name: 'needs_reupload', def: 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_active`' },
+        { name: 'original_image_url', def: 'VARCHAR(500) NULL DEFAULT NULL AFTER `primary_image`' },
         { name: 'deleted_at', def: 'DATETIME NULL DEFAULT NULL' }
       ];
 

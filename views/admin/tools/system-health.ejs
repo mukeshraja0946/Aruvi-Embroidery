@@ -349,6 +349,27 @@
         </div>
       </div>
 
+      <!-- Upload Route & Persistent Storage Health Check Card -->
+      <div style="background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+          <div>
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--admin-text); display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-cloud-arrow-up" style="color: #0284C7;"></i> Upload Route & Persistent Storage Health Check
+            </h3>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #666;">
+              Test end-to-end chunked upload routes, CSRF token acceptance, admin session persistence, UPLOAD_DIR write permissions, and Sharp processor mode.
+            </p>
+          </div>
+          <button type="button" id="btnTestUpload" onclick="runUploadRouteTest()" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1.25rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #0284C7; border-color: #0284C7; color: #FFF; font-weight: 700;">
+            <i class="fa-solid fa-vial"></i> Test Upload Route
+          </button>
+        </div>
+
+        <div id="uploadTestResultsContainer" style="display: none; margin-top: 1rem; border-top: 1px solid #ECEFF1; padding-top: 1rem;">
+          <!-- Dynamically populated by runUploadRouteTest -->
+        </div>
+      </div>
+
       <!-- Missing Items Alert (if any) -->
       <% if (!health.isHealthy) { %>
         <div style="background: #FFFFFF; border: 2px solid #FFCDD2; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
@@ -507,6 +528,109 @@ function filterTables() {
       row.style.display = 'none';
     }
   });
+}
+
+async function runUploadRouteTest() {
+  const btn = document.getElementById('btnTestUpload');
+  const container = document.getElementById('uploadTestResultsContainer');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Probing Upload Route...';
+  container.style.display = 'block';
+  container.innerHTML = '<div style="color: #666; font-size: 0.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> Testing route, CSRF, admin session, and persistent storage write permissions...</div>';
+
+  try {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    const token = meta ? meta.getAttribute('content') : (window.CSRF_TOKEN || '');
+    const res = await fetch('/admin/api/upload/test-health', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': token
+      },
+      body: JSON.stringify({ _csrf: token })
+    });
+
+    const data = await res.json();
+    const checks = data.checks || {};
+
+    const passBadge = '<span style="color: #2E7D32; font-weight: 700; background: #E8F5E9; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-circle-check"></i> PASS</span>';
+    const failBadge = '<span style="color: #C62828; font-weight: 700; background: #FFEBEE; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-circle-xmark"></i> FAIL</span>';
+    const warnBadge = '<span style="color: #E65100; font-weight: 700; background: #FFF3E0; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-triangle-exclamation"></i> FALLBACK</span>';
+
+    container.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 12px;">
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Route Accessibility:</strong>
+            ${checks.route?.status === 'pass' ? passBadge : failBadge}
+          </div>
+          <div style="font-size: 0.76rem; color: #666;">HTTP ${checks.route?.code || 200} OK (/admin/api/upload/test-health)</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">CSRF Header Acceptance:</strong>
+            ${checks.csrf?.status === 'pass' ? passBadge : failBadge}
+          </div>
+          <div style="font-size: 0.76rem; color: #666;">X-CSRF-Token verified successfully</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Session Persistence:</strong>
+            ${checks.session?.status === 'pass' ? passBadge : failBadge}
+          </div>
+          <div style="font-size: 0.76rem; color: #666;">Active Admin: ${escapeHtml(checks.session?.user || 'Active')}</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Storage Directory (UPLOAD_DIR):</strong>
+            ${checks.storageWritable?.status === 'pass' ? passBadge : failBadge}
+          </div>
+          <div style="font-size: 0.74rem; color: #666; font-family: monospace; word-break: break-all;">${escapeHtml(checks.storageWritable?.path || 'N/A')}</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Previews Directory:</strong>
+            ${checks.previewsWritable?.status === 'pass' ? passBadge : failBadge}
+          </div>
+          <div style="font-size: 0.74rem; color: #666; font-family: monospace; word-break: break-all;">${escapeHtml(checks.previewsWritable?.path || 'N/A')}</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Image Processor (Sharp):</strong>
+            ${checks.sharpAvailable?.status === 'pass' ? passBadge : warnBadge}
+          </div>
+          <div style="font-size: 0.76rem; color: #666;">Mode: ${escapeHtml(checks.sharpAvailable?.mode || 'Native')}</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Max Payload Limit:</strong>
+            ${passBadge}
+          </div>
+          <div style="font-size: 0.76rem; color: #666;">${escapeHtml(checks.maxBodySize || '10MB raw / 50MB batch')}</div>
+        </div>
+      </div>
+      <div style="font-size: 0.82rem; padding: 8px 12px; border-radius: 6px; background: ${data.success ? '#E8F5E9' : '#FFEBEE'}; color: ${data.success ? '#1B5E20' : '#B71C1C'}; font-weight: 600;">
+        <i class="fa-solid ${data.success ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i> ${escapeHtml(data.summary || 'Test complete')} [Ref: ${escapeHtml(data.referenceId || '')}]
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color: #C62828; font-size: 0.84rem; padding: 10px; background: #FFEBEE; border-radius: 6px;"><strong>Test probe failed:</strong> ${escapeHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-vial"></i> Test Upload Route';
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 </script>
 

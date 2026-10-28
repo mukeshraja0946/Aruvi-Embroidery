@@ -125,7 +125,10 @@ const fallbackSettings = {
   show_stitch_total: '1',
   label_stitch_total: 'Total Stitch Count',
   show_stitch_on_cards: '0',
-  require_checkout_address: '0'
+  require_checkout_address: '0',
+  watermark_enabled: '0',
+  watermark_position: 'center',
+  watermark_opacity: '25'
 };
 
 class Setting {

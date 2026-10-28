@@ -714,16 +714,36 @@
               </label>
             </div>
 
+            <!-- Optional PNG Logo Watermark (Default: OFF) -->
             <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; grid-column: span 2;">
-              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.8rem;">
                 <div>
                   <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">
-                    <i class="fa-solid fa-stamp" style="color: #007791; margin-right: 5px;"></i> Add Aruvi Watermark to Preview Images
+                    <i class="fa-solid fa-stamp" style="color: #007791; margin-right: 5px;"></i> Optional PNG Logo Watermark Overlay
                   </strong>
-                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Automatically stamps the Aruvi brand watermark when generating preview downloads and bulk replacing images (default: ON).</span>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">
+                    Uses a clean PNG logo file overlay (never SVG text or missing font glyphs). Configurable position & opacity. <strong>Default: OFF</strong> (Server renders clean, unaltered images by default).
+                  </span>
                 </div>
-                <input type="checkbox" name="watermark_preview_images" value="1" <%= (typeof settings === 'undefined' || settings.watermark_preview_images !== '0') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+                <input type="checkbox" name="watermark_enabled" id="watermarkEnabledCheck" value="1" <%= (typeof settings !== 'undefined' && settings.watermark_enabled === '1') ? 'checked' : '' %> onchange="document.getElementById('watermarkSubSettings').style.display = this.checked ? 'grid' : 'none';" style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
               </label>
+
+              <div id="watermarkSubSettings" style="display: <%= (typeof settings !== 'undefined' && settings.watermark_enabled === '1') ? 'grid' : 'none' %>; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; border-top: 1px dashed var(--admin-border); padding-top: 0.8rem; margin-top: 0.5rem;">
+                <div>
+                  <label class="form-label" style="font-size: 0.78rem; font-weight: 600; color: var(--admin-text-dark); display: block; margin-bottom: 4px;">Logo Overlay Position</label>
+                  <select name="watermark_position" class="form-control" style="width: 100%; height: 36px; border-radius: 6px; font-size: 0.82rem; border: 1px solid var(--admin-border);">
+                    <option value="center" <%= (typeof settings === 'undefined' || !settings.watermark_position || settings.watermark_position === 'center') ? 'selected' : '' %>>Center</option>
+                    <option value="bottom-right" <%= (typeof settings !== 'undefined' && settings.watermark_position === 'bottom-right') ? 'selected' : '' %>>Bottom Right</option>
+                    <option value="bottom-left" <%= (typeof settings !== 'undefined' && settings.watermark_position === 'bottom-left') ? 'selected' : '' %>>Bottom Left</option>
+                    <option value="top-right" <%= (typeof settings !== 'undefined' && settings.watermark_position === 'top-right') ? 'selected' : '' %>>Top Right</option>
+                    <option value="top-left" <%= (typeof settings !== 'undefined' && settings.watermark_position === 'top-left') ? 'selected' : '' %>>Top Left</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 0.78rem; font-weight: 600; color: var(--admin-text-dark); display: block; margin-bottom: 4px;">Watermark Opacity (%)</label>
+                  <input type="number" name="watermark_opacity" min="5" max="100" value="<%= (typeof settings !== 'undefined' && settings.watermark_opacity) ? settings.watermark_opacity : '25' %>" class="form-control" style="width: 100%; height: 36px; border-radius: 6px; font-size: 0.82rem; border: 1px solid var(--admin-border);">
+                </div>
+              </div>
             </div>
           </div>
         </div>

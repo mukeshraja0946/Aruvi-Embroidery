@@ -13,10 +13,46 @@ function checkIsAjax(req) {
 }
 
 function errorHandler(err, req, res, next) {
-  console.error(`[Unhandled Error] ${req.method} ${req.originalUrl}:`, err.message || err);
-
   const isCsrf = err.code === 'EBADCSRF' || (err.message && err.message.toLowerCase().includes('csrf'));
   const statusCode = isCsrf ? 403 : (err.status || err.statusCode || 500);
+
+  const refId = 'err_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
+  const isUploadRoute = req.originalUrl && (
+    req.originalUrl.includes('/upload') ||
+    req.originalUrl.includes('/bulk-') ||
+    req.originalUrl.startsWith('/admin/api/')
+  );
+
+  const isAjax = checkIsAjax(req) || isUploadRoute;
+
+  // Log upload request failure with complete diagnostics (excluding credentials)
+  if (isUploadRoute) {
+    const rawFileName = req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : (req.file ? req.file.originalname : (req.body ? req.body.originalName : 'N/A'));
+    const rawFileSize = req.headers['x-file-size'] || (req.file ? req.file.size : (req.body ? req.body.fileSize : 'N/A'));
+    const userIdentifier = req.user ? req.user.email : (req.session?.userId ? `UserId:${req.session.userId}` : 'anonymous');
+    const csrfStatus = isCsrf ? 'FAILED' : 'PASS';
+
+    console.error(`[Upload Request Failure] [${refId}] Route: ${req.method} ${req.originalUrl} | Status: ${statusCode} | User: ${userIdentifier} | File: "${rawFileName}" (${rawFileSize} bytes) | CSRF: ${csrfStatus} | Error:`, err.stack || err.message);
+
+    return res.status(statusCode).json({
+      success: false,
+      code: err.code || (isCsrf ? 'EBADCSRF' : (statusCode === 401 ? 'UNAUTHORIZED' : (statusCode === 413 ? 'LIMIT_FILE_SIZE' : 'UPLOAD_ERROR'))),
+      message: isCsrf
+        ? 'Security token mismatch or expired. Please refresh token and try again.'
+        : (err.message || 'An upload processing error occurred.'),
+      referenceId: refId,
+      stage: err.stage || (isCsrf ? 'CSRF Security Stage' : (statusCode === 401 ? 'Authentication Stage' : (statusCode === 413 ? 'Payload Size Stage' : 'Upload Request Stage'))),
+      suggestedAction: isCsrf
+        ? 'Refresh your page or re-login if session timed out.'
+        : (statusCode === 401
+            ? 'Admin session expired. Log in again in another tab, then resume.'
+            : (statusCode === 413
+                ? 'File exceeds upload limit. Slicing into 1MB chunks prevents this error.'
+                : 'Check server logs for database or storage permissions.'))
+    });
+  }
+
+  console.error(`[Unhandled Error] ${req.method} ${req.originalUrl}:`, err.message || err);
 
   const title = isCsrf ? 'Security Token Error' : `Error ${statusCode}`;
   const message = isCsrf
@@ -24,8 +60,6 @@ function errorHandler(err, req, res, next) {
     : (process.env.NODE_ENV === 'production'
         ? 'Something went wrong. Please try again later.'
         : (err.message || 'An unexpected error occurred.'));
-
-  const isAjax = checkIsAjax(req);
 
   // Handle Multer upload errors or file format validation errors gracefully
   const isUploadError = err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE' || (err.message && (err.message.includes('Invalid file format') || err.message.includes('file format') || err.message.includes('Unexpected field')));
@@ -37,7 +71,7 @@ function errorHandler(err, req, res, next) {
           ? 'Form upload error: unexpected field uploaded. Please re-try uploading.' 
           : (err.message || 'Invalid file uploaded.'));
     if (isAjax) {
-      return res.status(400).json({ success: false, message: uploadErrMsg, error: uploadErrMsg });
+      return res.status(400).json({ success: false, code: 'LIMIT_FILE_SIZE', message: uploadErrMsg, error: uploadErrMsg, referenceId: refId });
     }
     if (req.flash) {
       req.flash('error', uploadErrMsg);
@@ -49,11 +83,13 @@ function errorHandler(err, req, res, next) {
   if (isAjax) {
     return res.status(statusCode).json({
       success: false,
+      code: isCsrf ? 'EBADCSRF' : (statusCode === 401 ? 'UNAUTHORIZED' : 'SERVER_ERROR'),
       error: {
         code: isCsrf ? 'CSRF_TOKEN_INVALID' : (statusCode === 401 ? 'UNAUTHORIZED' : 'SERVER_ERROR'),
         message
       },
       message,
+      referenceId: refId,
       isCsrf,
       redirectUrl: req.originalUrl.startsWith('/admin') ? '/admin/login' : '/auth/login'
     });

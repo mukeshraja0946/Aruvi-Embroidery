@@ -176,10 +176,11 @@ class PreviewService {
   }
 
   /**
-   * Generates 3 synchronized WebP variants from any source image:
-   * 1. Large Preview: Max 1200px, watermarked WebP (quality 85)
-   * 2. Card Size: Max 600px, watermarked WebP (quality 85)
-   * 3. Thumbnail: Max 300px, watermarked WebP (quality 80)
+   * Generates 3 synchronized clean WebP variants from any source image:
+   * 1. Large Preview: Max 1200px, WebP (quality 85) - NO watermark overlay
+   * 2. Card Size: Max 600px, WebP (quality 85) - NO watermark overlay
+   * 3. Thumbnail: Max 300px, WebP (quality 80) - NO watermark overlay
+   * Also safely stores pristine un-watermarked original upload privately in UPLOAD_DIR/private/originals
    */
   async generatePreviewVariants(sourcePathOrBuffer, baseFilename) {
     let inputBuffer;
@@ -203,14 +204,12 @@ class PreviewService {
     const checksum = crypto.createHash('sha256').update(inputBuffer).digest('hex');
     const cleanBase = path.basename(baseFilename, path.extname(baseFilename)).replace(/[^a-zA-Z0-9_-]/g, '_');
     const uniqueBase = `${cleanBase}_${Date.now()}_${checksum.slice(0, 8)}`;
-
-    const largeFilename = `${uniqueBase}.webp`;
-    const cardFilename = `card_${uniqueBase}.webp`;
-    const thumbFilename = `${uniqueBase}.webp`;
+    const rawExt = isPng ? '.png' : (isWebp ? '.webp' : '.jpg');
 
     const previewsDir = storage.getPreviewsDir();
     const thumbsDir = storage.getThumbsDir();
-    const cardsDir = path.join(previewsDir, 'cards');
+    const cardsDir = storage.getCardsDir();
+    const originalsDir = storage.getOriginalsDir();
 
     if (!fs.existsSync(cardsDir)) {
       try { fs.mkdirSync(cardsDir, { recursive: true }); } catch (_) {}
@@ -218,60 +217,90 @@ class PreviewService {
     if (!fs.existsSync(thumbsDir)) {
       try { fs.mkdirSync(thumbsDir, { recursive: true }); } catch (_) {}
     }
+    if (!fs.existsSync(originalsDir)) {
+      try { fs.mkdirSync(originalsDir, { recursive: true }); } catch (_) {}
+    }
 
-    // 1. Large preview (max 1200px with transparent watermark)
-    const largeRes = await watermarkService.generateWatermarkedPreviews(inputBuffer, {
-      maxWidth: 1200,
-      maxHeight: 1200,
-      thumbSize: 300,
-      quality: 85
-    });
+    // 1. Privately store authentic original upload outside public folder
+    const originalFilename = `${uniqueBase}_orig${rawExt}`;
+    const originalPath = path.join(originalsDir, originalFilename);
+    await fs.promises.writeFile(originalPath, inputBuffer);
+    const originalKey = `/public/uploads/private/originals/${originalFilename}`;
 
-    const largePath = path.join(previewsDir, largeFilename);
-    const thumbPath = path.join(thumbsDir, thumbFilename);
+    const largeFilename = `${uniqueBase}.webp`;
+    const cardFilename = `card_${uniqueBase}.webp`;
+    const thumbFilename = `${uniqueBase}.webp`;
 
-    await fs.promises.writeFile(largePath, largeRes.largeBuffer);
-    await fs.promises.writeFile(thumbPath, largeRes.thumbBuffer);
+    // 2. Pure, clean Sharp processing pipeline: validate -> auto-rotate -> resize -> webp
+    try {
+      // Large Preview: 1200px max, quality 85 (NO watermark overlay)
+      const largeBuffer = await sharp(inputBuffer)
+        .rotate()
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer();
 
-    // 2. Card size preview (max 600px with subtle watermark)
-    const cardSharp = sharp(inputBuffer).resize(600, 600, {
-      fit: 'inside',
-      withoutEnlargement: true
-    });
-    const cardBuf = await cardSharp.toBuffer();
-    const cardMeta = await sharp(cardBuf).metadata();
-    const cw = cardMeta.width || 600;
-    const ch = cardMeta.height || 600;
-    const cardWmSvg = watermarkService.generateWatermarkSvg(cw, ch);
+      // Card Preview: 600px max, quality 85 (NO watermark overlay)
+      const cardBuffer = await sharp(inputBuffer)
+        .rotate()
+        .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer();
 
-    const cardWatermarked = await sharp(cardBuf)
-      .composite([{ input: cardWmSvg, top: 0, left: 0, blend: 'over' }])
-      .webp({ quality: 85 })
-      .toBuffer();
+      // Thumbnail: 300px max, quality 80 (NO watermark overlay)
+      const thumbBuffer = await sharp(inputBuffer)
+        .rotate()
+        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
 
-    const cardPath = path.join(cardsDir, cardFilename);
-    await fs.promises.writeFile(cardPath, cardWatermarked);
+      const largePath = path.join(previewsDir, largeFilename);
+      const cardPath = path.join(cardsDir, cardFilename);
+      const thumbPath = path.join(thumbsDir, thumbFilename);
 
-    const largeKey = `/public/uploads/previews/${largeFilename}`;
-    const cardKey = `/public/uploads/previews/cards/${cardFilename}`;
-    const thumbKey = `/public/uploads/previews/thumbs/${thumbFilename}`;
+      await fs.promises.writeFile(largePath, largeBuffer);
+      await fs.promises.writeFile(cardPath, cardBuffer);
+      await fs.promises.writeFile(thumbPath, thumbBuffer);
 
-    return {
-      largeKey,
-      cardKey,
-      thumbKey,
-      fileSize: largeRes.largeBuffer.length,
-      checksum,
-      version: 1
-    };
+      const largeKey = `/public/uploads/previews/${largeFilename}`;
+      const cardKey = `/public/uploads/previews/cards/${cardFilename}`;
+      const thumbKey = `/public/uploads/previews/thumbs/${thumbFilename}`;
+
+      return {
+        largeKey,
+        cardKey,
+        thumbKey,
+        originalKey,
+        fileSize: largeBuffer.length,
+        checksum,
+        version: 1
+      };
+    } catch (sharpErr) {
+      console.warn(`[Preview Service Sharp Fallback] Sharp image processing failed for "${baseFilename}": ${sharpErr.message}. Saving original image directly.`);
+      const fallbackFilename = `${uniqueBase}${rawExt}`;
+      const fallbackPath = path.join(previewsDir, fallbackFilename);
+      await fs.promises.writeFile(fallbackPath, inputBuffer);
+      const fallbackKey = `/public/uploads/previews/${fallbackFilename}`;
+      return {
+        largeKey: fallbackKey,
+        cardKey: fallbackKey,
+        thumbKey: fallbackKey,
+        originalKey,
+        fileSize: inputBuffer.length,
+        checksum,
+        version: 1,
+        warning: `Saved without resize (Sharp fallback: ${sharpErr.message})`
+      };
+    }
   }
 
   /**
-   * Commits primary preview record and keeps exactly ONE primary image per design
+   * Commits primary preview record, keeps original_key, resets needs_reupload to 0,
+   * and enforces exactly ONE primary image per design.
    */
   async setPrimaryPreview(designId, variants, externalConnection = null) {
     const conn = externalConnection || db;
-    const { largeKey, cardKey, thumbKey, fileSize, checksum, version = 1 } = variants;
+    const { largeKey, cardKey, thumbKey, originalKey, fileSize, checksum, version = 1 } = variants;
 
     if (db.isConnected()) {
       // Unset any previous primary flags for this design
@@ -289,46 +318,70 @@ class PreviewService {
         try {
           await conn.query(`
             UPDATE design_images 
-            SET image_url = ?, thumb_key = ?, card_key = ?, is_primary = 1, display_order = 0, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW()
+            SET image_url = ?, thumb_key = ?, card_key = ?, original_key = ?, is_primary = 1, display_order = 0, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW()
             WHERE id = ?
-          `, [largeKey, thumbKey, cardKey, fileSize || 0, checksum || null, imageRowId]);
+          `, [largeKey, thumbKey, cardKey, originalKey || null, fileSize || 0, checksum || null, imageRowId]);
         } catch (_) {
-          await conn.query(`
-            UPDATE design_images 
-            SET image_url = ?, is_primary = 1, display_order = 0, file_size = ?
-            WHERE id = ?
-          `, [largeKey, fileSize || 0, imageRowId]);
+          try {
+            await conn.query(`
+              UPDATE design_images 
+              SET image_url = ?, thumb_key = ?, card_key = ?, is_primary = 1, display_order = 0, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW()
+              WHERE id = ?
+            `, [largeKey, thumbKey, cardKey, fileSize || 0, checksum || null, imageRowId]);
+          } catch {
+            await conn.query(`
+              UPDATE design_images 
+              SET image_url = ?, is_primary = 1, display_order = 0, file_size = ?
+              WHERE id = ?
+            `, [largeKey, fileSize || 0, imageRowId]);
+          }
         }
       } else {
         try {
           const ins = await conn.query(`
-            INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version)
-            VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)
-          `, [designId, largeKey, thumbKey, cardKey, fileSize || 0, checksum || null, version]);
+            INSERT INTO design_images (design_id, image_url, thumb_key, card_key, original_key, is_primary, display_order, file_size, checksum, version)
+            VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?, ?)
+          `, [designId, largeKey, thumbKey, cardKey, originalKey || null, fileSize || 0, checksum || null, version]);
           imageRowId = ins.insertId;
         } catch (_) {
-          const ins = await conn.query(`
-            INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size)
-            VALUES (?, ?, 1, 0, ?)
-          `, [designId, largeKey, fileSize || 0]);
-          imageRowId = ins.insertId;
+          try {
+            const ins = await conn.query(`
+              INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version)
+              VALUES (?, ?, ?, ?, 1, 0, ?, ?, ?)
+            `, [designId, largeKey, thumbKey, cardKey, fileSize || 0, checksum || null, version]);
+            imageRowId = ins.insertId;
+          } catch {
+            const ins = await conn.query(`
+              INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size)
+              VALUES (?, ?, 1, 0, ?)
+            `, [designId, largeKey, fileSize || 0]);
+            imageRowId = ins.insertId;
+          }
         }
       }
 
       // Keep exactly ONE primary image: clean duplicate primary rows
       await conn.query('UPDATE design_images SET is_primary = 0 WHERE design_id = ? AND id != ?', [designId, imageRowId]);
 
-      // Synchronize designs table columns
+      // Synchronize designs table columns: primary_image, thumbnail_image, card_image, original_image_url, needs_reupload
       try {
         await conn.query(`
           UPDATE designs 
-          SET primary_image = ?, thumbnail_image = ?, card_image = ?, updated_at = NOW() 
+          SET primary_image = ?, thumbnail_image = ?, card_image = ?, original_image_url = ?, needs_reupload = 0, updated_at = NOW() 
           WHERE id = ?
-        `, [largeKey, thumbKey, cardKey, designId]);
+        `, [largeKey, thumbKey, cardKey, originalKey || null, designId]);
       } catch (_) {
         try {
-          await conn.query('UPDATE designs SET primary_image = ? WHERE id = ?', [largeKey, designId]);
-        } catch (_) {}
+          await conn.query(`
+            UPDATE designs 
+            SET primary_image = ?, thumbnail_image = ?, card_image = ?, updated_at = NOW() 
+            WHERE id = ?
+          `, [largeKey, thumbKey, cardKey, designId]);
+        } catch {
+          try {
+            await conn.query('UPDATE designs SET primary_image = ? WHERE id = ?', [largeKey, designId]);
+          } catch (_) {}
+        }
       }
 
       // Synchronize preview record in design_files
@@ -349,6 +402,49 @@ class PreviewService {
           );
         }
       } catch (_) {}
+    }
+
+    // Synchronize persistent fallback store (for local testing / offline mode)
+    try {
+      const fallbackFilePath = path.join(__dirname, '..', 'public', 'uploads', 'fallback_designs.json');
+      if (fs.existsSync(fallbackFilePath)) {
+        const raw = fs.readFileSync(fallbackFilePath, 'utf8');
+        const fallbackList = JSON.parse(raw);
+        if (Array.isArray(fallbackList)) {
+          const match = fallbackList.find(d => d.id == designId);
+          if (match) {
+            match.primary_image = largeKey;
+            match.thumbnail_image = thumbKey;
+            match.card_image = cardKey;
+            match.original_image_url = originalKey || match.original_image_url || null;
+            match.needs_reupload = 0;
+            if (!Array.isArray(match.images)) match.images = [];
+            const primaryImg = match.images.find(img => img && img.is_primary == 1);
+            if (primaryImg) {
+              primaryImg.image_url = largeKey;
+              primaryImg.thumb_key = thumbKey;
+              primaryImg.card_key = cardKey;
+              primaryImg.original_key = originalKey || null;
+              primaryImg.version = (primaryImg.version || 1) + 1;
+            } else {
+              match.images.unshift({
+                id: Date.now(),
+                design_id: designId,
+                image_url: largeKey,
+                thumb_key: thumbKey,
+                card_key: cardKey,
+                original_key: originalKey || null,
+                is_primary: 1,
+                display_order: 0,
+                version: 1
+              });
+            }
+            fs.writeFileSync(fallbackFilePath, JSON.stringify(fallbackList, null, 2), 'utf8');
+          }
+        }
+      }
+    } catch (fbErr) {
+      console.warn('[Preview Service Fallback Sync Warning]:', fbErr.message);
     }
 
     return true;

@@ -64,7 +64,8 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-// Body Parsing (allow up to 50MB for batch payloads)
+// Body Parsing (allow up to 50MB for batch payloads, raw 10MB stream for binary upload chunks)
+app.use('/admin/api/upload/chunk', express.raw({ type: 'application/octet-stream', limit: '10mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
@@ -80,6 +81,8 @@ const blockedStaticPaths = [
   '/public/uploads/designs', '/uploads/designs',
   '/public/uploads/raw', '/uploads/raw',
   '/public/uploads/originals', '/uploads/originals',
+  '/public/uploads/private', '/uploads/private',
+  '/public/uploads/private/originals', '/uploads/private/originals',
   '/private_uploads', '/public/uploads/private_designs',
   '/storage_private', '/public/storage_private',
   '/design-files', '/public/design-files',
@@ -133,9 +136,46 @@ app.use('/uploads/previews', serveUploadedPreview);
 app.use('/public/uploads', serveUploadedPreview);
 app.use('/uploads', serveUploadedPreview);
 
-// Session Management
+// Session Management with persistent express-mysql-session (prevents worker reload session drops)
+const MySQLStore = require('express-mysql-session')(session);
+
+let sessionStore = null;
+try {
+  const sessionDbOptions = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306', 10),
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'aruvi_embroidery',
+    createDatabaseTable: true,
+    clearExpired: true,
+    checkExpirationInterval: 900000, // 15 mins
+    expiration: 7 * 24 * 60 * 60 * 1000 // 7 days
+  };
+
+  const dbUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL;
+  if (dbUrl) {
+    try {
+      const parsedUrl = new URL(dbUrl);
+      sessionDbOptions.host = parsedUrl.hostname || sessionDbOptions.host;
+      sessionDbOptions.port = parsedUrl.port ? parseInt(parsedUrl.port, 10) : sessionDbOptions.port;
+      sessionDbOptions.user = decodeURIComponent(parsedUrl.username || sessionDbOptions.user);
+      sessionDbOptions.password = decodeURIComponent(parsedUrl.password || sessionDbOptions.password);
+      sessionDbOptions.database = parsedUrl.pathname ? parsedUrl.pathname.replace(/^\//, '') : sessionDbOptions.database;
+    } catch (_) {}
+  }
+
+  sessionStore = new MySQLStore(sessionDbOptions);
+  sessionStore.on('error', function (storeErr) {
+    console.warn('[Session Store Warning] MySQL session store notice (operating with fallback):', storeErr.message);
+  });
+} catch (storeInitErr) {
+  console.warn('[Session Store Warning] MySQL session store initialization fallback to memory:', storeInitErr.message);
+}
+
 app.use(
   session({
+    store: sessionStore || undefined,
     secret:
       process.env.SESSION_SECRET ||
       'aruvi_embroidery_secret_stitch_key',
