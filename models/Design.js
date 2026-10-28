@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const AdmZip = require('adm-zip');
 const storage = require('../config/storage');
+const previewService = require('../services/previewService');
 
 const fallbackFilePath = path.join(__dirname, '..', 'public', 'uploads', 'fallback_designs.json');
 
@@ -53,10 +54,13 @@ class Design {
     fileFilter = null,
     file_filter = null,
     stitchFilter = null,
-    stitch_filter = null
+    stitch_filter = null,
+    previewFilter = null,
+    preview_filter = null
   } = {}) {
     const activeFileFilter = fileFilter || file_filter;
     const activeStitchFilter = stitchFilter || stitch_filter;
+    const activePreviewFilter = previewFilter || preview_filter;
     if (db.isConnected()) {
       try {
         let whereClause = [];
@@ -82,6 +86,16 @@ class Design {
           whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) <= 0 AND COALESCE(d.stitch_count_front, 0) <= 0 AND COALESCE(d.stitch_count_back, 0) <= 0 AND COALESCE(d.stitch_count_sleeve, 0) <= 0)');
         } else if (activeStitchFilter === 'has_stitch') {
           whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) > 0 OR COALESCE(d.stitch_count_front, 0) > 0 OR COALESCE(d.stitch_count_back, 0) > 0 OR COALESCE(d.stitch_count_sleeve, 0) > 0)');
+        }
+
+        if (activePreviewFilter === 'problems') {
+          whereClause.push('((d.primary_image IS NULL OR d.thumbnail_image IS NULL OR NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1) OR (SELECT COUNT(*) FROM design_images di2 WHERE di2.design_id = d.id AND di2.is_primary = 1) != 1) AND (d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di3 WHERE di3.design_id = d.id)))');
+        } else if (activePreviewFilter === 'missing_thumb') {
+          whereClause.push('((d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id)) AND (d.thumbnail_image IS NULL OR d.thumbnail_image = \'\' OR EXISTS (SELECT 1 FROM design_images di2 WHERE di2.design_id = d.id AND (di2.is_primary = 1 OR di2.display_order = 0) AND (di2.thumb_key IS NULL OR di2.thumb_key = \'\'))))');
+        } else if (activePreviewFilter === 'no_preview') {
+          whereClause.push('(d.primary_image IS NULL AND NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id))');
+        } else if (activePreviewFilter === 'has_preview') {
+          whereClause.push('(d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id))');
         }
 
         if (is_featured !== null && is_featured !== undefined) {
@@ -252,6 +266,23 @@ class Design {
       filtered = filtered.filter(d => (!d.stitch_count_total || Number(d.stitch_count_total) === 0) && (!d.stitch_count_front || Number(d.stitch_count_front) === 0) && (!d.stitch_count_back || Number(d.stitch_count_back) === 0) && (!d.stitch_count_sleeve || Number(d.stitch_count_sleeve) === 0));
     } else if (activeStitchFilter === 'has_stitch') {
       filtered = filtered.filter(d => (d.stitch_count_total && Number(d.stitch_count_total) > 0) || (d.stitch_count_front && Number(d.stitch_count_front) > 0) || (d.stitch_count_back && Number(d.stitch_count_back) > 0) || (d.stitch_count_sleeve && Number(d.stitch_count_sleeve) > 0));
+    }
+
+    if (activePreviewFilter === 'problems' || activePreviewFilter === 'missing_thumb') {
+      filtered = filtered.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return prev.hasPreview && !prev.has_thumbnail;
+      });
+    } else if (activePreviewFilter === 'no_preview') {
+      filtered = filtered.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return !prev.hasPreview;
+      });
+    } else if (activePreviewFilter === 'has_preview') {
+      filtered = filtered.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return prev.hasPreview;
+      });
     }
 
     // Compute dynamic formats and check images for fallback designs
@@ -547,8 +578,27 @@ class Design {
   }
 
   static async replacePrimaryImage(designId, imageUrl, fileName = null, fileSize = 0, checksum = null) {
-    const finalFileName = fileName || path.basename(imageUrl);
+    const finalFileName = fileName || path.basename(imageUrl.split('?')[0]);
     const ext = finalFileName.split('.').pop().toUpperCase();
+    let thumbKey = null;
+    let cardKey = null;
+
+    // Generate/ensure 3 synchronized preview variants (large, card, thumb)
+    try {
+      const cleanUrl = imageUrl.split('?')[0];
+      const diskPath = storage.resolveFilePath(cleanUrl);
+      if (diskPath && fs.existsSync(diskPath)) {
+        const variants = await previewService.generatePreviewVariants(diskPath, finalFileName);
+        imageUrl = variants.largeKey;
+        cardKey = variants.cardKey;
+        thumbKey = variants.thumbKey;
+        fileSize = variants.fileSize;
+        checksum = variants.checksum;
+      }
+    } catch (vErr) {
+      console.warn('[replacePrimaryImage Preview Variants Warning]:', vErr.message);
+    }
+
     if (db.isConnected()) {
       try {
         // Find existing primary image records before replacement
@@ -563,15 +613,22 @@ class Design {
           // Update the SAME existing design_images record (keeps same ID, primary flag & order)
           try {
             await db.query(
-              'UPDATE design_images SET image_url = ?, is_primary = 1, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW() WHERE id = ?',
-              [imageUrl, fileSize || 0, checksum || null, primaryRowId]
+              'UPDATE design_images SET image_url = ?, thumb_key = ?, card_key = ?, is_primary = 1, display_order = 0, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW() WHERE id = ?',
+              [imageUrl, thumbKey, cardKey, fileSize || 0, checksum || null, primaryRowId]
             );
           } catch {
-            // Fallback if version/checksum columns not yet added
-            await db.query(
-              'UPDATE design_images SET image_url = ?, is_primary = 1 WHERE id = ?',
-              [imageUrl, primaryRowId]
-            );
+            // Fallback if thumb_key/card_key columns not yet added
+            try {
+              await db.query(
+                'UPDATE design_images SET image_url = ?, is_primary = 1, display_order = 0, file_size = ?, checksum = ?, version = version + 1, updated_at = NOW() WHERE id = ?',
+                [imageUrl, fileSize || 0, checksum || null, primaryRowId]
+              );
+            } catch {
+              await db.query(
+                'UPDATE design_images SET image_url = ?, is_primary = 1, display_order = 0 WHERE id = ?',
+                [imageUrl, primaryRowId]
+              );
+            }
           }
           // Remove duplicate primary rows for this design to prevent ghost thumbnails
           if (oldPrimaries.length > 1) {
@@ -586,29 +643,57 @@ class Design {
           ) || [];
           if (anyRows.length > 0) {
             primaryRowId = anyRows[0].id;
-            await db.query(
-              'UPDATE design_images SET image_url = ?, is_primary = 1, display_order = 0 WHERE id = ?',
-              [imageUrl, primaryRowId]
-            );
+            try {
+              await db.query(
+                'UPDATE design_images SET image_url = ?, thumb_key = ?, card_key = ?, is_primary = 1, display_order = 0, file_size = ?, checksum = ?, version = 1, updated_at = NOW() WHERE id = ?',
+                [imageUrl, thumbKey, cardKey, fileSize || 0, checksum || null, primaryRowId]
+              );
+            } catch {
+              await db.query(
+                'UPDATE design_images SET image_url = ?, is_primary = 1, display_order = 0 WHERE id = ?',
+                [imageUrl, primaryRowId]
+              );
+            }
           } else {
-            const insertRes = await db.query(
-              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)',
-              [designId, imageUrl]
-            );
-            primaryRowId = insertRes.insertId;
+            try {
+              const insertRes = await db.query(
+                'INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version) VALUES (?, ?, ?, ?, 1, 0, ?, ?, 1)',
+                [designId, imageUrl, thumbKey, cardKey, fileSize || 0, checksum || null]
+              );
+              primaryRowId = insertRes.insertId;
+            } catch {
+              const insertRes = await db.query(
+                'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)',
+                [designId, imageUrl]
+              );
+              primaryRowId = insertRes.insertId;
+            }
           }
         }
 
-        // Clean up any extra rows for this design that have identical image_url
+        // Ensure ONLY primaryRowId has is_primary = 1 for this design
+        await db.query(
+          'UPDATE design_images SET is_primary = 0 WHERE design_id = ? AND id != ?',
+          [designId, primaryRowId]
+        );
+
+        // Clean up any duplicate rows with identical image_url
         await db.query(
           'DELETE FROM design_images WHERE design_id = ? AND id != ? AND image_url = ?',
           [designId, primaryRowId, imageUrl]
         );
 
-        // Update designs table primary_image if column exists
+        // Update designs table sync columns
         try {
-          await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [imageUrl, designId]);
-        } catch (_) {}
+          await db.query(
+            'UPDATE designs SET primary_image = ?, thumbnail_image = ?, card_image = ?, updated_at = NOW() WHERE id = ?',
+            [imageUrl, thumbKey || imageUrl, cardKey || imageUrl, designId]
+          );
+        } catch (_) {
+          try {
+            await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [imageUrl, designId]);
+          } catch (_) {}
+        }
 
         // Update preview record in design_files
         const existingPreviewFiles = await db.query(
@@ -629,13 +714,6 @@ class Design {
             'INSERT INTO design_files (design_id, file_name, file_path, file_format, file_size, is_preview, file_kind) VALUES (?, ?, ?, ?, ?, 1, "image")',
             [designId, finalFileName, imageUrl, ext, fileSize || 0]
           );
-        }
-
-        // Regenerate thumbnail
-        try {
-          await storage.buildThumbnailUrl(imageUrl);
-        } catch (tErr) {
-          console.warn('[Thumbnail Regen Warning]:', tErr.message);
         }
 
         // Safe physical file cleanup:
@@ -734,27 +812,14 @@ class Design {
 
   static normalizePrimaryImage(d) {
     if (!d) return d;
-    let img = d.primary_image ? String(d.primary_image).trim() : '';
-    const ext = img ? img.split('.').pop().toLowerCase() : '';
-    const nonImgExts = ['zip', 'dst', 'pes', 'jef', 'exp', 'hus', 'vip', 'vp3', 'xxx'];
-    const stamp = d.updated_at ? new Date(d.updated_at).getTime() : null;
-
-    // Placeholder is used ONLY when a product has no image or an invalid non-image format.
-    // Neutral placeholder is handled in UI; primary_image remains null.
-    // Admin-uploaded images are NEVER overwritten.
-    if (!img || nonImgExts.includes(ext)) {
-      img = null;
-      d.thumbnail_image = null;
-    } else {
-      img = storage.buildPublicUrl(img);
-      d.thumbnail_image = storage.buildThumbnailUrl(img);
-      if (stamp) {
-        img = this.appendVersionSuffix(img, stamp);
-        if (d.thumbnail_image) d.thumbnail_image = this.appendVersionSuffix(d.thumbnail_image, stamp);
-      }
-    }
-
-    d.primary_image = img;
+    const preview = previewService.getPrimaryPreview(d);
+    d.preview = preview;
+    d.primary_image = preview.largeUrl !== '/public/images/placeholder-preview.svg' ? preview.largeUrl : null;
+    d.thumbnail_image = preview.thumbUrl !== '/public/images/placeholder-preview.svg' ? preview.thumbUrl : null;
+    d.card_image = preview.cardUrl !== '/public/images/placeholder-preview.svg' ? preview.cardUrl : null;
+    d.large_url = preview.largeUrl;
+    d.card_url = preview.cardUrl;
+    d.thumb_url = preview.thumbUrl;
 
     if (d.images && Array.isArray(d.images)) {
       const validImages = [];
@@ -764,7 +829,7 @@ class Design {
           let pubUrl = storage.buildPublicUrl(im.image_url);
           if (pubUrl && !seen.has(pubUrl.toLowerCase())) {
             seen.add(pubUrl.toLowerCase());
-            const imStamp = im.updated_at ? new Date(im.updated_at).getTime() : stamp;
+            const imStamp = im.checksum ? String(im.checksum).slice(0, 10) : (im.updated_at ? new Date(im.updated_at).getTime() : preview.version);
             if (imStamp) pubUrl = this.appendVersionSuffix(pubUrl, imStamp);
             im.image_url = pubUrl;
             validImages.push(im);

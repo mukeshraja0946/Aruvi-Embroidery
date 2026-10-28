@@ -16,9 +16,9 @@ const REQUIRED_SCHEMA = {
     'stitch_count_back', 'stitch_count_sleeve', 'stitch_count_total', 'stitch_total_manual',
     'dimensions', 'formats', 'is_featured', 'is_trending', 'is_active', 'download_count',
     'tags', 'total_sales', 'average_rating', 'reviews_count', 'import_image_filename',
-    'import_zip_filename', 'deleted_at', 'created_at'
+    'import_zip_filename', 'primary_image', 'deleted_at', 'created_at'
   ],
-  design_images: ['id', 'design_id', 'image_url', 'is_primary', 'display_order'],
+  design_images: ['id', 'design_id', 'image_url', 'thumb_key', 'card_key', 'is_primary', 'display_order'],
   design_files: ['id', 'design_id', 'file_kind', 'label', 'original_name', 'storage_key', 'mime_type', 'file_size', 'checksum_sha256', 'sort_order', 'is_primary_preview', 'created_at'],
   cart_items: ['id', 'user_id', 'session_id', 'design_id', 'quantity', 'created_at'],
   orders: ['id', 'order_number', 'user_id', 'total_amount', 'discount_amount', 'final_amount', 'coupon_code', 'status', 'razorpay_order_id', 'razorpay_payment_id', 'payment_gateway', 'cashfree_order_id', 'cashfree_payment_id', 'created_at'],

@@ -21,7 +21,7 @@ const errorLogger = require('../../services/errorLogger');
 exports.getDesigns = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { search, category, status, sort, fileFilter, stitchFilter } = req.query;
+    const { search, category, status, sort, fileFilter, stitchFilter, previewFilter } = req.query;
 
     let categoryId = null;
     let categorySlug = null;
@@ -39,6 +39,7 @@ exports.getDesigns = async (req, res, next) => {
       status: status || null,
       fileFilter: fileFilter || null,
       stitchFilter: stitchFilter || null,
+      previewFilter: previewFilter || null,
       sort: sort || 'newest',
       page,
       limit: 15
@@ -51,7 +52,7 @@ exports.getDesigns = async (req, res, next) => {
       title: 'Manage Embroidery Designs - Admin',
       designs,
       categories,
-      total: (search || category || status || fileFilter || stitchFilter) ? total : stats.totalDesigns,
+      total: (search || category || status || fileFilter || stitchFilter || previewFilter) ? total : stats.totalDesigns,
       activeCount: stats.activeDesigns,
       inactiveCount: stats.inactiveDesigns,
       categoryCount: stats.totalCategories,
@@ -63,7 +64,8 @@ exports.getDesigns = async (req, res, next) => {
       selectedStatus: status || '',
       selectedSort: sort || 'newest',
       selectedFileFilter: fileFilter || '',
-      selectedStitchFilter: stitchFilter || ''
+      selectedStitchFilter: stitchFilter || '',
+      selectedPreviewFilter: previewFilter || ''
     });
   } catch (err) {
     next(err);

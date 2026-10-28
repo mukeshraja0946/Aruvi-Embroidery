@@ -19,6 +19,7 @@ module.exports = {
   savePublicFile: (file, originalName, mimeType) => storageService.savePublicFile(file, originalName, mimeType),
   savePrivateFile: (file, originalName, mimeType, designId = null) => storageService.savePrivateFile(file, originalName, mimeType, designId),
   getThumbsDir: () => storageService.getThumbsDir(),
+  getCardsDir: () => storageService.getCardsDir(),
   buildPublicUrl: (keyOrPath) => storageService.buildPublicUrl(keyOrPath),
   buildThumbnailUrl: (keyOrPath) => storageService.buildThumbnailUrl(keyOrPath),
   generateThumbnail: (source, filename) => storageService.generateThumbnail(source, filename),

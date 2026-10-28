@@ -116,7 +116,8 @@
 
     let html = '<div class="search-suggestions-list">';
     list.forEach(item => {
-      const img = item.primary_image || '/public/images/cat_blouse.jpg';
+      const thumb = item.preview?.thumbUrl || item.thumb_url || item.thumbnail_image || item.primary_image || item.image_url || '/public/images/placeholder-preview.svg';
+      const large = item.preview?.largeUrl || item.large_url || item.primary_image || item.image_url || thumb;
       const curP = item.sale_price !== null && item.sale_price !== undefined ? parseFloat(item.sale_price) : parseFloat(item.price);
       const origP = parseFloat(item.price || 0);
       const hasDisc = origP > curP;
@@ -124,7 +125,7 @@
       html += `
         <a href="/design/${item.slug}" class="search-suggestion-item">
           <div class="suggestion-thumb">
-            <img src="${escapeHtml(img)}" alt="${escapeHtml(item.title || item.sku)}" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
+            <img src="${escapeHtml(thumb)}" alt="${escapeHtml(item.title || item.sku)}" onerror="if (this.src !== '${escapeHtml(large)}') { this.src = '${escapeHtml(large)}'; } else { this.onerror=null; this.src='/public/images/placeholder-preview.svg'; }">
           </div>
           <div class="suggestion-info">
             <div class="suggestion-title">${highlightMatch(item.title || item.sku, query)}</div>
@@ -561,7 +562,8 @@
       card.className = 'listing-product-card';
       card.dataset.designId = design.id;
 
-      const imgSrc = design.primary_image || '/public/images/cat_blouse.jpg';
+      const thumbSrc = design.preview?.thumbUrl || design.thumb_url || design.thumbnail_image || design.primary_image || design.image_url || '/public/images/placeholder-preview.svg';
+      const largeSrc = design.preview?.largeUrl || design.large_url || design.primary_image || design.image_url || thumbSrc;
       const fmtsList = design.formats ? design.formats.split(',').map(s => s.trim()).filter(Boolean) : ['DST'];
       const primaryFormatTag = fmtsList[0] || 'DST';
       const inWishlist = wishlistIds.includes(design.id);
@@ -579,7 +581,7 @@
       card.innerHTML = `
         <div class="card-image-box">
           <a href="/design/${design.slug}" class="card-img-link" aria-label="${escapeHtml(displayTitle)}">
-            <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(displayTitle)}" loading="lazy" class="card-product-img" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
+            <img src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(displayTitle)}" width="300" height="300" loading="lazy" class="card-product-img" onerror="if (this.src !== '${escapeHtml(largeSrc)}') { this.src = '${escapeHtml(largeSrc)}'; } else { this.onerror=null; this.src='/public/images/placeholder-preview.svg'; }">
           </a>
           <span class="card-format-tag">${escapeHtml(primaryFormatTag)}</span>
           <button type="button" class="wishlist-round-btn wishlist-btn ${inWishlist ? 'active' : ''}" data-id="${design.id}" aria-label="Save to Wishlist" title="Wishlist">

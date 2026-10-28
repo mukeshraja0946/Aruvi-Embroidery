@@ -88,12 +88,18 @@
               const origPrice = parseFloat(design.price || 0);
               const hasDisc = curPrice < origPrice;
             %>
+            <%
+              const prev = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(design) : null;
+              const hasPrev = prev ? prev.hasPreview : Boolean(design.primary_image);
+              const thumbUrl = prev?.thumbUrl || design.thumbnail_image || design.primary_image;
+              const largeUrl = prev?.largeUrl || design.primary_image || '/public/images/placeholder-preview.svg';
+            %>
             <div class="product-card-exact">
               <button class="heart-top-btn wishlist-btn" data-id="<%= design.id %>" title="Wishlist"><i class="fa-regular fa-heart"></i></button>
               <div class="product-exact-img" style="background: #FAF6F0; position: relative;">
                 <a href="/design/<%= design.slug %>" style="display: block; width: 100%; height: 100%;">
-                  <% if (design.primary_image) { %>
-                    <img src="<%= design.primary_image %>" alt="<%= design.title %>" style="object-fit: contain; width: 100%; height: 100%;" onerror="if(this.src.indexOf('placeholder-preview.svg')===-1)this.src='/public/images/placeholder-preview.svg';">
+                  <% if (hasPrev) { %>
+                    <img src="<%= thumbUrl %>" alt="<%= prev?.altText || design.title %>" width="300" height="300" loading="lazy" style="object-fit: contain; width: 100%; height: 100%;" onerror="if (this.src !== '<%= largeUrl %>' && '<%= largeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrl %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
                   <% } else { %>
                     <div style="width: 100%; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.8rem; font-weight: 500;">
                       <i class="fa-regular fa-image" style="font-size: 1.8rem; margin-bottom: 4px; opacity: 0.5;"></i>

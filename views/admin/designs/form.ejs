@@ -586,8 +586,12 @@
 
               <!-- Main Preview Image Box: Flexible height, object-fit: contain to show FULL portrait & landscape images without cropping -->
               <div id="mainPreviewBox" style="border-radius: 14px; overflow: hidden; border: 1px solid var(--admin-border); min-height: 220px; max-height: 420px; width: 100%; background: #FAF6F0; margin-bottom: 1.1rem; position: relative; display: flex; align-items: center; justify-content: center; padding: 10px;">
-                <% if (design && design.primary_image) { %>
-                  <img id="mainImagePreview" src="<%= design.primary_image %>" alt="Embroidery Design Preview" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                <% 
+                  const formPrev = (design && typeof getPrimaryPreview === 'function') ? getPrimaryPreview(design) : null;
+                  const formImgSrc = formPrev?.hasPreview ? formPrev.largeUrl : (design?.primary_image || null);
+                %>
+                <% if (formImgSrc) { %>
+                  <img id="mainImagePreview" src="<%= formImgSrc %>" alt="Embroidery Design Preview" style="max-width: 100%; max-height: 400px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
                   <div id="noPreviewState" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 2.5rem 1rem; color: var(--admin-text-muted);">
                     <i class="fa-regular fa-image" style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5; display: block;"></i>
                     <span style="font-size: 0.88rem; font-weight: 500;">No preview image uploaded</span>

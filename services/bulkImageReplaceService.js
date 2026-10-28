@@ -9,6 +9,7 @@ const Design = require('../models/Design');
 const Category = require('../models/Category');
 const Setting = require('../models/Setting');
 const watermarkService = require('./watermarkService');
+const previewService = require('./previewService');
 
 function normalizeKey(str) {
   if (!str) return '';
@@ -558,30 +559,26 @@ class BulkImageReplaceService {
           throw new Error(`Invalid image content for ${originalName}. Authentic PNG, JPG, or WEBP required.`);
         }
 
+        // Save authentic image to public previews
         const hash = crypto.randomBytes(8).toString('hex');
         const cleanName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
         const uniqueFilename = `${cleanName}_${Date.now()}_${hash}${ext}`;
-
-        // Save authentic image without logo watermark
         const finalBuffer = inputBuffer;
 
-        const publicUrl = await storage.savePublicFile(finalBuffer, uniqueFilename, file.mimetype || 'image/png');
-        const checksum = crypto.createHash('sha256').update(finalBuffer).digest('hex');
-
-        let thumbUrl = null;
-        try {
-          thumbUrl = await storage.buildThumbnailUrl(publicUrl);
-        } catch (tErr) {
-          console.warn('[Thumbnail Build Warning]:', tErr.message);
-        }
+        // Generate 3 synchronized preview variants (large watermarked, 600px card, 300px thumbnail)
+        const variants = await previewService.generatePreviewVariants(finalBuffer, originalName);
 
         processedFiles.push({
           originalName,
-          uniqueFilename,
-          publicUrl,
-          thumbUrl: thumbUrl || publicUrl,
-          fileSize: finalBuffer.length,
-          checksum,
+          uniqueFilename: path.basename(variants.largeKey),
+          publicUrl: variants.largeKey,
+          cardUrl: variants.cardKey,
+          thumbUrl: variants.thumbKey,
+          largeKey: variants.largeKey,
+          cardKey: variants.cardKey,
+          thumbKey: variants.thumbKey,
+          fileSize: variants.fileSize,
+          checksum: variants.checksum,
           isZip: false
         });
       }
@@ -708,17 +705,32 @@ class BulkImageReplaceService {
             if (replacementMode === 'replace_all') {
               if (db.isConnected()) {
                 await db.query('DELETE FROM design_images WHERE design_id = ?', [dId]);
+                const pThumb = primaryFile.thumbKey || primaryFile.thumbUrl || versionedPrimaryUrl;
+                const pCard = primaryFile.cardKey || primaryFile.cardUrl || versionedPrimaryUrl;
                 try {
-                  await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedPrimaryUrl, dId]);
-                } catch (_) {}
+                  await db.query('UPDATE designs SET primary_image = ?, thumbnail_image = ?, card_image = ? WHERE id = ?', [versionedPrimaryUrl, pThumb, pCard, dId]);
+                } catch (_) {
+                  try {
+                    await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedPrimaryUrl, dId]);
+                  } catch (_) {}
+                }
                 for (let i = 0; i < imageFiles.length; i++) {
                   const f = imageFiles[i];
                   const isP = (f === primaryFile) ? 1 : 0;
                   const fUrl = `${f.publicUrl}${versionSuffix}`;
-                  await db.query(`
-                    INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-                    VALUES (?, ?, ?, ?, ?, ?, 1)
-                  `, [dId, fUrl, isP, i, f.fileSize || 0, f.checksum || null]);
+                  const fThumb = f.thumbKey ? (f.thumbKey.includes('?v=') ? f.thumbKey : `${f.thumbKey}${versionSuffix}`) : fUrl;
+                  const fCard = f.cardKey ? (f.cardKey.includes('?v=') ? f.cardKey : `${f.cardKey}${versionSuffix}`) : fUrl;
+                  try {
+                    await db.query(`
+                      INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    `, [dId, fUrl, fThumb, fCard, isP, i, f.fileSize || 0, f.checksum || null]);
+                  } catch (_) {
+                    await db.query(`
+                      INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                      VALUES (?, ?, ?, ?, ?, ?, 1)
+                    `, [dId, fUrl, isP, i, f.fileSize || 0, f.checksum || null]);
+                  }
                 }
               }
             } else if (replacementMode === 'add_extra') {
@@ -728,10 +740,19 @@ class BulkImageReplaceService {
                 for (const f of imageFiles) {
                   const isP = f.isPrimary ? 1 : 0;
                   const fUrl = `${f.publicUrl}${versionSuffix}`;
-                  await db.query(`
-                    INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-                    VALUES (?, ?, ?, ?, ?, ?, 1)
-                  `, [dId, fUrl, isP, startOrder++, f.fileSize || 0, f.checksum || null]);
+                  const fThumb = f.thumbKey ? (f.thumbKey.includes('?v=') ? f.thumbKey : `${f.thumbKey}${versionSuffix}`) : fUrl;
+                  const fCard = f.cardKey ? (f.cardKey.includes('?v=') ? f.cardKey : `${f.cardKey}${versionSuffix}`) : fUrl;
+                  try {
+                    await db.query(`
+                      INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    `, [dId, fUrl, fThumb, fCard, isP, startOrder++, f.fileSize || 0, f.checksum || null]);
+                  } catch (_) {
+                    await db.query(`
+                      INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                      VALUES (?, ?, ?, ?, ?, ?, 1)
+                    `, [dId, fUrl, isP, startOrder++, f.fileSize || 0, f.checksum || null]);
+                  }
                 }
               }
             } else {
@@ -747,12 +768,22 @@ class BulkImageReplaceService {
               for (let idx = 0; idx < secondaryFiles.length; idx++) {
                 const secFile = secondaryFiles[idx];
                 const secUrl = `${secFile.publicUrl}${versionSuffix}`;
+                const secThumb = secFile.thumbKey ? (secFile.thumbKey.includes('?v=') ? secFile.thumbKey : `${secFile.thumbKey}${versionSuffix}`) : secUrl;
+                const secCard = secFile.cardKey ? (secFile.cardKey.includes('?v=') ? secFile.cardKey : `${secFile.cardKey}${versionSuffix}`) : secUrl;
                 if (db.isConnected()) {
-                  await db.query(`
-                    INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
-                    VALUES (?, ?, 0, ?, ?, ?, 1)
-                    ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), file_size = VALUES(file_size), checksum = VALUES(checksum), updated_at = NOW()
-                  `, [dId, secUrl, idx + 1, secFile.fileSize || 0, secFile.checksum || null]);
+                  try {
+                    await db.query(`
+                      INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version)
+                      VALUES (?, ?, ?, ?, 0, ?, ?, ?, 1)
+                      ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), thumb_key = VALUES(thumb_key), card_key = VALUES(card_key), file_size = VALUES(file_size), checksum = VALUES(checksum), updated_at = NOW()
+                    `, [dId, secUrl, secThumb, secCard, idx + 1, secFile.fileSize || 0, secFile.checksum || null]);
+                  } catch (_) {
+                    await db.query(`
+                      INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version)
+                      VALUES (?, ?, 0, ?, ?, ?, 1)
+                      ON DUPLICATE KEY UPDATE image_url = VALUES(image_url), file_size = VALUES(file_size), checksum = VALUES(checksum), updated_at = NOW()
+                    `, [dId, secUrl, idx + 1, secFile.fileSize || 0, secFile.checksum || null]);
+                  }
                 }
               }
             }
@@ -1453,30 +1484,45 @@ class BulkImageReplaceService {
 
       try {
         let insertedImageId = null;
+        const tKey = img.thumbKey ? (img.thumbKey.includes('?v=') ? img.thumbKey : `${img.thumbKey}${versionSuffix}`) : versionedUrl;
+        const cKey = img.cardKey ? (img.cardKey.includes('?v=') ? img.cardKey : `${img.cardKey}${versionSuffix}`) : versionedUrl;
+
         if (db.isConnected()) {
           try {
             const insRes = await db.query(
-              'INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version) VALUES (?, ?, ?, ?, ?, ?, 1)',
-              [dId, versionedUrl, isPrimary ? 1 : 0, imgIdx, img.fileSize || 0, img.checksum || null]
+              'INSERT INTO design_images (design_id, image_url, thumb_key, card_key, is_primary, display_order, file_size, checksum, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)',
+              [dId, versionedUrl, tKey, cKey, isPrimary ? 1 : 0, imgIdx, img.fileSize || 0, img.checksum || null]
             );
             insertedImageId = insRes.insertId;
           } catch (dbErr) {
-            const insRes = await db.query(
-              'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
-              [dId, versionedUrl, isPrimary ? 1 : 0, imgIdx]
-            );
-            insertedImageId = insRes.insertId;
+            try {
+              const insRes = await db.query(
+                'INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size, checksum, version) VALUES (?, ?, ?, ?, ?, ?, 1)',
+                [dId, versionedUrl, isPrimary ? 1 : 0, imgIdx, img.fileSize || 0, img.checksum || null]
+              );
+              insertedImageId = insRes.insertId;
+            } catch (_) {
+              const insRes = await db.query(
+                'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)',
+                [dId, versionedUrl, isPrimary ? 1 : 0, imgIdx]
+              );
+              insertedImageId = insRes.insertId;
+            }
           }
 
           if (insertedImageId) {
             newImageIdsByDesign.get(dId).push(insertedImageId);
           }
 
-          // If primary image, update designs table primary_image and design_files preview record
+          // If primary image, update designs table sync columns and design_files preview record
           if (isPrimary) {
             try {
-              await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedUrl, dId]);
-            } catch (_) {}
+              await db.query('UPDATE designs SET primary_image = ?, thumbnail_image = ?, card_image = ? WHERE id = ?', [versionedUrl, tKey, cKey, dId]);
+            } catch (_) {
+              try {
+                await db.query('UPDATE designs SET primary_image = ? WHERE id = ?', [versionedUrl, dId]);
+              } catch (_) {}
+            }
 
             try {
               const existingPreview = await db.query(

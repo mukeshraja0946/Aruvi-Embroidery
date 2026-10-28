@@ -1540,6 +1540,7 @@ exports.downloadCleanBrokenImagesSql = async (req, res, next) => {
 exports.getRegeneratePreviews = async (req, res, next) => {
   try {
     const Category = require('../../models/Category');
+    const previewService = require('../../services/previewService');
     const categories = await Category.getAll();
     const allDesigns = await Design.getAll({ limit: 10000 });
     const designsList = allDesigns.designs || [];
@@ -1547,21 +1548,35 @@ exports.getRegeneratePreviews = async (req, res, next) => {
     const totalDesigns = designsList.length;
     let designsWithPreview = 0;
     let designsMissingPreview = 0;
+    let designsPreviewProblems = 0;
+    let blouseDesignsCount = 0;
 
     designsList.forEach(d => {
-      if (d.primary_image && !d.primary_image.includes('placeholder-preview')) {
+      const prev = previewService.getPrimaryPreview(d);
+      if (prev.hasPreview) {
         designsWithPreview++;
+        if (!prev.has_thumbnail) {
+          designsPreviewProblems++;
+        }
       } else {
         designsMissingPreview++;
+      }
+
+      const catName = (d.category_name || '').toLowerCase();
+      const catSlug = (d.category_slug || '').toLowerCase();
+      if (catSlug.includes('blouse') || catName.includes('blouse')) {
+        blouseDesignsCount++;
       }
     });
 
     res.render('admin/tools/regenerate-previews', {
-      title: 'Regenerate Watermarked Previews - ARUVI Admin',
+      title: 'Regenerate Watermarked Previews & Thumbnails - ARUVI Admin',
       categories,
       totalDesigns,
       designsWithPreview,
-      designsMissingPreview
+      designsMissingPreview,
+      designsPreviewProblems,
+      blouseDesignsCount
     });
   } catch (err) {
     next(err);
@@ -1570,45 +1585,63 @@ exports.getRegeneratePreviews = async (req, res, next) => {
 
 /**
  * POST /admin/tools/regenerate-previews
- * Batch regenerates watermarked previews (1200px max + 300px thumb) with dry-run support
+ * Batch regenerates watermarked previews (1200px max, 600px card, 300px thumb) with chunking & dry-run
  */
 exports.postRegeneratePreviews = async (req, res, next) => {
   try {
     const watermarkService = require('../../services/watermarkService');
-    const { dry_run, batch_size = 25, category_id, scope = 'all' } = req.body || {};
-    const isDryRun = dry_run === '1' || dry_run === true || dry_run === 'true';
-    const limit = parseInt(batch_size, 10) || 25;
+    const previewService = require('../../services/previewService');
+    const { 
+      dry_run, 
+      batch_size = 50, 
+      offset = 0, 
+      category_id, 
+      scope = 'preview_problems' 
+    } = req.body || {};
 
+    const isDryRun = dry_run === '1' || dry_run === true || dry_run === 'true';
+    const limit = parseInt(batch_size, 10) || 50;
+    const startOffset = parseInt(offset, 10) || 0;
+
+    // Fetch designs matching category
     const allDesignsResult = await Design.getAll({ 
       category: category_id && category_id !== 'all' ? category_id : null,
+      category_slug: category_id && isNaN(category_id) && category_id !== 'all' ? category_id : null,
       limit: 10000 
     });
     let designs = allDesignsResult.designs || [];
 
-    if (scope === 'missing_only') {
-      designs = designs.filter(d => !d.primary_image || d.primary_image.includes('placeholder-preview'));
+    // Filter by scope
+    if (scope === 'preview_problems') {
+      designs = designs.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return prev.hasPreview && !prev.has_thumbnail;
+      });
+    } else if (scope === 'missing_only') {
+      designs = designs.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return !prev.hasPreview;
+      });
     }
 
-    if (limit > 0 && limit < designs.length) {
-      designs = designs.slice(0, limit);
-    }
+    const totalMatching = designs.length;
+    const batchDesigns = designs.slice(startOffset, startOffset + limit);
 
     const items = [];
     let updatedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
 
-    const previewsDir = storage.getPreviewsDir();
-    const thumbsDir = storage.getThumbsDir();
-
-    for (const design of designs) {
+    for (const design of batchDesigns) {
       const itemLog = {
         id: design.id,
         sku: design.sku || 'N/A',
         title: design.title,
         status: 'pending',
         action: '',
-        previewUrl: design.primary_image || null
+        previewUrl: design.primary_image || null,
+        thumbUrl: null,
+        cardUrl: null
       };
 
       try {
@@ -1618,76 +1651,62 @@ exports.postRegeneratePreviews = async (req, res, next) => {
           candidatePath = storage.resolveFilePath(design.primary_image);
         }
 
-        // If not found, check design_images table or files
-        if (!candidatePath || !fs.existsSync(candidatePath)) {
-          if (db.isConnected()) {
-            const imgRows = await db.query('SELECT image_url FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, id ASC', [design.id]);
-            for (const row of imgRows) {
-              const testP = storage.resolveFilePath(row.image_url);
-              if (testP && fs.existsSync(testP)) {
-                candidatePath = testP;
-                break;
-              }
+        // Check design_images rows
+        if ((!candidatePath || !fs.existsSync(candidatePath)) && db.isConnected()) {
+          const imgRows = await db.query(
+            'SELECT image_url FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, display_order ASC, id ASC',
+            [design.id]
+          );
+          for (const row of imgRows) {
+            const testP = storage.resolveFilePath(row.image_url);
+            if (testP && fs.existsSync(testP)) {
+              candidatePath = testP;
+              break;
+            }
+          }
+        }
+
+        // Check design_files table
+        if ((!candidatePath || !fs.existsSync(candidatePath)) && db.isConnected()) {
+          const fileRows = await db.query(
+            "SELECT file_path FROM design_files WHERE design_id = ? AND (is_preview = 1 OR file_kind = 'image') ORDER BY id ASC",
+            [design.id]
+          );
+          for (const row of fileRows) {
+            const testP = storage.resolveFilePath(row.file_path);
+            if (testP && fs.existsSync(testP)) {
+              candidatePath = testP;
+              break;
             }
           }
         }
 
         if (!candidatePath || !fs.existsSync(candidatePath)) {
           itemLog.status = 'skipped';
-          itemLog.action = 'No source image found on disk; placeholder kept.';
+          itemLog.action = 'No valid preview source file found on disk. Skipped.';
           skippedCount++;
           items.push(itemLog);
           continue;
         }
 
         const cleanSlug = (design.slug || `design-${design.id}`).replace(/[^a-z0-9_-]/gi, '_');
-        const previewFileName = `preview_${cleanSlug}_${design.id}.webp`;
-        const thumbFileName = `thumb_${cleanSlug}_${design.id}.webp`;
-        const previewRelUrl = `/public/uploads/previews/${previewFileName}`;
-        const thumbRelUrl = `/public/uploads/previews/thumbs/${thumbFileName}`;
 
         if (isDryRun) {
           itemLog.status = 'ready';
-          itemLog.action = `Ready to generate: 1200px WebP watermark preview & 300px thumbnail (${path.basename(candidatePath)})`;
-          itemLog.previewUrl = previewRelUrl;
+          itemLog.action = `Ready to generate variants: 1200px large, 600px card, 300px thumb from ${path.basename(candidatePath)}`;
+          itemLog.previewUrl = `/public/uploads/previews/${cleanSlug}_preview.webp`;
+          itemLog.thumbUrl = `/public/uploads/previews/thumbs/${cleanSlug}_thumb.webp`;
           updatedCount++;
         } else {
-          // Generate actual watermarked previews
-          const generated = await watermarkService.generateWatermarkedPreviews(candidatePath, {
-            maxWidth: 1200,
-            maxHeight: 1200,
-            thumbSize: 300,
-            quality: 85
-          });
-
-          const targetPreviewPath = path.join(previewsDir, previewFileName);
-          const targetThumbPath = path.join(thumbsDir, thumbFileName);
-
-          await fs.promises.writeFile(targetPreviewPath, generated.largeBuffer);
-          await fs.promises.writeFile(targetThumbPath, generated.thumbBuffer);
-
-          // Update design_images table and designs table
-          if (db.isConnected()) {
-            const existingRows = await db.query('SELECT id FROM design_images WHERE design_id = ? AND is_primary = 1 LIMIT 1', [design.id]);
-            if (existingRows && existingRows.length > 0) {
-              await db.query('UPDATE design_images SET image_url = ?, display_order = 1, file_size = ? WHERE id = ?', [
-                previewRelUrl,
-                generated.largeBuffer.length,
-                existingRows[0].id
-              ]);
-            } else {
-              await db.query('INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size) VALUES (?, ?, 1, 1, ?)', [
-                design.id,
-                previewRelUrl,
-                generated.largeBuffer.length
-              ]);
-            }
-            await db.query('UPDATE designs SET image_url = ? WHERE id = ?', [previewRelUrl, design.id]);
-          }
+          // Live variant generation
+          const variants = await previewService.generatePreviewVariants(candidatePath, `${cleanSlug}_${design.id}`);
+          await previewService.setPrimaryPreview(design.id, variants);
 
           itemLog.status = 'regenerated';
-          itemLog.action = `Successfully created watermarked preview (${generated.width}x${generated.height}) & thumbnail (${generated.thumbWidth}x${generated.thumbHeight})`;
-          itemLog.previewUrl = previewRelUrl;
+          itemLog.action = `Generated all 3 synchronized variants (Large 1200px, Card 600px, Thumb 300px) & enforced single primary`;
+          itemLog.previewUrl = variants.largeKey;
+          itemLog.cardUrl = variants.cardKey;
+          itemLog.thumbUrl = variants.thumbKey;
           updatedCount++;
         }
       } catch (procErr) {
@@ -1699,6 +1718,9 @@ exports.postRegeneratePreviews = async (req, res, next) => {
     }
 
     if (!isDryRun) {
+      if (watermarkService.watermarkCache) {
+        try { watermarkService.watermarkCache.clear(); } catch (_) {}
+      }
       ActivityLog.log({
         action: 'REGENERATE_PREVIEWS',
         details: {
@@ -1706,17 +1728,25 @@ exports.postRegeneratePreviews = async (req, res, next) => {
           skippedCount,
           failedCount,
           scope,
-          total: designs.length
+          offset: startOffset,
+          batchSize: limit,
+          totalMatching
         },
         adminId: req.user ? req.user.id : null,
         adminEmail: req.user ? req.user.email : 'admin'
       }).catch(() => {});
     }
 
+    const processedSoFar = startOffset + batchDesigns.length;
+    const hasMore = processedSoFar < totalMatching;
+
     res.json({
       success: true,
       dryRun: isDryRun,
-      totalSelected: designs.length,
+      totalMatching,
+      processedSoFar,
+      hasMore,
+      nextOffset: hasMore ? processedSoFar : null,
       updatedCount,
       skippedCount,
       failedCount,
@@ -1725,6 +1755,63 @@ exports.postRegeneratePreviews = async (req, res, next) => {
   } catch (err) {
     console.error('postRegeneratePreviews error:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /admin/tools/regenerate-previews/export-csv
+ * Exports the scan/repair audit list as a CSV file
+ */
+exports.exportRegeneratePreviewsCsv = async (req, res, next) => {
+  try {
+    const previewService = require('../../services/previewService');
+    const { scope = 'preview_problems', category_id } = req.query || {};
+
+    const allDesignsResult = await Design.getAll({
+      category: category_id && category_id !== 'all' ? category_id : null,
+      category_slug: category_id && isNaN(category_id) && category_id !== 'all' ? category_id : null,
+      limit: 10000
+    });
+    let designs = allDesignsResult.designs || [];
+
+    if (scope === 'preview_problems') {
+      designs = designs.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return prev.hasPreview && !prev.has_thumbnail;
+      });
+    } else if (scope === 'missing_only') {
+      designs = designs.filter(d => {
+        const prev = previewService.getPrimaryPreview(d);
+        return !prev.hasPreview;
+      });
+    }
+
+    const rows = [
+      ['Design ID', 'SKU', 'Title', 'Category', 'Has Large Preview', 'Has Thumbnail', 'Large Preview URL', 'Thumbnail URL', 'Status']
+    ];
+
+    for (const d of designs) {
+      const prev = previewService.getPrimaryPreview(d);
+      rows.push([
+        d.id,
+        `"${(d.sku || '').replace(/"/g, '""')}"`,
+        `"${(d.title || '').replace(/"/g, '""')}"`,
+        `"${(d.category_name || '').replace(/"/g, '""')}"`,
+        prev.hasPreview ? 'YES' : 'NO',
+        prev.has_thumbnail ? 'YES' : 'NO',
+        `"${prev.largeUrl}"`,
+        `"${prev.thumbUrl}"`,
+        prev.hasPreview ? (prev.has_thumbnail ? 'OK' : 'MISSING_THUMB') : 'NO_PREVIEW'
+      ]);
+    }
+
+    const csvContent = rows.map(r => r.join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=preview_audit_${scope}_${Date.now()}.csv`);
+    res.send(csvContent);
+  } catch (err) {
+    console.error('exportRegeneratePreviewsCsv error:', err);
+    next(err);
   }
 };
 

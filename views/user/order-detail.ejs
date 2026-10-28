@@ -84,7 +84,12 @@
               <tr>
                 <td>
                   <div style="display: flex; align-items: center; gap: 1rem;">
-                    <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= cleanTitle %>" style="width: 50px; height: 50px; object-fit: contain; background: #FAF6F0; border-radius: 6px; border: 1px solid var(--border-light);">
+                    <%
+                      const prev = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(item) : null;
+                      const thumbUrl = prev?.thumbUrl || item.thumbnail_image || item.primary_image || '/public/images/logo.jpg';
+                      const largeUrl = prev?.largeUrl || item.primary_image || thumbUrl;
+                    %>
+                    <img src="<%= thumbUrl %>" alt="<%= cleanTitle %>" style="width: 50px; height: 50px; object-fit: contain; background: #FAF6F0; border-radius: 6px; border: 1px solid var(--border-light);" onerror="if (this.src !== '<%= largeUrl %>' && '<%= largeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrl %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
                     <div>
                       <strong><a href="/design/<%= item.slug %>" style="color: var(--text-dark);"><%= cleanTitle %></a></strong>
                     </div>
@@ -147,7 +152,12 @@
             <!-- Row: 64px thumbnail on left, Title/Specs/Price on right -->
             <div class="order-m-item-row">
               <div class="order-m-item-thumb">
-                <img src="<%= item.primary_image || '/public/images/logo.jpg' %>" alt="<%= cleanTitle %>">
+                <%
+                  const prevM = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(item) : null;
+                  const thumbUrlM = prevM?.thumbUrl || item.thumbnail_image || item.primary_image || '/public/images/logo.jpg';
+                  const largeUrlM = prevM?.largeUrl || item.primary_image || thumbUrlM;
+                %>
+                <img src="<%= thumbUrlM %>" alt="<%= cleanTitle %>" onerror="if (this.src !== '<%= largeUrlM %>' && '<%= largeUrlM %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrlM %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
               </div>
               <div class="order-m-item-details">
                 <a href="/design/<%= item.slug %>" class="order-m-item-title"><%= cleanTitle %></a>

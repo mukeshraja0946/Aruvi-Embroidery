@@ -83,11 +83,16 @@
 
       <div class="grid-6">
         <% featuredDesigns.forEach(design => { %>
+          <%
+            const prev = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(design) : null;
+            const thumbUrl = prev?.thumbUrl || design.thumbnail_image || design.primary_image || '/public/images/logo.jpg';
+            const largeUrl = prev?.largeUrl || design.primary_image || thumbUrl;
+          %>
           <div class="mini-product-card">
             <button class="mini-wishlist-btn wishlist-btn" data-id="<%= design.id %>"><i class="fa-regular fa-heart"></i></button>
             <div class="mini-card-img">
               <a href="/design/<%= design.slug %>">
-                <img src="<%= design.primary_image || '/public/images/logo.jpg' %>" alt="<%= design.title %>">
+                <img src="<%= thumbUrl %>" alt="<%= prev?.altText || design.title %>" width="300" height="300" loading="lazy" onerror="if (this.src !== '<%= largeUrl %>' && '<%= largeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrl %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
               </a>
             </div>
             <div class="mini-card-body">

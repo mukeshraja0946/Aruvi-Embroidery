@@ -68,6 +68,14 @@ class StorageService {
     return dir;
   }
 
+  getCardsDir() {
+    const dir = path.join(this.getPreviewsDir(), 'cards');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    }
+    return dir;
+  }
+
   getThumbsDir() {
     const dir = path.join(this.getPreviewsDir(), 'thumbs');
     if (!fs.existsSync(dir)) {
@@ -87,15 +95,20 @@ class StorageService {
   initStorageDirs() {
     try {
       this.getPreviewsDir();
+      this.getCardsDir();
       this.getThumbsDir();
       this.getDesignsDir();
       
       // Fallback local dirs inside project root
       const defaultPreviews = path.join(defaultUploadsDir, 'previews');
+      const defaultCards = path.join(defaultPreviews, 'cards');
       const defaultThumbs = path.join(defaultPreviews, 'thumbs');
       const defaultDesigns = path.join(defaultUploadsDir, 'designs');
       if (!fs.existsSync(defaultPreviews)) {
         try { fs.mkdirSync(defaultPreviews, { recursive: true }); } catch (e) {}
+      }
+      if (!fs.existsSync(defaultCards)) {
+        try { fs.mkdirSync(defaultCards, { recursive: true }); } catch (e) {}
       }
       if (!fs.existsSync(defaultThumbs)) {
         try { fs.mkdirSync(defaultThumbs, { recursive: true }); } catch (e) {}

@@ -46,8 +46,13 @@
               <div class="col-product product-info-col">
                 <input type="checkbox" checked class="custom-checkbox">
                 <div class="cart-item-thumb">
+                  <%
+                    const prev = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(item) : null;
+                    const thumbUrl = prev?.thumbUrl || item.thumbnail_image || item.primary_image || '/public/images/placeholder-preview.svg';
+                    const largeUrl = prev?.largeUrl || item.primary_image || thumbUrl;
+                  %>
                   <a href="/design/<%= item.slug %>">
-                    <img src="<%= item.primary_image || '/public/images/placeholder-preview.svg' %>" alt="<%= item.title %>" onerror="if(this.src.indexOf('placeholder-preview.svg')===-1)this.src='/public/images/placeholder-preview.svg';">
+                    <img src="<%= thumbUrl %>" alt="<%= prev?.altText || item.title %>" width="70" height="70" loading="lazy" onerror="if (this.src !== '<%= largeUrl %>' && '<%= largeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrl %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
                   </a>
                 </div>
                 <div class="cart-item-meta">

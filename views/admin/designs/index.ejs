@@ -373,6 +373,15 @@
             <option value="has_stitch" <%= (typeof selectedStitchFilter !== 'undefined' && selectedStitchFilter === 'has_stitch') ? 'selected' : '' %>>Has stitch count ✓</option>
           </select>
 
+          <!-- Preview Filter (Preview Problems / Missing Thumbnails / No Preview) -->
+          <select name="previewFilter" onchange="this.form.submit()" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
+            <option value="">All Previews</option>
+            <option value="problems" <%= (typeof selectedPreviewFilter !== 'undefined' && selectedPreviewFilter === 'problems') ? 'selected' : '' %>>⚠️ Preview problems</option>
+            <option value="missing_thumb" <%= (typeof selectedPreviewFilter !== 'undefined' && selectedPreviewFilter === 'missing_thumb') ? 'selected' : '' %>>Missing Thumbnail</option>
+            <option value="no_preview" <%= (typeof selectedPreviewFilter !== 'undefined' && selectedPreviewFilter === 'no_preview') ? 'selected' : '' %>>No Preview</option>
+            <option value="has_preview" <%= (typeof selectedPreviewFilter !== 'undefined' && selectedPreviewFilter === 'has_preview') ? 'selected' : '' %>>Has Preview ✓</option>
+          </select>
+
           <!-- Standardized Sort Filter -->
           <%- include('../../partials/sort-dropdown', {
             id: 'admin_designs_sort_dd',
@@ -437,8 +446,15 @@
                   </td>
                   <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.7rem;">
                     <div style="position: relative; width: 52px; height: 52px; display: inline-block;">
-                      <% if (d.primary_image) { %>
-                        <img id="designImg-<%= d.id %>" src="<%= d.thumbnail_image || d.primary_image %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                      <% 
+                        const prev = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(d) : null;
+                        const hasThumb = prev ? prev.has_thumbnail : Boolean(d.thumbnail_image);
+                        const hasPreview = prev ? prev.hasPreview : Boolean(d.primary_image);
+                        const displayThumbUrl = prev?.thumbUrl || d.thumbnail_image || d.primary_image;
+                        const displayLargeUrl = prev?.largeUrl || d.primary_image;
+                      %>
+                      <% if (hasPreview) { %>
+                        <img id="designImg-<%= d.id %>" src="<%= displayThumbUrl %>" alt="<%= d.title %>" style="width: 52px; height: 52px; border-radius: 8px; object-fit: contain; background: #FAF6F0; border: 1px solid var(--admin-border);" onerror="if (this.src !== '<%= displayLargeUrl %>' && '<%= displayLargeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= displayLargeUrl %>'; } else { this.style.display='none'; this.nextElementSibling.style.display='flex'; }">
                         <div style="display: none; width: 52px; height: 52px; border-radius: 8px; background: #F8F9FA; border: 1px dashed var(--admin-border); flex-direction: column; align-items: center; justify-content: center; color: var(--admin-text-muted); font-size: 0.65rem; font-weight: 600; text-align: center; padding: 2px;" title="Image could not be loaded">
                           <i class="fa-regular fa-image" style="font-size: 0.82rem; margin-bottom: 2px; color: var(--admin-text-muted);"></i>
                           <span>No image</span>
@@ -456,9 +472,13 @@
                     <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark); margin-bottom: 2px; line-height: 1.3;"><%= d.title %></strong>
                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                       <span style="font-size: 0.72rem; color: var(--admin-text-muted); font-family: monospace; letter-spacing: 0.3px;"><%= d.sku || ('AED-00' + d.id) %></span>
-                      <% if (!d.primary_image) { %>
+                      <% if (!hasPreview) { %>
                         <span class="badge" style="background: #FFF3E0; color: #E65100; border: 1px solid #FFE0B2; font-size: 0.65rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;" title="This design has no watermarked preview image">
                           <i class="fa-solid fa-triangle-exclamation"></i> No Preview
+                        </span>
+                      <% } else if (!hasThumb) { %>
+                        <span class="badge" style="background: #FFF8E1; color: #F57F17; border: 1px solid #FFE082; font-size: 0.65rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;" title="Preview exists but 300px thumbnail is missing">
+                          <i class="fa-solid fa-triangle-exclamation"></i> Missing Thumb
                         </span>
                       <% } %>
                     </div>

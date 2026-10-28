@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Cart = require('../models/Cart');
 const Setting = require('../models/Setting');
 const Wishlist = require('../models/Wishlist');
+const previewService = require('../services/previewService');
 
 async function attachUserAndCart(req, res, next) {
   // Always initialize res.locals defaults to prevent EJS ReferenceError crashes
@@ -16,6 +17,7 @@ async function attachUserAndCart(req, res, next) {
   res.locals.messages = { success: '', error: '', info: '' };
   res.locals.csrfToken = '';
   res.locals.schemaAlert = (req.app && req.app.locals && req.app.locals.schemaAlert) ? req.app.locals.schemaAlert : { isHealthy: true, missingCount: 0, missingSummary: '' };
+  res.locals.getPrimaryPreview = (d) => previewService.getPrimaryPreview(d);
 
   try {
     // 1. Session customer or admin user

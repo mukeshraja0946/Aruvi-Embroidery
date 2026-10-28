@@ -14,12 +14,15 @@
     <!-- Left Column: Gallery (Thumbnails Strip + Large Main Preview) -->
     <div class="product-gallery-box">
       <%
+        const primaryPrev = (typeof getPrimaryPreview === 'function') ? getPrimaryPreview(design) : null;
         let initialMainImage = null;
         let selectedThumbIdx = 0;
         if (design.images && design.images.length > 0) {
           const primaryIdx = design.images.findIndex(img => img.is_primary === 1 || img.is_primary === true);
           selectedThumbIdx = primaryIdx >= 0 ? primaryIdx : 0;
-          initialMainImage = design.images[selectedThumbIdx].image_url;
+          initialMainImage = design.images[selectedThumbIdx].image_url || primaryPrev?.largeUrl;
+        } else if (primaryPrev && primaryPrev.hasPreview) {
+          initialMainImage = primaryPrev.largeUrl;
         } else if (design.primary_image) {
           initialMainImage = design.primary_image;
         } else {
@@ -48,8 +51,9 @@
         <div class="thumbnails-stack">
           <% if (design.images && design.images.length > 0) { %>
             <% design.images.forEach((img, idx) => { %>
+              <% const itemThumbSrc = img.thumb_url || img.thumb_key || img.image_url; %>
               <div class="thumb-item <%= idx === selectedThumbIdx ? 'active' : '' %>" onclick="changeMainImage('<%= img.image_url %>', this)">
-                <img src="<%= img.image_url %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;" onerror="this.closest('.thumb-item')?.remove(); console.warn('Missing thumbnail removed:', this.src);">
+                <img src="<%= itemThumbSrc %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;" onerror="if (this.src !== '<%= img.image_url %>') { this.src = '<%= img.image_url %>'; } else { this.closest('.thumb-item')?.remove(); }">
               </div>
             <% }) %>
           <% } else { %>

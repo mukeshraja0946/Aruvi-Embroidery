@@ -2,8 +2,16 @@
   <!-- Square Image Box (1:1 Aspect Ratio) -->
   <div class="card-image-box">
     <a href="/design/<%= design.slug %>" class="card-img-link" aria-label="<%= design.title || design.sku || 'Design' %>">
-      <% const imgSrc = design.primary_image || '/public/images/placeholder-preview.svg'; %>
-      <img src="<%= imgSrc %>" alt="<%= design.title || design.sku || 'Embroidery Design' %>" loading="lazy" class="card-product-img" onerror="this.onerror=null; this.src='/public/images/placeholder-preview.svg';">
+      <% 
+        const preview = typeof getPrimaryPreview === 'function' ? getPrimaryPreview(design) : (design.preview || { thumbUrl: design.primary_image || '/public/images/placeholder-preview.svg', largeUrl: design.primary_image || '/public/images/placeholder-preview.svg', altText: design.title || 'Embroidery Design' });
+      %>
+      <img src="<%= preview.thumbUrl %>" 
+           alt="<%= preview.altText || design.title || design.sku || 'Embroidery Design' %>" 
+           loading="lazy" 
+           width="300" 
+           height="300" 
+           class="card-product-img" 
+           onerror="if (this.src !== '<%= preview.largeUrl %>') { this.src = '<%= preview.largeUrl %>'; } else { this.onerror = null; this.src = '/public/images/placeholder-preview.svg'; }">
     </a>
 
     <!-- Top Left Format Tag -->

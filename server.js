@@ -11,6 +11,8 @@ const cors = require('cors');
 
 dotenv.config();
 
+const previewService = require('./services/previewService');
+
 const app = express();
 
 // Enable trust proxy for production HTTPS reverse proxies (Nginx, Cloudflare, Render, Cpanel)
@@ -226,6 +228,7 @@ app.locals.flash = {
   info: []
 };
 app.locals.csrfToken = '';
+app.locals.getPrimaryPreview = (d) => previewService.getPrimaryPreview(d);
 
 // Custom Middleware
 // Attach user, cart, flash & global settings
