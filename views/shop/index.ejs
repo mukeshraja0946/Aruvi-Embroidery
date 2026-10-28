@@ -285,7 +285,7 @@
       </div>
 
       <!-- 4. Category Filter Pills: Horizontally Scrollable with Scroll-Snap, 44px height, Real DB Counts -->
-      <div class="category-pills-scroll-row" id="categoryPillsRow">
+      <div class="category-pills-scroll-row hide-scrollbar" id="categoryPillsRow">
         <a href="/designs<%= search ? '?search=' + encodeURIComponent(search) : '' %>" class="cat-pill-btn <%= !selectedCategory ? 'active' : '' %>">
           All (<%= typeof totalActiveDesigns !== 'undefined' ? totalActiveDesigns : totalCount %>)
         </a>

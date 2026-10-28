@@ -13,12 +13,25 @@
   <div class="product-detail-hero">
     <!-- Left Column: Gallery (Thumbnails Strip + Large Main Preview) -->
     <div class="product-gallery-box">
+      <%
+        let initialMainImage = null;
+        let selectedThumbIdx = 0;
+        if (design.images && design.images.length > 0) {
+          const primaryIdx = design.images.findIndex(img => img.is_primary === 1 || img.is_primary === true);
+          selectedThumbIdx = primaryIdx >= 0 ? primaryIdx : 0;
+          initialMainImage = design.images[selectedThumbIdx].image_url;
+        } else if (design.primary_image) {
+          initialMainImage = design.primary_image;
+        } else {
+          initialMainImage = '/public/images/placeholder-preview.svg';
+        }
+      %>
       <div class="main-image-display" id="mainImageDisplayWrapper" style="cursor: zoom-in;" onclick="openLightbox(document.getElementById('mainDisplayImg').src)">
         <% const isWish = (typeof inWishlist !== 'undefined' && inWishlist) || (typeof userWishlistDesignIds !== 'undefined' && userWishlistDesignIds && userWishlistDesignIds.includes(design.id)); %>
         <button type="button" class="wishlist-round-btn wishlist-btn <%= isWish ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
           <i class="fa-<%= isWish ? 'solid' : 'regular' %> fa-heart"></i>
         </button>
-        <img id="mainDisplayImg" src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" class="zoomable-detail-img" onerror="if (this.src !== '/public/images/cat_floral.jpg') { this.src = '/public/images/cat_floral.jpg'; }">
+        <img id="mainDisplayImg" src="<%= initialMainImage %>" alt="<%= design.title %>" class="zoomable-detail-img" onerror="if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
         
         <% if (typeof siteSettings === 'undefined' || siteSettings.show_preview_download_button !== '0') { %>
           <!-- Preview PNG Download Pill (available on preview image for all visitors) -->
@@ -31,17 +44,17 @@
         <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass"></i> Tap to zoom</span>
       </div>
 
-      <div class="thumbnails-scroll-container">
+      <div class="thumbnails-scroll-container hide-scrollbar">
         <div class="thumbnails-stack">
           <% if (design.images && design.images.length > 0) { %>
             <% design.images.forEach((img, idx) => { %>
-              <div class="thumb-item <%= (img.is_primary || idx === 0) ? 'active' : '' %>" onclick="changeMainImage('<%= img.image_url %>', this)">
+              <div class="thumb-item <%= idx === selectedThumbIdx ? 'active' : '' %>" onclick="changeMainImage('<%= img.image_url %>', this)">
                 <img src="<%= img.image_url %>" alt="<%= design.title %> - Preview <%= idx + 1 %>" style="object-fit: contain; background: #FAF6F0;" onerror="this.closest('.thumb-item')?.remove(); console.warn('Missing thumbnail removed:', this.src);">
               </div>
             <% }) %>
           <% } else { %>
-            <div class="thumb-item active" onclick="changeMainImage('<%= design.primary_image || '/public/images/cat_floral.jpg' %>', this)">
-              <img src="<%= design.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= design.title %>" style="object-fit: contain; background: #FAF6F0;" onerror="this.closest('.thumb-item')?.remove();">
+            <div class="thumb-item active" onclick="changeMainImage('<%= initialMainImage %>', this)">
+              <img src="<%= initialMainImage %>" alt="<%= design.title %>" style="object-fit: contain; background: #FAF6F0;" onerror="this.closest('.thumb-item')?.remove();">
             </div>
           <% } %>
           <% if (design.images && design.images.length > 4) { %>

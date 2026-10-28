@@ -165,10 +165,10 @@ class Design {
                  (SELECT AVG(r.rating) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) as real_avg_rating,
                  (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) as real_reviews_count,
                  COALESCE(
-                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
-                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
-                   (SELECT file_path FROM design_files WHERE design_id = d.id AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1),
-                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id DESC LIMIT 1)
+                   (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY display_order ASC, id ASC LIMIT 1),
+                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, display_order ASC, id ASC LIMIT 1),
+                   d.primary_image,
+                   (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 AND UPPER(file_format) IN ('PNG','JPG','JPEG','WEBP','SVG','AVIF') ORDER BY id DESC LIMIT 1)
                  ) as primary_image,
                  (SELECT df.file_name FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_name,
                  (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0 ORDER BY df.id DESC LIMIT 1) as machine_file_path,
@@ -490,19 +490,18 @@ class Design {
             }
           }
 
-          // Determine primary image
-          const previewFile = design.files.find(f => f.is_preview === 1 || f.is_preview === true || f.is_primary_preview === 1 || f.is_primary_preview === true);
+          // Determine primary image: prioritize authentic watermarked preview in design_images
           const primaryImg = design.images.find(img => img.is_primary === 1 || img.is_primary === true);
 
-          if (previewFile) {
-            design.primary_image = previewFile.storage_key || previewFile.file_path;
-          } else if (primaryImg) {
+          if (primaryImg) {
             design.primary_image = primaryImg.image_url;
-          } else if (design.images.length > 0) {
+          } else if (design.images && design.images.length > 0) {
             design.primary_image = design.images[0].image_url;
+          } else if (design.primary_image) {
+            // Keep existing primary_image from designs table
           } else {
-            const imgFile = design.files.find(f => ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((f.file_format || '').toUpperCase()) || f.file_kind === 'image');
-            design.primary_image = imgFile ? (imgFile.storage_key || imgFile.file_path) : null;
+            const previewFile = design.files.find(f => (f.is_preview === 1 || f.is_preview === true || f.is_primary_preview === 1 || f.is_primary_preview === true) && ['PNG', 'JPG', 'JPEG', 'WEBP'].includes((f.file_format || '').toUpperCase()));
+            design.primary_image = previewFile ? (previewFile.storage_key || previewFile.file_path) : null;
           }
 
           // Attach zipPackage metadata, file summary & sync formats

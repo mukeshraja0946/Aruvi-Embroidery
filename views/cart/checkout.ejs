@@ -100,8 +100,8 @@
             </div>
 
             <div class="form-group-field span-2">
-              <label>Delivery / Studio Address <span class="req">*</span></label>
-              <textarea name="address" rows="2" placeholder="Street, City, State, Pincode" required style="width: 100%; border: 1px solid var(--border-light); border-radius: 8px; padding: 0.6rem 0.8rem; font-family: inherit; font-size: 0.9rem;"><%= currentUser ? (currentUser.address || '') : '' %></textarea>
+              <label>Studio / Address (Optional)</label>
+              <textarea name="address" rows="2" placeholder="Add your address if you want it on the invoice" maxlength="500" style="width: 100%; border: 1px solid var(--border-light); border-radius: 8px; padding: 0.6rem 0.8rem; font-family: inherit; font-size: 0.9rem;"><%= currentUser ? (currentUser.address || '') : '' %></textarea>
             </div>
           </div>
         </div>
@@ -137,7 +137,7 @@
           <% cart.items.forEach(item => { %>
             <div class="summary-item-row">
               <div class="summary-item-thumb">
-                <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>">
+                <img src="<%= item.primary_image || '/public/images/placeholder-preview.svg' %>" alt="<%= item.title %>" onerror="if(this.src.indexOf('placeholder-preview.svg')===-1)this.src='/public/images/placeholder-preview.svg';">
               </div>
               <div class="summary-item-info">
                 <h4><%= item.title %></h4>

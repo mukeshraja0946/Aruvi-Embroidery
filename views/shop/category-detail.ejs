@@ -89,7 +89,7 @@
 
   <!-- 4. Category Filter Pills: Horizontally Scrollable with Scroll-Snap & Real DB Counts -->
   <% if (typeof categories !== 'undefined' && categories.length > 0) { %>
-    <div class="category-pills-scroll-row" id="categoryPillsRow">
+    <div class="category-pills-scroll-row hide-scrollbar" id="categoryPillsRow">
       <a href="/designs" class="cat-pill-btn">
         All (<%= typeof totalActiveDesigns !== 'undefined' ? totalActiveDesigns : catTotalCount %>)
       </a>

@@ -122,8 +122,28 @@ exports.createRazorpayOrder = async (req, res, next) => {
     const userId = req.user.id;
     const { full_name, email, phone, address, design_id } = req.body;
 
+    const cleanName = (full_name || (req.user ? req.user.full_name : '') || '').trim();
+    const cleanEmail = (email || (req.user ? req.user.email : '') || '').trim();
     const cleanPhone = (phone || (req.user ? req.user.phone : '') || '').trim();
-    const cleanAddress = (address || (req.user ? req.user.address : '') || '').trim();
+    // Address is optional; preserve user's typed value or fallback to profile
+    const rawAddress = (address !== undefined && address !== null) ? String(address) : (req.user ? (req.user.address || '') : '');
+    const cleanAddress = rawAddress.trim();
+
+    if (!cleanName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Full Name is required at checkout.',
+        referenceId: refId
+      });
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid email address is required at checkout.',
+        referenceId: refId
+      });
+    }
 
     if (!cleanPhone || cleanPhone.replace(/\D/g, '').length < 10) {
       return res.status(400).json({
@@ -133,21 +153,39 @@ exports.createRazorpayOrder = async (req, res, next) => {
       });
     }
 
-    if (!cleanAddress || cleanAddress.length < 3) {
+    // Check store setting: "Require address at checkout" (default OFF)
+    let requireAddressSetting = '0';
+    try {
+      requireAddressSetting = await Setting.get('require_checkout_address', '0');
+    } catch (_) {}
+
+    const isAddressMandatory = requireAddressSetting === '1' || requireAddressSetting === 'true';
+    if (isAddressMandatory && (!cleanAddress || cleanAddress.length < 3)) {
       return res.status(400).json({
         success: false,
-        message: 'Delivery / Studio address is required at checkout.',
+        message: 'Delivery / Studio address is required at checkout by store policy.',
         referenceId: refId
       });
     }
 
-    // Update customer profile with phone & address safely
-    try {
-      await User.updateProfile(userId, {
-        full_name: full_name || req.user.full_name,
-        phone: cleanPhone,
-        address: cleanAddress
+    if (cleanAddress.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'Address must not exceed 500 characters.',
+        referenceId: refId
       });
+    }
+
+    // Update customer profile with phone & address safely (only updating address if provided)
+    try {
+      const profileUpdates = {
+        full_name: cleanName,
+        phone: cleanPhone
+      };
+      if (cleanAddress) {
+        profileUpdates.address = cleanAddress;
+      }
+      await User.updateProfile(userId, profileUpdates);
     } catch (profileErr) {
       console.warn('[Checkout User Profile Update Warning]:', profileErr.message);
     }
@@ -252,9 +290,10 @@ exports.createRazorpayOrder = async (req, res, next) => {
     // Create local order with status "pending"
     const { orderId, orderNumber } = await Order.createOrder({
       userId,
-      guestEmail: email || req.user.email,
-      guestName: full_name || req.user.full_name,
+      guestEmail: cleanEmail,
+      guestName: cleanName,
       guestPhone: cleanPhone,
+      shippingAddress: cleanAddress || null,
       items: verifiedItems,
       totalAmount: dbOriginalTotal,
       discountAmount: totalDiscount,

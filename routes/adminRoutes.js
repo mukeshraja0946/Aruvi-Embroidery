@@ -239,6 +239,9 @@ router.post('/admin/tools/missing-files/clean-broken-images', adminToolsControll
 router.get('/admin/tools/missing-files/clean-broken-images/download-sql', adminToolsController.downloadCleanBrokenImagesSql);
 router.post('/admin/tools/replace-file-quick', upload.single('file'), adminToolsController.replaceDesignFileQuick);
 
+router.get('/admin/tools/regenerate-previews', adminToolsController.getRegeneratePreviews);
+router.post('/admin/tools/regenerate-previews', adminToolsController.postRegeneratePreviews);
+
 router.get('/admin/tools/bulk-image-relink', adminToolsController.getBulkImageRelink);
 router.get('/admin/tools/bulk-image-relink/export-report', adminToolsController.getBulkImageRelinkExport);
 router.post('/admin/tools/bulk-image-relink/preview', upload.single('zip_file'), adminToolsController.postBulkImageRelinkPreview);

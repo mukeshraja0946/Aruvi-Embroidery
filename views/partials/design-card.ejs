@@ -2,8 +2,8 @@
   <!-- Square Image Box (1:1 Aspect Ratio) -->
   <div class="card-image-box">
     <a href="/design/<%= design.slug %>" class="card-img-link" aria-label="<%= design.title || design.sku || 'Design' %>">
-      <% const imgSrc = design.primary_image || '/public/images/cat_blouse.jpg'; %>
-      <img src="<%= imgSrc %>" alt="<%= design.title || design.sku || 'Embroidery Design' %>" loading="lazy" class="card-product-img" onerror="this.onerror=null; this.src='/public/images/cat_blouse.jpg';">
+      <% const imgSrc = design.primary_image || '/public/images/placeholder-preview.svg'; %>
+      <img src="<%= imgSrc %>" alt="<%= design.title || design.sku || 'Embroidery Design' %>" loading="lazy" class="card-product-img" onerror="this.onerror=null; this.src='/public/images/placeholder-preview.svg';">
     </a>
 
     <!-- Top Left Format Tag -->

@@ -83,6 +83,62 @@ class WatermarkService {
       return await fs.promises.readFile(inputBufferOrPath);
     }
   }
+
+  /**
+   * Generates a watermarked large preview (max ~1200px) and a 300px thumbnail.
+   * Ensures customers only ever receive watermarked preview assets.
+   */
+  async generateWatermarkedPreviews(inputBufferOrPath, { maxWidth = 1200, maxHeight = 1200, thumbSize = 300, quality = 85 } = {}) {
+    let inputBuffer;
+    if (Buffer.isBuffer(inputBufferOrPath)) {
+      inputBuffer = inputBufferOrPath;
+    } else if (typeof inputBufferOrPath === 'string' && fs.existsSync(inputBufferOrPath)) {
+      inputBuffer = await fs.promises.readFile(inputBufferOrPath);
+    } else {
+      throw new Error('Invalid image input for preview generation');
+    }
+
+    // 1. Resize large image to fit within maxWidth x maxHeight without enlargement
+    const largeSharp = sharp(inputBuffer).resize(maxWidth, maxHeight, {
+      fit: 'inside',
+      withoutEnlargement: true
+    });
+    const largeBuf = await largeSharp.toBuffer();
+    const largeMeta = await sharp(largeBuf).metadata();
+    const width = largeMeta.width || 800;
+    const height = largeMeta.height || 800;
+
+    // Apply watermark on large preview
+    const wmSvg = this.generateWatermarkSvg(width, height);
+    const largeWatermarked = await sharp(largeBuf)
+      .composite([{ input: wmSvg, top: 0, left: 0, blend: 'over' }])
+      .webp({ quality })
+      .toBuffer();
+
+    // 2. Generate 300px thumbnail (also with small watermark banner)
+    const thumbBuf = await sharp(inputBuffer)
+      .resize(thumbSize, thumbSize, { fit: 'inside', withoutEnlargement: true })
+      .toBuffer();
+    const thumbMeta = await sharp(thumbBuf).metadata();
+    const tw = thumbMeta.width || thumbSize;
+    const th = thumbMeta.height || thumbSize;
+
+    const thumbWmSvg = this.generateWatermarkSvg(tw, th);
+    const thumbWatermarked = await sharp(thumbBuf)
+      .composite([{ input: thumbWmSvg, top: 0, left: 0, blend: 'over' }])
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    return {
+      largeBuffer: largeWatermarked,
+      thumbBuffer: thumbWatermarked,
+      width,
+      height,
+      thumbWidth: tw,
+      thumbHeight: th,
+      format: 'webp'
+    };
+  }
 }
 
 module.exports = new WatermarkService();

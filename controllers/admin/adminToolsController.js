@@ -1533,5 +1533,200 @@ exports.downloadCleanBrokenImagesSql = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /admin/tools/regenerate-previews
+ * Previews regeneration management page
+ */
+exports.getRegeneratePreviews = async (req, res, next) => {
+  try {
+    const Category = require('../../models/Category');
+    const categories = await Category.getAll();
+    const allDesigns = await Design.getAll({ limit: 10000 });
+    const designsList = allDesigns.designs || [];
+
+    const totalDesigns = designsList.length;
+    let designsWithPreview = 0;
+    let designsMissingPreview = 0;
+
+    designsList.forEach(d => {
+      if (d.primary_image && !d.primary_image.includes('placeholder-preview')) {
+        designsWithPreview++;
+      } else {
+        designsMissingPreview++;
+      }
+    });
+
+    res.render('admin/tools/regenerate-previews', {
+      title: 'Regenerate Watermarked Previews - ARUVI Admin',
+      categories,
+      totalDesigns,
+      designsWithPreview,
+      designsMissingPreview
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /admin/tools/regenerate-previews
+ * Batch regenerates watermarked previews (1200px max + 300px thumb) with dry-run support
+ */
+exports.postRegeneratePreviews = async (req, res, next) => {
+  try {
+    const watermarkService = require('../../services/watermarkService');
+    const { dry_run, batch_size = 25, category_id, scope = 'all' } = req.body || {};
+    const isDryRun = dry_run === '1' || dry_run === true || dry_run === 'true';
+    const limit = parseInt(batch_size, 10) || 25;
+
+    const allDesignsResult = await Design.getAll({ 
+      category: category_id && category_id !== 'all' ? category_id : null,
+      limit: 10000 
+    });
+    let designs = allDesignsResult.designs || [];
+
+    if (scope === 'missing_only') {
+      designs = designs.filter(d => !d.primary_image || d.primary_image.includes('placeholder-preview'));
+    }
+
+    if (limit > 0 && limit < designs.length) {
+      designs = designs.slice(0, limit);
+    }
+
+    const items = [];
+    let updatedCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+
+    const previewsDir = storage.getPreviewsDir();
+    const thumbsDir = storage.getThumbsDir();
+
+    for (const design of designs) {
+      const itemLog = {
+        id: design.id,
+        sku: design.sku || 'N/A',
+        title: design.title,
+        status: 'pending',
+        action: '',
+        previewUrl: design.primary_image || null
+      };
+
+      try {
+        // Resolve candidate source image
+        let candidatePath = null;
+        if (design.primary_image && !design.primary_image.includes('placeholder-preview')) {
+          candidatePath = storage.resolveFilePath(design.primary_image);
+        }
+
+        // If not found, check design_images table or files
+        if (!candidatePath || !fs.existsSync(candidatePath)) {
+          if (db.isConnected()) {
+            const imgRows = await db.query('SELECT image_url FROM design_images WHERE design_id = ? ORDER BY is_primary DESC, id ASC', [design.id]);
+            for (const row of imgRows) {
+              const testP = storage.resolveFilePath(row.image_url);
+              if (testP && fs.existsSync(testP)) {
+                candidatePath = testP;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!candidatePath || !fs.existsSync(candidatePath)) {
+          itemLog.status = 'skipped';
+          itemLog.action = 'No source image found on disk; placeholder kept.';
+          skippedCount++;
+          items.push(itemLog);
+          continue;
+        }
+
+        const cleanSlug = (design.slug || `design-${design.id}`).replace(/[^a-z0-9_-]/gi, '_');
+        const previewFileName = `preview_${cleanSlug}_${design.id}.webp`;
+        const thumbFileName = `thumb_${cleanSlug}_${design.id}.webp`;
+        const previewRelUrl = `/public/uploads/previews/${previewFileName}`;
+        const thumbRelUrl = `/public/uploads/previews/thumbs/${thumbFileName}`;
+
+        if (isDryRun) {
+          itemLog.status = 'ready';
+          itemLog.action = `Ready to generate: 1200px WebP watermark preview & 300px thumbnail (${path.basename(candidatePath)})`;
+          itemLog.previewUrl = previewRelUrl;
+          updatedCount++;
+        } else {
+          // Generate actual watermarked previews
+          const generated = await watermarkService.generateWatermarkedPreviews(candidatePath, {
+            maxWidth: 1200,
+            maxHeight: 1200,
+            thumbSize: 300,
+            quality: 85
+          });
+
+          const targetPreviewPath = path.join(previewsDir, previewFileName);
+          const targetThumbPath = path.join(thumbsDir, thumbFileName);
+
+          await fs.promises.writeFile(targetPreviewPath, generated.largeBuffer);
+          await fs.promises.writeFile(targetThumbPath, generated.thumbBuffer);
+
+          // Update design_images table and designs table
+          if (db.isConnected()) {
+            const existingRows = await db.query('SELECT id FROM design_images WHERE design_id = ? AND is_primary = 1 LIMIT 1', [design.id]);
+            if (existingRows && existingRows.length > 0) {
+              await db.query('UPDATE design_images SET image_url = ?, display_order = 1, file_size = ? WHERE id = ?', [
+                previewRelUrl,
+                generated.largeBuffer.length,
+                existingRows[0].id
+              ]);
+            } else {
+              await db.query('INSERT INTO design_images (design_id, image_url, is_primary, display_order, file_size) VALUES (?, ?, 1, 1, ?)', [
+                design.id,
+                previewRelUrl,
+                generated.largeBuffer.length
+              ]);
+            }
+            await db.query('UPDATE designs SET image_url = ? WHERE id = ?', [previewRelUrl, design.id]);
+          }
+
+          itemLog.status = 'regenerated';
+          itemLog.action = `Successfully created watermarked preview (${generated.width}x${generated.height}) & thumbnail (${generated.thumbWidth}x${generated.thumbHeight})`;
+          itemLog.previewUrl = previewRelUrl;
+          updatedCount++;
+        }
+      } catch (procErr) {
+        itemLog.status = 'failed';
+        itemLog.action = `Error: ${procErr.message}`;
+        failedCount++;
+      }
+      items.push(itemLog);
+    }
+
+    if (!isDryRun) {
+      ActivityLog.log({
+        action: 'REGENERATE_PREVIEWS',
+        details: {
+          updatedCount,
+          skippedCount,
+          failedCount,
+          scope,
+          total: designs.length
+        },
+        adminId: req.user ? req.user.id : null,
+        adminEmail: req.user ? req.user.email : 'admin'
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      dryRun: isDryRun,
+      totalSelected: designs.length,
+      updatedCount,
+      skippedCount,
+      failedCount,
+      items
+    });
+  } catch (err) {
+    console.error('postRegeneratePreviews error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.matchFileToDesigns = matchFileToDesigns;
 

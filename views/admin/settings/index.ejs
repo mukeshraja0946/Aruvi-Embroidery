@@ -121,6 +121,7 @@
             <ul class="sidebar-nav-list">
               <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
+              <li class="sidebar-nav-item"><a href="/admin/settings#checkout-settings"><span><i class="fa-solid fa-cart-shopping"></i> Checkout Settings</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/settings#design-settings"><span><i class="fa-solid fa-palette"></i> Design Page</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/settings" class="active"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
             </ul>
@@ -397,6 +398,39 @@
             <span style="font-size: 0.76rem; color: var(--admin-text-muted);">
               Verifies API authorization with Razorpay servers without charging anything.
             </span>
+          </div>
+        </div>
+
+        <!-- Card: Checkout Settings -->
+        <div class="admin-card-box" id="checkout-settings" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">
+                <i class="fa-solid fa-cart-shopping" style="color: var(--primary);"></i> Checkout Settings
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                Configure customer checkout requirements, delivery address rules, and purchase workflow.
+              </span>
+            </div>
+            <span style="background: <%= (typeof settings !== 'undefined' && (settings.require_checkout_address === '1' || settings.require_checkout_address === 'true')) ? '#FFEBEE; color: #C62828;' : '#E8F5E9; color: #2E7D32;' %>; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">
+              <%= (typeof settings !== 'undefined' && (settings.require_checkout_address === '1' || settings.require_checkout_address === 'true')) ? 'Address Mandatory' : 'Address Optional (Default)' %>
+            </span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr; gap: 1.2rem;">
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin: 0;">
+                <div>
+                  <strong style="display: block; font-size: 0.94rem; color: var(--admin-text-dark); margin-bottom: 4px;">
+                    <i class="fa-solid fa-location-dot" style="color: var(--admin-primary); margin-right: 6px;"></i> Require address at checkout
+                  </strong>
+                  <span style="display: block; font-size: 0.78rem; color: var(--admin-text-muted); line-height: 1.4;">
+                    When toggled <strong>OFF</strong> (default), only Full Name, Email, and Phone are mandatory; the Studio / Address field is completely optional. When toggled <strong>ON</strong>, customers must provide their delivery / studio address to proceed.
+                  </span>
+                </div>
+                <input type="checkbox" name="require_checkout_address" value="1" <%= (typeof settings !== 'undefined' && (settings.require_checkout_address === '1' || settings.require_checkout_address === 'true')) ? 'checked' : '' %> style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--admin-primary); flex-shrink: 0; margin-left: 1.5rem;">
+              </label>
+            </div>
           </div>
         </div>
 

@@ -815,6 +815,18 @@ body.admin-body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem !important;
-  box-sizing: border-box !important;
+/* Universal Hide Scrollbar Utility */
+.hide-scrollbar,
+.admin-tabs-scroll,
+.admin-quick-strip {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
+.hide-scrollbar::-webkit-scrollbar,
+.admin-tabs-scroll::-webkit-scrollbar,
+.admin-quick-strip::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

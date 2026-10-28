@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <title><%= title %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .regen-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .regen-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+    .regen-stat-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .regen-stat-icon.blue { background: #E3F2FD; color: #1565C0; }
+    .regen-stat-icon.green { background: #E8F5E9; color: #2E7D32; }
+    .regen-stat-icon.amber { background: #FFF3E0; color: #E65100; }
+    .regen-stat-icon.purple { background: #F3E5F5; color: #7B1FA2; }
+    .regen-stat-data strong {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--admin-text-dark);
+      line-height: 1.2;
+    }
+    .regen-stat-data span {
+      font-size: 0.8rem;
+      color: var(--admin-text-muted);
+      font-weight: 500;
+    }
+    .progress-bar-container {
+      background: #EFEBE4;
+      border-radius: 10px;
+      height: 14px;
+      overflow: hidden;
+      margin: 1rem 0 0.5rem;
+      display: none;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #A87C4F, #2E7D32);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <img src="/public/assets/brand/logo.png" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;" onerror="this.src='/public/images/logo.jpg'">
+    </a>
+    <div class="admin-header-right">
+      <a href="/admin/tools/system-health" class="admin-icon-btn" title="System Health"><i class="fa-solid fa-heart-pulse"></i></a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item"><a href="/admin"><span><i class="fa-solid fa-house"></i> Dashboard</span></a></li>
+      </ul>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & RECOVERY</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/regenerate-previews" class="active"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Regenerate Previews</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/duplicate-files"><span><i class="fa-solid fa-clone"></i> Remove Duplicates</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-image-relink"><span><i class="fa-solid fa-images"></i> Bulk Image Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-file-relink"><span><i class="fa-solid fa-file-zipper"></i> Bulk File Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Storage</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">SYSTEM SETTINGS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main-content">
+      <div class="admin-page-header" style="margin-bottom: 1.5rem;">
+        <div style="font-size: 0.82rem; color: var(--admin-text-muted); margin-bottom: 0.3rem;">
+          <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp;
+          <span>Tools</span> &nbsp;>&nbsp;
+          <strong style="color: var(--admin-primary);">Regenerate Previews</strong>
+        </div>
+        <h1 style="font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 0 0.4rem; color: var(--admin-text-dark);">
+          <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary);"></i> Regenerate Watermarked Previews
+        </h1>
+        <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">
+          Generates optimized, watermarked WebP large previews (max 1200px) and 300px thumbnails for designs. Prevents raw/original uploads from ever being served directly to public visitors.
+        </p>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="regen-stat-grid">
+        <div class="regen-stat-card">
+          <div class="regen-stat-icon blue"><i class="fa-solid fa-layer-group"></i></div>
+          <div class="regen-stat-data">
+            <strong><%= totalDesigns %></strong>
+            <span>Total Designs</span>
+          </div>
+        </div>
+        <div class="regen-stat-card">
+          <div class="regen-stat-icon green"><i class="fa-solid fa-image"></i></div>
+          <div class="regen-stat-data">
+            <strong><%= designsWithPreview %></strong>
+            <span>Active Previews</span>
+          </div>
+        </div>
+        <div class="regen-stat-card">
+          <div class="regen-stat-icon amber"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="regen-stat-data">
+            <strong><%= designsMissingPreview %></strong>
+            <span>Missing / Placeholders</span>
+          </div>
+        </div>
+        <div class="regen-stat-card">
+          <div class="regen-stat-icon purple"><i class="fa-solid fa-shield-halved"></i></div>
+          <div class="regen-stat-data">
+            <strong>1200px / 300px</strong>
+            <span>Watermarked WebP</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Execution Form Box -->
+      <div class="admin-card-box" style="padding: 1.8rem; margin-bottom: 2rem;">
+        <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; margin: 0 0 1.2rem; color: var(--admin-text-dark);">
+          Batch Preview Regeneration Controls
+        </h3>
+
+        <form id="regenForm">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.2rem; margin-bottom: 1.4rem;">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Scope</label>
+              <select name="scope" id="scopeSelect" class="form-control" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.86rem; background: #FFF;">
+                <option value="all">All Designs</option>
+                <option value="missing_only">Only Designs Missing Previews</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Category Filter</label>
+              <select name="category_id" id="catSelect" class="form-control" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.86rem; background: #FFF;">
+                <option value="all">All Categories</option>
+                <% if (categories && categories.length > 0) { %>
+                  <% categories.forEach(cat => { %>
+                    <option value="<%= cat.id %>"><%= cat.name %></option>
+                  <% }) %>
+                <% } %>
+              </select>
+            </div>
+
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Batch Size</label>
+              <select name="batch_size" id="batchSelect" class="form-control" style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 0.8rem; font-size: 0.86rem; background: #FFF;">
+                <option value="10">10 Designs (Fast test)</option>
+                <option value="25" selected>25 Designs</option>
+                <option value="50">50 Designs</option>
+                <option value="100">100 Designs</option>
+                <option value="0">All Matching Designs</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dry Run Checkbox -->
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0;">
+              <input type="checkbox" name="dry_run" id="dryRunCheck" value="1" checked style="width: 20px; height: 20px; accent-color: var(--admin-primary); cursor: pointer;">
+              <div>
+                <strong style="font-size: 0.9rem; color: var(--admin-text-dark); display: block;">Dry Run First (Preview Only)</strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Inspect matched designs, source files, and expected output filenames without modifying disks or the database.</span>
+              </div>
+            </label>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <button type="button" id="startDryRunBtn" onclick="runProcess(true)" class="btn btn-outline" style="border: 1.5px solid var(--admin-primary); color: var(--admin-primary); background: #FFF; padding: 0.6rem 1.4rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              <i class="fa-solid fa-magnifying-glass"></i> Run Dry Run Test
+            </button>
+            <button type="button" id="startRealBtn" onclick="runProcess(false)" class="btn btn-primary" style="padding: 0.6rem 1.4rem; border-radius: 8px; font-weight: 600; cursor: pointer; background: var(--primary);">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Regenerate Previews Now
+            </button>
+            <span id="processStatusText" style="font-size: 0.85rem; font-weight: 600; color: var(--admin-text-muted);"></span>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress-bar-container" id="progressBarWrap">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Results / Audit Log Box -->
+      <div class="admin-card-box" id="resultsBox" style="padding: 1.8rem; display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 10px;">
+          <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; margin: 0; color: var(--admin-text-dark);" id="resultsHeader">
+            Regeneration Results
+          </h3>
+          <div id="resultsCounters" style="font-size: 0.85rem; display: flex; gap: 12px;"></div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="admin-table-styled" style="width: 100%;">
+            <thead>
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th style="width: 100px;">SKU</th>
+                <th>Design Title</th>
+                <th style="width: 120px;">Status</th>
+                <th>Action Details</th>
+                <th style="width: 80px; text-align: center;">Preview</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+async function runProcess(isDryRun) {
+  const dryCheck = document.getElementById('dryRunCheck');
+  dryCheck.checked = isDryRun;
+
+  const statusText = document.getElementById('processStatusText');
+  const dryBtn = document.getElementById('startDryRunBtn');
+  const realBtn = document.getElementById('startRealBtn');
+  const progressWrap = document.getElementById('progressBarWrap');
+  const progressFill = document.getElementById('progressBarFill');
+  const resultsBox = document.getElementById('resultsBox');
+  const resultsHeader = document.getElementById('resultsHeader');
+  const resultsCounters = document.getElementById('resultsCounters');
+  const tbody = document.getElementById('resultsTableBody');
+
+  dryBtn.disabled = true;
+  realBtn.disabled = true;
+  progressWrap.style.display = 'block';
+  progressFill.style.width = '25%';
+  statusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${isDryRun ? 'Executing Dry Run...' : 'Generating watermarked WebP previews...'}`;
+
+  const payload = {
+    dry_run: isDryRun ? '1' : '0',
+    batch_size: document.getElementById('batchSelect').value,
+    category_id: document.getElementById('catSelect').value,
+    scope: document.getElementById('scopeSelect').value
+  };
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+  try {
+    progressFill.style.width = '60%';
+    const res = await fetch('/admin/tools/regenerate-previews', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    progressFill.style.width = '100%';
+
+    if (!data.success) {
+      statusText.innerHTML = `<span style="color: #C62828;"><i class="fa-solid fa-triangle-exclamation"></i> ${data.message || 'Error occurred.'}</span>`;
+      dryBtn.disabled = false;
+      realBtn.disabled = false;
+      return;
+    }
+
+    resultsBox.style.display = 'block';
+    resultsHeader.textContent = isDryRun ? 'Dry Run Audit Summary (Simulation)' : 'Live Preview Regeneration Summary';
+
+    resultsCounters.innerHTML = `
+      <span style="color: #2E7D32; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ${isDryRun ? 'Ready' : 'Updated'}: ${data.updatedCount}</span>
+      <span style="color: #E65100; font-weight: 700;"><i class="fa-solid fa-forward"></i> Skipped: ${data.skippedCount}</span>
+      <span style="color: #C62828; font-weight: 700;"><i class="fa-solid fa-circle-xmark"></i> Failed: ${data.failedCount}</span>
+    `;
+
+    tbody.innerHTML = '';
+    if (data.items && data.items.length > 0) {
+      data.items.forEach(item => {
+        const tr = document.createElement('tr');
+        const badgeColor = item.status === 'regenerated' ? '#E8F5E9; color: #2E7D32;' : (item.status === 'ready' ? '#E3F2FD; color: #1565C0;' : (item.status === 'skipped' ? '#FFF3E0; color: #E65100;' : '#FFEBEE; color: #C62828;'));
+
+        tr.innerHTML = `
+          <td><strong>#${item.id}</strong></td>
+          <td><code style="font-size: 0.8rem;">${item.sku || 'N/A'}</code></td>
+          <td><strong>${item.title}</strong></td>
+          <td><span style="background: ${badgeColor}; padding: 3px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase;">${item.status}</span></td>
+          <td style="font-size: 0.82rem; color: #4A3E39;">${item.action}</td>
+          <td style="text-align: center;">
+            ${item.previewUrl ? `<img src="${item.previewUrl}" alt="thumb" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid #EFE6D9;" onerror="this.src='/public/images/placeholder-preview.svg'">` : '<span style="color: #999; font-size: 0.75rem;">None</span>'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #888;">No designs matched the criteria.</td></tr>';
+    }
+
+    statusText.innerHTML = `<span style="color: #2E7D32;"><i class="fa-solid fa-circle-check"></i> ${isDryRun ? 'Dry run simulation finished.' : 'Regeneration completed successfully!'}</span>`;
+  } catch (err) {
+    console.error('Regenerate preview error:', err);
+    statusText.innerHTML = `<span style="color: #C62828;"><i class="fa-solid fa-triangle-exclamation"></i> Network error: ${err.message}</span>`;
+  } finally {
+    dryBtn.disabled = false;
+    realBtn.disabled = false;
+  }
+}
+</script>
+
+</body>
+</html>

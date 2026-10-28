@@ -242,6 +242,15 @@
               <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.8rem; color: var(--admin-text-dark);">Customer Info</h4>
               <p style="margin-bottom: 0.4rem;"><strong>Customer:</strong> <%= order.guest_name || order.user_name || 'N/A' %></p>
               <p style="margin-bottom: 0.4rem;"><strong>Email:</strong> <%= order.guest_email || order.user_email || 'N/A' %></p>
+              <% if (order.guest_phone || order.user_phone || order.phone) { %>
+                <p style="margin-bottom: 0.4rem;"><strong>Phone:</strong> <%= order.guest_phone || order.user_phone || order.phone %></p>
+              <% } %>
+              <% 
+                const orderAddr = (order.shipping_address || order.user_address || order.address || '').trim();
+                if (orderAddr) { 
+              %>
+                <p style="margin-bottom: 0.4rem;"><strong>Studio / Address:</strong> <%= orderAddr %></p>
+              <% } %>
               <p style="margin-bottom: 0.4rem;"><strong>Payment Gateway:</strong> <span style="text-transform: uppercase; font-weight: 600; color: var(--admin-primary);"><%= (order.payment_gateway || 'razorpay').toUpperCase() %></span></p>
               <p style="margin-bottom: 0;"><strong>Payment ID:</strong> <code style="background: #FAF6F0; border: 1px solid var(--admin-border); padding: 2px 6px; border-radius: 4px; font-size: 0.78rem;"><%= order.razorpay_payment_id || order.razorpay_order_id || 'N/A' %></code></p>
             </div>

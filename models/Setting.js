@@ -124,7 +124,8 @@ const fallbackSettings = {
   label_stitch_sleeve: 'Stitch Count (Sleeve)',
   show_stitch_total: '1',
   label_stitch_total: 'Total Stitch Count',
-  show_stitch_on_cards: '0'
+  show_stitch_on_cards: '0',
+  require_checkout_address: '0'
 };
 
 class Setting {

@@ -215,12 +215,14 @@ async function sendPurchaseConfirmationEmail(order) {
       return { success: false, simulated: true, message: 'SMTP credentials not configured.' };
     }
 
+    const orderAddr = (order.shipping_address || order.user_address || order.address || '').trim();
+
     const mailOptions = {
       from,
       replyTo: from,
       to: customerEmail,
       subject: `Order Confirmation #${orderId} – Aruvi Embroidery`,
-      text: `Hello ${customerName},\n\nThank you for your purchase from Aruvi Embroidery.\n\nYou have successfully purchased:\n${designName}\n\nYour payment has been successfully received.\n\nYour purchased design is now available for download from your account.\n\nDownload Link:\n${downloadUrl}\n\nOrder ID: ${orderId}\nAmount: ₹${amount}\nPayment Status: Paid\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
+      text: `Hello ${customerName},\n\nThank you for your purchase from Aruvi Embroidery.\n\nYou have successfully purchased:\n${designName}\n\nYour payment has been successfully received.\n\nYour purchased design is now available for download from your account.\n\nDownload Link:\n${downloadUrl}\n\nOrder ID: ${orderId}\nAmount: ₹${amount}\nPayment Status: Paid${orderAddr ? `\nStudio / Address:\n${orderAddr}` : ''}\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
           <div style="background: #231815; color: #FFF; padding: 20px; text-align: center;">
@@ -238,7 +240,8 @@ async function sendPurchaseConfirmationEmail(order) {
             <div style="background: #FAF6F0; border-left: 4px solid #2E7D32; padding: 15px; margin: 20px 0; border-radius: 4px;">
               <p style="margin: 0 0 6px;"><strong>Order ID:</strong> ${orderId}</p>
               <p style="margin: 0 0 6px;"><strong>Amount:</strong> ₹${amount}</p>
-              <p style="margin: 0;"><strong>Payment Status:</strong> <span style="color: #2E7D32; font-weight: bold;">Paid</span></p>
+              <p style="margin: 0 0 6px;"><strong>Payment Status:</strong> <span style="color: #2E7D32; font-weight: bold;">Paid</span></p>
+              ${orderAddr ? `<p style="margin: 0;"><strong>Studio / Address:</strong> ${orderAddr}</p>` : ''}
             </div>
 
             <p><a href="${downloadUrl}" style="display: inline-block; background: #2E7D32; color: #FFF; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Open My Downloads</a></p>

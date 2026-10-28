@@ -403,7 +403,7 @@ exports.downloadPreviewPng = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Design not found' });
     }
 
-    const reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/cat_floral.jpg';
+    const reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/placeholder-preview.png';
     if (!reqImgUrl) {
       return res.status(404).json({ success: false, message: 'No preview image available for this design' });
     }
@@ -547,7 +547,7 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
     }
 
     if (!reqImgUrl) {
-      reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/cat_floral.jpg';
+      reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/placeholder-preview.png';
     }
 
     // Security check: strictly forbid machine embroidery files, archives, and system files

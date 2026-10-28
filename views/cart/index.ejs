@@ -47,7 +47,7 @@
                 <input type="checkbox" checked class="custom-checkbox">
                 <div class="cart-item-thumb">
                   <a href="/design/<%= item.slug %>">
-                    <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>">
+                    <img src="<%= item.primary_image || '/public/images/placeholder-preview.svg' %>" alt="<%= item.title %>" onerror="if(this.src.indexOf('placeholder-preview.svg')===-1)this.src='/public/images/placeholder-preview.svg';">
                   </a>
                 </div>
                 <div class="cart-item-meta">

@@ -85,6 +85,80 @@ img {
   padding: 0 1rem;
 }
 
+/* ============================================================
+   UNIVERSAL HIDE SCROLLBAR UTILITY (FIX 1)
+   Hides visible scrollbars across all browsers (Chrome Android,
+   Safari iOS, Desktop) while preserving 100% swipe and scrolling.
+   ============================================================ */
+.hide-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Desktop Horizontal Scroller Wrapper & Hover Navigation Arrows */
+.scroller-wrapper-relative {
+  position: relative !important;
+  width: 100% !important;
+}
+
+.scroller-arrow-btn {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light, #E8DFD5) !important;
+  color: var(--primary, #A32A38) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.85rem !important;
+  box-shadow: 0 4px 12px rgba(44, 24, 16, 0.15) !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease !important;
+}
+
+.scroller-arrow-btn:hover {
+  background: var(--primary, #A32A38) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-50%) scale(1.08) !important;
+}
+
+.scroller-arrow-btn.prev-arrow {
+  left: -14px !important;
+}
+
+.scroller-arrow-btn.next-arrow {
+  right: -14px !important;
+}
+
+/* Show arrows on hover for desktop users */
+@media (hover: hover) and (pointer: fine) {
+  .scroller-wrapper-relative:hover .scroller-arrow-btn {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+/* Hide arrow buttons on touch devices */
+@media (hover: none) or (max-width: 768px) {
+  .scroller-arrow-btn {
+    display: none !important;
+  }
+}
+
+
 /* Form Group & Input Controls */
 .form-group {
   margin-bottom: 1.2rem;
@@ -5209,12 +5283,22 @@ textarea.form-control {
     display: flex !important;
     overflow-x: auto !important;
     scroll-snap-type: x mandatory !important;
-    gap: 8px !important;
+    gap: 12px !important;
     padding-bottom: 0.4rem !important;
+    padding-right: 1.5rem !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
     -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .grid-6::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   .grid-6 > * {
@@ -7349,18 +7433,17 @@ textarea.form-control {
     overflow-x: auto !important;
     overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
     scroll-behavior: smooth !important;
-    scrollbar-width: thin !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
     padding: 4px 0 6px 0 !important;
   }
 
   .thumbnails-scroll-container::-webkit-scrollbar {
-    height: 4px !important;
-  }
-
-  .thumbnails-scroll-container::-webkit-scrollbar-thumb {
-    background: rgba(0,0,0,0.15) !important;
-    border-radius: 4px !important;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   .thumbnails-stack {
@@ -7998,6 +8081,15 @@ textarea.form-control {
     max-width: 100% !important;
     box-sizing: border-box !important;
     -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    touch-action: pan-x pan-y !important;
+  }
+
+  .testimonial-cards-wrapper::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   .testimonial-card {

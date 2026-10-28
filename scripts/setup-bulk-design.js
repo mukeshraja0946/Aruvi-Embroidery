@@ -27,7 +27,7 @@ async function run() {
     for (let i = 1; i <= 10; i++) {
       await db.query(
         "INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, ?, ?)",
-        [designId, '/public/images/cat_floral.jpg', i === 1 ? 1 : 0, i]
+        [designId, '/public/images/placeholder-preview.svg', i === 1 ? 1 : 0, i]
       );
     }
 

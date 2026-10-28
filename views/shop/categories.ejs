@@ -18,20 +18,11 @@
   <div class="grid-4-strict categories-cards-grid">
     <% categories.forEach(cat => { %>
       <% 
-        let catImg = cat.image_url;
-        if (!catImg) {
-          const s = (cat.slug || '').toLowerCase();
-          if (s.includes('floral')) catImg = '/public/images/cat_floral.jpg';
-          else if (s.includes('border') || s.includes('lace')) catImg = '/public/images/cat_border.jpg';
-          else if (s.includes('kid')) catImg = '/public/images/cat_kids.jpg';
-          else if (s.includes('traditional') || s.includes('temple') || s.includes('saree')) catImg = '/public/images/cat_traditional.jpg';
-          else if (s.includes('logo') || s.includes('shirt') || s.includes('monogram')) catImg = '/public/images/cat_monogram.jpg';
-          else catImg = '/public/images/cat_blouse.jpg';
-        }
+        let catImg = cat.image_url || '/public/images/placeholder-preview.svg';
       %>
       <a href="/category/<%= cat.slug %>" class="category-card">
         <div class="category-card-img-box">
-          <img src="<%= catImg %>" alt="<%= cat.name %>" onerror="this.onerror=null;this.src='/public/images/cat_blouse.jpg';">
+          <img src="<%= catImg %>" alt="<%= cat.name %>" onerror="this.onerror=null;this.src='/public/images/placeholder-preview.svg';">
         </div>
         <div class="category-card-info">
           <div class="category-card-meta">

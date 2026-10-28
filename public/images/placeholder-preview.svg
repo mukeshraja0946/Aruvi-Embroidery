@@ -1,0 +1,34 @@
+<svg width="600" height="600" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Subtle Elegant Neutral Background -->
+  <rect width="600" height="600" rx="16" fill="#FAF6F0"/>
+  <rect x="12" y="12" width="576" height="576" rx="12" stroke="#EAE0D2" stroke-width="2" stroke-dasharray="6 4"/>
+  
+  <!-- Subtle Watermark/Pattern Hexagons in Background -->
+  <g opacity="0.12" stroke="#A32A38" stroke-width="1.5">
+    <polygon points="300,160 360,195 360,265 300,300 240,265 240,195" fill="none"/>
+    <polygon points="200,218 260,253 260,323 200,358 140,323 140,253" fill="none"/>
+    <polygon points="400,218 460,253 460,323 400,358 340,323 340,253" fill="none"/>
+  </g>
+
+  <!-- Central Brand Icon Box -->
+  <circle cx="300" cy="250" r="58" fill="#F4EBE0" stroke="#DCCEC0" stroke-width="2"/>
+  
+  <!-- Stylized Embroidery Needle & Hoop Icon -->
+  <g transform="translate(270, 220)">
+    <!-- Embroidery Hoop Outline -->
+    <circle cx="30" cy="30" r="26" fill="none" stroke="#A32A38" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="30" cy="30" r="20" fill="none" stroke="#BB4558" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <!-- Thread / Needle Stitch Motif -->
+    <path d="M18 36 L26 22 L34 32 L42 18" stroke="#A32A38" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Center Sparkle -->
+    <circle cx="30" cy="30" r="2.5" fill="#A32A38"/>
+  </g>
+
+  <!-- Brand Typography -->
+  <text x="300" y="348" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-size="20" font-weight="700" fill="#2C1810" letter-spacing="1">ARUVI EMBROIDERY</text>
+  <text x="300" y="372" text-anchor="middle" font-family="'Poppins', sans-serif" font-size="12" font-weight="600" fill="#8C7F79" letter-spacing="2">STUDIO</text>
+
+  <!-- Status Badge Pill -->
+  <rect x="200" y="405" width="200" height="34" rx="17" fill="#EFE7DC" stroke="#D8CABE" stroke-width="1"/>
+  <text x="300" y="427" text-anchor="middle" font-family="'Poppins', sans-serif" font-size="12" font-weight="500" fill="#6E5E57">Preview not available</text>
+</svg>

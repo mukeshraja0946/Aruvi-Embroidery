@@ -96,6 +96,7 @@ class Order {
     guestEmail = null,
     guestName = null,
     guestPhone = null,
+    shippingAddress = null,
     items = [],
     totalAmount,
     discountAmount = 0,
@@ -109,11 +110,20 @@ class Order {
     const orderNumber = 'AE-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000);
 
     if (db.isConnected()) {
-      const orderRes = await db.query(
-        `INSERT INTO orders (order_number, user_id, guest_email, guest_name, guest_phone, total_amount, discount_amount, final_amount, coupon_code, status, razorpay_order_id, cashfree_order_id, payment_gateway, is_test)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-        [orderNumber, userId || null, guestEmail || null, guestName || null, guestPhone || null, totalAmount, discountAmount, finalAmount, couponCode || null, razorpayOrderId || null, cashfreeOrderId || null, paymentGateway, isTest ? 1 : 0]
-      );
+      let orderRes;
+      try {
+        orderRes = await db.query(
+          `INSERT INTO orders (order_number, user_id, guest_email, guest_name, guest_phone, shipping_address, total_amount, discount_amount, final_amount, coupon_code, status, razorpay_order_id, cashfree_order_id, payment_gateway, is_test)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+          [orderNumber, userId || null, guestEmail || null, guestName || null, guestPhone || null, shippingAddress || null, totalAmount, discountAmount, finalAmount, couponCode || null, razorpayOrderId || null, cashfreeOrderId || null, paymentGateway, isTest ? 1 : 0]
+        );
+      } catch (insertErr) {
+        orderRes = await db.query(
+          `INSERT INTO orders (order_number, user_id, guest_email, guest_name, guest_phone, total_amount, discount_amount, final_amount, coupon_code, status, razorpay_order_id, cashfree_order_id, payment_gateway, is_test)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+          [orderNumber, userId || null, guestEmail || null, guestName || null, guestPhone || null, totalAmount, discountAmount, finalAmount, couponCode || null, razorpayOrderId || null, cashfreeOrderId || null, paymentGateway, isTest ? 1 : 0]
+        );
+      }
       const orderId = orderRes.insertId;
 
       for (const item of items) {
@@ -145,6 +155,7 @@ class Order {
       guest_email: guestEmail,
       guest_name: guestName,
       guest_phone: guestPhone,
+      shipping_address: shippingAddress || null,
       total_amount: totalAmount,
       discount_amount: discountAmount,
       final_amount: finalAmount,
@@ -368,7 +379,7 @@ class Order {
         purchase_date: new Date(),
         order_number: 'AE-20261005-5194',
         order_item_id: 1,
-        primary_image: '/public/images/cat_floral.jpg',
+        primary_image: '/public/images/placeholder-preview.svg',
         file_count: 1
       }
     ];

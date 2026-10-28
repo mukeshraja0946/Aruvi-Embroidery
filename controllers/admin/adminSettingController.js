@@ -208,6 +208,7 @@ exports.postSettings = async (req, res, next) => {
       razorpay_key_secret: b.razorpay_key_secret !== undefined ? b.razorpay_key_secret.trim() : undefined,
       razorpay_mode: b.razorpay_mode !== undefined ? b.razorpay_mode.trim() : undefined,
       razorpay_webhook_secret: b.razorpay_webhook_secret !== undefined ? b.razorpay_webhook_secret.trim() : undefined,
+      require_checkout_address: b.require_checkout_address === '1' ? '1' : '0',
       hide_empty_categories_in_pills: b.hide_empty_categories_in_pills === 'true' || b.hide_empty_categories_in_pills === '1' ? 'true' : (b.hide_empty_categories_in_pills === 'false' || b.hide_empty_categories_in_pills === '0' ? 'false' : undefined),
       show_category_banner_mobile: b.show_category_banner_mobile === '1' ? '1' : '0',
       show_sku_on_cards: b.show_sku_on_cards === '1' ? '1' : '0',

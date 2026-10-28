@@ -72,10 +72,30 @@ const storage = require('./config/storage');
 storage.initStorage();
 storage.validateStorageConfiguration();
 
-// Strict Security: Block unauthenticated static access to paid design archives & private uploads
+// Strict Security: Block unauthenticated static access to paid design archives, raw uploads & private files
 // Paid design files must be downloaded ONLY through authenticated customer/user download routes
-app.use(['/public/uploads/designs', '/uploads/designs', '/private_uploads', '/public/uploads/private_designs', '/storage_private', '/public/storage_private', '/design-files', '/public/design-files'], (req, res) => {
-  res.status(403).json({ error: 'Access forbidden. Paid design archives can only be downloaded via authenticated routes.' });
+const blockedStaticPaths = [
+  '/public/uploads/designs', '/uploads/designs',
+  '/public/uploads/raw', '/uploads/raw',
+  '/public/uploads/originals', '/uploads/originals',
+  '/private_uploads', '/public/uploads/private_designs',
+  '/storage_private', '/public/storage_private',
+  '/design-files', '/public/design-files',
+  '/raw_uploads', '/public/raw_uploads'
+];
+
+app.use(blockedStaticPaths, (req, res) => {
+  res.status(403).json({ error: 'Access forbidden. Raw uploads and paid machine archives can only be downloaded via authenticated routes.' });
+});
+
+// Block machine file extensions (.zip, .dst, .pes, etc.) from direct public static requests
+app.use(['/public', '/uploads', '/public/uploads'], (req, res, next) => {
+  const ext = path.extname(req.path).toLowerCase();
+  const machineExts = ['.zip', '.dst', '.pes', '.jef', '.exp', '.xxx', '.vp3', '.hus', '.sew', '.pec', '.rar', '.7z'];
+  if (machineExts.includes(ext)) {
+    return res.status(403).json({ error: 'Access forbidden. Machine files must be downloaded through authenticated customer download routes.' });
+  }
+  next();
 });
 
 // Serve preview images and public uploads from persistent storage

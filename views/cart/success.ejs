@@ -327,7 +327,7 @@
           <% const cleanTitle = item.title || item.slug || ('AED_' + (item.design_id || item.id)); %>
           <div class="purchased-design-card">
             <div class="design-card-top-row">
-              <img src="<%= item.primary_image || '/public/images/cat_floral.jpg' %>" alt="<%= item.title %>" class="design-card-thumb">
+              <img src="<%= item.primary_image || '/public/images/placeholder-preview.svg' %>" alt="<%= item.title %>" class="design-card-thumb" onerror="if(this.src.indexOf('placeholder-preview.svg')===-1)this.src='/public/images/placeholder-preview.svg';">
               <div class="design-card-details">
                 <h3 class="design-card-name"><%= item.title %></h3>
                 <div class="design-card-price">
