@@ -65,7 +65,8 @@ exports.getDesigns = async (req, res, next) => {
       selectedSort: sort || 'newest',
       selectedFileFilter: fileFilter || '',
       selectedStitchFilter: stitchFilter || '',
-      selectedPreviewFilter: previewFilter || ''
+      selectedPreviewFilter: previewFilter || '',
+      csrfToken: (typeof req.csrfToken === 'function') ? req.csrfToken() : (res.locals.csrfToken || '')
     });
   } catch (err) {
     next(err);

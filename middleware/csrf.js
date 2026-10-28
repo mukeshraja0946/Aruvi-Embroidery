@@ -31,13 +31,14 @@ function csrfProtection(req, res, next) {
     return next();
   }
 
-  // Extract token from body, query parameters, or standard security headers
+  // Extract token from body, query parameters, cookies, or standard security headers
   const token = (req.body && (req.body._csrf || req.body.csrf_token || req.body.securityToken)) ||
                 (req.query && (req.query._csrf || req.query.csrf_token || req.query.securityToken)) ||
                 req.headers['x-csrf-token'] ||
                 req.headers['csrf-token'] ||
                 req.headers['x-xsrf-token'] ||
-                (typeof req.get === 'function' ? (req.get('x-csrf-token') || req.get('csrf-token') || req.get('x-xsrf-token')) : null);
+                (typeof req.get === 'function' ? (req.get('x-csrf-token') || req.get('csrf-token') || req.get('x-xsrf-token')) : null) ||
+                (req.cookies && (req.cookies['XSRF-TOKEN'] || req.cookies['xsrf-token']));
 
   // Strict token validation
   if (!token || token !== req.session.csrfSecret) {

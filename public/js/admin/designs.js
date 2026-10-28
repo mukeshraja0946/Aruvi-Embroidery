@@ -3,12 +3,34 @@
  * Controls: Bulk operations, delete modals, image replacement, bulk upload, and 3-step bulk import.
  */
 
-// Global CSRF helper
+// Global CSRF helper with cookie and dynamic refresh support
 function getCsrfToken() {
   if (window.CSRF_TOKEN) return window.CSRF_TOKEN;
   const meta = document.querySelector('meta[name="csrf-token"]');
-  if (meta) return meta.getAttribute('content');
+  if (meta && meta.getAttribute('content')) return meta.getAttribute('content');
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+  if (match) return decodeURIComponent(match[1]);
   return '';
+}
+
+async function fetchFreshCsrfToken() {
+  try {
+    const res = await fetch('/admin/api/csrf-token', {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.csrfToken) {
+        window.CSRF_TOKEN = data.csrfToken;
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) meta.setAttribute('content', data.csrfToken);
+        return data.csrfToken;
+      }
+    }
+  } catch (e) {
+    console.warn('Unable to refresh CSRF token automatically:', e);
+  }
+  return getCsrfToken();
 }
 
 // Global Toast Popup
@@ -858,6 +880,9 @@ async function startChunkedBulkImageUpload() {
   renderLiveFileList();
   updateProgressCounters();
 
+  // Refresh CSRF token before launching batch workers to prevent 403 on stale sessions
+  await fetchFreshCsrfToken();
+
   // Launch worker pool with max configured concurrent streams (default 2)
   const workerCount = Math.min(bulkUploadState.maxConcurrency, batches.length);
   const workerPromises = [];
@@ -903,8 +928,13 @@ async function processSingleBatch(batch) {
   }, bulkUploadState.batchTimeoutMs);
 
   try {
+    let currentToken = getCsrfToken();
+    if (!currentToken) {
+      currentToken = await fetchFreshCsrfToken();
+    }
+
     const formData = new FormData();
-    formData.append('_csrf', getCsrfToken());
+    formData.append('_csrf', currentToken);
     formData.append('confirmed_mappings', JSON.stringify(bulkUploadState.confirmedMappings || {}));
 
     // Process files through browser compressor before attaching to FormData
@@ -913,12 +943,12 @@ async function processSingleBatch(batch) {
       formData.append('images', fileToUpload, item.originalName);
     }
 
-    const res = await fetch('/admin/designs/bulk-upload-images', {
+    let res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(currentToken), {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': getCsrfToken()
+        'X-CSRF-Token': currentToken
       },
       body: formData,
       signal: controller.signal
@@ -930,12 +960,38 @@ async function processSingleBatch(batch) {
     if (!res.ok) {
       let errBody = {};
       try { errBody = await res.json(); } catch (e) {}
-      const errMsg = errBody.message || `Server returned HTTP ${res.status}`;
-      const isPermanent = [400, 401, 403, 404, 413, 415, 422].includes(res.status);
-      const batchErr = new Error(errMsg);
-      batchErr.isPermanent = isPermanent;
-      batchErr.status = res.status;
-      throw batchErr;
+
+      // If rejected with 403 (e.g. server restarted or token expired), refresh token and retry batch once
+      if (res.status === 403 || errBody.isCsrf || errBody.code === 'EBADCSRF' || (errBody.error && errBody.error.code === 'CSRF_TOKEN_INVALID') || (errBody.message && errBody.message.toLowerCase().includes('token'))) {
+        console.warn(`[Batch #${batch.id} 403 Alert]: Token rejected. Refreshing CSRF token and retrying batch...`);
+        const freshToken = await fetchFreshCsrfToken();
+        if (freshToken) {
+          formData.set('_csrf', freshToken);
+          res = await fetch('/admin/designs/bulk-upload-images?_csrf=' + encodeURIComponent(freshToken), {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRF-Token': freshToken
+            },
+            body: formData
+          });
+          if (res.ok) {
+            errBody = {};
+          } else {
+            try { errBody = await res.json(); } catch (e) {}
+          }
+        }
+      }
+
+      if (!res.ok) {
+        const errMsg = errBody.message || `Server returned HTTP ${res.status}`;
+        const isPermanent = [400, 401, 404, 413, 415, 422].includes(res.status);
+        const batchErr = new Error(errMsg);
+        batchErr.isPermanent = isPermanent;
+        batchErr.status = res.status;
+        throw batchErr;
+      }
     }
 
     const data = await res.json();
