@@ -10,6 +10,16 @@ const Design = require('../models/Design');
 const Category = require('../models/Category');
 const ActivityLog = require('../models/ActivityLog');
 
+function normalizeCodeKey(str) {
+  if (!str) return '';
+  const clean = String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const m = clean.match(/^([a-z]+)0*(\d+)$/);
+  if (m) {
+    return `${m[1]}${parseInt(m[2], 10)}`;
+  }
+  return clean;
+}
+
 class BulkDesignDetailsService {
   /**
    * Returns clean structured text for templates and notes
@@ -527,6 +537,29 @@ class BulkDesignDetailsService {
     const { list, map: skuMap } = await Design.getAllMapBySku();
     const categories = await Category.getAll();
 
+    // Auxiliary normalized maps for flexible matching
+    const normSkuMap = new Map();
+    const idMap = new Map();
+    const titleMap = new Map();
+
+    for (const d of (list || [])) {
+      if (d.id) {
+        idMap.set(String(d.id), d);
+      }
+      if (d.sku) {
+        const sNorm = String(d.sku).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const sCode = normalizeCodeKey(d.sku);
+        if (!normSkuMap.has(sNorm)) normSkuMap.set(sNorm, d);
+        if (!normSkuMap.has(sCode)) normSkuMap.set(sCode, d);
+      }
+      if (d.title) {
+        const tNorm = String(d.title).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const tCode = normalizeCodeKey(d.title);
+        if (!titleMap.has(tNorm)) titleMap.set(tNorm, d);
+        if (!titleMap.has(tCode)) titleMap.set(tCode, d);
+      }
+    }
+
     const items = [];
     let readyCount = 0;
     let noChangeCount = 0;
@@ -541,16 +574,54 @@ class BulkDesignDetailsService {
       const changes = [];
 
       // 1. Check SKU presence
-      if (!rawSku || !rawSku.trim()) {
-        errors.push('Missing Design Code / SKU. A unique SKU is required to match products.');
+      if ((!rawSku || !rawSku.trim()) && (!rawName || !rawName.trim())) {
+        errors.push('Missing Design Code / SKU or Design Name. A SKU or Name is required to match products.');
       }
 
-      // 2. Lookup existing design in DB
+      // 2. Lookup existing design in DB (Priority: Exact SKU -> Normalized SKU -> Product ID -> Title)
       const cleanSku = (rawSku || '').trim().toUpperCase();
-      const existingDesign = skuMap.get(cleanSku);
+      let existingDesign = cleanSku ? skuMap.get(cleanSku) : null;
+
+      if (!existingDesign && rawSku) {
+        const rawNorm = String(rawSku).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const rawCode = normalizeCodeKey(rawSku);
+
+        // 2b. Normalized alphanumeric SKU match
+        existingDesign = normSkuMap.get(rawNorm) || normSkuMap.get(rawCode);
+
+        // 2c. Product ID match (e.g. "1", "#1", "ID: 1")
+        if (!existingDesign) {
+          const digitsMatch = String(rawSku).match(/^(?:id[-_\s:]*)?(\d+)$/i) || String(rawSku).match(/^[\[#](\d+)[\]]?$/);
+          if (digitsMatch) {
+            existingDesign = idMap.get(digitsMatch[1]);
+          }
+        }
+
+        // 2d. Exact/Normalized Title match using rawSku
+        if (!existingDesign) {
+          existingDesign = titleMap.get(rawNorm) || titleMap.get(rawCode);
+        }
+
+        // 2e. AED number prefix to ID fallback (e.g. "AED 1" -> ID 1)
+        if (!existingDesign) {
+          const aedNumMatch = String(rawSku).match(/^AED[\s\-_]*0*(\d+)$/i);
+          if (aedNumMatch && idMap.has(aedNumMatch[1])) {
+            existingDesign = idMap.get(aedNumMatch[1]);
+          }
+        }
+      }
+
+      // 2e. Fallback: match by rawName if SKU was missing or didn't match
+      if (!existingDesign && rawName && !rawSku) {
+        const nameNorm = String(rawName).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const nameCode = normalizeCodeKey(rawName);
+        existingDesign = titleMap.get(nameNorm) || titleMap.get(nameCode);
+      }
 
       if (!existingDesign && rawSku) {
         errors.push(`SKU "${rawSku}" does not match any existing design in catalog.`);
+      } else if (!existingDesign && rawName) {
+        errors.push(`Design "${rawName}" does not match any existing design in catalog.`);
       }
 
       // Existing values snapshot

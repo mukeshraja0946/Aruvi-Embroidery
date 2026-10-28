@@ -1808,6 +1808,21 @@ function calculateSimilarity(str1, str2) {
 }
 
 /**
+ * Normalizes SKU, code, or title for robust alphanumeric comparison.
+ * Strips whitespace, hyphens, and underscores.
+ * Normalizes leading zeros in letter+number combinations (e.g. "AED 01" -> "aed1", "AED-1" -> "aed1").
+ */
+function normalizeCodeKey(str) {
+  if (!str) return '';
+  const clean = String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const m = clean.match(/^([a-z]+)0*(\d+)$/);
+  if (m) {
+    return `${m[1]}${parseInt(m[2], 10)}`;
+  }
+  return clean;
+}
+
+/**
  * Validates actual image file content using magic bytes header.
  * Supports PNG, JPEG, WebP, and AVIF.
  */
@@ -1891,15 +1906,14 @@ const BASE_CANDIDATE_SQL = `
 /**
  * Robust Multi-Tier Image Matching Engine
  *
- * Priority 1 — Exact SKU:
- *   - Match filenames containing the exact product SKU (ignore case & ext, no partial matches).
- * Priority 2 — Exact Product ID:
- *   - Filenames explicitly containing a valid documented product ID (pure digits, id-X, product-X).
- * Priority 3 — Exact Product Title:
- *   - Normalized title uniquely identifying exactly one product.
- * Priority 4 — Legacy Numbered Filenames:
- *   - Verified legacy mappings from designs.import_image_filename or import_job_items.
- *   - Does not assume AED 2 means product ID 2 or SKU 2.
+ * Priority 0 — Confirmed Batch Mappings (remembered manual linkages)
+ * Priority 1 — Exact & Normalized SKU (case-insensitive, space/hyphen/zero-stripped e.g. "AED 1.png" -> SKU "AED-1" or "AED 1")
+ * Priority 2 — Exact Product ID (e.g. "1.png", "042.png", "id-42.png")
+ * Priority 3 — Exact Product Title & Normalized Title
+ * Priority 4 — Verified Legacy Import Filename (designs.import_image_filename & import_job_items)
+ * Priority 5 — AED Number to Product ID Fallback (e.g. "AED 1.png" -> ID 1)
+ * Priority 6 — Word-Boundary SKU Token Match (e.g. "AED-BLO-01_front.png")
+ * Priority 7 — Unmatched with Top 3 Suggestions
  */
 async function findMatchingDesign(filename, allDesignsCache = null, confirmedMappings = {}) {
   if (!filename) {
@@ -1914,15 +1928,46 @@ async function findMatchingDesign(filename, allDesignsCache = null, confirmedMap
 
   const cleanLower = rawBaseName.toLowerCase();
   const cleanCollapsed = rawBaseName.replace(/[\s\-_]+/g, ' ').trim().toLowerCase();
-  const isLegacyNumberedPattern = /^AED[\s\-_]*\d+$/i.test(rawBaseName);
+  const cleanAlphaNum = rawBaseName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const codeKey = normalizeCodeKey(rawBaseName);
 
-  console.log(`[Bulk Image Matcher] Checking "${filename}": Base="${rawBaseName}", Collapsed="${cleanCollapsed}", IsLegacyPattern=${isLegacyNumberedPattern}`);
+  // Core base name by stripping image suffixes (e.g. "AED 1_front.png", "AED 1 (1).png", "AED-1_1.png")
+  const coreBaseName = rawBaseName
+    .replace(/[_\-\s\.]+(?:main|primary|front|back|sleeve|neck|blouse|zip|\d+)\s*$/i, '')
+    .replace(/\s*\(\d+\)\s*$/, '')
+    .trim();
+  const coreCleanLower = coreBaseName ? coreBaseName.toLowerCase() : cleanLower;
+  const coreCleanCollapsed = coreBaseName ? coreBaseName.replace(/[\s\-_]+/g, ' ').trim().toLowerCase() : cleanCollapsed;
+  const coreCleanAlphaNum = coreBaseName ? coreBaseName.replace(/[^a-z0-9]/gi, '').toLowerCase() : cleanAlphaNum;
+  const coreCodeKey = coreBaseName ? normalizeCodeKey(coreBaseName) : codeKey;
+  const hasVariantSuffix = coreBaseName && coreBaseName !== rawBaseName;
+
+  // Numeric ID extraction: pure digits (e.g. "1.png", "042.png") or explicit prefix ("id-1.png", "product-1.png", "#1.png")
+  let targetId = null;
+  if (/^\d+$/.test(rawBaseName)) {
+    targetId = parseInt(rawBaseName, 10);
+  } else {
+    const idPrefixMatch = rawBaseName.match(/^(?:id|product|prod|p)[\s\-_]+(\d+)$/i) || rawBaseName.match(/^[\[#](\d+)[\]]?$/);
+    if (idPrefixMatch) {
+      targetId = parseInt(idPrefixMatch[1], 10);
+    }
+  }
+
+  // AED number prefix match (e.g. "AED 1.png", "AED-1.png", "AED01.png")
+  const aedMatch = rawBaseName.match(/^AED[\s\-_]*0*(\d+)$/i) || (coreBaseName ? coreBaseName.match(/^AED[\s\-_]*0*(\d+)$/i) : null);
+  const aedNumericId = aedMatch ? parseInt(aedMatch[1], 10) : null;
+
+  console.log(`[Bulk Image Matcher] Checking "${filename}": Base="${rawBaseName}", CodeKey="${codeKey}", AedNumericId=${aedNumericId}`);
 
   // --------------------------------------------------------------------------
   // Priority 0: Confirmed batch mapping (remembered manual confirmations)
   // --------------------------------------------------------------------------
   if (confirmedMappings && typeof confirmedMappings === 'object') {
-    const confirmedId = confirmedMappings[cleanLower] || confirmedMappings[cleanCollapsed] || confirmedMappings[filename.toLowerCase()];
+    const confirmedId = confirmedMappings[cleanLower] || 
+                        confirmedMappings[cleanCollapsed] || 
+                        confirmedMappings[cleanAlphaNum] || 
+                        confirmedMappings[codeKey] || 
+                        confirmedMappings[filename.toLowerCase()];
     if (confirmedId) {
       if (db.isConnected()) {
         try {
@@ -1947,79 +1992,62 @@ async function findMatchingDesign(filename, allDesignsCache = null, confirmedMap
   if (db.isConnected()) {
     try {
       // ----------------------------------------------------------------------
-      // Priority 1 — Exact SKU (Only when filename is not a legacy numbered pattern like AED 1)
+      // Priority 1 — Exact SKU (direct equality + normalized alphanumeric + zero-stripped)
       // ----------------------------------------------------------------------
-      if (!isLegacyNumberedPattern) {
-        // 1A. Direct exact SKU equality
-        const skuRows = await db.query(
-          `${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' AND (LOWER(TRIM(d.sku)) = ? OR LOWER(TRIM(d.sku)) = ?)`,
-          [cleanLower, cleanCollapsed]
+      // If filename has a copy/variant suffix (e.g. "AED 1 (1).png"), match core SKU ("AED 1") first
+      if (hasVariantSuffix) {
+        const coreSkuCandidates = Array.from(new Set([coreCleanLower, coreCleanCollapsed, coreCleanAlphaNum, coreCodeKey].filter(Boolean)));
+        const corePlaceholders = coreSkuCandidates.map(() => '?').join(', ');
+        const coreRows = await db.query(
+          `${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' AND (
+            LOWER(TRIM(d.sku)) = ? 
+            OR LOWER(TRIM(d.sku)) = ?
+            OR REPLACE(REPLACE(REPLACE(LOWER(d.sku), ' ', ''), '_', ''), '-', '') IN (${corePlaceholders})
+          )`,
+          [coreCleanLower, coreCleanCollapsed, ...coreSkuCandidates]
         );
-        if (skuRows && skuRows.length === 1) {
-          console.log(`[Bulk Image Matcher] Priority 1 (Exact SKU Direct): "${filename}" -> ID=${skuRows[0].id} (${skuRows[0].sku})`);
-          return { status: 'matched', design: normalizeCandidateRecord(skuRows[0]), matchedBy: 'exact_sku' };
+        if (coreRows && coreRows.length === 1) {
+          console.log(`[Bulk Image Matcher] Priority 1 (Core Variant SKU): "${filename}" -> ID=${coreRows[0].id} (${coreRows[0].sku})`);
+          return { status: 'matched', design: normalizeCandidateRecord(coreRows[0]), matchedBy: 'exact_sku' };
         }
-        if (skuRows && skuRows.length > 1) {
+        if (coreRows && coreRows.length > 1) {
           return {
             status: 'ambiguous',
-            candidates: skuRows.map(normalizeCandidateRecord),
+            candidates: coreRows.map(normalizeCandidateRecord),
             matchedBy: 'exact_sku',
-            reason: `Multiple products share SKU "${skuRows[0].sku}"`
+            reason: `Multiple products share matching SKU "${coreRows[0].sku}"`
           };
         }
+      }
 
-        // 1B. Filename contains exact SKU surrounded by word/token boundaries (e.g. AED-BLO-01_front.png)
-        // Must NOT match partial SKU substrings (e.g. AED-BLO-1 inside AED-BLO-10)
-        let designsToCheck = allDesignsCache;
-        if (!designsToCheck) {
-          designsToCheck = await db.query(`${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' LIMIT 1500`);
-        }
+      const skuCandidates = Array.from(new Set([cleanLower, cleanCollapsed, cleanAlphaNum, codeKey].filter(Boolean)));
+      const skuPlaceholders = skuCandidates.map(() => '?').join(', ');
 
-        if (designsToCheck && designsToCheck.length > 0) {
-          const tokenMatches = [];
-          for (const d of designsToCheck) {
-            if (!d.sku) continue;
-            const cleanSku = d.sku.trim();
-            if (cleanSku.length < 3) continue;
-            if (/^AED[\s\-_]*\d+$/i.test(cleanSku)) continue; // ignore legacy demo SKUs
+      const skuRows = await db.query(
+        `${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' AND (
+          LOWER(TRIM(d.sku)) = ? 
+          OR LOWER(TRIM(d.sku)) = ?
+          OR REPLACE(REPLACE(REPLACE(LOWER(d.sku), ' ', ''), '_', ''), '-', '') IN (${skuPlaceholders})
+        )`,
+        [cleanLower, cleanCollapsed, ...skuCandidates]
+      );
 
-            const escaped = cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const boundaryRegex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
-            if (boundaryRegex.test(rawBaseName)) {
-              tokenMatches.push(d);
-            }
-          }
-
-          if (tokenMatches.length === 1) {
-            console.log(`[Bulk Image Matcher] Priority 1 (Exact SKU Token): "${filename}" -> ID=${tokenMatches[0].id} (${tokenMatches[0].sku})`);
-            return { status: 'matched', design: normalizeCandidateRecord(tokenMatches[0]), matchedBy: 'exact_sku_token' };
-          }
-          if (tokenMatches.length > 1) {
-            return {
-              status: 'ambiguous',
-              candidates: tokenMatches.map(normalizeCandidateRecord),
-              matchedBy: 'exact_sku_token',
-              reason: `Filename contains multiple matching product SKUs (${tokenMatches.length} candidates)`
-            };
-          }
-        }
+      if (skuRows && skuRows.length === 1) {
+        console.log(`[Bulk Image Matcher] Priority 1 (Exact/Norm SKU): "${filename}" -> ID=${skuRows[0].id} (${skuRows[0].sku})`);
+        return { status: 'matched', design: normalizeCandidateRecord(skuRows[0]), matchedBy: 'exact_sku' };
+      }
+      if (skuRows && skuRows.length > 1) {
+        return {
+          status: 'ambiguous',
+          candidates: skuRows.map(normalizeCandidateRecord),
+          matchedBy: 'exact_sku',
+          reason: `Multiple products share matching SKU "${skuRows[0].sku}"`
+        };
       }
 
       // ----------------------------------------------------------------------
-      // Priority 2 — Exact Product ID
-      // Formats: pure number "42.png", explicit prefix "id-42.png", "product-42.png", "[42].png"
-      // NEVER treat "AED 2.png" as ID 2.
+      // Priority 2 — Exact Product ID (pure numbers e.g. "1.png" or explicit id prefix)
       // ----------------------------------------------------------------------
-      let targetId = null;
-      if (/^\d+$/.test(rawBaseName)) {
-        targetId = parseInt(rawBaseName, 10);
-      } else {
-        const idPrefixMatch = rawBaseName.match(/^(?:id|product|prod|p)[\s\-_]+(\d+)$/i) || rawBaseName.match(/^[\[#](\d+)[\]]?$/);
-        if (idPrefixMatch) {
-          targetId = parseInt(idPrefixMatch[1], 10);
-        }
-      }
-
       if (targetId !== null && targetId > 0) {
         const idRows = await db.query(`${BASE_CANDIDATE_SQL} AND d.id = ?`, [targetId]);
         if (idRows && idRows.length === 1) {
@@ -2029,19 +2057,24 @@ async function findMatchingDesign(filename, allDesignsCache = null, confirmedMap
       }
 
       // ----------------------------------------------------------------------
-      // Priority 3 — Exact Product Title
-      // Match only when the normalized title identifies exactly ONE product.
+      // Priority 3 — Exact Product Title & Normalized Title Match
       // ----------------------------------------------------------------------
+      const titleCandidates = Array.from(new Set([cleanLower, cleanCollapsed, cleanAlphaNum, coreCleanLower, coreCleanCollapsed, coreCleanAlphaNum].filter(Boolean)));
+      const titlePlaceholders = titleCandidates.map(() => '?').join(', ');
+
       const titleRows = await db.query(
-        `${BASE_CANDIDATE_SQL} AND (LOWER(TRIM(d.title)) = ? OR LOWER(TRIM(d.title)) = ?)`,
-        [cleanLower, cleanCollapsed]
+        `${BASE_CANDIDATE_SQL} AND (
+          LOWER(TRIM(d.title)) = ? 
+          OR LOWER(TRIM(d.title)) = ?
+          OR REPLACE(REPLACE(REPLACE(LOWER(d.title), ' ', ''), '_', ''), '-', '') IN (${titlePlaceholders})
+        )`,
+        [cleanLower, cleanCollapsed, ...titleCandidates]
       );
       if (titleRows && titleRows.length === 1) {
         console.log(`[Bulk Image Matcher] Priority 3 (Unique Title): "${filename}" -> ID=${titleRows[0].id} ("${titleRows[0].title}")`);
         return { status: 'matched', design: normalizeCandidateRecord(titleRows[0]), matchedBy: 'exact_title' };
       }
       if (titleRows && titleRows.length > 1) {
-        // Multiple products share this title -> Ambiguous
         console.log(`[Bulk Image Matcher] Priority 3 (Ambiguous Title): "${filename}" matches ${titleRows.length} products`);
         return {
           status: 'ambiguous',
@@ -2052,30 +2085,27 @@ async function findMatchingDesign(filename, allDesignsCache = null, confirmedMap
       }
 
       // ----------------------------------------------------------------------
-      // Priority 4 — Legacy Numbered Filenames & Verified Legacy Mappings
-      // Check designs.import_image_filename and import_job_items.image_filename
+      // Priority 4 — Verified Legacy Import Filenames
       // ----------------------------------------------------------------------
+      const legacyCandidates = Array.from(new Set([filename.toLowerCase(), cleanLower, cleanAlphaNum].filter(Boolean)));
+      const legacyPlaceholders = legacyCandidates.map(() => '?').join(', ');
       const legacyDesigns = await db.query(
-        `SELECT DISTINCT d.id, d.title, d.sku, d.slug, d.import_image_filename, d.is_active,
-                COALESCE(c.name, 'Uncategorized') as category_name,
-                COALESCE(
-                  (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1 ORDER BY di.id DESC LIMIT 1),
-                  (SELECT di.image_url FROM design_images di WHERE di.design_id = d.id ORDER BY di.is_primary DESC, di.id DESC LIMIT 1),
-                  (SELECT df.file_path FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 1 AND UPPER(df.file_format) IN ('PNG','JPG','JPEG','WEBP','AVIF') ORDER BY df.id DESC LIMIT 1)
-                ) as image_url
-         FROM designs d
-         LEFT JOIN categories c ON d.category_id = c.id
-         WHERE d.deleted_at IS NULL
-           AND (
-             (d.import_image_filename IS NOT NULL AND (LOWER(TRIM(d.import_image_filename)) = ? OR LOWER(TRIM(d.import_image_filename)) = ?))
-             OR d.id IN (
-               SELECT iji.imported_design_id 
-               FROM import_job_items iji 
-               WHERE iji.imported_design_id IS NOT NULL 
-                 AND (LOWER(TRIM(iji.image_filename)) = ? OR LOWER(TRIM(iji.image_filename)) = ?)
-             )
-           )`,
-        [filename.toLowerCase(), cleanLower, filename.toLowerCase(), cleanLower]
+        `${BASE_CANDIDATE_SQL} AND (
+          (d.import_image_filename IS NOT NULL AND (
+            LOWER(TRIM(d.import_image_filename)) IN (${legacyPlaceholders})
+            OR REPLACE(REPLACE(REPLACE(LOWER(d.import_image_filename), ' ', ''), '_', ''), '-', '') IN (${legacyPlaceholders})
+          ))
+          OR d.id IN (
+            SELECT iji.imported_design_id 
+            FROM import_job_items iji 
+            WHERE iji.imported_design_id IS NOT NULL 
+              AND (
+                LOWER(TRIM(iji.image_filename)) IN (${legacyPlaceholders})
+                OR REPLACE(REPLACE(REPLACE(LOWER(iji.image_filename), ' ', ''), '_', ''), '-', '') IN (${legacyPlaceholders})
+              )
+          )
+        )`,
+        [...legacyCandidates, ...legacyCandidates, ...legacyCandidates, ...legacyCandidates]
       );
 
       if (legacyDesigns && legacyDesigns.length === 1) {
@@ -2091,21 +2121,51 @@ async function findMatchingDesign(filename, allDesignsCache = null, confirmedMap
         };
       }
 
-      // If legacy pattern like AED 2 and no verified mapping, find candidate products sharing similar title or SKU pattern
-      if (isLegacyNumberedPattern) {
-        const candidateRows = await db.query(
-          `${BASE_CANDIDATE_SQL} AND (
-            LOWER(TRIM(d.title)) LIKE ?
-            OR LOWER(TRIM(d.sku)) = ?
-          ) LIMIT 10`,
-          [`${cleanLower}%`, cleanLower]
-        );
-        if (candidateRows && candidateRows.length > 1) {
+      // ----------------------------------------------------------------------
+      // Priority 5 — AED Number to Product ID Fallback ("AED 1.png" -> ID 1)
+      // ----------------------------------------------------------------------
+      if (aedNumericId !== null && aedNumericId > 0) {
+        const aedIdRows = await db.query(`${BASE_CANDIDATE_SQL} AND d.id = ?`, [aedNumericId]);
+        if (aedIdRows && aedIdRows.length === 1) {
+          console.log(`[Bulk Image Matcher] Priority 5 (AED Numeric ID Fallback): "${filename}" -> ID=${aedIdRows[0].id}`);
+          return { status: 'matched', design: normalizeCandidateRecord(aedIdRows[0]), matchedBy: 'aed_id_fallback' };
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // Priority 6 — Filename contains exact SKU surrounded by word/token boundaries
+      // e.g. "AED-BLO-01_front.png" or "Front_AED-1.png"
+      // Must NOT match partial SKU substrings (e.g. "AED 1" inside "AED 10")
+      // ----------------------------------------------------------------------
+      let designsToCheck = allDesignsCache;
+      if (!designsToCheck) {
+        designsToCheck = await db.query(`${BASE_CANDIDATE_SQL} AND d.sku IS NOT NULL AND TRIM(d.sku) != '' LIMIT 2500`);
+      }
+
+      if (designsToCheck && designsToCheck.length > 0) {
+        const tokenMatches = [];
+        for (const d of designsToCheck) {
+          if (!d.sku) continue;
+          const cleanSku = d.sku.trim();
+          if (cleanSku.length < 2) continue;
+
+          const escaped = cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const boundaryRegex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+          if (boundaryRegex.test(rawBaseName) || boundaryRegex.test(coreBaseName)) {
+            tokenMatches.push(d);
+          }
+        }
+
+        if (tokenMatches.length === 1) {
+          console.log(`[Bulk Image Matcher] Priority 6 (Exact SKU Token): "${filename}" -> ID=${tokenMatches[0].id} (${tokenMatches[0].sku})`);
+          return { status: 'matched', design: normalizeCandidateRecord(tokenMatches[0]), matchedBy: 'exact_sku_token' };
+        }
+        if (tokenMatches.length > 1) {
           return {
             status: 'ambiguous',
-            candidates: candidateRows.map(normalizeCandidateRecord),
-            matchedBy: 'legacy_numbered_candidates',
-            reason: `Multiple candidate products found for legacy filename "${filename}"`
+            candidates: tokenMatches.map(normalizeCandidateRecord),
+            matchedBy: 'exact_sku_token',
+            reason: `Filename contains multiple matching product SKUs (${tokenMatches.length} candidates)`
           };
         }
       }
@@ -2121,28 +2181,80 @@ async function findMatchingDesign(filename, allDesignsCache = null, confirmedMap
   if (!db.isConnected() && allDesignsCache && allDesignsCache.length > 0) {
     const activeDesigns = allDesignsCache.filter(d => !d.deleted_at);
 
-    // Priority 1: Exact SKU
-    if (!isLegacyNumberedPattern) {
-      const matchSku = activeDesigns.filter(d => d.sku && d.sku.trim().toLowerCase() === cleanLower);
-      if (matchSku.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchSku[0]), matchedBy: 'exact_sku' };
-      if (matchSku.length > 1) return { status: 'ambiguous', candidates: matchSku.map(normalizeCandidateRecord), matchedBy: 'exact_sku' };
+    // 1. Exact SKU & Normalized SKU
+    if (hasVariantSuffix) {
+      const matchCoreSku = activeDesigns.filter(d => {
+        if (!d.sku) return false;
+        const s = d.sku.trim().toLowerCase();
+        const sNorm = d.sku.replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const sCode = normalizeCodeKey(d.sku);
+        return s === coreCleanLower || s === coreCleanCollapsed || sNorm === coreCleanAlphaNum || (coreCodeKey && sCode === coreCodeKey);
+      });
+      if (matchCoreSku.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchCoreSku[0]), matchedBy: 'exact_sku' };
+      if (matchCoreSku.length > 1) return { status: 'ambiguous', candidates: matchCoreSku.map(normalizeCandidateRecord), matchedBy: 'exact_sku' };
     }
 
-    // Priority 2: Product ID
-    if (/^\d+$/.test(rawBaseName)) {
-      const matchId = activeDesigns.find(d => Number(d.id) === parseInt(rawBaseName, 10));
+    const matchSku = activeDesigns.filter(d => {
+      if (!d.sku) return false;
+      const s = d.sku.trim().toLowerCase();
+      const sNorm = d.sku.replace(/[^a-z0-9]/gi, '').toLowerCase();
+      const sCode = normalizeCodeKey(d.sku);
+      return s === cleanLower || 
+             s === cleanCollapsed || 
+             sNorm === cleanAlphaNum || 
+             (codeKey && sCode === codeKey);
+    });
+    if (matchSku.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchSku[0]), matchedBy: 'exact_sku' };
+    if (matchSku.length > 1) return { status: 'ambiguous', candidates: matchSku.map(normalizeCandidateRecord), matchedBy: 'exact_sku' };
+
+    // 2. Product ID
+    if (targetId !== null && targetId > 0) {
+      const matchId = activeDesigns.find(d => Number(d.id) === targetId);
       if (matchId) return { status: 'matched', design: normalizeCandidateRecord(matchId), matchedBy: 'exact_product_id' };
     }
 
-    // Priority 3: Exact Title
-    const matchTitle = activeDesigns.filter(d => d.title && d.title.trim().toLowerCase() === cleanCollapsed);
+    // 3. Exact Title & Normalized Title
+    const matchTitle = activeDesigns.filter(d => {
+      if (!d.title) return false;
+      const t = d.title.trim().toLowerCase();
+      const tNorm = d.title.replace(/[^a-z0-9]/gi, '').toLowerCase();
+      return t === cleanLower || 
+             t === cleanCollapsed || 
+             tNorm === cleanAlphaNum || 
+             (coreCleanAlphaNum && tNorm === coreCleanAlphaNum);
+    });
     if (matchTitle.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchTitle[0]), matchedBy: 'exact_title' };
     if (matchTitle.length > 1) return { status: 'ambiguous', candidates: matchTitle.map(normalizeCandidateRecord), matchedBy: 'exact_title' };
 
-    // Priority 4: Legacy Import Filename
-    const matchLegacy = activeDesigns.filter(d => d.import_image_filename && (d.import_image_filename.toLowerCase() === filename.toLowerCase() || d.import_image_filename.toLowerCase() === cleanLower));
+    // 4. Legacy Import Filename
+    const matchLegacy = activeDesigns.filter(d => d.import_image_filename && (
+      d.import_image_filename.toLowerCase() === filename.toLowerCase() ||
+      d.import_image_filename.toLowerCase() === cleanLower ||
+      d.import_image_filename.replace(/[^a-z0-9]/gi, '').toLowerCase() === cleanAlphaNum
+    ));
     if (matchLegacy.length === 1) return { status: 'matched', design: normalizeCandidateRecord(matchLegacy[0]), matchedBy: 'legacy_import_mapping' };
     if (matchLegacy.length > 1) return { status: 'ambiguous', candidates: matchLegacy.map(normalizeCandidateRecord), matchedBy: 'legacy_import_mapping' };
+
+    // 5. AED Number to Product ID Fallback ("AED 1.png" -> ID 1)
+    if (aedNumericId !== null && aedNumericId > 0) {
+      const matchAedId = activeDesigns.find(d => Number(d.id) === aedNumericId);
+      if (matchAedId) return { status: 'matched', design: normalizeCandidateRecord(matchAedId), matchedBy: 'aed_id_fallback' };
+    }
+
+    // 6. Word-Boundary SKU Token Match
+    const tokenMatches = [];
+    for (const d of activeDesigns) {
+      if (!d.sku) continue;
+      const cleanSku = d.sku.trim();
+      if (cleanSku.length < 2) continue;
+      const escaped = cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const boundaryRegex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, 'i');
+      if (boundaryRegex.test(rawBaseName) || boundaryRegex.test(coreBaseName)) {
+        tokenMatches.push(d);
+      }
+    }
+    if (tokenMatches.length === 1) return { status: 'matched', design: normalizeCandidateRecord(tokenMatches[0]), matchedBy: 'exact_sku_token' };
+    if (tokenMatches.length > 1) return { status: 'ambiguous', candidates: tokenMatches.map(normalizeCandidateRecord), matchedBy: 'exact_sku_token' };
   }
 
   // --------------------------------------------------------------------------
@@ -2678,7 +2790,7 @@ function validateMachineFileOrZip(filePath, originalName) {
  *   f) Fallback AED numeric ID (AED 1 -> ID 1)
  */
 async function findMatchingDesignForZip(filename, allDesignsCache = null) {
-  if (!filename || !db.isConnected()) {
+  if (!filename || (!db.isConnected() && (!allDesignsCache || allDesignsCache.length === 0))) {
     return { status: 'unmatched', reason: 'Database is offline or filename is empty', suggestions: [] };
   }
 
@@ -2690,7 +2802,9 @@ async function findMatchingDesignForZip(filename, allDesignsCache = null) {
   }
 
   const cleanLower = rawBaseName.toLowerCase();
+  const cleanCollapsed = rawBaseName.replace(/[\s\-_]+/g, ' ').trim().toLowerCase();
   const cleanAlphaNum = rawBaseName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const codeKey = normalizeCodeKey(rawBaseName);
   const numericId = /^\d+$/.test(rawBaseName) ? parseInt(rawBaseName, 10) : null;
   const aedMatch = rawBaseName.match(/^AED[\s\-_]*0*(\d+)$/i);
   const aedNumericId = aedMatch ? parseInt(aedMatch[1], 10) : null;
@@ -2704,88 +2818,142 @@ async function findMatchingDesignForZip(filename, allDesignsCache = null) {
     return { status: 'ambiguous', candidates: rows, matchedBy };
   }
 
-  // a) Exact SKU (case-insensitive)
-  const matchSku = await checkCandidates(
-    `SELECT id, title, sku, slug, import_zip_filename, is_active 
-     FROM designs 
-     WHERE is_active >= 0 AND (
-       LOWER(sku) = ? 
-       OR REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') = ?
-     )`,
-    [cleanLower, cleanAlphaNum],
-    'sku'
-  );
-  if (matchSku) return matchSku;
-
-  // b) Product ID (1.zip, 042.zip)
-  if (numericId !== null && numericId > 0) {
-    const matchId = await checkCandidates(
+  if (db.isConnected()) {
+    // a) Exact SKU (case-insensitive & space/dash/zero normalized)
+    const skuCandidates = Array.from(new Set([cleanLower, cleanCollapsed, cleanAlphaNum, codeKey].filter(Boolean)));
+    const skuPlaceholders = skuCandidates.map(() => '?').join(', ');
+    const matchSku = await checkCandidates(
       `SELECT id, title, sku, slug, import_zip_filename, is_active 
        FROM designs 
-       WHERE is_active >= 0 AND id = ?`,
-      [numericId],
-      'id'
+       WHERE is_active >= 0 AND (
+         LOWER(sku) = ? 
+         OR LOWER(sku) = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(sku), ' ', ''), '_', ''), '-', '') IN (${skuPlaceholders})
+       )`,
+      [cleanLower, cleanCollapsed, ...skuCandidates],
+      'sku'
     );
-    if (matchId) return matchId;
-  }
+    if (matchSku) return matchSku;
 
-  // c) Normalized Title ("AED 1.ZIP" = "AED 1")
-  const matchTitle = await checkCandidates(
-    `SELECT id, title, sku, slug, import_zip_filename, is_active 
-     FROM designs 
-     WHERE is_active >= 0 AND (
-       LOWER(TRIM(title)) = ? 
-       OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?
-     )`,
-    [cleanLower, cleanAlphaNum],
-    'title'
-  );
-  if (matchTitle) return matchTitle;
+    // b) Product ID (1.zip, 042.zip)
+    if (numericId !== null && numericId > 0) {
+      const matchId = await checkCandidates(
+        `SELECT id, title, sku, slug, import_zip_filename, is_active 
+         FROM designs 
+         WHERE is_active >= 0 AND id = ?`,
+        [numericId],
+        'id'
+      );
+      if (matchId) return matchId;
+    }
 
-  // d) Machine ZIP Filename stored from bulk import (designs.import_zip_filename)
-  const matchImportZip = await checkCandidates(
-    `SELECT id, title, sku, slug, import_zip_filename, is_active 
-     FROM designs 
-     WHERE is_active >= 0 AND import_zip_filename IS NOT NULL AND (
-       LOWER(import_zip_filename) = ? 
-       OR LOWER(import_zip_filename) = ?
-       OR REPLACE(REPLACE(REPLACE(LOWER(import_zip_filename), ' ', ''), '_', ''), '-', '') = ?
-     )`,
-    [filename.toLowerCase(), cleanLower, cleanAlphaNum],
-    'import_zip_filename'
-  );
-  if (matchImportZip) return matchImportZip;
-
-  // e) Slug
-  const matchSlug = await checkCandidates(
-    `SELECT id, title, sku, slug, import_zip_filename, is_active 
-     FROM designs 
-     WHERE is_active >= 0 AND (
-       LOWER(slug) = ? 
-       OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?
-     )`,
-    [cleanLower, cleanAlphaNum],
-    'slug'
-  );
-  if (matchSlug) return matchSlug;
-
-  // f) AED Number prefix fallback (e.g. "AED 1.zip" -> ID 1)
-  if (aedNumericId !== null && aedNumericId > 0) {
-    const matchAedId = await checkCandidates(
+    // c) Normalized Title ("AED 1.ZIP" = "AED 1")
+    const matchTitle = await checkCandidates(
       `SELECT id, title, sku, slug, import_zip_filename, is_active 
        FROM designs 
-       WHERE is_active >= 0 AND id = ?`,
-      [aedNumericId],
-      'aed_id_fallback'
+       WHERE is_active >= 0 AND (
+         LOWER(TRIM(title)) = ? 
+         OR LOWER(TRIM(title)) = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(title), ' ', ''), '_', ''), '-', '') = ?
+       )`,
+      [cleanLower, cleanCollapsed, cleanAlphaNum, codeKey],
+      'title'
     );
-    if (matchAedId) return matchAedId;
+    if (matchTitle) return matchTitle;
+
+    // d) Machine ZIP Filename stored from bulk import (designs.import_zip_filename)
+    const matchImportZip = await checkCandidates(
+      `SELECT id, title, sku, slug, import_zip_filename, is_active 
+       FROM designs 
+       WHERE is_active >= 0 AND import_zip_filename IS NOT NULL AND (
+         LOWER(import_zip_filename) = ? 
+         OR LOWER(import_zip_filename) = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(import_zip_filename), ' ', ''), '_', ''), '-', '') = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(import_zip_filename), ' ', ''), '_', ''), '-', '') = ?
+       )`,
+      [filename.toLowerCase(), cleanLower, cleanAlphaNum, codeKey],
+      'import_zip_filename'
+    );
+    if (matchImportZip) return matchImportZip;
+
+    // e) Slug
+    const matchSlug = await checkCandidates(
+      `SELECT id, title, sku, slug, import_zip_filename, is_active 
+       FROM designs 
+       WHERE is_active >= 0 AND (
+         LOWER(slug) = ? 
+         OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?
+         OR REPLACE(REPLACE(REPLACE(LOWER(slug), ' ', ''), '_', ''), '-', '') = ?
+       )`,
+      [cleanLower, cleanAlphaNum, codeKey],
+      'slug'
+    );
+    if (matchSlug) return matchSlug;
+
+    // f) AED Number prefix fallback (e.g. "AED 1.zip" -> ID 1)
+    if (aedNumericId !== null && aedNumericId > 0) {
+      const matchAedId = await checkCandidates(
+        `SELECT id, title, sku, slug, import_zip_filename, is_active 
+         FROM designs 
+         WHERE is_active >= 0 AND id = ?`,
+        [aedNumericId],
+        'aed_id_fallback'
+      );
+      if (matchAedId) return matchAedId;
+    }
+  } else if (allDesignsCache && allDesignsCache.length > 0) {
+    // In-Memory Fallback for offline mode
+    const activeDesigns = allDesignsCache.filter(d => !d.deleted_at && d.is_active >= 0);
+
+    // a) Exact SKU
+    const matchSku = activeDesigns.filter(d => {
+      if (!d.sku) return false;
+      const s = d.sku.trim().toLowerCase();
+      const sNorm = d.sku.replace(/[^a-z0-9]/gi, '').toLowerCase();
+      const sCode = normalizeCodeKey(d.sku);
+      return s === cleanLower || s === cleanCollapsed || sNorm === cleanAlphaNum || sCode === codeKey;
+    });
+    if (matchSku.length === 1) return { status: 'matched', design: matchSku[0], matchedBy: 'sku' };
+    if (matchSku.length > 1) return { status: 'ambiguous', candidates: matchSku, matchedBy: 'sku' };
+
+    // b) Product ID
+    if (numericId !== null && numericId > 0) {
+      const matchId = activeDesigns.find(d => Number(d.id) === numericId);
+      if (matchId) return { status: 'matched', design: matchId, matchedBy: 'id' };
+    }
+
+    // c) Title
+    const matchTitle = activeDesigns.filter(d => {
+      if (!d.title) return false;
+      const t = d.title.trim().toLowerCase();
+      const tNorm = d.title.replace(/[^a-z0-9]/gi, '').toLowerCase();
+      return t === cleanLower || t === cleanCollapsed || tNorm === cleanAlphaNum;
+    });
+    if (matchTitle.length === 1) return { status: 'matched', design: matchTitle[0], matchedBy: 'title' };
+    if (matchTitle.length > 1) return { status: 'ambiguous', candidates: matchTitle, matchedBy: 'title' };
+
+    // d) Import ZIP
+    const matchZip = activeDesigns.filter(d => d.import_zip_filename && (
+      d.import_zip_filename.toLowerCase() === filename.toLowerCase() ||
+      d.import_zip_filename.toLowerCase() === cleanLower ||
+      d.import_zip_filename.replace(/[^a-z0-9]/gi, '').toLowerCase() === cleanAlphaNum
+    ));
+    if (matchZip.length === 1) return { status: 'matched', design: matchZip[0], matchedBy: 'import_zip_filename' };
+    if (matchZip.length > 1) return { status: 'ambiguous', candidates: matchZip, matchedBy: 'import_zip_filename' };
+
+    // e) AED Numeric ID Fallback
+    if (aedNumericId !== null && aedNumericId > 0) {
+      const matchAed = activeDesigns.find(d => Number(d.id) === aedNumericId);
+      if (matchAed) return { status: 'matched', design: matchAed, matchedBy: 'aed_id_fallback' };
+    }
   }
 
   // g) Unmatched: Top 3 suggestions
   let suggestions = [];
   try {
     let designsList = allDesignsCache;
-    if (!designsList) {
+    if (!designsList && db.isConnected()) {
       designsList = await db.query('SELECT id, title, sku FROM designs WHERE is_active >= 0 LIMIT 500');
     }
     if (designsList && designsList.length > 0) {
@@ -4271,4 +4439,6 @@ exports.getBulkReplaceExportCsv = async (req, res, next) => {
 };
 
 exports.validateMachineFileOrZip = validateMachineFileOrZip;
+exports.findMatchingDesign = findMatchingDesign;
+exports.normalizeCodeKey = normalizeCodeKey;
 
