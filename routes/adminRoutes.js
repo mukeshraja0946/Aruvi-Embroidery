@@ -21,9 +21,11 @@ const adminSettingController = require('../controllers/admin/adminSettingControl
 const adminEmailCampaignController = require('../controllers/admin/adminEmailCampaignController');
 const adminReviewController = require('../controllers/admin/adminReviewController');
 
+const { strictLimiter, adminUploadLimiter, resetLimiter } = require('../middleware/rateLimiters');
+
 // 1. Unprotected Admin Login Routes
 router.get('/admin/login', adminAuthController.getLogin);
-router.post('/admin/login', adminAuthController.postLogin);
+router.post('/admin/login', strictLimiter, adminAuthController.postLogin);
 router.get('/admin/logout', adminAuthController.logout);
 
 // CSRF Token endpoint for client-side AJAX requests & dynamic refreshes
@@ -42,22 +44,13 @@ const adminUploadController = require('../controllers/admin/adminUploadControlle
 router.use('/admin', isAdmin);
 router.use('/api/admin', isAdmin);
 
-// Unified Chunk Upload Engine Routes (supports 1MB application/octet-stream and multipart chunks)
-router.post('/admin/api/upload/init', adminUploadController.initUpload);
-router.post('/admin/api/upload/chunk', upload.single('chunk'), adminUploadController.uploadChunk);
-router.post('/admin/api/upload/complete', adminUploadController.completeUpload);
-router.post('/admin/api/upload/test-health', adminUploadController.testHealth);
-router.get('/admin/api/keep-alive', adminUploadController.keepAlive);
-
-// Rate limiter for critical reset operations
-const rateLimit = require('express-rate-limit');
-const resetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, error: 'Too many reset requests. Please wait 15 minutes before trying again.' }
-});
+// Unified Chunk Upload Engine Routes (supports direct upload for <2MB, 1-2MB octet-stream and multipart chunks)
+router.post('/admin/api/upload/init', adminUploadLimiter, adminUploadController.initUpload);
+router.post('/admin/api/upload/chunk', adminUploadLimiter, upload.single('chunk'), adminUploadController.uploadChunk);
+router.post('/admin/api/upload/complete', adminUploadLimiter, adminUploadController.completeUpload);
+router.post('/admin/api/upload/direct', adminUploadLimiter, upload.single('file'), adminUploadController.directUpload);
+router.post('/admin/api/upload/test-health', adminUploadLimiter, adminUploadController.testHealth);
+router.get('/admin/api/keep-alive', adminUploadLimiter, adminUploadController.keepAlive);
 
 // Dashboard
 router.get('/admin', adminDashboardController.getDashboard);

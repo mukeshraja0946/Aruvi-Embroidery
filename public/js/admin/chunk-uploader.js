@@ -1,31 +1,40 @@
 /**
- * Aruvi Embroidery — Unified Enterprise Chunked Upload Engine
+ * Aruvi Embroidery — Unified Enterprise Chunked & Direct Upload Engine
  * 
  * Reusable upload engine for:
  * 1. Bulk Restore / Re-upload Images
  * 2. Bulk Replace Files by Category
  * 3. Bulk Import Asset Step
+ * 4. Machine ZIP / File Uploads
  * 
  * Architectural Highlights:
- * - 1 MB chunk slicing (file.slice) via application/octet-stream (bypasses WAF/ModSecurity multipart blocks)
- * - Maximum 2 parallel streams to eliminate Hostinger thread pool saturation
- * - Resumable with exponential backoff (1s, 3s, 8s)
- * - Auto-pauses on 5 consecutive same-code failures with Resume/Cancel controls
+ * - Direct Single-Request Upload for small images/files (< 2 MB): combines init + upload + complete into 1 round trip!
+ * - 2 MB chunk slicing (file.slice) via application/octet-stream for large files & ZIPs (cuts request count in half)
+ * - Dynamic concurrency control (up to 2 parallel streams; throttles to 1 on server load/rate limit)
+ * - Intelligent HTTP 429 Rate Limit Handling:
+ *     * Reads Retry-After header or applies exponential backoff (5s, 10s, 20s)
+ *     * Never burns retry counters or counts as a failed file on 429
+ *     * Shows "Server is busy, waiting Xs..." in status badge & item details
+ *     * Automatically resumes when cooldown finishes
+ *     * Only pauses if 429 persists > 2 minutes
+ * - Idempotent Assembly: retries complete step without re-uploading all chunks
+ * - Resumable with zero duplicate uploads
  * - Admin session keep-alive ping every 4 minutes (prevents session drop)
  * - Preflight health check before upload commences
  * - Never truncates errors: tap/click to expand full HTTP status, stage, reference ID & suggested action
  * - "Copy error details" & "Download error report (CSV)"
- * - Optional client-side image compression for preview images > 2 MB (never touches ZIPs)
  */
 
 (function (window) {
   'use strict';
 
-  const CHUNK_SIZE = 1024 * 1024; // 1 MB per chunk
+  const DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB per chunk for large files
+  const DIRECT_UPLOAD_LIMIT = 2 * 1024 * 1024; // 2 MB: direct single-request upload for small images/files
   const MAX_CONCURRENCY = 2; // Up to 2 parallel streams
-  const RETRY_DELAYS = [1000, 3000, 8000]; // 1s, 3s, 8s backoff
-  const CONSECUTIVE_FAIL_LIMIT = 5; // Auto-pause threshold
+  const RETRY_DELAYS = [1000, 3000, 8000]; // 1s, 3s, 8s backoff for regular errors
+  const CONSECUTIVE_FAIL_LIMIT = 5; // Auto-pause threshold (non-429 failures only)
   const KEEP_ALIVE_INTERVAL = 4 * 60 * 1000; // 4 minutes
+  const RATE_LIMIT_PAUSE_THRESHOLD_MS = 120 * 1000; // 2 minutes before pausing whole upload on persistent 429
 
   class ChunkUploader {
     constructor(options = {}) {
@@ -34,11 +43,13 @@
         initEndpoint: '/admin/api/upload/init',
         chunkEndpoint: '/admin/api/upload/chunk',
         completeEndpoint: '/admin/api/upload/complete',
+        directEndpoint: '/admin/api/upload/direct',
         healthEndpoint: '/admin/api/upload/test-health',
         keepAliveEndpoint: '/admin/api/keep-alive',
         csrfEndpoint: '/admin/api/csrf-token',
         onProgress: null,
         onItemStatusChange: null,
+        onStatusMessage: null,
         onPaused: null,
         onResumed: null,
         onFinished: null,
@@ -50,12 +61,21 @@
       this.isPaused = false;
       this.isCancelled = false;
       this.activeWorkers = 0;
+      this.concurrency = MAX_CONCURRENCY;
       this.queue = [];
       this.currentJobPromise = null;
       this.keepAliveTimer = null;
       this.consecutiveFailures = { count: 0, code: null, reason: '' };
       this.csrfToken = this.getCsrfToken();
       this.activeAbortControllers = new Set();
+
+      // Rate limit state tracking
+      this.rateLimitState = {
+        isRateLimited: false,
+        startTime: null,
+        retryCount: 0,
+        waitingUntil: null
+      };
     }
 
     getCsrfToken() {
@@ -109,8 +129,104 @@
       }
     }
 
+    notifyStatusMessage(msg) {
+      if (this.options.onStatusMessage) {
+        this.options.onStatusMessage(msg);
+      }
+      // Update DOM status badge if present
+      const badge = document.getElementById('bulkImageStatusBadge') || document.getElementById('bulkZipCurrentActiveFileText');
+      if (badge) {
+        if (msg) {
+          badge.innerHTML = `<i class="fa-solid fa-hourglass-half fa-spin" style="color: #E65100;"></i> ${this.escapeHtml(msg)}`;
+        } else if (this.isUploading) {
+          badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
+        }
+      }
+    }
+
     /**
-     * Preflight Health Check: Runs route, CSRF, session, and storage permissions probe
+     * Handles HTTP 429 Too Many Requests
+     * - Lowers concurrency to 1
+     * - Reads Retry-After header or applies exponential backoff (5s, 10s, 20s)
+     * - Does NOT burn retries, does NOT mark as failed
+     * - Pauses upload only if 429 persists for > 2 minutes
+     */
+    async handle429RateLimit(res, item, stage, signal) {
+      const now = Date.now();
+      if (!this.rateLimitState.startTime) {
+        this.rateLimitState.startTime = now;
+      }
+      this.rateLimitState.isRateLimited = true;
+      this.rateLimitState.retryCount = (this.rateLimitState.retryCount || 0) + 1;
+
+      // Automatically lower concurrency to 1 to reduce server load
+      this.concurrency = 1;
+
+      // Check if 429 has persisted for more than 2 minutes
+      const elapsed = now - this.rateLimitState.startTime;
+      if (elapsed >= RATE_LIMIT_PAUSE_THRESHOLD_MS) {
+        const pauseMsg = 'Server rate limit persisted for more than 2 minutes. Upload paused to allow server cooldown. Click Resume to continue.';
+        this.pause(pauseMsg);
+        const err = new Error(pauseMsg);
+        err.status = 429;
+        err.stage = stage;
+        err.suggestedAction = 'Wait a minute for the rate limit window to reset, then click Resume.';
+        throw err;
+      }
+
+      // Read Retry-After header or calculate exponential backoff (5s, 10s, 20s)
+      let waitSec = 5;
+      if (res && res.headers) {
+        const retryHeader = res.headers.get('Retry-After');
+        const parsed = parseInt(retryHeader, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          waitSec = Math.min(60, parsed);
+        } else {
+          waitSec = Math.min(30, 5 * Math.pow(2, Math.min(3, this.rateLimitState.retryCount - 1)));
+        }
+      } else {
+        waitSec = Math.min(30, 5 * Math.pow(2, Math.min(3, this.rateLimitState.retryCount - 1)));
+      }
+
+      const waitMs = waitSec * 1000;
+      this.rateLimitState.waitingUntil = now + waitMs;
+
+      const waitMsg = `Server is busy, waiting ${waitSec}s...`;
+      if (item) {
+        item.stage = stage || 'Server Rate Limit';
+        item.details = `Server rate limit — retrying automatically in ${waitSec}s...`;
+        this.notifyItemChange(item);
+      }
+      this.notifyStatusMessage(waitMsg);
+
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, waitMs);
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new Error('Upload cancelled.'));
+          }, { once: true });
+        }
+      });
+
+      this.notifyStatusMessage('');
+    }
+
+    clearRateLimitState() {
+      if (this.rateLimitState.isRateLimited) {
+        this.rateLimitState = {
+          isRateLimited: false,
+          startTime: null,
+          retryCount: 0,
+          waitingUntil: null
+        };
+        this.concurrency = MAX_CONCURRENCY;
+        this.notifyStatusMessage('');
+      }
+    }
+
+    /**
+     * Preflight Health Check: Runs route, CSRF, session, rate limiter and storage permissions probe
      */
     async testHealth() {
       try {
@@ -137,13 +253,13 @@
     async compressImageIfNeeded(file, enabled = true) {
       if (!enabled) return { file, originalSize: file.size, finalSize: file.size, wasCompressed: false };
 
-      const isZip = /\.(zip|rar|dst|pes|jef|exp|xxx|vp3|hus|sew)$/i.test(file.name || '');
+      const isZip = /\.(zip|rar|7z|dst|pes|jef|exp|xxx|vp3|hus|sew)$/i.test(file.name || '');
       if (isZip) {
         return { file, originalSize: file.size, finalSize: file.size, wasCompressed: false };
       }
 
       const isImg = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|webp|avif)$/i.test(file.name || '');
-      if (!isImg || file.size < 2 * 1024 * 1024) {
+      if (!isImg || file.size < DIRECT_UPLOAD_LIMIT) {
         return { file, originalSize: file.size, finalSize: file.size, wasCompressed: false };
       }
 
@@ -217,7 +333,7 @@
         status: 'pending', // 'pending' | 'optimizing' | 'uploading' | 'assembling' | 'linked' | 'ambiguous' | 'unmatched' | 'failed'
         progressPercent: 0,
         uploadedChunks: 0,
-        totalChunks: Math.max(1, Math.ceil(file.size / CHUNK_SIZE)),
+        totalChunks: Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE)),
         details: 'Pending',
         stage: 'init',
         referenceId: null,
@@ -262,11 +378,11 @@
         return;
       }
 
-      // Populate Queue with pending/failed items
+      // Populate Queue with pending or failed items (preserves already linked/matched items)
       this.queue = this.items.filter(it => it.status === 'pending' || it.status === 'failed');
 
-      // Launch worker pool (up to MAX_CONCURRENCY parallel workers)
-      const workerCount = Math.min(MAX_CONCURRENCY, this.queue.length);
+      // Launch worker pool
+      const workerCount = Math.min(this.concurrency, this.queue.length);
       const workerPromises = [];
       for (let i = 0; i < workerCount; i++) {
         workerPromises.push(this.runFileWorker());
@@ -294,6 +410,9 @@
 
     async uploadSingleFile(item) {
       if (this.isCancelled) return;
+      if (['linked', 'ambiguous', 'unmatched'].includes(item.status)) {
+        return; // Already successfully processed!
+      }
 
       const controller = new AbortController();
       this.activeAbortControllers.add(controller);
@@ -307,34 +426,51 @@
           const compResult = await this.compressImageIfNeeded(item.rawFile, true);
           item.file = compResult.file;
           item.size = compResult.finalSize;
-          item.totalChunks = Math.max(1, Math.ceil(item.size / CHUNK_SIZE));
+          item.totalChunks = Math.max(1, Math.ceil(item.size / DEFAULT_CHUNK_SIZE));
           if (compResult.wasCompressed) {
             item.formattedSize = `${this.formatBytes(compResult.originalSize)} → ${this.formatBytes(compResult.finalSize)}`;
           }
         }
 
+        // FAST PATH: Single-Request Direct Upload (< 2MB)
+        // Combines init + upload + complete into ONE round trip!
+        const isArchive = /\.(zip|rar|7z)$/i.test(item.name || '');
+        if (item.size <= DIRECT_UPLOAD_LIMIT && !isArchive) {
+          item.status = 'uploading';
+          item.stage = 'Direct Upload';
+          item.details = 'Uploading in 1 request...';
+          item.progressPercent = 50;
+          this.notifyItemChange(item);
+
+          const directResult = await this.uploadDirectWithRetry(item, controller.signal);
+          this.applyProcessedResult(item, directResult);
+          return;
+        }
+
+        // CHUNKED PATH for large files (> 2MB) & machine archives:
         // Step B: Initialize Upload Session on Server
         item.status = 'uploading';
-        item.stage = 'init';
+        item.stage = 'Init Stage';
         item.details = 'Initializing session...';
         this.notifyItemChange(item);
 
-        let initData = await this.requestInit(item, controller.signal);
+        let initData = await this.requestInitWithRetry(item, controller.signal);
         item.uploadId = initData.uploadId;
         item.referenceId = initData.referenceId;
 
-        // Step C: Upload Chunks (1 MB each via application/octet-stream)
-        item.stage = 'chunk';
+        // Step C: Upload Chunks (2 MB each via application/octet-stream)
+        item.stage = 'Chunk Upload Stage';
         const totalChunks = item.totalChunks;
+        const startChunk = item.uploadedChunks || 0;
 
-        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+        for (let chunkIdx = startChunk; chunkIdx < totalChunks; chunkIdx++) {
           if (this.isCancelled) break;
           while (this.isPaused && !this.isCancelled) {
             await new Promise(r => setTimeout(r, 500));
           }
 
-          const start = chunkIdx * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, item.size);
+          const start = chunkIdx * DEFAULT_CHUNK_SIZE;
+          const end = Math.min(start + DEFAULT_CHUNK_SIZE, item.size);
           const chunkBlob = item.file.slice(start, end);
 
           item.details = `Uploading chunk ${chunkIdx + 1} of ${totalChunks}...`;
@@ -347,55 +483,15 @@
 
         if (this.isCancelled) return;
 
-        // Step D: Complete Upload & Assemble File
-        item.stage = 'complete';
+        // Step D: Complete Upload & Assemble File (Idempotent retry without re-uploading chunks)
+        item.stage = 'Assembly & Matching Stage';
         item.status = 'assembling';
         item.details = 'Assembling & matching design...';
         item.progressPercent = 90;
         this.notifyItemChange(item);
 
-        const completeResult = await this.requestComplete(item, controller.signal);
-        item.completeResult = completeResult;
-        if (completeResult.file) item.processedFile = completeResult.file;
-
-        // Map status result
-        if (completeResult.status === 'linked') {
-          item.status = 'linked';
-          item.details = `Linked to #${completeResult.designId} (${completeResult.sku || completeResult.title})`;
-          item.matchedDesign = completeResult;
-          this.recordSuccess();
-        } else if (completeResult.status === 'ambiguous') {
-          item.status = 'ambiguous';
-          item.tempToken = completeResult.tempToken;
-          item.candidates = completeResult.candidates || [];
-          item.details = 'Multiple candidate designs matched';
-          this.recordSuccess();
-        } else if (completeResult.status === 'unmatched') {
-          item.status = 'unmatched';
-          item.tempToken = completeResult.tempToken;
-          item.suggestions = completeResult.suggestions || [];
-          item.details = completeResult.reason || 'No matching product found';
-          this.recordSuccess();
-        } else if (completeResult.status === 'failed') {
-          item.status = 'failed';
-          item.stage = completeResult.stage || 'complete';
-          item.details = `[${item.stage}] ${completeResult.error || 'Processing error'}`;
-          item.referenceId = completeResult.referenceId;
-          item.errorObj = {
-            status: completeResult.code || 'FAIL',
-            message: completeResult.error,
-            stage: item.stage,
-            suggestedAction: completeResult.suggestedAction || 'Check file format and database.'
-          };
-          this.recordFailure(completeResult.code || 500, completeResult.error);
-        } else {
-          item.status = 'linked';
-          item.details = 'Uploaded successfully';
-          this.recordSuccess();
-        }
-
-        item.progressPercent = 100;
-        this.notifyItemChange(item);
+        const completeResult = await this.requestCompleteWithRetry(item, controller.signal);
+        this.applyProcessedResult(item, completeResult);
 
       } catch (err) {
         if (this.isCancelled) {
@@ -405,20 +501,27 @@
         } else {
           const status = err.status || (err.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR');
           const stage = err.stage || item.stage || 'Upload Stage';
-          const action = err.suggestedAction || 'Check internet connection and server status.';
+          let action = err.suggestedAction || 'Check internet connection and server status.';
+          let message = err.message || 'Processing error';
+
+          if (status === 429) {
+            message = 'Server rate limit — retrying automatically';
+            action = 'Server busy processing requests. Uploader will retry automatically.';
+          }
+
           item.status = 'failed';
           item.stage = stage;
-          item.details = `[${stage}] HTTP ${status}: ${err.message}`;
+          item.details = `[${stage}] HTTP ${status}: ${message}`;
           item.referenceId = err.referenceId || item.referenceId;
           item.errorObj = {
             status,
-            message: err.message,
+            message,
             stage,
             referenceId: item.referenceId,
             suggestedAction: action,
             filename: item.name
           };
-          this.recordFailure(status, err.message);
+          this.recordFailure(status, message);
         }
         this.notifyItemChange(item);
       } finally {
@@ -427,58 +530,167 @@
     }
 
     /**
-     * Sends Session Init Request
+     * Direct Single-Request Upload (< 2MB)
      */
-    async requestInit(item, signal) {
-      const token = this.csrfToken || this.getCsrfToken();
-      const res = await fetch(this.options.initEndpoint, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': token
-        },
-        body: JSON.stringify({
-          _csrf: token,
-          filename: item.name,
-          fileSize: item.size,
-          totalChunks: item.totalChunks,
-          uploadType: this.options.uploadType,
-          batchId: this.options.batchId
-        }),
-        signal
-      });
+    async uploadDirectWithRetry(item, signal) {
+      let attempt = 0;
+      while (attempt <= 3) {
+        try {
+          const token = this.csrfToken || this.getCsrfToken();
+          const formData = new FormData();
+          formData.append('file', item.file, item.name);
+          formData.append('originalName', item.name);
+          formData.append('uploadType', this.options.uploadType);
+          if (this.options.batchId) formData.append('batchId', this.options.batchId);
+          formData.append('_csrf', token);
+          if (window.bulkUploadState?.confirmedMappings) {
+            formData.append('confirmed_mappings', JSON.stringify(window.bulkUploadState.confirmedMappings));
+          }
 
-      if (res.status === 401) {
-        this.handleSessionExpired();
-        const err = new Error('Admin session expired.');
-        err.status = 401;
-        err.stage = 'Authentication Stage';
-        err.suggestedAction = 'Log into Admin in another tab, then click Resume.';
-        throw err;
+          const res = await fetch(this.options.directEndpoint, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'X-CSRF-Token': token
+            },
+            body: formData,
+            signal
+          });
+
+          // Handle 429 Rate Limit: back off, do NOT burn attempt, do NOT fail
+          if (res.status === 429) {
+            await this.handle429RateLimit(res, item, 'Direct Upload Stage', signal);
+            continue; // Retry without incrementing attempt
+          }
+
+          if (res.status === 401) {
+            this.handleSessionExpired();
+            const err = new Error('Admin session expired.');
+            err.status = 401;
+            err.stage = 'Authentication Stage';
+            err.suggestedAction = 'Log into Admin in another tab, then click Resume.';
+            throw err;
+          }
+
+          if (res.status === 403 && attempt === 0) {
+            console.warn('[ChunkUploader] Direct upload got 403. Refreshing token...');
+            await this.refreshCsrfToken();
+            attempt++;
+            continue;
+          }
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const err = new Error(data.message || `Direct upload failed (HTTP ${res.status})`);
+            err.status = res.status;
+            err.stage = data.stage || 'Direct Upload Stage';
+            err.referenceId = data.referenceId;
+            err.suggestedAction = data.suggestedAction;
+            throw err;
+          }
+
+          this.clearRateLimitState();
+          return data;
+
+        } catch (err) {
+          if (err.name === 'AbortError' || this.isCancelled || err.status === 401 || err.status === 429) {
+            throw err;
+          }
+
+          attempt++;
+          if (attempt > 3) {
+            err.stage = 'Direct Upload Stage';
+            throw err;
+          }
+
+          const delay = RETRY_DELAYS[attempt - 1] || 3000;
+          item.details = `Retry ${attempt}/3 in ${Math.round(delay / 1000)}s (${err.message})...`;
+          this.notifyItemChange(item);
+          await new Promise(r => setTimeout(r, delay));
+        }
       }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const err = new Error(errData.message || `Init rejected with HTTP ${res.status}`);
-        err.status = res.status;
-        err.stage = 'Init Stage';
-        err.referenceId = errData.referenceId;
-        err.suggestedAction = errData.suggestedAction;
-        throw err;
-      }
-
-      return await res.json();
     }
 
     /**
-     * Uploads individual chunk with 3 exponential backoff retries (1s, 3s, 8s)
+     * Sends Session Init Request with 429 & backoff handling
+     */
+    async requestInitWithRetry(item, signal) {
+      let attempt = 0;
+      while (attempt <= 3) {
+        try {
+          const token = this.csrfToken || this.getCsrfToken();
+          const res = await fetch(this.options.initEndpoint, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': token
+            },
+            body: JSON.stringify({
+              _csrf: token,
+              filename: item.name,
+              fileSize: item.size,
+              totalChunks: item.totalChunks,
+              uploadType: this.options.uploadType,
+              batchId: this.options.batchId
+            }),
+            signal
+          });
+
+          // Handle 429 Rate Limit
+          if (res.status === 429) {
+            await this.handle429RateLimit(res, item, 'Init Stage', signal);
+            continue;
+          }
+
+          if (res.status === 401) {
+            this.handleSessionExpired();
+            const err = new Error('Admin session expired.');
+            err.status = 401;
+            err.stage = 'Authentication Stage';
+            err.suggestedAction = 'Log into Admin in another tab, then click Resume.';
+            throw err;
+          }
+
+          if (res.status === 403 && attempt === 0) {
+            await this.refreshCsrfToken();
+            attempt++;
+            continue;
+          }
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const err = new Error(errData.message || `Init rejected with HTTP ${res.status}`);
+            err.status = res.status;
+            err.stage = 'Init Stage';
+            err.referenceId = errData.referenceId;
+            err.suggestedAction = errData.suggestedAction;
+            throw err;
+          }
+
+          this.clearRateLimitState();
+          return await res.json();
+
+        } catch (err) {
+          if (err.name === 'AbortError' || this.isCancelled || err.status === 401 || err.status === 429) {
+            throw err;
+          }
+          attempt++;
+          if (attempt > 3) throw err;
+          const delay = RETRY_DELAYS[attempt - 1] || 3000;
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+
+    /**
+     * Uploads individual chunk with 3 exponential backoff retries & 429 immunity
      */
     async uploadChunkWithRetry(item, chunkIdx, totalChunks, chunkBlob, signal) {
       let attempt = 0;
       while (attempt <= 3) {
         try {
-          let token = this.csrfToken || this.getCsrfToken();
+          const token = this.csrfToken || this.getCsrfToken();
           const res = await fetch(this.options.chunkEndpoint, {
             method: 'POST',
             headers: {
@@ -495,7 +707,12 @@
             signal
           });
 
-          // Handle 401 Session Expiry
+          // Handle 429 Rate Limit
+          if (res.status === 429) {
+            await this.handle429RateLimit(res, item, 'Chunk Upload Stage', signal);
+            continue;
+          }
+
           if (res.status === 401) {
             this.handleSessionExpired();
             const err = new Error('Admin session expired during chunk upload.');
@@ -505,7 +722,6 @@
             throw err;
           }
 
-          // Handle 403 CSRF Expiry: refresh token once and retry chunk
           if (res.status === 403 && attempt === 0) {
             console.warn(`[ChunkUploader] Chunk ${chunkIdx} got 403. Refreshing token...`);
             await this.refreshCsrfToken();
@@ -523,10 +739,11 @@
             throw err;
           }
 
+          this.clearRateLimitState();
           return await res.json();
 
         } catch (err) {
-          if (err.name === 'AbortError' || this.isCancelled || err.status === 401) {
+          if (err.name === 'AbortError' || this.isCancelled || err.status === 401 || err.status === 429) {
             throw err;
           }
 
@@ -547,55 +764,135 @@
 
     /**
      * Sends Complete Request to Assemble File
+     * Idempotent retry without throwing away uploaded chunks
      */
-    async requestComplete(item, signal) {
-      const token = this.csrfToken || this.getCsrfToken();
-      const res = await fetch(this.options.completeEndpoint, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': token
-        },
-        body: JSON.stringify({
-          _csrf: token,
-          uploadId: item.uploadId,
-          originalName: item.name,
-          totalChunks: item.totalChunks,
-          uploadType: this.options.uploadType,
-          batchId: this.options.batchId,
-          confirmed_mappings: window.bulkUploadState?.confirmedMappings || {}
-        }),
-        signal
-      });
+    async requestCompleteWithRetry(item, signal) {
+      let attempt = 0;
+      while (attempt <= 3) {
+        try {
+          const token = this.csrfToken || this.getCsrfToken();
+          const res = await fetch(this.options.completeEndpoint, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': token
+            },
+            body: JSON.stringify({
+              _csrf: token,
+              uploadId: item.uploadId,
+              originalName: item.name,
+              totalChunks: item.totalChunks,
+              uploadType: this.options.uploadType,
+              batchId: this.options.batchId,
+              confirmed_mappings: window.bulkUploadState?.confirmedMappings || {}
+            }),
+            signal
+          });
 
-      if (res.status === 401) {
-        this.handleSessionExpired();
-        const err = new Error('Admin session expired.');
-        err.status = 401;
-        err.stage = 'Authentication Stage';
-        err.suggestedAction = 'Log into Admin in another tab, then click Resume.';
-        throw err;
+          // Handle 429 Rate Limit on Assembly
+          if (res.status === 429) {
+            await this.handle429RateLimit(res, item, 'Assembly & Matching Stage', signal);
+            continue;
+          }
+
+          if (res.status === 401) {
+            this.handleSessionExpired();
+            const err = new Error('Admin session expired.');
+            err.status = 401;
+            err.stage = 'Authentication Stage';
+            err.suggestedAction = 'Log into Admin in another tab, then click Resume.';
+            throw err;
+          }
+
+          const data = await res.json().catch(() => ({}));
+
+          if (!res.ok) {
+            const err = new Error(data.message || `Assembly failed (HTTP ${res.status})`);
+            err.status = res.status;
+            err.stage = data.stage || 'Assembly & Matching Stage';
+            err.referenceId = data.referenceId;
+            err.suggestedAction = data.suggestedAction;
+            throw err;
+          }
+
+          this.clearRateLimitState();
+          return data;
+
+        } catch (err) {
+          if (err.name === 'AbortError' || this.isCancelled || err.status === 401 || err.status === 429) {
+            throw err;
+          }
+
+          attempt++;
+          if (attempt > 3) {
+            err.stage = 'Assembly & Matching Stage';
+            throw err;
+          }
+
+          const delay = RETRY_DELAYS[attempt - 1] || 3000;
+          item.details = `Assembly retry ${attempt}/3 in ${Math.round(delay / 1000)}s (${err.message})...`;
+          this.notifyItemChange(item);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+
+    /**
+     * Map completed/direct upload result to item status
+     */
+    applyProcessedResult(item, result) {
+      item.completeResult = result;
+      if (result.file) item.processedFile = result.file;
+
+      if (result.status === 'linked') {
+        item.status = 'linked';
+        item.details = `Linked to #${result.designId} (${result.sku || result.title})`;
+        item.matchedDesign = result;
+        this.recordSuccess();
+      } else if (result.status === 'ambiguous') {
+        item.status = 'ambiguous';
+        item.tempToken = result.tempToken;
+        item.candidates = result.candidates || [];
+        item.details = 'Multiple candidate designs matched';
+        this.recordSuccess();
+      } else if (result.status === 'unmatched') {
+        item.status = 'unmatched';
+        item.tempToken = result.tempToken;
+        item.suggestions = result.suggestions || [];
+        item.details = result.reason || 'No matching product found';
+        this.recordSuccess();
+      } else if (result.status === 'failed') {
+        item.status = 'failed';
+        item.stage = result.stage || 'complete';
+        item.details = `[${item.stage}] ${result.error || 'Processing error'}`;
+        item.referenceId = result.referenceId;
+        item.errorObj = {
+          status: result.code || 'FAIL',
+          message: result.error,
+          stage: item.stage,
+          suggestedAction: result.suggestedAction || 'Check file format and database.'
+        };
+        this.recordFailure(result.code || 500, result.error);
+      } else {
+        item.status = 'linked';
+        item.details = 'Uploaded successfully';
+        this.recordSuccess();
       }
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const err = new Error(data.message || `Assembly failed (HTTP ${res.status})`);
-        err.status = res.status;
-        err.stage = data.stage || 'Assembly & Matching Stage';
-        err.referenceId = data.referenceId;
-        err.suggestedAction = data.suggestedAction;
-        throw err;
-      }
-
-      return data;
+      item.progressPercent = 100;
+      this.notifyItemChange(item);
     }
 
     /**
      * Tracks consecutive failures and triggers auto-pause
+     * HTTP 429 is explicitly excluded so it never triggers auto-pause
      */
     recordFailure(statusCode, reason) {
+      if (statusCode === 429 || statusCode === 'RATE_LIMIT_EXCEEDED') {
+        return; // Never count 429 towards fail threshold
+      }
+
       if (this.consecutiveFailures.code === statusCode) {
         this.consecutiveFailures.count++;
       } else {
@@ -626,6 +923,14 @@
     resume() {
       this.isPaused = false;
       this.consecutiveFailures = { count: 0, code: null, reason: '' };
+      this.rateLimitState = {
+        isRateLimited: false,
+        startTime: null,
+        retryCount: 0,
+        waitingUntil: null
+      };
+      this.concurrency = MAX_CONCURRENCY;
+
       if (this.options.onResumed) {
         this.options.onResumed();
       }
@@ -676,6 +981,8 @@
     finishUpload() {
       this.isUploading = false;
       this.stopKeepAlive();
+      this.clearRateLimitState();
+
       if (this.options.onFinished) {
         this.options.onFinished({
           total: this.items.length,
@@ -771,6 +1078,11 @@
       const sizes = ['B', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return (bytes / Math.pow(k, i)).toFixed(i >= 2 ? 1 : 0) + ' ' + sizes[i];
+    }
+
+    escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
   }
 

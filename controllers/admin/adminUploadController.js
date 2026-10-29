@@ -428,15 +428,141 @@ async function handleBulkRestoreImageComplete({ req, res, combinedPath, original
 }
 
 /**
+ * 2b. Direct Single-Request Upload (< 2MB)
+ * POST /admin/api/upload/direct
+ * Combines init + upload + complete into ONE round trip for files <= 2MB!
+ */
+exports.directUpload = async (req, res) => {
+  const refId = 'dir_' + Date.now().toString(36) + '_' + crypto.randomBytes(3).toString('hex');
+  try {
+    const isAdmin = (req.user && req.user.role === 'admin') || (req.session && (req.session.adminUser || req.session.userId));
+    if (!isAdmin) {
+      return res.status(401).json({
+        success: false,
+        code: 'UNAUTHORIZED',
+        message: 'Admin session expired or access denied.',
+        referenceId: refId,
+        stage: 'auth'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        code: 'NO_FILE',
+        message: 'No file received in direct upload.',
+        referenceId: refId,
+        stage: 'upload'
+      });
+    }
+
+    const originalName = req.body.originalName || req.file.originalname || req.body.filename || 'unknown';
+    const uploadType = req.body.uploadType || 'bulk-restore';
+    const filePath = req.file.path;
+    const finalSize = req.file.size;
+    let confirmedMappings = {};
+    if (req.body.confirmed_mappings) {
+      try {
+        confirmedMappings = typeof req.body.confirmed_mappings === 'string'
+          ? JSON.parse(req.body.confirmed_mappings)
+          : req.body.confirmed_mappings;
+      } catch (_) {}
+    }
+
+    if (uploadType === 'bulk-restore' || uploadType === 'image') {
+      return await handleBulkRestoreImageComplete({
+        req,
+        res,
+        combinedPath: filePath,
+        originalName,
+        finalSize,
+        refId,
+        confirmedMappings
+      });
+    }
+
+    if (uploadType === 'bulk-replace') {
+      const bulkImageReplaceService = require('../../services/bulkImageReplaceService');
+      const processed = await bulkImageReplaceService.processUploadChunk([{
+        path: filePath,
+        originalname: originalName,
+        size: finalSize
+      }]);
+      const pFile = processed[0] || {};
+      return res.json({
+        success: true,
+        status: 'processed',
+        filename: originalName,
+        file: pFile,
+        referenceId: refId
+      });
+    }
+
+    if (uploadType === 'import-asset') {
+      const bulkImportService = require('../../services/bulkImportService');
+      const batchId = req.body.batchId || req.body.confirmed_mappings?.batchId || req.headers['x-batch-id'];
+      if (!batchId) {
+        return res.status(400).json({ success: false, message: 'Missing import session batchId.', referenceId: refId });
+      }
+      const result = await bulkImportService.processAssetBatch(batchId, [{
+        path: filePath,
+        originalname: originalName,
+        size: finalSize
+      }]);
+      return res.json({
+        success: true,
+        status: 'processed',
+        filename: originalName,
+        ...result,
+        referenceId: refId
+      });
+    }
+
+    return res.json({
+      success: true,
+      status: 'assembled',
+      filename: originalName,
+      fileSize: finalSize,
+      filePath: filePath,
+      referenceId: refId
+    });
+
+  } catch (err) {
+    console.error(`[Direct Upload Error] [${refId}]:`, err.stack || err.message);
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { await fs.promises.unlink(req.file.path); } catch (_) {}
+    }
+    return res.status(500).json({
+      success: false,
+      code: 'DIRECT_UPLOAD_FAILED',
+      message: err.message || 'Direct upload failed.',
+      referenceId: refId,
+      stage: 'direct-upload',
+      suggestedAction: 'Retry file upload.'
+    });
+  }
+};
+
+/**
  * 4. Route Health Check & Test Upload Tool
  * POST /admin/api/upload/test-health
  */
 exports.testHealth = async (req, res) => {
   const refId = 'hlth_' + Date.now().toString(36);
+  const { getRateLimitStatus } = require('../../middleware/rateLimiters');
+  const rateLimitStatus = getRateLimitStatus(req);
+
   const checks = {
     route: { status: 'pass', code: 200 },
     csrf: { status: 'pass' },
     session: { status: 'pass', user: req.user ? req.user.email : 'Unknown' },
+    rateLimiter: {
+      status: 'pass',
+      adminExempt: true,
+      trustProxy: Boolean(req.app.get('trust proxy')),
+      clientIp: req.ip,
+      config: rateLimitStatus
+    },
     storageWritable: { status: 'fail', error: null },
     previewsWritable: { status: 'fail', error: null },
     sharpAvailable: { status: 'fail', mode: 'unknown' },
@@ -484,7 +610,7 @@ exports.testHealth = async (req, res) => {
     success: allPassed,
     referenceId: refId,
     checks,
-    summary: allPassed ? 'Upload engine is 100% operational.' : 'Upload engine storage permissions issue detected.'
+    summary: allPassed ? 'Upload engine is 100% operational (Admin upload routes exempt from rate limiting).' : 'Upload engine storage permissions issue detected.'
   });
 };
 

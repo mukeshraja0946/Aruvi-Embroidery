@@ -1146,13 +1146,20 @@ exports.getSystemHealth = async (req, res, next) => {
         } catch (sErr) {}
       }
     }
+    const { getRateLimitStatus } = require('../../middleware/rateLimiters');
+    const rateLimitStatus = getRateLimitStatus(req);
+
     res.render('admin/tools/system-health', {
       title: 'Database & System Health - Admin',
       health,
+      rateLimitStatus,
       page: 'system-health'
     });
   } catch (err) {
     console.error('❌ [getSystemHealth Controller Error]:', err);
+    const { getRateLimitStatus } = require('../../middleware/rateLimiters');
+    const rateLimitStatus = getRateLimitStatus(req);
+
     res.status(500).render('admin/tools/system-health', {
       title: 'Database & System Health - Admin',
       health: {
@@ -1162,9 +1169,9 @@ exports.getSystemHealth = async (req, res, next) => {
         missingTables: [],
         missingColumns: [],
         stats: { totalExpectedTables: 0, existingTablesCount: 0, missingTablesCount: 0, totalExpectedColumns: 0, existingColumnsCount: 0, missingColumnsCount: 0, healthPercentage: 0 },
-        migrations: { total: 0, appliedCount: 0, pendingCount: 0, isUpToDate: false, migrations: [] },
         isHealthy: false
       },
+      rateLimitStatus,
       page: 'system-health'
     });
   }

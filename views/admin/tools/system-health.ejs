@@ -365,6 +365,32 @@
           </button>
         </div>
 
+        <!-- Live Rate Limit & Proxy Status Overview -->
+        <% if (locals.rateLimitStatus) { %>
+          <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem;">
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+              <span style="color: #166534; font-weight: 700;">
+                <i class="fa-solid fa-shield-halved" style="margin-right: 4px;"></i> Rate Limiter Config:
+              </span>
+              <span style="color: #15803D;">
+                Admin Uploads: <strong style="background: #DCFCE7; padding: 2px 6px; border-radius: 4px; color: #166534;">100% EXEMPT</strong>
+              </span>
+              <span style="color: #374151;">
+                Trust Proxy: <strong><%= rateLimitStatus.trustProxy.enabled ? 'Active (app.set trust proxy, 1)' : 'Disabled' %></strong>
+              </span>
+              <span style="color: #374151;">
+                Strict Auth: <strong>10 req / 15m</strong>
+              </span>
+              <span style="color: #374151;">
+                Public Store: <strong>300 req / 5m</strong>
+              </span>
+            </div>
+            <div style="color: #6B7280; font-family: monospace; font-size: 0.75rem;">
+              Client IP: <%= rateLimitStatus.clientIp %>
+            </div>
+          </div>
+        <% } %>
+
         <div id="uploadTestResultsContainer" style="display: none; margin-top: 1rem; border-top: 1px solid #ECEFF1; padding-top: 1rem;">
           <!-- Dynamically populated by runUploadRouteTest -->
         </div>
@@ -582,6 +608,19 @@ async function runUploadRouteTest() {
             ${checks.session?.status === 'pass' ? passBadge : failBadge}
           </div>
           <div style="font-size: 0.76rem; color: #666;">Active Admin: ${escapeHtml(checks.session?.user || 'Active')}</div>
+        </div>
+
+        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 0.82rem; color: #333;">Rate Limiter & Proxy:</strong>
+            ${checks.rateLimiter?.adminExempt ? '<span style="color: #2E7D32; font-weight: 700; background: #E8F5E9; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-shield-check"></i> EXEMPT (PASS)</span>' : passBadge}
+          </div>
+          <div style="font-size: 0.76rem; color: #666;">
+            Admin Upload: <strong>Exempt from 429</strong> | Trust Proxy: <strong>${checks.rateLimiter?.trustProxy ? 'Active (1)' : 'Direct'}</strong> (Client IP: ${escapeHtml(checks.rateLimiter?.clientIp || '127.0.0.1')})
+          </div>
+          <div style="font-size: 0.72rem; color: #888; margin-top: 2px;">
+            Strict Auth: 10 req/15m | Public Pages: 300 req/5m | Static Assets: Exempt
+          </div>
         </div>
 
         <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">

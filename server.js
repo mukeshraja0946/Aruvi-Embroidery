@@ -50,20 +50,6 @@ app.use(
   })
 );
 
-// Rate Limiter
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 2000, // 2000 requests per IP
-  skip: (req) =>
-    req.ip === '127.0.0.1' ||
-    req.ip === '::1' ||
-    req.ip === '::ffff:127.0.0.1' ||
-    process.env.NODE_ENV !== 'production',
-  message: 'Too many requests from this IP, please try again after 15 minutes.'
-});
-
-app.use(limiter);
-
 // Body Parsing (allow up to 50MB for batch payloads, raw 10MB stream for binary upload chunks)
 app.use('/admin/api/upload/chunk', express.raw({ type: 'application/octet-stream', limit: '10mb' }));
 app.use(express.json({ limit: '50mb' }));
@@ -167,15 +153,61 @@ try {
 
   sessionStore = new MySQLStore(sessionDbOptions);
   sessionStore.on('error', function (storeErr) {
-    console.warn('[Session Store Warning] MySQL session store notice (operating with fallback):', storeErr.message);
+    console.warn('[Session Store Warning] MySQL session store notice (operating with memory fallback):', storeErr.message);
   });
 } catch (storeInitErr) {
   console.warn('[Session Store Warning] MySQL session store initialization fallback to memory:', storeInitErr.message);
 }
 
+// Resilient Session Store: delegates to MySQL when connected, gracefully falls back to memory without crashing
+const db = require('./config/db');
+class SafeStore extends session.Store {
+  constructor() {
+    super();
+    this.memoryStore = new session.MemoryStore();
+  }
+  get(sid, fn) {
+    if (sessionStore && db.isConnected()) {
+      sessionStore.get(sid, (err, sess) => {
+        if (err) return this.memoryStore.get(sid, fn);
+        return fn(null, sess);
+      });
+    } else {
+      this.memoryStore.get(sid, fn);
+    }
+  }
+  set(sid, sess, fn) {
+    this.memoryStore.set(sid, sess, () => {});
+    if (sessionStore && db.isConnected()) {
+      sessionStore.set(sid, sess, (err) => {
+        if (fn) fn(err);
+      });
+    } else if (fn) {
+      fn();
+    }
+  }
+  destroy(sid, fn) {
+    this.memoryStore.destroy(sid, () => {});
+    if (sessionStore && db.isConnected()) {
+      sessionStore.destroy(sid, fn);
+    } else if (fn) {
+      fn();
+    }
+  }
+  touch(sid, sess, fn) {
+    this.memoryStore.touch(sid, sess, () => {});
+    if (sessionStore && db.isConnected() && typeof sessionStore.touch === 'function') {
+      sessionStore.touch(sid, sess, fn);
+    } else if (fn) {
+      fn();
+    }
+  }
+}
+const safeStore = new SafeStore();
+
 app.use(
   session({
-    store: sessionStore || undefined,
+    store: safeStore,
     secret:
       process.env.SESSION_SECRET ||
       'aruvi_embroidery_secret_stitch_key',
@@ -274,6 +306,10 @@ app.locals.getPrimaryPreview = (d) => previewService.getPrimaryPreview(d);
 // Attach user, cart, flash & global settings
 const { attachUserAndCart } = require('./middleware/auth');
 app.use(attachUserAndCart);
+
+// Public Pages & API Rate Limiter (moderate 300 per 5 min, static assets & admin routes excluded)
+const { publicLimiter } = require('./middleware/rateLimiters');
+app.use(publicLimiter);
 
 // Routes
 const indexRoutes = require('./routes/indexRoutes');
