@@ -4278,13 +4278,14 @@ exports.getBulkReplaceScopeSummary = async (req, res, next) => {
  */
 exports.postBulkReplacePreviewMatch = async (req, res, next) => {
   try {
-    const { files = [], categoryIds = [], status = 'all', search = '', checkedIds = [], mode = 'replace_primary' } = req.body;
+    const { files = [], categoryIds = [], status = 'all', search = '', checkedIds = [], mode = 'replace_primary', targetDesignId } = req.body;
     const matchResult = await bulkImageReplaceService.matchFilesToScope(files, {
       categoryIds,
       status,
       search,
       checkedIds,
-      mode
+      mode,
+      targetDesignId: targetDesignId ? parseInt(targetDesignId, 10) : null
     });
     res.json({ success: true, ...matchResult });
   } catch (err) {
@@ -4331,15 +4332,16 @@ exports.getBulkReplaceCategoryGroups = async (req, res, next) => {
  */
 exports.postBulkReplaceCommit = async (req, res, next) => {
   try {
-    const { categoryId, categoryName, scopeSummary, replacementMode, groupName, items } = req.body;
+    const { categoryId, categoryName, scopeSummary, replacementMode, groupName, targetDesignId, items } = req.body;
 
     let result;
-    if (groupName && groupName !== 'All Designs in Category' && groupName !== '__ALL_DESIGNS__' && groupName !== 'all') {
+    if (targetDesignId || (groupName && groupName !== 'All Designs in Category' && groupName !== '__ALL_DESIGNS__' && groupName !== 'all')) {
       result = await bulkImageReplaceService.replaceFileGroup({
         adminUser: req.user,
         categoryId,
         categoryName,
-        groupName,
+        groupName: groupName || (targetDesignId ? `Design #${targetDesignId}` : null),
+        targetDesignId: targetDesignId ? parseInt(targetDesignId, 10) : null,
         replacementMode: replacementMode || 'replace_group',
         items
       });
@@ -4358,12 +4360,13 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
       await ActivityLog.log({
         action: 'bulk_replace_images',
         entity: 'designs',
-        entityId: null,
+        entityId: targetDesignId || null,
         details: {
           logId: result.logId,
+          targetDesignId: targetDesignId || null,
           categoryName,
           groupName: groupName || null,
-          replacementMode: groupName ? 'replace_group' : replacementMode,
+          replacementMode: (targetDesignId || groupName) ? 'replace_group' : replacementMode,
           replacedCount: result.replacedCount || result.replacedDesignsCount || ((result.replacedImagesCount || 0) + (result.replacedZipsCount || 0)),
           replacedImagesCount: result.replacedImagesCount || 0,
           replacedZipsCount: result.replacedZipsCount || 0,
@@ -4378,6 +4381,44 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
     res.json(result);
   } catch (err) {
     console.error('postBulkReplaceCommit error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * Repair / Re-apply last bulk replacement run to a specific design
+ * POST /admin/designs/bulk-replace/repair-last
+ */
+exports.postBulkReplaceRepair = async (req, res, next) => {
+  try {
+    const { logId, targetDesignId, dryRun } = req.body;
+    const result = await bulkImageReplaceService.repairBulkReplacement({
+      logId: logId ? parseInt(logId, 10) : null,
+      targetDesignId: targetDesignId ? parseInt(targetDesignId, 10) : 637,
+      dryRun: dryRun === true || dryRun === 'true',
+      adminUser: req.user
+    });
+
+    if (!dryRun && result.success) {
+      await ActivityLog.log({
+        action: 'repair_bulk_replace_files',
+        entity: 'designs',
+        entityId: result.repairedDesignId || targetDesignId || 637,
+        details: {
+          logId: result.logId,
+          repairedDesignId: result.repairedDesignId,
+          repairedDesignSku: result.repairedDesignSku,
+          replacedImagesCount: result.replacedImagesCount,
+          replacedZipsCount: result.replacedZipsCount
+        },
+        adminId: req.user ? req.user.id : null,
+        adminEmail: req.user ? req.user.email : 'admin'
+      });
+    }
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('postBulkReplaceRepair error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

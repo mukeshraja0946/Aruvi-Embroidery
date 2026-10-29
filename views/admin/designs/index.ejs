@@ -2362,9 +2362,14 @@
             <option value="">Scanning stored paths...</option>
           </select>
 
+          <!-- Explicit Target Design Notice -->
+          <div id="targetDesignNotice" style="display: none; margin-top: 10px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #1E40AF;">
+            <i class="fa-solid fa-crosshairs"></i> <strong>Target Design:</strong> <span id="targetDesignNoticeText">-</span>
+          </div>
+
           <!-- Group Details Card -->
           <div id="existingGroupSummaryBadge" style="margin-top: 14px; background: #F0F9FF; border: 1px solid #BAE6FD; padding: 12px 16px; border-radius: 10px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 0.84rem;">
-            <span><i class="fa-solid fa-folder"></i> Folder: <strong id="groupDetailName" style="color: #0369A1;">-</strong></span>
+            <span><i class="fa-solid fa-folder"></i> Folder / Scope: <strong id="groupDetailName" style="color: #0369A1;">-</strong></span>
             <span><i class="fa-solid fa-shirt"></i> Designs in Group: <strong id="groupDetailDesignsCount" style="color: #0284C7;">0</strong></span>
             <span><i class="fa-solid fa-image"></i> Existing Images: <strong id="groupDetailImagesCount" style="color: #512DA8;">0</strong></span>
             <span><i class="fa-solid fa-file-zipper"></i> Existing ZIPs: <strong id="groupDetailZipsCount" style="color: #00796B;">0</strong></span>
@@ -2445,6 +2450,11 @@
           </p>
 
           <div style="background: #FAF9F6; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
+            <!-- Target Design Banner -->
+            <div id="confTargetDesignRow" style="display: none; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.85rem; color: #1E40AF;">
+              <i class="fa-solid fa-bullseye"></i> <strong>Target Design:</strong> <span id="confTargetDesignText">-</span>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
               <div>
                 <span style="font-size: 0.74rem; color: var(--admin-text-muted); text-transform: uppercase; font-weight: 600; display: block;">Selected Category</span>
@@ -2598,10 +2608,11 @@
                   <tr style="text-align: left; color: #475569;">
                     <th style="padding: 10px 14px; width: 45px; text-align: center;">#</th>
                     <th style="padding: 10px 14px;">File Name</th>
-                    <th style="padding: 10px 14px; width: 110px;">Type</th>
-                    <th style="padding: 10px 14px; width: 95px;">Size</th>
-                    <th style="padding: 10px 14px; width: 125px;">Storage Status</th>
-                    <th style="padding: 10px 14px; width: 125px;">Database Status</th>
+                    <th style="padding: 10px 14px; width: 85px;">Type</th>
+                    <th style="padding: 10px 14px; width: 85px;">Size</th>
+                    <th style="padding: 10px 14px; width: 140px;">Target Design / SKU</th>
+                    <th style="padding: 10px 14px; width: 120px;">Storage Status</th>
+                    <th style="padding: 10px 14px; width: 120px;">Database Status</th>
                     <th style="padding: 10px 14px; width: 105px; text-align: center;">Result</th>
                   </tr>
                 </thead>
@@ -2616,6 +2627,9 @@
           <div style="display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; padding-top: 0.25rem;">
             <button type="button" id="bulkReplaceRetryFailedBtn" onclick="window.bulkImageReplaceInstance.retryFailed()" class="btn btn-warning" style="display: none; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; align-items: center; gap: 6px; background: #FFF8E1; color: #B45309; border: 1px solid #FDE68A; font-weight: 600;">
               <i class="fa-solid fa-arrows-rotate"></i> Retry Failed Files
+            </button>
+            <button type="button" id="bulkReplaceRepairBtn" onclick="window.bulkImageReplaceInstance.promptRepair()" class="btn" style="font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; cursor: pointer; align-items: center; gap: 6px; font-weight: 600; display: inline-flex;">
+              <i class="fa-solid fa-screwdriver-wrench"></i> Repair / Re-apply to Design
             </button>
             <a id="bulkReplaceDownloadCsvBtn" href="#" class="btn btn-outline" style="font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #0284C7; border-color: #BAE6FD;">
               <i class="fa-solid fa-file-csv"></i> Download CSV Report

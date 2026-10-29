@@ -103,6 +103,7 @@ router.get('/admin/designs/bulk-replace/groups', adminDesignController.getBulkRe
 router.post('/admin/designs/bulk-replace/preview-match', adminDesignController.postBulkReplacePreviewMatch);
 router.post('/admin/designs/bulk-replace/upload-chunk', upload.array('files', 50), adminDesignController.postBulkReplaceUploadChunk);
 router.post('/admin/designs/bulk-replace/commit', adminDesignController.postBulkReplaceCommit);
+router.post('/admin/designs/bulk-replace/repair-last', adminDesignController.postBulkReplaceRepair);
 router.post('/admin/designs/bulk-replace/undo/:id', adminDesignController.postBulkReplaceUndo);
 router.get('/admin/designs/bulk-replace/history', adminDesignController.getBulkReplaceHistory);
 router.get('/admin/designs/bulk-replace/export-csv/:id', adminDesignController.getBulkReplaceExportCsv);

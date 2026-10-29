@@ -16,7 +16,9 @@
       this.currentCategoryId = null;
       this.currentCategoryName = '';
       this.availableGroups = [];
+      this.categoryDesigns = [];
       this.selectedGroup = null;
+      this.selectedTargetDesignId = null;
       this.selectedFiles = [];
       this.isUploading = false;
       this.abortController = null;
@@ -94,8 +96,14 @@
       this.currentStep = 1;
       this.selectedFiles = [];
       this.selectedGroup = null;
+      this.selectedTargetDesignId = null;
+      this.categoryDesigns = [];
       this.isUploading = false;
       this.lastLogId = null;
+
+      // Reset target design notice
+      const targetNotice = document.getElementById('targetDesignNotice');
+      if (targetNotice) targetNotice.style.display = 'none';
 
       // Reset file input and badges
       const filesInput = document.getElementById('bulkReplaceFileInput');
@@ -181,12 +189,13 @@
 
         if (data.success) {
           this.availableGroups = data.groups || [];
+          this.categoryDesigns = data.categoryDesigns || [];
           this.currentCategoryName = data.categoryName || this.currentCategoryName;
 
           if (groupSelect) {
             groupSelect.innerHTML = '';
 
-            if (this.availableGroups.length === 0) {
+            if (this.availableGroups.length === 0 && this.categoryDesigns.length === 0) {
               const opt = document.createElement('option');
               opt.value = '';
               opt.textContent = 'No designs found in this category';
@@ -195,24 +204,54 @@
               return;
             }
 
-            let preferredGroup = null;
+            let defaultVal = null;
 
-            this.availableGroups.forEach((g, idx) => {
-              const opt = document.createElement('option');
-              opt.value = g.groupName;
-              opt.textContent = `📁 ${g.groupName} (${g.designCount} designs — ${g.existingImagesCount} images, ${g.existingZipsCount} ZIPs)`;
-              groupSelect.appendChild(opt);
+            // 1. Pack designs / Single Design targeting optgroup
+            if (this.categoryDesigns.length > 0) {
+              const packGroup = document.createElement('optgroup');
+              packGroup.label = '🎯 Pack / Individual Designs (Target All 10 Images + 10 ZIPs to 1 Design)';
 
-              if (/aruvi.*bulk.*designs.*2/i.test(g.groupName) || idx === 0) {
-                if (!preferredGroup || /aruvi.*bulk.*designs.*2/i.test(g.groupName)) {
-                  preferredGroup = g;
+              this.categoryDesigns.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = `design:${d.id}`;
+                opt.textContent = `🎯 Design #${d.id} — ${d.title || d.sku} (SKU: ${d.sku})`;
+                packGroup.appendChild(opt);
+
+                // Priority: auto-select Design #637 or first pack design
+                if (!defaultVal && (d.id === 637 || /AED-BUL-01/i.test(d.sku) || /Aruvi Bulk Designs 1/i.test(d.title))) {
+                  defaultVal = `design:${d.id}`;
                 }
-              }
-            });
+              });
 
-            if (preferredGroup) {
-              groupSelect.value = preferredGroup.groupName;
-              this.selectGroup(preferredGroup.groupName);
+              groupSelect.appendChild(packGroup);
+            }
+
+            // 2. Folder Groups optgroup
+            if (this.availableGroups.length > 0) {
+              const folderGroup = document.createElement('optgroup');
+              folderGroup.label = '📁 Folder Groups (Multi-design Import Groups)';
+
+              this.availableGroups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = `group:${g.groupName}`;
+                opt.textContent = `📁 ${g.groupName} (${g.designCount} designs — ${g.existingImagesCount} images, ${g.existingZipsCount} ZIPs)`;
+                folderGroup.appendChild(opt);
+
+                if (!defaultVal) {
+                  defaultVal = `group:${g.groupName}`;
+                }
+              });
+
+              groupSelect.appendChild(folderGroup);
+            }
+
+            if (!defaultVal && this.categoryDesigns.length > 0) {
+              defaultVal = `design:${this.categoryDesigns[0].id}`;
+            }
+
+            if (defaultVal) {
+              groupSelect.value = defaultVal;
+              this.selectGroup(defaultVal);
             }
           }
         } else {
@@ -230,15 +269,19 @@
       }
     }
 
-    selectGroup(groupName) {
+    selectGroup(val) {
       const nextBtn = document.getElementById('bulkReplaceScopeNextBtn');
       const nameEl = document.getElementById('groupDetailName');
       const designsEl = document.getElementById('groupDetailDesignsCount');
       const imagesEl = document.getElementById('groupDetailImagesCount');
       const zipsEl = document.getElementById('groupDetailZipsCount');
+      const targetNotice = document.getElementById('targetDesignNotice');
+      const targetNoticeText = document.getElementById('targetDesignNoticeText');
 
-      if (!groupName) {
+      if (!val) {
         this.selectedGroup = null;
+        this.selectedTargetDesignId = null;
+        if (targetNotice) targetNotice.style.display = 'none';
         if (nameEl) nameEl.textContent = '-';
         if (designsEl) designsEl.textContent = '0';
         if (imagesEl) imagesEl.textContent = '0';
@@ -247,7 +290,38 @@
         return;
       }
 
-      const foundGroup = this.availableGroups.find(g => g.groupName === groupName);
+      if (val.startsWith('design:')) {
+        const dId = parseInt(val.replace('design:', ''), 10);
+        const found = this.categoryDesigns.find(d => d.id === dId);
+        if (found) {
+          this.selectedTargetDesignId = dId;
+          this.selectedGroup = {
+            groupName: found.title || found.sku,
+            designCount: 1,
+            designs: [found],
+            isSingleDesign: true,
+            existingImagesCount: found.images_count || (found.preview_image_url ? 1 : 0),
+            existingZipsCount: found.files_count || (found.import_zip_filename ? 1 : 0)
+          };
+          if (targetNotice && targetNoticeText) {
+            targetNotice.style.display = 'block';
+            targetNoticeText.textContent = `Design #${found.id} (${found.sku} — ${found.title}). All uploaded images & ZIPs will attach directly to this design!`;
+          }
+          if (nameEl) nameEl.textContent = `Design #${found.id} (${found.sku})`;
+          if (designsEl) designsEl.textContent = '1';
+          if (imagesEl) imagesEl.textContent = this.selectedGroup.existingImagesCount;
+          if (zipsEl) zipsEl.textContent = this.selectedGroup.existingZipsCount;
+          if (nextBtn) nextBtn.disabled = false;
+          return;
+        }
+      }
+
+      // Folder group selection
+      this.selectedTargetDesignId = null;
+      if (targetNotice) targetNotice.style.display = 'none';
+
+      const cleanGroupName = val.startsWith('group:') ? val.replace('group:', '') : val;
+      const foundGroup = this.availableGroups.find(g => g.groupName === cleanGroupName);
       if (foundGroup) {
         this.selectedGroup = foundGroup;
         if (nameEl) nameEl.textContent = foundGroup.groupName;
@@ -260,6 +334,7 @@
         if (nextBtn) nextBtn.disabled = true;
       }
     }
+
 
     proceedToStep2() {
       if (!this.selectedGroup) {
@@ -332,6 +407,16 @@
       const confOldZipsCount = document.getElementById('confOldZipsCount');
       const confNewImagesCount = document.getElementById('confNewImagesCount');
       const confNewZipsCount = document.getElementById('confNewZipsCount');
+      const confTargetRow = document.getElementById('confTargetDesignRow');
+      const confTargetText = document.getElementById('confTargetDesignText');
+
+      if (this.selectedTargetDesignId && this.selectedGroup && this.selectedGroup.designs && this.selectedGroup.designs[0]) {
+        const d = this.selectedGroup.designs[0];
+        if (confTargetRow) confTargetRow.style.display = 'block';
+        if (confTargetText) confTargetText.textContent = `Design #${d.id} (${d.sku} — ${d.title})`;
+      } else {
+        if (confTargetRow) confTargetRow.style.display = 'none';
+      }
 
       if (confCategoryName) confCategoryName.textContent = this.currentCategoryName || 'Selected Category';
       if (confGroupName) confGroupName.textContent = this.selectedGroup ? this.selectedGroup.groupName : 'All Designs in Category';
@@ -374,6 +459,7 @@
             files: filePayload,
             categoryIds,
             checkedIds,
+            targetDesignId: this.selectedTargetDesignId,
             mode: this.replacementMode || 'replace_matching'
           })
         });
@@ -533,9 +619,12 @@
             categoryId: this.currentCategoryId,
             categoryName: this.currentCategoryName,
             groupName: groupNameToPass,
-            scopeSummary: groupNameToPass 
-              ? `Replaced all files in group "${groupNameToPass}"`
-              : `Replaced files across category "${this.currentCategoryName}"`,
+            targetDesignId: this.selectedTargetDesignId,
+            scopeSummary: this.selectedTargetDesignId
+              ? `Replaced all files for Design #${this.selectedTargetDesignId}`
+              : (groupNameToPass 
+                  ? `Replaced all files in group "${groupNameToPass}"`
+                  : `Replaced files across category "${this.currentCategoryName}"`),
             replacementMode: this.replacementMode || 'replace_matching',
             items: uploadedProcessedItems
           }),
@@ -620,6 +709,9 @@
               </td>
               <td style="padding: 10px 14px;">${typeBadge}</td>
               <td style="padding: 10px 14px; color: #64748B;">${sizeText}</td>
+              <td style="padding: 10px 14px; font-weight: 600; color: #1E293B;">
+                <code>${this.escapeHtml(f.targetSku || f.sku || '-')}</code> ${f.targetDesignId ? `<span style="font-size: 0.72rem; color: #64748B;">(#${f.targetDesignId})</span>` : ''}
+              </td>
               <td style="padding: 10px 14px;">${storageBadge}</td>
               <td style="padding: 10px 14px;">${dbBadge}</td>
               <td style="padding: 10px 14px; text-align: center;">${resultBadge}</td>
@@ -735,6 +827,70 @@
         }
       } catch (err) {
         alert('Network error while undoing: ' + err.message);
+      }
+    }
+
+    async promptRepair() {
+      const defaultId = this.selectedTargetDesignId || 637;
+      const input = prompt('Enter the Target Design ID to attach all files from the previous bulk replacement run:\n\n(Default: Design #637 = Aruvi Bulk Designs 1 / AED-BUL-01)', defaultId);
+      if (!input) return;
+      const targetDesignId = parseInt(input.trim(), 10);
+      if (isNaN(targetDesignId) || targetDesignId <= 0) {
+        alert('Please enter a valid numeric Design ID (e.g. 637).');
+        return;
+      }
+
+      try {
+        // 1. Dry run preview
+        const previewRes = await fetch('/admin/designs/bulk-replace/repair-last', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CSRF-Token': this.getCSRF()
+          },
+          body: JSON.stringify({
+            _csrf: this.getCSRF(),
+            targetDesignId,
+            dryRun: true
+          })
+        });
+
+        const previewData = await previewRes.json();
+        if (!previewData.success) {
+          alert('Repair Preview Error: ' + (previewData.message || 'Failed'));
+          return;
+        }
+
+        const confirmMsg = `${previewData.message}\n\n` +
+          `• Images to attach: ${previewData.imagesCount} (First image will become Primary Image)\n` +
+          `• ZIPs to attach: ${previewData.zipsCount} (Machine files in Download Files table)\n\n` +
+          `Proceed with attaching and verifying all files for Design #${targetDesignId}?`;
+
+        if (!confirm(confirmMsg)) return;
+
+        // 2. Commit repair
+        const commitRes = await fetch('/admin/designs/bulk-replace/repair-last', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CSRF-Token': this.getCSRF()
+          },
+          body: JSON.stringify({
+            _csrf: this.getCSRF(),
+            targetDesignId,
+            dryRun: false
+          })
+        });
+
+        const commitData = await commitRes.json();
+        if (commitData.success) {
+          alert(commitData.message || 'Repair successfully executed! Design files and thumbnails are now active and verified.');
+          window.location.reload();
+        } else {
+          alert('Repair Failed: ' + (commitData.message || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error during repair: ' + err.message);
       }
     }
   }
