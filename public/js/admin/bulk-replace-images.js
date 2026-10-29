@@ -21,8 +21,23 @@
       this.isUploading = false;
       this.abortController = null;
       this.lastLogId = null;
+      this.replacementMode = 'replace_matching';
 
       this.initEvents();
+    }
+
+    setMode(mode) {
+      this.replacementMode = mode;
+    }
+
+    clearSelectedFiles() {
+      this.selectedFiles = [];
+      const filesInput = document.getElementById('bulkReplaceFileInput');
+      if (filesInput) filesInput.value = '';
+      const summaryBadge = document.getElementById('selectedFilesSummaryBadge');
+      if (summaryBadge) summaryBadge.style.display = 'none';
+      const nextBtn = document.getElementById('bulkReplaceFilesNextBtn');
+      if (nextBtn) nextBtn.disabled = true;
     }
 
     getCSRF() {
@@ -256,7 +271,7 @@
     }
 
     // ==============================================================
-    // STEP 2: SELECT NEW FILES (FILES DIRECTLY, NO FOLDER REQUIRED)
+    // STEP 2: SELECT NEW FILES (ACCUMULATES FILES DIRECTLY)
     // ==============================================================
     handleFilesSelected(filesList) {
       if (!filesList || filesList.length === 0) return;
@@ -272,10 +287,14 @@
         return;
       }
 
-      this.selectedFiles = validFiles;
+      // Deduplicate and accumulate into this.selectedFiles
+      const existingMap = new Map();
+      this.selectedFiles.forEach(f => existingMap.set(`${f.name}_${f.size}`, f));
+      validFiles.forEach(f => existingMap.set(`${f.name}_${f.size}`, f));
+      this.selectedFiles = Array.from(existingMap.values());
 
-      const imgCount = validFiles.filter(f => !f.name.toLowerCase().endsWith('.zip')).length;
-      const zipCount = validFiles.filter(f => f.name.toLowerCase().endsWith('.zip')).length;
+      const imgCount = this.selectedFiles.filter(f => !f.name.toLowerCase().endsWith('.zip')).length;
+      const zipCount = this.selectedFiles.filter(f => f.name.toLowerCase().endsWith('.zip')).length;
 
       const summaryBadge = document.getElementById('selectedFilesSummaryBadge');
       const imgEl = document.getElementById('selectedNewImagesCount');
@@ -286,19 +305,19 @@
         summaryBadge.style.display = 'flex';
         imgEl.textContent = imgCount;
         zipEl.textContent = zipCount;
-        totalEl.textContent = validFiles.length;
+        totalEl.textContent = this.selectedFiles.length;
       }
 
       const nextBtn = document.getElementById('bulkReplaceFilesNextBtn');
       if (nextBtn) {
-        nextBtn.disabled = validFiles.length === 0;
+        nextBtn.disabled = this.selectedFiles.length === 0;
       }
     }
 
     // ==============================================================
-    // STEP 3: CONFIRMATION SUMMARY (NO MANUAL MAPPING / PREVIEW)
+    // STEP 3: CONFIRMATION SUMMARY & MATCH PREVIEW
     // ==============================================================
-    proceedToStep3() {
+    async proceedToStep3() {
       if (!this.selectedFiles || this.selectedFiles.length === 0) {
         alert('Please select or drag-and-drop replacement files first.');
         return;
@@ -315,7 +334,7 @@
       const confNewZipsCount = document.getElementById('confNewZipsCount');
 
       if (confCategoryName) confCategoryName.textContent = this.currentCategoryName || 'Selected Category';
-      if (confGroupName) confGroupName.textContent = this.selectedGroup ? this.selectedGroup.groupName : '-';
+      if (confGroupName) confGroupName.textContent = this.selectedGroup ? this.selectedGroup.groupName : 'All Designs in Category';
       if (confOldImagesCount) confOldImagesCount.textContent = this.selectedGroup ? this.selectedGroup.existingImagesCount : 0;
       if (confOldZipsCount) confOldZipsCount.textContent = this.selectedGroup ? this.selectedGroup.existingZipsCount : 0;
       if (confNewImagesCount) confNewImagesCount.textContent = newImgCount;
@@ -323,6 +342,105 @@
 
       this.currentStep = 3;
       this.updateStepView();
+
+      await this.loadStep3Preview();
+    }
+
+    async loadStep3Preview() {
+      const tbody = document.getElementById('confPreviewTableBody');
+      const matchedCountEl = document.getElementById('confMatchedDesignsCount');
+      const unmatchedBadge = document.getElementById('confUnmatchedFilesBadge');
+      const unmatchedCountEl = document.getElementById('confUnmatchedCount');
+
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #0284C7;"><i class="fa-solid fa-spinner fa-spin"></i> Matching files against scoped designs...</td></tr>';
+      }
+
+      try {
+        const filePayload = this.selectedFiles.map(f => ({ name: f.name, size: f.size }));
+        const categoryIds = (this.currentCategoryId && this.currentCategoryId !== 'all') ? [this.currentCategoryId] : [];
+        const checkedIds = (this.selectedGroup && !this.selectedGroup.isAllCategory && Array.isArray(this.selectedGroup.designs)) 
+          ? this.selectedGroup.designs.map(d => d.id) 
+          : [];
+
+        const res = await fetch('/admin/designs/bulk-replace/preview-match', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CSRF-Token': this.getCSRF()
+          },
+          body: JSON.stringify({
+            _csrf: this.getCSRF(),
+            files: filePayload,
+            categoryIds,
+            checkedIds,
+            mode: this.replacementMode || 'replace_matching'
+          })
+        });
+
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to generate preview');
+        }
+
+        const previewList = data.previewList || [];
+        if (matchedCountEl) matchedCountEl.textContent = previewList.length;
+
+        const unmatchedFiles = data.unmatchedFiles || [];
+        if (unmatchedBadge && unmatchedCountEl) {
+          if (unmatchedFiles.length > 0) {
+            unmatchedBadge.style.display = 'inline-flex';
+            unmatchedCountEl.textContent = unmatchedFiles.length;
+          } else {
+            unmatchedBadge.style.display = 'none';
+          }
+        }
+
+        if (tbody) {
+          tbody.innerHTML = '';
+          if (previewList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #DC2626;"><i class="fa-solid fa-circle-exclamation"></i> No designs matched the selected file names in this category. Files must match SKU or Title.</td></tr>';
+            return;
+          }
+
+          previewList.forEach((item, idx) => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #F1F5F9';
+
+            const imgNames = (item.images || []).map(img => `<span style="display: inline-block; background: #E0F2FE; color: #0369A1; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; margin: 2px;">${this.escapeHtml(img.fileName || img.originalName)}</span>`).join(' ') || '<span style="color: #94A3B8; font-size: 0.75rem;">(None)</span>';
+
+            const zipNames = (item.downloadFiles || []).map(z => `<span style="display: inline-block; background: #E0F7FA; color: #00796B; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; margin: 2px;">${this.escapeHtml(z.fileName || z.originalName)}</span>`).join(' ') || '<span style="color: #94A3B8; font-size: 0.75rem;">(None)</span>';
+
+            let statusBadge = '<span style="background: #E2E8F0; color: #475569; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;">Matched</span>';
+            if (item.zipStatus && item.zipStatus.includes('none currently uploaded')) {
+              statusBadge = '<span style="background: #FEF3C7; color: #92400E; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; border: 1px solid #FDE68A;"><i class="fa-solid fa-plus"></i> ZIP will be ADDED</span>';
+            } else if (item.status && item.status.includes('replace Image & ZIP')) {
+              statusBadge = '<span style="background: #DCFCE7; color: #166534; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; border: 1px solid #BBF7D0;"><i class="fa-solid fa-check"></i> Image & ZIP Replaced</span>';
+            } else if (item.hasNewZip) {
+              statusBadge = '<span style="background: #DCFCE7; color: #166534; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; border: 1px solid #BBF7D0;"><i class="fa-solid fa-file-zipper"></i> ZIP Replaced</span>';
+            } else if (item.hasNewImage) {
+              statusBadge = '<span style="background: #E0F2FE; color: #0369A1; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; border: 1px solid #BAE6FD;"><i class="fa-solid fa-image"></i> Image Replaced</span>';
+            }
+
+            tr.innerHTML = `
+              <td style="padding: 8px 12px; text-align: center; color: #94A3B8;">${idx + 1}</td>
+              <td style="padding: 8px 12px; font-weight: 600; color: #1E293B;">
+                <div>${this.escapeHtml(item.title || item.sku)}</div>
+                <div style="font-size: 0.74rem; color: #64748B; font-weight: 400;">SKU: <code>${this.escapeHtml(item.sku)}</code></div>
+              </td>
+              <td style="padding: 8px 12px;">${imgNames}</td>
+              <td style="padding: 8px 12px;">${zipNames}</td>
+              <td style="padding: 8px 12px; text-align: center;">${statusBadge}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (err) {
+        console.error('loadStep3Preview error:', err);
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #DC2626;">Error preparing preview: ${this.escapeHtml(err.message)}</td></tr>`;
+        }
+      }
     }
 
     // ==============================================================
@@ -331,7 +449,7 @@
     async executeReplace() {
       if (this.isUploading) return;
       if (!this.selectedGroup) {
-        alert('Missing target group to replace.');
+        alert('Missing target group or category to replace.');
         return;
       }
       if (!this.selectedFiles || this.selectedFiles.length === 0) {
@@ -396,11 +514,13 @@
           console.warn(`[BulkReplace] ${failedCount} files failed upload.`);
         }
 
-        // Commit replacement in database:
-        // Removes old images and ZIPs belonging to this group, sets new files active
-        if (progressStatus) progressStatus.textContent = 'Removing old files and activating newly selected files in database...';
+        // Commit replacement in database
+        if (progressStatus) progressStatus.textContent = 'Updating database records and attaching files to designs...';
         if (progressBar) progressBar.style.width = '92%';
         if (progressPercent) progressPercent.textContent = '92%';
+
+        const isGroupReplacement = this.selectedGroup && !this.selectedGroup.isAllCategory && this.selectedGroup.groupName !== 'All Designs in Category';
+        const groupNameToPass = isGroupReplacement ? this.selectedGroup.groupName : null;
 
         const commitRes = await fetch('/admin/designs/bulk-replace/commit', {
           method: 'POST',
@@ -412,9 +532,11 @@
             _csrf: this.getCSRF(),
             categoryId: this.currentCategoryId,
             categoryName: this.currentCategoryName,
-            groupName: this.selectedGroup.groupName,
-            scopeSummary: `Replaced all files in group "${this.selectedGroup.groupName}"`,
-            replacementMode: 'replace_group',
+            groupName: groupNameToPass,
+            scopeSummary: groupNameToPass 
+              ? `Replaced all files in group "${groupNameToPass}"`
+              : `Replaced files across category "${this.currentCategoryName}"`,
+            replacementMode: this.replacementMode || 'replace_matching',
             items: uploadedProcessedItems
           }),
           signal: this.abortController.signal
@@ -437,16 +559,18 @@
 
         const reportSummaryEl = document.getElementById('reportGroupSummaryText');
         if (reportSummaryEl) {
-          reportSummaryEl.textContent = commitData.message || `All old files in "${this.selectedGroup.groupName}" have been removed. Only newly selected files are active.`;
+          reportSummaryEl.textContent = commitData.message || `File replacement finished successfully. Newly selected files are active.`;
         }
 
         const replacedImgEl = document.getElementById('reportCountReplacedImages');
         const replacedZipEl = document.getElementById('reportCountReplacedZips');
+        const unchangedEl = document.getElementById('reportCountUnchanged');
         const removedOldEl = document.getElementById('reportCountRemovedOld');
         const failedEl = document.getElementById('reportCountFailed');
 
         if (replacedImgEl) replacedImgEl.textContent = commitData.replacedImagesCount ?? 0;
-        if (replacedZipEl) replacedZipEl.textContent = commitData.replacedZipsCount ?? 0;
+        if (replacedZipEl) replacedZipEl.textContent = (commitData.replacedZipsCount ?? 0) + (commitData.addedCount ?? 0);
+        if (unchangedEl) unchangedEl.textContent = commitData.unchangedCount ?? 0;
         if (removedOldEl) removedOldEl.textContent = commitData.removedOldFilesCount ?? 0;
         if (failedEl) failedEl.textContent = commitData.failedCount ?? 0;
 
@@ -478,9 +602,12 @@
               ? '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-circle-check"></i> Stored</span>'
               : `<span style="color: #DC2626; font-weight: 600;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-circle-xmark"></i> Failed</span>`;
 
-            const dbBadge = f.dbStatus === 'Updated'
-              ? '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Updated</span>'
-              : '<span style="color: #DC2626; font-weight: 600;"><i class="fa-solid fa-xmark"></i> Failed</span>';
+            let dbBadge = '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Updated</span>';
+            if (f.dbStatus === 'Unchanged') {
+              dbBadge = '<span style="color: #475569; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-equals"></i> Unchanged</span>';
+            } else if (f.dbStatus === 'Failed') {
+              dbBadge = '<span style="color: #DC2626; font-weight: 600;"><i class="fa-solid fa-xmark"></i> Failed</span>';
+            }
 
             const resultBadge = isVerified
               ? '<span style="background: #DCFCE7; color: #166534; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BBF7D0; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Verified</span>'

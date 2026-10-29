@@ -4334,12 +4334,13 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
     const { categoryId, categoryName, scopeSummary, replacementMode, groupName, items } = req.body;
 
     let result;
-    if (groupName) {
+    if (groupName && groupName !== 'All Designs in Category' && groupName !== '__ALL_DESIGNS__' && groupName !== 'all') {
       result = await bulkImageReplaceService.replaceFileGroup({
         adminUser: req.user,
         categoryId,
         categoryName,
         groupName,
+        replacementMode: replacementMode || 'replace_group',
         items
       });
     } else {
@@ -4348,7 +4349,7 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
         categoryId,
         categoryName,
         scopeSummary,
-        replacementMode,
+        replacementMode: replacementMode || 'replace_matching',
         items
       });
     }
