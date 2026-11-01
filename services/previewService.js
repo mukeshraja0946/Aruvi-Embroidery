@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const sharp = require('sharp');
+const { getSharp } = require('../utils/sharpHelper');
 const db = require('../config/db');
 const storage = require('../config/storage');
 const watermarkService = require('./watermarkService');
@@ -232,6 +232,10 @@ class PreviewService {
 
     // 2. Pure, clean Sharp processing pipeline: validate -> auto-rotate -> resize -> webp
     try {
+      const sharp = getSharp();
+      if (!sharp) {
+        throw new Error('Native sharp module is unavailable on server');
+      }
       // Large Preview: 1200px max, quality 85 (NO watermark overlay)
       const largeBuffer = await sharp(inputBuffer)
         .rotate()

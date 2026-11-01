@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const sharp = require('sharp');
+const { getSharp } = require('../utils/sharpHelper');
 const AdmZip = require('adm-zip');
 const db = require('../config/db');
 const storage = require('../config/storage');

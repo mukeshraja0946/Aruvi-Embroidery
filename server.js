@@ -1,3 +1,19 @@
+const serverStartTime = Date.now();
+
+// ---------------------------------------------------------------------------
+// Process-Level Crash Protection (Hostinger Business Resilient Operation)
+// Keeps the Node.js process alive for recoverable errors and logs with reference IDs
+// ---------------------------------------------------------------------------
+process.on('uncaughtException', (err) => {
+  const refId = `EXC_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  console.error(`[${new Date().toISOString()}] [CRITICAL UNCAUGHT EXCEPTION] [Ref: ${refId}]:`, err.stack || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  const refId = `REJ_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  console.error(`[${new Date().toISOString()}] [UNHANDLED PROMISE REJECTION] [Ref: ${refId}]:`, reason);
+});
+
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -14,6 +30,56 @@ dotenv.config();
 const previewService = require('./services/previewService');
 
 const app = express();
+
+// Degraded mode tracking (never crashes the server)
+app.locals.isDegraded = false;
+app.locals.degradedReasons = [];
+
+// Lightweight health check endpoint for Hostinger / uptime monitoring (zero DB/storage work)
+app.get('/healthz', (req, res) => {
+  const mem = process.memoryUsage();
+  res.status(200).json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    degraded: Boolean(app.locals.isDegraded),
+    degradedReasons: app.locals.degradedReasons || [],
+    memory: {
+      rssMb: Math.round(mem.rss / 1024 / 1024),
+      heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+      heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024)
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Request timeout protection (25s) to prevent slow requests from hanging the process
+app.use((req, res, next) => {
+  const isHeavy = req.path.includes('/upload-chunk') || req.path.includes('/backup');
+  const timeoutMs = isHeavy ? 120000 : 25000;
+
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      console.warn(`[Request Timeout Warning] Request exceeded ${timeoutMs / 1000}s timeout: ${req.method} ${req.originalUrl}`);
+      res.status(504).send('<!DOCTYPE html><html><head><title>Request Timeout</title><style>body{font-family:sans-serif;padding:3rem;text-align:center;color:#333;}</style></head><body><h1>504 Request Timeout</h1><p>The server took too long to process your request. Please try again.</p><p><a href="javascript:location.reload()">Reload Page</a> | <a href="/">Return Home</a></p></body></html>');
+    }
+  }, timeoutMs);
+
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer));
+  next();
+});
+
+// Hostinger Business Plan RAM Watcher: Checks RSS against 512MB limit every 60s
+const MEMORY_LIMIT_MB = parseInt(process.env.MEMORY_LIMIT_MB || '512', 10);
+setInterval(() => {
+  try {
+    const mem = process.memoryUsage();
+    const rssMb = mem.rss / 1024 / 1024;
+    if (rssMb > (MEMORY_LIMIT_MB * 0.70)) {
+      console.warn(`[Memory Alert] High RAM usage: RSS ${Math.round(rssMb)}MB (${Math.round((rssMb / MEMORY_LIMIT_MB) * 100)}% of ${MEMORY_LIMIT_MB}MB limit). Heap used: ${Math.round(mem.heapUsed / 1024 / 1024)}MB`);
+    }
+  } catch (_) {}
+}, 60000).unref();
 
 // Enable trust proxy for production HTTPS reverse proxies (Nginx, Cloudflare, Render, Cpanel)
 app.set('trust proxy', 1);
@@ -67,6 +133,10 @@ app.locals.storageAlert = {
   uploadsDir: initialStorageStatus.uploadsDir,
   driver: initialStorageStatus.driver
 };
+if (initialStorageStatus.isBlocked) {
+  app.locals.isDegraded = true;
+  app.locals.degradedReasons.push(`Storage unsafe or blocked: ${initialStorageStatus.warningMessage || 'UPLOAD_DIR inside deploy folder'}`);
+}
 
 // Strict Security: Block unauthenticated static access to paid design archives, raw uploads & private files
 // Paid design files must be downloaded ONLY through authenticated customer/user download routes
@@ -150,7 +220,10 @@ try {
     createDatabaseTable: true,
     clearExpired: true,
     checkExpirationInterval: 900000, // 15 mins
-    expiration: 7 * 24 * 60 * 60 * 1000 // 7 days
+    expiration: 7 * 24 * 60 * 60 * 1000, // 7 days
+    connectTimeout: 5000,
+    connectionLimit: 3,
+    endConnectionOnClose: true
   };
 
   const dbUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL;
@@ -182,10 +255,14 @@ class SafeStore extends session.Store {
   }
   get(sid, fn) {
     if (sessionStore && db.isConnected()) {
-      sessionStore.get(sid, (err, sess) => {
-        if (err) return this.memoryStore.get(sid, fn);
-        return fn(null, sess);
-      });
+      try {
+        sessionStore.get(sid, (err, sess) => {
+          if (err) return this.memoryStore.get(sid, fn);
+          return fn(null, sess);
+        });
+      } catch (_) {
+        this.memoryStore.get(sid, fn);
+      }
     } else {
       this.memoryStore.get(sid, fn);
     }
@@ -193,9 +270,13 @@ class SafeStore extends session.Store {
   set(sid, sess, fn) {
     this.memoryStore.set(sid, sess, () => {});
     if (sessionStore && db.isConnected()) {
-      sessionStore.set(sid, sess, (err) => {
-        if (fn) fn(err);
-      });
+      try {
+        sessionStore.set(sid, sess, (err) => {
+          if (fn) fn(err);
+        });
+      } catch (_) {
+        if (fn) fn();
+      }
     } else if (fn) {
       fn();
     }
@@ -203,7 +284,11 @@ class SafeStore extends session.Store {
   destroy(sid, fn) {
     this.memoryStore.destroy(sid, () => {});
     if (sessionStore && db.isConnected()) {
-      sessionStore.destroy(sid, fn);
+      try {
+        sessionStore.destroy(sid, fn);
+      } catch (_) {
+        if (fn) fn();
+      }
     } else if (fn) {
       fn();
     }
@@ -211,7 +296,11 @@ class SafeStore extends session.Store {
   touch(sid, sess, fn) {
     this.memoryStore.touch(sid, sess, () => {});
     if (sessionStore && db.isConnected() && typeof sessionStore.touch === 'function') {
-      sessionStore.touch(sid, sess, fn);
+      try {
+        sessionStore.touch(sid, sess, fn);
+      } catch (_) {
+        if (fn) fn();
+      }
     } else if (fn) {
       fn();
     }
@@ -360,6 +449,25 @@ app.use(errorHandler);
 // Global Schema Alert state for Admin Dashboard & System Health
 app.locals.schemaAlert = { isHealthy: true, missingCount: 0, missingSummary: '' };
 
+function checkRequiredEnvVars() {
+  const missing = [];
+  if (!process.env.DB_NAME && !process.env.DATABASE_URL && !process.env.MYSQL_URL) missing.push('DB_NAME (or DATABASE_URL)');
+  if (!process.env.DB_USER && !process.env.DATABASE_URL && !process.env.MYSQL_URL) missing.push('DB_USER');
+  if (!process.env.SESSION_SECRET) missing.push('SESSION_SECRET (using fallback default)');
+  if (!process.env.UPLOAD_DIR && process.env.NODE_ENV === 'production') missing.push('UPLOAD_DIR (using auto-detected or fallback)');
+  if (!process.env.RAZORPAY_KEY_ID) missing.push('RAZORPAY_KEY_ID (payments in test/mock mode)');
+  if (!process.env.RAZORPAY_KEY_SECRET) missing.push('RAZORPAY_KEY_SECRET');
+
+  if (missing.length > 0) {
+    console.warn('====================================================');
+    console.warn('⚠️ [ENVIRONMENT VARIABLES NOTICE]');
+    console.warn('   The following recommended environment variables are not set:');
+    missing.forEach(v => console.warn(`   - ${v}`));
+    console.warn('   The application will continue in resilient fallback mode.');
+    console.warn('====================================================');
+  }
+}
+
 let hasInitializedDatabase = false;
 let databaseServerVersion = 'Unknown';
 
@@ -374,6 +482,10 @@ async function initializeDatabaseAndSchema() {
     if (migResult && migResult.dbServerVersion) {
       databaseServerVersion = migResult.dbServerVersion;
     }
+    if (migResult && migResult.failedCount > 0) {
+      app.locals.isDegraded = true;
+      app.locals.degradedReasons.push(`Database migrations had ${migResult.failedCount} issue(s)`);
+    }
   } catch (migErr) {
     const { formatErrorMessage } = require('./services/migrationRunner');
     const cleanMsg = formatErrorMessage(migErr);
@@ -382,6 +494,8 @@ async function initializeDatabaseAndSchema() {
     console.error(`   Message: ${cleanMsg}`);
     console.error('   Action: Verify DB credentials in hPanel or run "npm run migrate"');
     console.error('====================================================');
+    app.locals.isDegraded = true;
+    app.locals.degradedReasons.push(`Database connection / migration error: ${cleanMsg}`);
   }
 
   // 2. Schema Safety Check: compare required columns against information_schema
@@ -389,6 +503,10 @@ async function initializeDatabaseAndSchema() {
     const { checkSchemaSafetyOnStartup } = require('./services/schemaHealthService');
     const schemaStatus = await checkSchemaSafetyOnStartup();
     app.locals.schemaAlert = schemaStatus;
+    if (schemaStatus && !schemaStatus.isHealthy) {
+      app.locals.isDegraded = true;
+      app.locals.degradedReasons.push(`Database missing columns: ${schemaStatus.missingSummary || 'See System Health'}`);
+    }
   } catch (schemaErr) {
     console.warn('[Startup Schema Check Warning]:', schemaErr.message);
   }
@@ -404,32 +522,51 @@ async function initializeDatabaseAndSchema() {
   }
 }
 
-// Trigger initialization immediately on module load (supports Phusion Passenger, cPanel, PM2, Docker)
-const initPromise = initializeDatabaseAndSchema();
+// Start Server: binds port immediately on 0.0.0.0 to satisfy Hostinger proxy health checks
+function startServer() {
+  const listenStartTime = serverStartTime;
+  checkRequiredEnvVars();
 
-// Start Server
-async function startServer() {
-  await initPromise;
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    const elapsed = Date.now() - listenStartTime;
+    const storageStatus = storage.getStorageStatus();
+    const sessionType = (sessionStore && db.isConnected()) ? 'express-mysql-session' : 'SafeStore (resilient)';
 
-  const storageStatus = storage.getStorageStatus();
-  const sessionType = (sessionStore && db.isConnected()) ? 'express-mysql-session' : 'SafeStore (resilient)';
-
-  app.listen(PORT, '0.0.0.0', async () => {
     console.log('====================================================');
     console.log(`🌸 Aruvi Embroidery Web App running on port ${PORT}`);
-    console.log('📌 Tagline: "Where Threads Tell Stories"');
+    console.log(`⚡ SERVER STARTED on port ${PORT} in ${elapsed} ms, degraded=${Boolean(app.locals.isDegraded)}`);
     console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
     console.log(`📦 Storage Driver: ${storageStatus.driver.toUpperCase()}`);
     console.log(`📁 UPLOAD_DIR: ${storageStatus.uploadsDir}, writable: ${storageStatus.isWritable ? 'yes' : 'no'}`);
     console.log(`🔐 Session Store: ${sessionType}`);
-    console.log(`🐬 DB Version: ${databaseServerVersion}`);
     console.log('====================================================');
   });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[Server Fatal Error] Port ${PORT} is already in use by another process.`);
+    } else {
+      console.error('[Server Fatal Error]:', err);
+    }
+  });
+
+  // Background initialization runs asynchronously without blocking HTTP port binding
+  initializeDatabaseAndSchema().catch((err) => {
+    console.warn('[Startup Notice] Background DB/Schema initialization notice:', err.message);
+  });
+
+  return server;
 }
 
 // Passenger or standalone startup check
 if (typeof PhusionPassenger !== 'undefined') {
-  app.listen('passenger');
+  checkRequiredEnvVars();
+  app.listen('passenger', () => {
+    console.log(`⚡ SERVER STARTED on Phusion Passenger, degraded=${Boolean(app.locals.isDegraded)}`);
+  });
+  initializeDatabaseAndSchema().catch((err) => {
+    console.warn('[Passenger Startup Notice] DB/Schema initialization notice:', err.message);
+  });
 } else if (require.main === module) {
   startServer();
 }

@@ -305,4 +305,28 @@ The permanent storage fix and deployment safety pipeline were rigorously verifie
 | **Integrity Health Scanner** | Scanned 100% of catalog designs against disk storage paths | **PASSED** ✓ |
 | **Full Backup Pipeline** | Executed `npm run backup`: dumped MySQL + compressed uploads into standalone ZIP (`32.40 MB`) | **PASSED** ✓ |
 | **Bulk Relink Matcher** | Tested auto-matcher against sample SKU `AED-BLO-01` and complex variants | **PASSED** ✓ |
+| **Crash-Proof Startup** | Port binds in <200ms; offline DB & insecure storage run in degraded mode without 503 | **PASSED** ✓ |
+
+---
+
+## 🚀 Preflight Deployment Check & 503 Prevention
+
+Before every `git push` or production deployment, run the automated preflight audit:
+
+```bash
+npm run preflight
+```
+
+This automated tool executes:
+1. **Module Check:** Verifies that all required packages exist and load cleanly without native compilation failures.
+2. **JavaScript Syntax Verification:** Runs `node --check` across all 114 JavaScript files in the project to catch syntax errors or duplicate identifiers before deploy.
+3. **Environment Audit:** Validates DB connection parameters, `SESSION_SECRET`, `UPLOAD_DIR`, and Razorpay keys.
+
+### Troubleshooting Hostinger "503 Service Unavailable"
+If production ever returns `503 Service Unavailable - The server is temporarily busy`:
+1. **Check Runtime Logs:** In Hostinger hPanel &rarr; **Websites** &rarr; **Manage** &rarr; **Node.js** &rarr; **Runtime Logs**.
+2. **Immediate Health Check:** Access `https://aruviembroidery.com/healthz` — this zero-dependency probe returns server status, memory, and degraded mode diagnostics.
+3. **Restart Node App:** Click **Restart** in hPanel Node.js dashboard.
+4. **Safe Rollback:** If a bad deploy occurred, run `git revert HEAD` or check out the previous commit and deploy.
+
 

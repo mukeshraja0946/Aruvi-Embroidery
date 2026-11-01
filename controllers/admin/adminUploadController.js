@@ -596,7 +596,9 @@ exports.testHealth = async (req, res) => {
 
   // Test sharp
   try {
-    const sharp = require('sharp');
+    const { getSharp } = require('../../utils/sharpHelper');
+    const sharp = getSharp();
+    if (!sharp) throw new Error('Native sharp module unavailable');
     const probeBuf = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     await sharp(probeBuf).resize(1, 1).toBuffer();
     checks.sharpAvailable = { status: 'pass', mode: 'native_libvips' };

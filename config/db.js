@@ -17,6 +17,7 @@ let dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  connectTimeout: 5000,
   multipleStatements: true,
   charset: 'utf8mb4'
 };
@@ -43,20 +44,23 @@ async function initPool() {
 
   initPromise = (async () => {
     try {
-      // 1. Attempt server-level connection to ensure DB exists
-      try {
-        const rootConn = await mysql.createConnection({
-          host: dbConfig.host,
-          port: dbConfig.port,
-          user: dbConfig.user,
-          password: dbConfig.password,
-          multipleStatements: true,
-          charset: 'utf8mb4'
-        });
-        await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\`;`);
-        await rootConn.end();
-      } catch (dbCreateErr) {
-        // Ignore if server user has no DB create permission or database exists
+      // 1. Attempt server-level connection to ensure DB exists (Local development only)
+      if (process.env.NODE_ENV !== 'production' && (dbConfig.host === 'localhost' || dbConfig.host === '127.0.0.1')) {
+        try {
+          const rootConn = await mysql.createConnection({
+            host: dbConfig.host,
+            port: dbConfig.port,
+            user: dbConfig.user,
+            password: dbConfig.password,
+            connectTimeout: 2000,
+            multipleStatements: true,
+            charset: 'utf8mb4'
+          });
+          await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\`;`);
+          await rootConn.end();
+        } catch (dbCreateErr) {
+          // Ignore if user has no DB create permission or database exists
+        }
       }
 
       // 2. Create pool to target database

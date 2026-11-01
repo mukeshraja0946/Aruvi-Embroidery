@@ -77,11 +77,17 @@ function testDirectoryWritable(dirPath) {
   }
 }
 
+let cachedFileCounts = {
+  public: 0,
+  private: 0,
+  lastUpdated: 0
+};
+
 /**
- * Counts all files recursively inside a directory
+ * Counts files inside a directory with caching and depth-limiting to avoid blocking the event loop
  */
-function countFilesInDirectory(dirPath) {
-  if (!dirPath || !fs.existsSync(dirPath)) return 0;
+function countFilesInDirectory(dirPath, maxDepth = 4, currentDepth = 0) {
+  if (!dirPath || currentDepth > maxDepth || !fs.existsSync(dirPath)) return 0;
   let count = 0;
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -89,7 +95,7 @@ function countFilesInDirectory(dirPath) {
       if (entry.name.startsWith('.')) continue;
       const fullPath = path.join(dirPath, entry.name);
       if (entry.isDirectory()) {
-        count += countFilesInDirectory(fullPath);
+        count += countFilesInDirectory(fullPath, maxDepth, currentDepth + 1);
       } else if (entry.isFile()) {
         count++;
       }
@@ -325,13 +331,22 @@ class StorageService {
   /**
    * Checks health and status of the storage subsystem
    */
-  getStorageStatus() {
+  getStorageStatus(forceRefresh = false) {
     const info = this.resolveStorageLocation();
     const isProduction = process.env.NODE_ENV === 'production';
     const isBlocked = isProduction && (!info.isSafe || info.isInsideRepo || !info.isWritable);
 
-    const publicFilesCount = countFilesInDirectory(this.getPublicDir()) + countFilesInDirectory(path.join(info.path, 'previews'));
-    const privateFilesCount = countFilesInDirectory(this.getPrivateDir()) + countFilesInDirectory(path.join(projectRoot, 'storage_private'));
+    const now = Date.now();
+    if (forceRefresh || (now - cachedFileCounts.lastUpdated > 10 * 60 * 1000)) {
+      try {
+        cachedFileCounts.public = countFilesInDirectory(this.getPublicDir()) + countFilesInDirectory(path.join(info.path, 'previews'));
+        cachedFileCounts.private = countFilesInDirectory(this.getPrivateDir()) + countFilesInDirectory(path.join(projectRoot, 'storage_private'));
+        cachedFileCounts.lastUpdated = now;
+      } catch (_) {}
+    }
+
+    const publicFilesCount = cachedFileCounts.public;
+    const privateFilesCount = cachedFileCounts.private;
 
     let warningMessage = null;
     if (info.isInsideRepo) {
@@ -454,7 +469,9 @@ class StorageService {
    */
   async generateThumbnail(sourcePathOrBuffer, filename) {
     try {
-      const sharp = require('sharp');
+      const { getSharp } = require('../utils/sharpHelper');
+      const sharp = getSharp();
+      if (!sharp) return null;
       const baseNameWithoutExt = path.basename(filename, path.extname(filename));
       const thumbFilename = `${baseNameWithoutExt}.webp`;
       const thumbDestPath = path.join(this.getThumbsDir(), thumbFilename);

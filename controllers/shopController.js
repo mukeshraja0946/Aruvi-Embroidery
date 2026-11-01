@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const sharp = require('sharp');
+const { getSharp } = require('../utils/sharpHelper');
 const Design = require('../models/Design');
 const Category = require('../models/Category');
 const Review = require('../models/Review');
@@ -616,7 +616,10 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
                   inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 &&
                   inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
     if (!isPng) {
-      outputBuffer = await sharp(inputBuffer).rotate().png({ compressionLevel: 8 }).toBuffer();
+      const sharp = getSharp();
+      if (sharp) {
+        outputBuffer = await sharp(inputBuffer).rotate().png({ compressionLevel: 8 }).toBuffer();
+      }
     }
 
     const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();

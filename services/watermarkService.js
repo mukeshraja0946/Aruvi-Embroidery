@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const sharp = require('sharp');
+const { getSharp } = require('../utils/sharpHelper');
 const Setting = require('../models/Setting');
 
 class WatermarkService {
@@ -23,6 +23,11 @@ class WatermarkService {
         inputBuffer = await fs.promises.readFile(inputBufferOrPath);
       } else {
         throw new Error('Invalid image input for watermark check');
+      }
+
+      const sharp = getSharp();
+      if (!sharp) {
+        return inputBuffer;
       }
 
       // Check if optional PNG logo watermark is enabled (Default: OFF)

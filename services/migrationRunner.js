@@ -253,6 +253,7 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
     }
 
     const appliedThisRun = [];
+    const failedThisRun = [];
     let pendingCount = 0;
 
     for (const file of allFiles) {
@@ -270,8 +271,11 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
 
-      // Execute migration safely statement-by-statement
+      // Execute migration safely statement-by-statement inside transaction
+      let inTransaction = false;
       try {
+        await conn.query('START TRANSACTION');
+        inTransaction = true;
         await executeMigrationSql(conn, sql, file);
 
         // Record in schema_migrations
@@ -279,22 +283,34 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
           'INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES (?, ?)',
           [version, file]
         );
+        await conn.query('COMMIT');
+        inTransaction = false;
 
         appliedThisRun.push(file);
         if (!silent) console.log(`  ✅ [SUCCESS] ${file} applied successfully.`);
       } catch (fileErr) {
+        if (inTransaction) {
+          try { await conn.query('ROLLBACK'); } catch (_) {}
+        }
         const cleanMsg = formatErrorMessage(fileErr);
         console.error(`\n❌ [MIGRATION FAILED] Error applying migration file: ${file}`);
         console.error(`   Message: ${cleanMsg}`);
         console.error(`   SQL State: ${fileErr.sqlState || 'N/A'}`);
-        console.error('   Existing data has not been touched.\n');
-        throw new Error(`Migration ${file} failed: ${cleanMsg}`);
+        console.error('   Existing data has not been touched. Boot continuing in resilient mode.\n');
+        failedThisRun.push({
+          file,
+          version,
+          error: cleanMsg,
+          sqlState: fileErr.sqlState || 'N/A'
+        });
       }
     }
 
     if (!silent) {
       console.log('====================================================');
-      if (appliedThisRun.length === 0) {
+      if (failedThisRun.length > 0) {
+        console.warn(` ⚠️ Migrations completed with ${failedThisRun.length} warning(s)/failure(s). Run manual sync via phpMyAdmin if needed.`);
+      } else if (appliedThisRun.length === 0) {
         console.log(' ✨ Database schema is up to date. Zero pending migrations.');
       } else {
         console.log(` ✨ Successfully applied ${appliedThisRun.length} pending migration(s).`);
@@ -303,9 +319,11 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
     }
 
     return {
-      success: true,
+      success: failedThisRun.length === 0,
       appliedCount: appliedThisRun.length,
       appliedFiles: appliedThisRun,
+      failedCount: failedThisRun.length,
+      failedFiles: failedThisRun,
       dbServerVersion
     };
 

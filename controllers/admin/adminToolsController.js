@@ -6,7 +6,7 @@ const AdmZip = require('adm-zip');
 const db = require('../../config/db');
 const storage = require('../../config/storage');
 const healthCheckService = require('../../services/healthCheckService');
-const { runBackup, backupsDir } = require('../../scripts/backup');
+const { runBackup, backupsDir, getBackupsList, restoreFromZip, getBackupDir } = require('../../scripts/backup');
 const Design = require('../../models/Design');
 const ActivityLog = require('../../models/ActivityLog');
 const { checkSystemHealth, checkSchemaSafetyOnStartup } = require('../../services/schemaHealthService');
@@ -2075,8 +2075,6 @@ exports.downloadDeploymentRecoveryCsv = async (req, res, next) => {
  * Backups Management: List, Run, Download, Restore
  * --------------------------------------------------------------------------
  */
-const { runBackup, getBackupsList, restoreFromZip, getBackupDir } = require('../../scripts/backup');
-
 exports.getBackups = async (req, res, next) => {
   try {
     const storageStatus = storage.getStorageStatus();
