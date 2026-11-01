@@ -29,8 +29,12 @@
   <% if (_currentUser && _currentUser.role === 'admin' && _currentPath.startsWith('/admin')) { %>
     <link rel="stylesheet" href="/public/css/admin.css">
   <% } %>
+  <!-- Critical Animated Preloader (inlined in head for instant paint before other CSS) -->
+  <%- include('preloader-css') %>
 </head>
 <body>
+  <!-- Brand Preloader Overlay -->
+  <%- include('preloader', { isPreview: false, hasIncludedPreloaderCss: true }) %>
 
   <!-- Top Announcement Bar matching Reference -->
   <div class="header-top">

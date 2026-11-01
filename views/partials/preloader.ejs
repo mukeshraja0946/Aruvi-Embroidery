@@ -1,0 +1,362 @@
+<%
+  const _s = (typeof siteSettings !== 'undefined' && siteSettings) ? siteSettings : ((typeof settings !== 'undefined' && settings) ? settings : {});
+  const isEnabled = _s.preloader_enabled !== '0';
+  const isPreviewMode = (typeof isPreview !== 'undefined' && isPreview);
+
+  if (!isEnabled && !isPreviewMode) {
+    return;
+  }
+
+  const selectedStyle = (typeof forcedStyle !== 'undefined' && forcedStyle) ? forcedStyle : (_s.preloader_style || 'stitching_hexagon');
+  const speedMode = _s.preloader_speed || 'normal';
+  const speedVal = speedMode === 'slow' ? 1.4 : (speedMode === 'fast' ? 0.7 : 1.0);
+  const exitEffect = _s.preloader_exit_effect || 'fade';
+  const frequency = _s.preloader_frequency || 'session';
+  const minTime = parseInt(_s.preloader_min_time, 10) || 900;
+  const maxTime = parseInt(_s.preloader_max_time, 10) || 3500;
+  const showTagline = _s.preloader_show_tagline !== '0';
+
+  const colPrimary = _s.preloader_color_primary || '#4B0F1C';
+  const colSecondary = _s.preloader_color_secondary || '#C7876C';
+  const colRose = _s.preloader_color_rose || '#BB4558';
+  const colBg = _s.preloader_color_bg || '#F8E8E2';
+  const colThread = _s.preloader_color_thread || '#EFC09B';
+  const colStitch = _s.preloader_color_stitch || '#911628';
+
+  const logoUrl = _s.logo_url || '/public/assets/brand/logo.png';
+  const faviconUrl = _s.favicon_url || _s.mobile_logo_url || logoUrl;
+  const customUrl = _s.preloader_custom_url || '';
+  const shopName = (_s.shop_name || 'ARUVI EMBROIDERY').trim();
+  const shopTagline = (_s.tagline || 'Where Threads Tell Stories').trim();
+  const nameChars = shopName.split('');
+%>
+
+<% if (typeof hasIncludedPreloaderCss === 'undefined' || !hasIncludedPreloaderCss) { %>
+  <%- include('preloader-css') %>
+<% } %>
+
+<div id="aruvi-preloader"
+     role="status"
+     aria-live="polite"
+     aria-label="Loading <%= shopName %>"
+     class="aruvi-preloader-container <%= isPreviewMode ? 'aruvi-pl-preview-active' : '' %>"
+     data-min-time="<%= minTime %>"
+     data-max-time="<%= maxTime %>"
+     data-exit="<%= exitEffect %>"
+     data-speed="<%= speedVal %>"
+     data-style="<%= selectedStyle %>">
+
+  <script>
+    (function(){
+      try {
+        var isPrev = <%= isPreviewMode ? 'true' : 'false' %>;
+        var freq = "<%= frequency %>";
+        if (!isPrev && freq === 'session' && window.sessionStorage && sessionStorage.getItem('aruvi_preloaded') === 'true') {
+          var p = document.getElementById('aruvi-preloader');
+          if (p) p.style.display = 'none';
+        } else if (!isPrev) {
+          document.body && document.body.classList.add('aruvi-preloader-locked');
+          document.documentElement && document.documentElement.classList.add('aruvi-preloader-locked');
+        }
+      } catch(e) {}
+    })();
+  </script>
+
+  <!-- Curtain Split Sheets for Curtain Exit -->
+  <div class="aruvi-pl-curtain-top"></div>
+  <div class="aruvi-pl-curtain-bottom"></div>
+
+  <% if (isPreviewMode) { %>
+    <button type="button" class="aruvi-pl-preview-close-btn" onclick="window.dismissAruviPreloader(true)">
+      <i class="fa-solid fa-xmark"></i> Close Preview
+    </button>
+  <% } %>
+
+  <div class="aruvi-pl-content">
+    <span class="aruvi-pl-sr-only">Loading <%= shopName %>...</span>
+
+    <% if (selectedStyle === 'stitching_hexagon') { %>
+      <!-- 1. Stitching Hexagon (Default) -->
+      <div class="aruvi-pl-hex-stage">
+        <svg class="aruvi-pl-hex-svg" viewBox="0 0 170 170" aria-hidden="true">
+          <path id="aruviHexPath"
+                class="aruvi-pl-hex-outline"
+                d="M 85,20 L 140,52 L 140,118 L 85,150 L 30,118 L 30,52 Z" />
+          <!-- Fallback SVG animateMotion for older browsers without CSS offset-path -->
+          <g class="aruvi-pl-svg-motion-needle" opacity="0">
+            <animateMotion path="M 85,20 L 140,52 L 140,118 L 85,150 L 30,118 L 30,52 Z"
+                           dur="<%= (1.4 * speedVal).toFixed(2) %>s"
+                           fill="freeze"
+                           rotate="auto" />
+            <path d="M 0,0 L -12,-3 L -10,0 L -12,3 Z" fill="var(--pl-thread)" />
+            <line x1="-10" y1="0" x2="6" y2="0" stroke="var(--pl-copper)" stroke-width="1.8" stroke-linecap="round" />
+          </g>
+        </svg>
+
+        <!-- CSS offset-path needle (hardware-accelerated in modern engines) -->
+        <div class="aruvi-pl-hex-needle" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path d="M 2,12 L 10,7 L 9,12 L 10,17 Z" fill="var(--pl-thread)" />
+            <line x1="9" y1="12" x2="22" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+            <circle cx="11" cy="12" r="1.3" fill="var(--pl-bg)" />
+          </svg>
+        </div>
+
+        <div class="aruvi-pl-hex-logo-wrap">
+          <img src="<%= faviconUrl %>" alt="ARUVI Brand Mark" onerror="this.onerror=null;this.src='<%= logoUrl %>';">
+        </div>
+      </div>
+
+    <% } else if (selectedStyle === 'needle_loop') { %>
+      <!-- 2. Needle & Thread Loop -->
+      <div class="aruvi-pl-loop-stage">
+        <svg class="aruvi-pl-loop-svg" viewBox="0 0 190 160" aria-hidden="true">
+          <path class="aruvi-pl-loop-track"
+                d="M 30,80 C 30,35 75,35 95,80 C 115,125 160,125 160,80 C 160,35 115,35 95,80 C 75,125 30,125 30,80 Z" />
+        </svg>
+
+        <div class="aruvi-pl-loop-needle" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M 2,12 L 8,8 L 7,12 L 8,16 Z" fill="var(--pl-thread)" />
+            <line x1="7" y1="12" x2="21" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+            <circle cx="9" cy="12" r="1.2" fill="var(--pl-bg)" />
+          </svg>
+        </div>
+
+        <div class="aruvi-pl-loop-logo">
+          <img src="<%= faviconUrl %>" alt="ARUVI Brand Mark" onerror="this.onerror=null;this.src='<%= logoUrl %>';">
+        </div>
+      </div>
+
+    <% } else if (selectedStyle === 'spool_progress') { %>
+      <!-- 3. Thread Spool Progress -->
+      <div class="aruvi-pl-spool-stage">
+        <div class="aruvi-pl-spool-logo">
+          <img src="<%= logoUrl %>" alt="<%= shopName %>" onerror="this.onerror=null;this.src='/public/assets/brand/logo.png';">
+        </div>
+
+        <div class="aruvi-pl-spool-row">
+          <div class="aruvi-pl-spool-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="30" height="30">
+              <!-- Vintage thread spool / bobbin icon -->
+              <rect x="7" y="5" width="18" height="4" rx="2" fill="var(--pl-copper)" />
+              <rect x="7" y="23" width="18" height="4" rx="2" fill="var(--pl-copper)" />
+              <rect x="10" y="9" width="12" height="14" rx="1" fill="var(--pl-maroon)" />
+              <!-- Thread coils -->
+              <line x1="10" y1="11" x2="22" y2="11" stroke="var(--pl-thread)" stroke-width="1.6" />
+              <line x1="10" y1="14" x2="22" y2="14" stroke="var(--pl-rose)" stroke-width="1.6" />
+              <line x1="10" y1="17" x2="22" y2="17" stroke="var(--pl-thread)" stroke-width="1.6" />
+              <line x1="10" y1="20" x2="22" y2="20" stroke="var(--pl-rose)" stroke-width="1.6" />
+              <circle cx="16" cy="16" r="2.2" fill="var(--pl-copper)" />
+            </svg>
+          </div>
+
+          <div class="aruvi-pl-progress-track">
+            <div id="aruviPlProgressBar" class="aruvi-pl-progress-bar"></div>
+          </div>
+
+          <span id="aruviPlProgressText" class="aruvi-pl-progress-text">15%</span>
+        </div>
+      </div>
+
+    <% } else if (selectedStyle === 'logo_reveal') { %>
+      <!-- 4. Logo Reveal (Clip wipe + shimmering sweep) -->
+      <div class="aruvi-pl-reveal-stage">
+        <div class="aruvi-pl-reveal-box">
+          <img src="<%= logoUrl %>" alt="<%= shopName %>" onerror="this.onerror=null;this.src='/public/assets/brand/logo.png';">
+          <div class="aruvi-pl-reveal-shimmer" aria-hidden="true"></div>
+        </div>
+      </div>
+
+    <% } else if (selectedStyle === 'dots_stitches') { %>
+      <!-- 5. Dots & Stitches -->
+      <div class="aruvi-pl-dots-stage">
+        <div class="aruvi-pl-dots-logo">
+          <img src="<%= logoUrl %>" alt="<%= shopName %>" onerror="this.onerror=null;this.src='/public/assets/brand/logo.png';">
+        </div>
+        <div class="aruvi-pl-stitches-row" aria-hidden="true">
+          <span class="aruvi-pl-dash" style="--pl-dash-idx: 0;"></span>
+          <span class="aruvi-pl-dash" style="--pl-dash-idx: 1;"></span>
+          <span class="aruvi-pl-dash" style="--pl-dash-idx: 2;"></span>
+          <span class="aruvi-pl-dash" style="--pl-dash-idx: 3;"></span>
+          <span class="aruvi-pl-dash" style="--pl-dash-idx: 4;"></span>
+        </div>
+      </div>
+
+    <% } else if (selectedStyle === 'custom_upload' && customUrl) { %>
+      <!-- 6. Custom Upload Image -->
+      <div class="aruvi-pl-custom-stage">
+        <img src="<%= customUrl %>" alt="Loading" onerror="this.onerror=null;this.src='<%= logoUrl %>';">
+      </div>
+
+    <% } else if (selectedStyle === 'pulsing_glow') { %>
+      <!-- 7. Pulsing Glow (Retained simple style) -->
+      <div class="aruvi-pl-glow-stage">
+        <img src="<%= faviconUrl %>" alt="<%= shopName %>" onerror="this.onerror=null;this.src='<%= logoUrl %>';">
+      </div>
+
+    <% } else if (selectedStyle === 'progress_ring') { %>
+      <!-- 8. Progress Ring (Retained simple style) -->
+      <div class="aruvi-pl-ring-stage">
+        <svg class="aruvi-pl-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="aruvi-pl-ring-circle" cx="60" cy="60" r="50" />
+        </svg>
+        <img src="<%= faviconUrl %>" alt="<%= shopName %>" onerror="this.onerror=null;this.src='<%= logoUrl %>';">
+      </div>
+
+    <% } else { %>
+      <!-- Fallback Default: Stitching Hexagon -->
+      <div class="aruvi-pl-hex-stage">
+        <svg class="aruvi-pl-hex-svg" viewBox="0 0 170 170" aria-hidden="true">
+          <path class="aruvi-pl-hex-outline" d="M 85,20 L 140,52 L 140,118 L 85,150 L 30,118 L 30,52 Z" />
+        </svg>
+        <div class="aruvi-pl-hex-needle" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path d="M 2,12 L 10,7 L 9,12 L 10,17 Z" fill="var(--pl-thread)" />
+            <line x1="9" y1="12" x2="22" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+            <circle cx="11" cy="12" r="1.3" fill="var(--pl-bg)" />
+          </svg>
+        </div>
+        <div class="aruvi-pl-hex-logo-wrap">
+          <img src="<%= faviconUrl %>" alt="ARUVI" onerror="this.onerror=null;this.src='<%= logoUrl %>';">
+        </div>
+      </div>
+    <% } %>
+
+    <!-- Shop Name with Staggered Letter Reveal -->
+    <div class="aruvi-pl-shopname" aria-label="<%= shopName %>">
+      <% nameChars.forEach((ch, idx) => { %>
+        <span class="aruvi-pl-char" style="--pl-char-idx: <%= idx %>;"><%= ch === ' ' ? '\u00A0' : ch %></span>
+      <% }); %>
+    </div>
+
+    <!-- Optional Brand Tagline -->
+    <% if (showTagline && shopTagline) { %>
+      <div class="aruvi-pl-tagline"><%= shopTagline %></div>
+    <% } %>
+  </div>
+</div>
+
+<script>
+(function() {
+  var preloader = document.getElementById('aruvi-preloader');
+  if (!preloader || preloader.style.display === 'none') return;
+
+  var startTime = Date.now();
+  var minTime = parseInt(preloader.getAttribute('data-min-time'), 10) || 900;
+  var maxTime = parseInt(preloader.getAttribute('data-max-time'), 10) || 3500;
+  var exitEffect = preloader.getAttribute('data-exit') || 'fade';
+  var speedVal = parseFloat(preloader.getAttribute('data-speed')) || 1.0;
+  var isPreview = <%= isPreviewMode ? 'true' : 'false' %>;
+
+  var isDismissed = false;
+  var pageLoaded = false;
+  var currentPct = 18;
+  var progressInterval = null;
+
+  var barEl = document.getElementById('aruviPlProgressBar');
+  var txtEl = document.getElementById('aruviPlProgressText');
+
+  function updateProgress(target) {
+    if (!barEl) return;
+    if (target > currentPct) {
+      currentPct = Math.min(100, target);
+      barEl.style.width = currentPct + '%';
+      if (txtEl) txtEl.textContent = Math.round(currentPct) + '%';
+    }
+  }
+
+  // Smooth unspooling progress simulation tied to document readiness
+  if (barEl) {
+    updateProgress(25);
+    progressInterval = setInterval(function() {
+      if (pageLoaded) {
+        updateProgress(100);
+      } else if (document.readyState === 'interactive') {
+        updateProgress(currentPct + (75 - currentPct) * 0.15);
+      } else {
+        updateProgress(currentPct + (55 - currentPct) * 0.1);
+      }
+    }, 120);
+  }
+
+  function dismiss(immediate) {
+    if (isDismissed) return;
+    isDismissed = true;
+    if (progressInterval) clearInterval(progressInterval);
+    if (barEl) updateProgress(100);
+
+    var exitDuration = Math.round(650 * speedVal);
+
+    if (immediate) {
+      cleanup();
+      return;
+    }
+
+    // Apply designated exit effect class
+    preloader.classList.add('aruvi-pl-exit-' + exitEffect);
+
+    setTimeout(function() {
+      cleanup();
+    }, exitDuration + 50);
+  }
+
+  function cleanup() {
+    try {
+      if (!isPreview && window.sessionStorage) {
+        sessionStorage.setItem('aruvi_preloaded', 'true');
+      }
+      document.body && document.body.classList.remove('aruvi-preloader-locked');
+      document.documentElement && document.documentElement.classList.remove('aruvi-preloader-locked');
+      if (document.body && document.body.style.overflow === 'hidden') {
+        document.body.style.overflow = '';
+      }
+      if (preloader && preloader.parentNode) {
+        preloader.parentNode.removeChild(preloader);
+      }
+    } catch(e) {}
+  }
+
+  window.dismissAruviPreloader = dismiss;
+
+  function onPageReady() {
+    pageLoaded = true;
+    var elapsed = Date.now() - startTime;
+    var remaining = Math.max(0, minTime - elapsed);
+    setTimeout(function() {
+      dismiss(false);
+    }, remaining);
+  }
+
+  // Real page load detection
+  if (document.readyState === 'complete') {
+    onPageReady();
+  } else {
+    window.addEventListener('load', onPageReady, { once: true });
+    document.addEventListener('DOMContentLoaded', function() {
+      if (barEl) updateProgress(70);
+    }, { once: true });
+  }
+
+  // Failsafe maximum timer: NEVER hang longer than maxTime
+  setTimeout(function() {
+    if (!isDismissed) {
+      dismiss(false);
+    }
+  }, maxTime);
+
+  // Error fallback
+  window.addEventListener('error', function() {
+    setTimeout(function() {
+      if (!isDismissed) dismiss(false);
+    }, minTime);
+  }, { once: true });
+
+  // Escape key for preview dismissal
+  if (isPreview) {
+    document.addEventListener('keydown', function(evt) {
+      if (evt.key === 'Escape') dismiss(true);
+    }, { once: true });
+  }
+})();
+</script>

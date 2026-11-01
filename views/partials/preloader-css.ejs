@@ -1,0 +1,643 @@
+<%
+  const _s = (typeof siteSettings !== 'undefined' && siteSettings) ? siteSettings : ((typeof settings !== 'undefined' && settings) ? settings : {});
+  const isEnabled = _s.preloader_enabled !== '0';
+  const isPreviewMode = (typeof isPreview !== 'undefined' && isPreview);
+
+  if (!isEnabled && !isPreviewMode) {
+    return;
+  }
+
+  const speedMode = _s.preloader_speed || 'normal';
+  const speedVal = speedMode === 'slow' ? 1.4 : (speedMode === 'fast' ? 0.7 : 1.0);
+  const colPrimary = _s.preloader_color_primary || '#4B0F1C';
+  const colSecondary = _s.preloader_color_secondary || '#C7876C';
+  const colRose = _s.preloader_color_rose || '#BB4558';
+  const colBg = _s.preloader_color_bg || '#F8E8E2';
+  const colThread = _s.preloader_color_thread || '#EFC09B';
+  const colStitch = _s.preloader_color_stitch || '#911628';
+%>
+<noscript>
+  <style>#aruvi-preloader{display:none!important;}</style>
+</noscript>
+
+<style id="aruvi-preloader-critical-css">
+:root {
+  --pl-maroon: <%= colPrimary %>;
+  --pl-copper: <%= colSecondary %>;
+  --pl-rose: <%= colRose %>;
+  --pl-bg: <%= colBg %>;
+  --pl-thread: <%= colThread %>;
+  --pl-stitch: <%= colStitch %>;
+  --pl-speed: <%= speedVal %>;
+}
+
+#aruvi-preloader {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background-color: var(--pl-bg);
+  padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px);
+  box-sizing: border-box;
+  opacity: 1;
+  transition: opacity calc(0.6s * var(--pl-speed)) ease, transform calc(0.6s * var(--pl-speed)) ease;
+  overflow: hidden;
+  user-select: none;
+}
+
+body.aruvi-preloader-locked {
+  overflow: hidden !important;
+}
+
+.aruvi-pl-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  border: 0;
+}
+
+/* Curtain background split sheets */
+.aruvi-pl-curtain-top,
+.aruvi-pl-curtain-bottom {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50.5%;
+  background: var(--pl-bg);
+  z-index: 1;
+  transition: transform calc(0.65s * var(--pl-speed)) cubic-bezier(0.77, 0, 0.175, 1);
+  pointer-events: none;
+}
+.aruvi-pl-curtain-top { top: 0; }
+.aruvi-pl-curtain-bottom { bottom: 0; }
+
+.aruvi-pl-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 90vw;
+  transition: opacity calc(0.45s * var(--pl-speed)) ease, transform calc(0.45s * var(--pl-speed)) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Brand typography in preloader */
+.aruvi-pl-shopname {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.15rem, 3.8vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--pl-maroon);
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  line-height: 1.25;
+}
+
+.aruvi-pl-char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: plCharIn calc(0.35s * var(--pl-speed)) ease forwards;
+  animation-delay: calc((1.35s + var(--pl-char-idx) * 0.038s) * var(--pl-speed));
+}
+
+@keyframes plCharIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.aruvi-pl-tagline {
+  font-family: 'Caveat', cursive, 'Poppins', sans-serif;
+  font-size: clamp(0.95rem, 3.2vw, 1.25rem);
+  color: var(--pl-rose);
+  letter-spacing: 0.05em;
+  margin-top: 6px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: plTaglineIn calc(0.5s * var(--pl-speed)) ease calc(1.75s * var(--pl-speed)) forwards;
+}
+
+@keyframes plTaglineIn {
+  to { opacity: 0.95; transform: translateY(0); }
+}
+
+/* Exit effect variations */
+#aruvi-preloader.aruvi-pl-exit-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+#aruvi-preloader.aruvi-pl-exit-fade .aruvi-pl-content {
+  transform: scale(1.08);
+  opacity: 0;
+}
+
+#aruvi-preloader.aruvi-pl-exit-curtain {
+  background: transparent !important;
+  pointer-events: none;
+}
+#aruvi-preloader.aruvi-pl-exit-curtain .aruvi-pl-curtain-top {
+  transform: translateY(-100%);
+}
+#aruvi-preloader.aruvi-pl-exit-curtain .aruvi-pl-curtain-bottom {
+  transform: translateY(100%);
+}
+#aruvi-preloader.aruvi-pl-exit-curtain .aruvi-pl-content {
+  transform: scale(1.08);
+  opacity: 0;
+}
+
+#aruvi-preloader.aruvi-pl-exit-zoom {
+  opacity: 0;
+  transform: scale(1.12);
+  pointer-events: none;
+}
+#aruvi-preloader.aruvi-pl-exit-zoom .aruvi-pl-content {
+  transform: scale(1.1);
+  opacity: 0;
+}
+
+/* -------------------------------------------------------------
+   STYLE 1: STITCHING HEXAGON (DEFAULT)
+   ------------------------------------------------------------- */
+.aruvi-pl-hex-stage {
+  position: relative;
+  width: 170px;
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aruvi-pl-hex-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.aruvi-pl-hex-outline {
+  fill: var(--pl-bg);
+  fill-opacity: 0;
+  stroke: var(--pl-maroon);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 9 6;
+  stroke-dashoffset: 374;
+  animation: plHexStroke calc(1.4s * var(--pl-speed)) cubic-bezier(0.45, 0, 0.25, 1) forwards,
+             plHexFillIn calc(0.45s * var(--pl-speed)) ease calc(1.35s * var(--pl-speed)) forwards,
+             plHexShimmer calc(3.2s * var(--pl-speed)) ease-in-out calc(1.85s * var(--pl-speed)) infinite alternate;
+}
+
+@keyframes plHexStroke {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes plHexFillIn {
+  to { fill-opacity: 1; }
+}
+@keyframes plHexShimmer {
+  0% { stroke: var(--pl-maroon); filter: drop-shadow(0 0 0px transparent); }
+  50% { stroke: var(--pl-rose); filter: drop-shadow(0 0 8px rgba(187, 69, 88, 0.45)); }
+  100% { stroke: var(--pl-copper); filter: drop-shadow(0 0 5px rgba(199, 135, 108, 0.35)); }
+}
+
+.aruvi-pl-hex-needle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  offset-path: path("M 85,20 L 140,52 L 140,118 L 85,150 L 30,118 L 30,52 Z");
+  offset-rotate: auto 0deg;
+  animation: plNeedleTrack calc(1.4s * var(--pl-speed)) cubic-bezier(0.45, 0, 0.25, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes plNeedleTrack {
+  0% { offset-distance: 0%; opacity: 1; }
+  98% { offset-distance: 100%; opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.aruvi-pl-hex-logo-wrap {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 2;
+  opacity: 0;
+  transform: scale(0.88);
+  animation: plHexLogoIn calc(0.5s * var(--pl-speed)) cubic-bezier(0.2, 0.8, 0.3, 1) calc(1.3s * var(--pl-speed)) forwards;
+}
+
+@keyframes plHexLogoIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 4px 12px rgba(75, 15, 28, 0.15));
+  }
+}
+
+.aruvi-pl-hex-logo-wrap img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* -------------------------------------------------------------
+   STYLE 2: NEEDLE & THREAD LOOP
+   ------------------------------------------------------------- */
+.aruvi-pl-loop-stage {
+  position: relative;
+  width: 190px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aruvi-pl-loop-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.aruvi-pl-loop-track {
+  fill: none;
+  stroke: var(--pl-copper);
+  stroke-width: 2.8;
+  stroke-dasharray: 7 5;
+  stroke-dashoffset: 350;
+  animation: plLoopDraw calc(1.6s * var(--pl-speed)) cubic-bezier(0.45, 0, 0.25, 1) forwards,
+             plLoopGlow calc(2.4s * var(--pl-speed)) ease-in-out calc(1.6s * var(--pl-speed)) infinite alternate;
+}
+
+@keyframes plLoopDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes plLoopGlow {
+  0% { stroke: var(--pl-copper); }
+  50% { stroke: var(--pl-stitch); }
+  100% { stroke: var(--pl-rose); }
+}
+
+.aruvi-pl-loop-logo {
+  position: relative;
+  z-index: 2;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: plLoopPulse calc(1.6s * var(--pl-speed)) ease-in-out infinite alternate;
+}
+.aruvi-pl-loop-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(75, 15, 28, 0.12));
+}
+
+@keyframes plLoopPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.045); }
+}
+
+.aruvi-pl-loop-needle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  offset-path: path("M 30,80 C 30,35 75,35 95,80 C 115,125 160,125 160,80 C 160,35 115,35 95,80 C 75,125 30,125 30,80 Z");
+  offset-rotate: auto 0deg;
+  animation: plNeedleTrack calc(1.6s * var(--pl-speed)) cubic-bezier(0.45, 0, 0.25, 1) forwards;
+}
+
+/* -------------------------------------------------------------
+   STYLE 3: THREAD SPOOL PROGRESS
+   ------------------------------------------------------------- */
+.aruvi-pl-spool-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.aruvi-pl-spool-logo {
+  max-width: 140px;
+  max-height: 70px;
+}
+.aruvi-pl-spool-logo img {
+  max-width: 100%;
+  max-height: 70px;
+  object-fit: contain;
+}
+
+.aruvi-pl-spool-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 250px;
+  max-width: 85vw;
+}
+
+.aruvi-pl-spool-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  animation: plSpoolRotate calc(2.2s * var(--pl-speed)) linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes plSpoolRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.aruvi-pl-progress-track {
+  flex: 1;
+  height: 7px;
+  background: rgba(75, 15, 28, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.aruvi-pl-progress-bar {
+  height: 100%;
+  width: 15%;
+  background: linear-gradient(90deg, var(--pl-maroon), var(--pl-rose), var(--pl-copper));
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.aruvi-pl-progress-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--pl-maroon);
+  min-width: 38px;
+  text-align: right;
+}
+
+/* -------------------------------------------------------------
+   STYLE 4: LOGO REVEAL (CLIP-PATH WIPE + SHIMMER)
+   ------------------------------------------------------------- */
+.aruvi-pl-reveal-stage {
+  position: relative;
+  display: inline-block;
+  padding: 8px;
+}
+
+.aruvi-pl-reveal-box {
+  position: relative;
+  overflow: hidden;
+  max-width: 210px;
+  max-height: 95px;
+  clip-path: inset(0 100% 0 0);
+  animation: plRevealClip calc(1.3s * var(--pl-speed)) cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes plRevealClip {
+  to { clip-path: inset(0 0% 0 0); }
+}
+
+.aruvi-pl-reveal-box img {
+  display: block;
+  max-width: 100%;
+  max-height: 95px;
+  object-fit: contain;
+}
+
+.aruvi-pl-reveal-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  transform: translateX(-120%);
+  animation: plSweep calc(1.8s * var(--pl-speed)) ease-in-out calc(1.1s * var(--pl-speed)) infinite;
+  pointer-events: none;
+}
+
+@keyframes plSweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+
+/* -------------------------------------------------------------
+   STYLE 5: DOTS & STITCHES
+   ------------------------------------------------------------- */
+.aruvi-pl-dots-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.aruvi-pl-dots-logo {
+  max-width: 150px;
+  max-height: 75px;
+  animation: plLogoPulseSimple calc(1.6s * var(--pl-speed)) ease-in-out infinite alternate;
+}
+.aruvi-pl-dots-logo img {
+  max-width: 100%;
+  max-height: 75px;
+  object-fit: contain;
+}
+
+.aruvi-pl-stitches-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 16px;
+}
+
+.aruvi-pl-dash {
+  display: inline-block;
+  width: 20px;
+  height: 4px;
+  background: var(--pl-stitch);
+  border-radius: 3px;
+  transform: scaleX(0.3);
+  opacity: 0.35;
+  animation: plDashWave calc(1.3s * var(--pl-speed)) ease-in-out infinite;
+  animation-delay: calc(var(--pl-dash-idx) * 0.16s * var(--pl-speed));
+}
+
+@keyframes plDashWave {
+  0%, 100% { transform: scaleX(0.3); opacity: 0.35; background: var(--pl-stitch); }
+  50% { transform: scaleX(1.45); opacity: 1; background: var(--pl-rose); box-shadow: 0 0 6px rgba(187, 69, 88, 0.5); }
+}
+
+/* -------------------------------------------------------------
+   STYLE 6: CUSTOM UPLOAD
+   ------------------------------------------------------------- */
+.aruvi-pl-custom-stage {
+  max-width: 220px;
+  max-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.aruvi-pl-custom-stage img {
+  max-width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+}
+
+/* -------------------------------------------------------------
+   STYLE 7: PULSING GLOW (SIMPLE)
+   ------------------------------------------------------------- */
+.aruvi-pl-glow-stage {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pl-bg);
+  box-shadow: 0 0 0 0 rgba(187, 69, 88, 0.4);
+  animation: plGlowPulse calc(1.8s * var(--pl-speed)) cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.aruvi-pl-glow-stage img {
+  max-width: 75%;
+  max-height: 75%;
+  object-fit: contain;
+}
+
+@keyframes plGlowPulse {
+  0% { box-shadow: 0 0 0 0 rgba(187, 69, 88, 0.6), 0 0 0 0 rgba(199, 135, 108, 0.4); }
+  70% { box-shadow: 0 0 0 24px rgba(187, 69, 88, 0), 0 0 0 38px rgba(199, 135, 108, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(187, 69, 88, 0), 0 0 0 0 rgba(199, 135, 108, 0); }
+}
+
+/* -------------------------------------------------------------
+   STYLE 8: PROGRESS RING (SIMPLE)
+   ------------------------------------------------------------- */
+.aruvi-pl-ring-stage {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aruvi-pl-ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: plRingSpin calc(2s * var(--pl-speed)) linear infinite;
+}
+
+.aruvi-pl-ring-circle {
+  fill: none;
+  stroke: var(--pl-maroon);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 8 6;
+  stroke-dashoffset: 0;
+}
+
+.aruvi-pl-ring-stage img {
+  max-width: 65px;
+  max-height: 65px;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+@keyframes plRingSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes plLogoPulseSimple {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.04); }
+}
+
+/* Preview Dismiss Button for Admin Testing */
+.aruvi-pl-preview-close-btn {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: var(--pl-maroon);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 10000;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.aruvi-pl-preview-close-btn:hover {
+  transform: scale(1.05);
+  background: var(--pl-rose);
+}
+
+/* -------------------------------------------------------------
+   ACCESSIBILITY: PREFERS-REDUCED-MOTION
+   ------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  #aruvi-preloader * {
+    animation: none !important;
+    transition: opacity 0.3s ease !important;
+  }
+  .aruvi-pl-hex-outline,
+  .aruvi-pl-loop-track {
+    stroke-dashoffset: 0 !important;
+    fill-opacity: 1 !important;
+  }
+  .aruvi-pl-hex-logo-wrap,
+  .aruvi-pl-char,
+  .aruvi-pl-tagline,
+  .aruvi-pl-reveal-box {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+  .aruvi-pl-hex-needle,
+  .aruvi-pl-loop-needle,
+  .aruvi-pl-reveal-shimmer {
+    display: none !important;
+  }
+  .aruvi-pl-dash {
+    transform: scaleX(1) !important;
+    opacity: 1 !important;
+  }
+}
+</style>

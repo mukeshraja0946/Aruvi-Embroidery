@@ -26,7 +26,8 @@ const BRAND_DEFAULTS = {
   logo: '/public/assets/brand/logo.png',
   mobile_logo: '/public/assets/brand/logo.png',
   favicon: '/public/assets/brand/favicon.ico',
-  hero_image: '/public/assets/brand/hero_embroidery.jpg'
+  hero_image: '/public/assets/brand/hero_embroidery.jpg',
+  preloader_custom: ''
 };
 
 class StorageService {

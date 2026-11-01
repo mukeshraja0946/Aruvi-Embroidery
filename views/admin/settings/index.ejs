@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/public/css/main.css">
   <link rel="stylesheet" href="/public/css/admin.css">
+  <%- include('../../partials/preloader-css', { isPreview: true }) %>
 </head>
 <body class="admin-body">
 
@@ -123,6 +124,7 @@
               <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/settings#checkout-settings"><span><i class="fa-solid fa-cart-shopping"></i> Checkout Settings</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/settings#design-settings"><span><i class="fa-solid fa-palette"></i> Design Page</span></a></li>
+              <li class="sidebar-nav-item"><a href="/admin/settings#preloader-settings"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Branding & Preloader</span></a></li>
               <li class="sidebar-nav-item"><a href="/admin/settings" class="active"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
             </ul>
           </div>
@@ -246,6 +248,542 @@
             </div>
           </div>
         </div>
+
+        <!-- Card 1b: Animated Branding & Preloader Settings -->
+        <div class="admin-card-box" id="preloader-settings" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.9rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h3 style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">
+                  <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--admin-primary, #4B0F1C);"></i> Animated Branding & Preloader
+                </h3>
+                <span id="plActiveBadge" style="background: <%= (settings.preloader_enabled !== '0') ? '#E8F5E9' : '#FFEBEE' %>; color: <%= (settings.preloader_enabled !== '0') ? '#2E7D32' : '#C62828' %>; padding: 2px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 700;">
+                  <%= (settings.preloader_enabled !== '0') ? 'Active' : 'Disabled' %>
+                </span>
+              </div>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Pure CSS + inline SVG hardware-accelerated animations (<8 KB, zero layout shift). Choose from 8 artisan animated styles.</span>
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <button type="button" onclick="previewCurrentPreloader()" class="btn btn-primary btn-sm" style="font-size: 0.8rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-weight: 600;">
+                <i class="fa-solid fa-play"></i> Preview Preloader
+              </button>
+              <button type="button" onclick="resetPreloaderDefaults()" class="btn btn-outline btn-sm" style="font-size: 0.8rem; border-radius: 8px; background: #FFF; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;">
+                <i class="fa-solid fa-rotate-left"></i> Reset Defaults
+              </button>
+            </div>
+          </div>
+
+          <!-- Master Toggle & Frequency Row -->
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.1rem 1.4rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; margin: 0;">
+                <input type="checkbox" name="preloader_enabled" id="preloader_enabled" value="1" <%= (settings.preloader_enabled !== '0') ? 'checked' : '' %> onchange="onPreloaderToggleChange(this)" style="width: 20px; height: 20px; accent-color: var(--admin-primary);">
+                <strong style="margin-left: 8px; font-size: 0.92rem; color: var(--admin-text-dark);">Enable Website Preloader</strong>
+              </label>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">(Failsafe protected: never hangs page, timeout capped)</span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark);">Display Frequency:</span>
+              <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer; color: var(--admin-text-dark);">
+                <input type="radio" name="preloader_frequency" value="session" <%= (settings.preloader_frequency !== 'always') ? 'checked' : '' %>>
+                <span>First visit of session (Recommended)</span>
+              </label>
+              <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer; color: var(--admin-text-dark);">
+                <input type="radio" name="preloader_frequency" value="always" <%= (settings.preloader_frequency === 'always') ? 'checked' : '' %>>
+                <span>Every page visit</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Section: Animated Style Selection (Live Interactive Cards) -->
+          <div style="margin-bottom: 1.8rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+              <label style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark);">
+                Choose Animated Style <span style="font-size: 0.78rem; font-weight: 400; color: var(--admin-text-muted);">(Hover/tap card to play micro-preview)</span>
+              </label>
+              <span style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 600;">Click any card to select</span>
+            </div>
+
+            <%
+              const currentStyle = settings.preloader_style || 'stitching_hexagon';
+              const pLogo = settings.logo_url || '/public/assets/brand/logo.png';
+              const pFav = settings.favicon_url || settings.mobile_logo_url || pLogo;
+            %>
+
+            <div class="pl-style-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.1rem;">
+              
+              <!-- 1. Stitching Hexagon (Default) -->
+              <div class="pl-card <%= currentStyle === 'stitching_hexagon' ? 'active' : '' %>" onclick="selectStyleCard('stitching_hexagon')">
+                <input type="radio" name="preloader_style" value="stitching_hexagon" id="style_stitching_hexagon" <%= currentStyle === 'stitching_hexagon' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-hex-stage" style="transform: scale(0.62); transform-origin: center;">
+                    <svg class="aruvi-pl-hex-svg" viewBox="0 0 170 170" aria-hidden="true">
+                      <path class="aruvi-pl-hex-outline" d="M 85,20 L 140,52 L 140,118 L 85,150 L 30,118 L 30,52 Z" />
+                    </svg>
+                    <div class="aruvi-pl-hex-needle" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="22" height="22">
+                        <path d="M 2,12 L 10,7 L 9,12 L 10,17 Z" fill="var(--pl-thread)" />
+                        <line x1="9" y1="12" x2="22" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </div>
+                    <div class="aruvi-pl-hex-logo-wrap">
+                      <img src="<%= pFav %>" alt="A">
+                    </div>
+                  </div>
+                </div>
+                <strong class="pl-card-title">1. Stitching Hexagon <span class="pl-tag-def">DEFAULT</span></strong>
+                <p class="pl-card-desc">Hexagon drawn stroke-by-stroke with traveling needle, blush fill, logo fade-in & staggered shop name letters.</p>
+              </div>
+
+              <!-- 2. Needle & Thread Loop -->
+              <div class="pl-card <%= currentStyle === 'needle_loop' ? 'active' : '' %>" onclick="selectStyleCard('needle_loop')">
+                <input type="radio" name="preloader_style" value="needle_loop" id="style_needle_loop" <%= currentStyle === 'needle_loop' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-loop-stage" style="transform: scale(0.62); transform-origin: center;">
+                    <svg class="aruvi-pl-loop-svg" viewBox="0 0 190 160" aria-hidden="true">
+                      <path class="aruvi-pl-loop-track" d="M 30,80 C 30,35 75,35 95,80 C 115,125 160,125 160,80 C 160,35 115,35 95,80 C 75,125 30,125 30,80 Z" />
+                    </svg>
+                    <div class="aruvi-pl-loop-needle" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M 2,12 L 8,8 L 7,12 L 8,16 Z" fill="var(--pl-thread)" />
+                        <line x1="7" y1="12" x2="21" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </div>
+                    <div class="aruvi-pl-loop-logo">
+                      <img src="<%= pFav %>" alt="A">
+                    </div>
+                  </div>
+                </div>
+                <strong class="pl-card-title">2. Needle & Thread Loop</strong>
+                <p class="pl-card-desc">Needle weaves along continuous figure-8 infinity embroidery curve leaving stitched trail around pulsing logo.</p>
+              </div>
+
+              <!-- 3. Thread Spool Progress -->
+              <div class="pl-card <%= currentStyle === 'spool_progress' ? 'active' : '' %>" onclick="selectStyleCard('spool_progress')">
+                <input type="radio" name="preloader_style" value="spool_progress" id="style_spool_progress" <%= currentStyle === 'spool_progress' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-spool-stage" style="transform: scale(0.7); transform-origin: center; width: 100%;">
+                    <div class="aruvi-pl-spool-row" style="width: 100%; max-width: 170px;">
+                      <div class="aruvi-pl-spool-icon">
+                        <svg viewBox="0 0 32 32" width="26" height="26">
+                          <rect x="7" y="5" width="18" height="4" rx="2" fill="var(--pl-copper)" />
+                          <rect x="7" y="23" width="18" height="4" rx="2" fill="var(--pl-copper)" />
+                          <rect x="10" y="9" width="12" height="14" rx="1" fill="var(--pl-maroon)" />
+                          <circle cx="16" cy="16" r="2.2" fill="var(--pl-copper)" />
+                        </svg>
+                      </div>
+                      <div class="aruvi-pl-progress-track" style="flex: 1; height: 6px;">
+                        <div class="aruvi-pl-progress-bar" style="width: 65%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <strong class="pl-card-title">3. Thread Spool Progress</strong>
+                <p class="pl-card-desc">Thread bobbin rotates while thread unspools into real page-load progress bar with smooth monotonic easing.</p>
+              </div>
+
+              <!-- 4. Logo Reveal -->
+              <div class="pl-card <%= currentStyle === 'logo_reveal' ? 'active' : '' %>" onclick="selectStyleCard('logo_reveal')">
+                <input type="radio" name="preloader_style" value="logo_reveal" id="style_logo_reveal" <%= currentStyle === 'logo_reveal' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-reveal-stage" style="transform: scale(0.7); transform-origin: center;">
+                    <div class="aruvi-pl-reveal-box" style="clip-path: inset(0 0% 0 0);">
+                      <img src="<%= pLogo %>" alt="Logo" style="max-height: 50px;">
+                      <div class="aruvi-pl-reveal-shimmer"></div>
+                    </div>
+                  </div>
+                </div>
+                <strong class="pl-card-title">4. Logo Reveal</strong>
+                <p class="pl-card-desc">Wipe reveal from left to right with a soft light shimmering sweep moving across the store logo.</p>
+              </div>
+
+              <!-- 5. Dots & Stitches -->
+              <div class="pl-card <%= currentStyle === 'dots_stitches' ? 'active' : '' %>" onclick="selectStyleCard('dots_stitches')">
+                <input type="radio" name="preloader_style" value="dots_stitches" id="style_dots_stitches" <%= currentStyle === 'dots_stitches' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-dots-stage" style="transform: scale(0.75); transform-origin: center;">
+                    <div class="aruvi-pl-stitches-row">
+                      <span class="aruvi-pl-dash" style="--pl-dash-idx: 0;"></span>
+                      <span class="aruvi-pl-dash" style="--pl-dash-idx: 1;"></span>
+                      <span class="aruvi-pl-dash" style="--pl-dash-idx: 2;"></span>
+                      <span class="aruvi-pl-dash" style="--pl-dash-idx: 3;"></span>
+                      <span class="aruvi-pl-dash" style="--pl-dash-idx: 4;"></span>
+                    </div>
+                  </div>
+                </div>
+                <strong class="pl-card-title">5. Dots & Stitches</strong>
+                <p class="pl-card-desc">Five embroidery stitches lengthen sequentially in a wave with subtle rhythm beneath the logo.</p>
+              </div>
+
+              <!-- 6. Custom Upload -->
+              <div class="pl-card <%= currentStyle === 'custom_upload' ? 'active' : '' %>" onclick="selectStyleCard('custom_upload')">
+                <input type="radio" name="preloader_style" value="custom_upload" id="style_custom_upload" <%= currentStyle === 'custom_upload' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <% if (settings.preloader_custom_url) { %>
+                    <img src="<%= settings.preloader_custom_url %>" alt="Custom" style="max-height: 60px; max-width: 100%; object-fit: contain;">
+                  <% } else { %>
+                    <div style="text-align: center; color: var(--admin-primary);">
+                      <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.8rem; margin-bottom: 4px; display: block;"></i>
+                      <span style="font-size: 0.72rem; font-weight: 600;">Custom File</span>
+                    </div>
+                  <% } %>
+                </div>
+                <strong class="pl-card-title">6. Custom Upload</strong>
+                <p class="pl-card-desc">Display your own animated graphic (SVG, WEBP, GIF, APNG up to 1 MB) centered with brand styling.</p>
+              </div>
+
+              <!-- 7. Pulsing Glow (Simple) -->
+              <div class="pl-card <%= currentStyle === 'pulsing_glow' ? 'active' : '' %>" onclick="selectStyleCard('pulsing_glow')">
+                <input type="radio" name="preloader_style" value="pulsing_glow" id="style_pulsing_glow" <%= currentStyle === 'pulsing_glow' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-glow-stage" style="width: 60px; height: 60px; transform: scale(0.8);">
+                    <img src="<%= pFav %>" alt="Logo" style="max-width: 70%; max-height: 70%;">
+                  </div>
+                </div>
+                <strong class="pl-card-title">7. Pulsing Glow</strong>
+                <p class="pl-card-desc">Minimalist breathing pulse with soft radial ambient glow around the brand mark.</p>
+              </div>
+
+              <!-- 8. Progress Ring (Simple) -->
+              <div class="pl-card <%= currentStyle === 'progress_ring' ? 'active' : '' %>" onclick="selectStyleCard('progress_ring')">
+                <input type="radio" name="preloader_style" value="progress_ring" id="style_progress_ring" <%= currentStyle === 'progress_ring' ? 'checked' : '' %> style="display: none;">
+                <div class="pl-card-badge"><i class="fa-solid fa-circle-check"></i> Selected</div>
+                <div class="pl-thumb">
+                  <div class="aruvi-pl-ring-stage" style="transform: scale(0.65); transform-origin: center;">
+                    <svg class="aruvi-pl-ring-svg" viewBox="0 0 120 120">
+                      <circle class="aruvi-pl-ring-circle" cx="60" cy="60" r="50" />
+                    </svg>
+                    <img src="<%= pFav %>" alt="Logo">
+                  </div>
+                </div>
+                <strong class="pl-card-title">8. Progress Ring</strong>
+                <p class="pl-card-desc">Artisan dashed circular stitch ring rotating gracefully around the centered emblem.</p>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Section: Custom Upload File Box (Expanded when Custom is active or for uploading) -->
+          <div id="plCustomUploadBox" style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-bottom: 1.8rem; <%= currentStyle === 'custom_upload' ? '' : 'display: none;' %>">
+            <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark); margin-bottom: 4px;">
+              <i class="fa-solid fa-file-image" style="color: var(--admin-primary);"></i> Custom Animated Image (Up to 1 MB)
+            </strong>
+            <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 1rem;">
+              Upload your own custom animation file (.SVG, .WEBP, .GIF, .APNG, .PNG). Max size: 1 MB.
+            </p>
+
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <div style="width: 80px; height: 80px; background: #FFF; border: 1px solid var(--admin-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <img id="plCustomPreviewImg" src="<%= settings.preloader_custom_url || pLogo %>" alt="Custom Preview" style="max-width: 90%; max-height: 90%; object-fit: contain;">
+              </div>
+
+              <div>
+                <input type="file" name="preloader_custom_file" id="plCustomFileInput" accept="image/svg+xml, image/webp, image/gif, image/png, image/apng" style="display: none;" onchange="previewImg(this, 'plCustomPreviewImg')">
+                <button type="button" onclick="document.getElementById('plCustomFileInput').click()" class="btn btn-outline btn-sm" style="background: #FFF; font-size: 0.8rem; border-radius: 8px;">
+                  <i class="fa-solid fa-upload"></i> Choose Animation File
+                </button>
+
+                <% if (settings.preloader_custom_url) { %>
+                  <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--admin-primary); margin-left: 12px; cursor: pointer;">
+                    <input type="checkbox" name="remove_preloader_custom" value="1"> Remove Custom File
+                  </label>
+                <% } %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Timing, Speed, Exit Effect & Tagline -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.4rem; margin-bottom: 1.8rem;">
+            
+            <!-- Speed Control -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;">
+                <i class="fa-solid fa-gauge-high" style="color: var(--admin-primary);"></i> Animation Speed
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <% const spd = settings.preloader_speed || 'normal'; %>
+                <label class="pl-pill-label <%= spd === 'slow' ? 'selected' : '' %>">
+                  <input type="radio" name="preloader_speed" value="slow" <%= spd === 'slow' ? 'checked' : '' %> onchange="updatePillClasses(this)"> Slow (1.4x)
+                </label>
+                <label class="pl-pill-label <%= spd === 'normal' ? 'selected' : '' %>">
+                  <input type="radio" name="preloader_speed" value="normal" <%= spd === 'normal' ? 'checked' : '' %> onchange="updatePillClasses(this)"> Normal (1.0x)
+                </label>
+                <label class="pl-pill-label <%= spd === 'fast' ? 'selected' : '' %>">
+                  <input type="radio" name="preloader_speed" value="fast" <%= spd === 'fast' ? 'checked' : '' %> onchange="updatePillClasses(this)"> Fast (0.7x)
+                </label>
+              </div>
+            </div>
+
+            <!-- Exit Effect -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 8px;">
+                <i class="fa-solid fa-door-open" style="color: var(--admin-primary);"></i> Exit Transition Effect
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <% const exitEff = settings.preloader_exit_effect || 'fade'; %>
+                <label class="pl-pill-label <%= exitEff === 'fade' ? 'selected' : '' %>">
+                  <input type="radio" name="preloader_exit_effect" value="fade" <%= exitEff === 'fade' ? 'checked' : '' %> onchange="updatePillClasses(this)"> Fade
+                </label>
+                <label class="pl-pill-label <%= exitEff === 'curtain' ? 'selected' : '' %>">
+                  <input type="radio" name="preloader_exit_effect" value="curtain" <%= exitEff === 'curtain' ? 'checked' : '' %> onchange="updatePillClasses(this)"> Slide Up Curtain
+                </label>
+                <label class="pl-pill-label <%= exitEff === 'zoom' ? 'selected' : '' %>">
+                  <input type="radio" name="preloader_exit_effect" value="zoom" <%= exitEff === 'zoom' ? 'checked' : '' %> onchange="updatePillClasses(this)"> Zoom Out
+                </label>
+              </div>
+            </div>
+
+            <!-- Minimum Display Time -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 4px;">
+                <i class="fa-solid fa-clock" style="color: var(--admin-primary);"></i> Minimum Display Time (ms)
+              </label>
+              <span style="display: block; font-size: 0.72rem; color: var(--admin-text-muted); margin-bottom: 6px;">Keeps animation visible for appreciation</span>
+              <input type="number" name="preloader_min_time" id="preloader_min_time" class="form-control" value="<%= settings.preloader_min_time || '900' %>" min="200" max="5000" step="50" style="background: #FFF; font-weight: 600;">
+            </div>
+
+            <!-- Maximum Failsafe Timeout -->
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.1rem;">
+              <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 4px;">
+                <i class="fa-solid fa-shield-halved" style="color: var(--admin-primary);"></i> Maximum Time Failsafe (ms)
+              </label>
+              <span style="display: block; font-size: 0.72rem; color: var(--admin-text-muted); margin-bottom: 6px;">Never blocks user even on slow 3G</span>
+              <input type="number" name="preloader_max_time" id="preloader_max_time" class="form-control" value="<%= settings.preloader_max_time || '3500' %>" min="1000" max="10000" step="100" style="background: #FFF; font-weight: 600;">
+            </div>
+
+          </div>
+
+          <!-- Tagline Toggle -->
+          <div style="margin-bottom: 1.8rem; display: flex; align-items: center; justify-content: space-between; background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1rem 1.4rem;">
+            <div>
+              <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);">Show Brand Tagline Under Store Name</strong>
+              <span style="font-size: 0.76rem; color: var(--admin-text-muted);">Displays "<%= settings.tagline || 'Where Threads Tell Stories' %>" sliding gracefully up.</span>
+            </div>
+            <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; margin: 0;">
+              <input type="checkbox" name="preloader_show_tagline" id="preloader_show_tagline" value="1" <%= (settings.preloader_show_tagline !== '0') ? 'checked' : '' %> style="width: 18px; height: 18px; accent-color: var(--admin-primary);">
+              <span style="margin-left: 6px; font-size: 0.84rem; font-weight: 600;">Show tagline</span>
+            </label>
+          </div>
+
+          <!-- Section: Brand Palette Colors with Live Preview Swatches -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+              <label style="font-size: 0.88rem; font-weight: 700; color: var(--admin-text-dark);">
+                <i class="fa-solid fa-palette" style="color: var(--admin-primary);"></i> Brand Color Palette <span style="font-size: 0.78rem; font-weight: 400; color: var(--admin-text-muted);">(Live synchronized via CSS variables)</span>
+              </label>
+              <button type="button" onclick="resetBrandPaletteColors()" class="btn btn-sm" style="font-size: 0.74rem; color: var(--admin-primary); background: none; border: none; text-decoration: underline; cursor: pointer;">
+                Restore Logo Colors
+              </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem;">
+              <!-- 1. Dark Maroon -->
+              <div class="pl-color-box">
+                <span class="pl-color-label">Primary Maroon</span>
+                <div class="pl-color-input-wrap">
+                  <input type="color" id="color_primary_picker" value="<%= settings.preloader_color_primary || '#4B0F1C' %>" oninput="syncColorInput(this, 'preloader_color_primary')">
+                  <input type="text" name="preloader_color_primary" id="preloader_color_primary" value="<%= settings.preloader_color_primary || '#4B0F1C' %>" onchange="syncColorPicker(this, 'color_primary_picker')">
+                </div>
+              </div>
+
+              <!-- 2. Copper -->
+              <div class="pl-color-box">
+                <span class="pl-color-label">Secondary Copper</span>
+                <div class="pl-color-input-wrap">
+                  <input type="color" id="color_secondary_picker" value="<%= settings.preloader_color_secondary || '#C7876C' %>" oninput="syncColorInput(this, 'preloader_color_secondary')">
+                  <input type="text" name="preloader_color_secondary" id="preloader_color_secondary" value="<%= settings.preloader_color_secondary || '#C7876C' %>" onchange="syncColorPicker(this, 'color_secondary_picker')">
+                </div>
+              </div>
+
+              <!-- 3. Rose -->
+              <div class="pl-color-box">
+                <span class="pl-color-label">Accent Rose</span>
+                <div class="pl-color-input-wrap">
+                  <input type="color" id="color_rose_picker" value="<%= settings.preloader_color_rose || '#BB4558' %>" oninput="syncColorInput(this, 'preloader_color_rose')">
+                  <input type="text" name="preloader_color_rose" id="preloader_color_rose" value="<%= settings.preloader_color_rose || '#BB4558' %>" onchange="syncColorPicker(this, 'color_rose_picker')">
+                </div>
+              </div>
+
+              <!-- 4. Blush Background -->
+              <div class="pl-color-box">
+                <span class="pl-color-label">Blush Background</span>
+                <div class="pl-color-input-wrap">
+                  <input type="color" id="color_bg_picker" value="<%= settings.preloader_color_bg || '#F8E8E2' %>" oninput="syncColorInput(this, 'preloader_color_bg')">
+                  <input type="text" name="preloader_color_bg" id="preloader_color_bg" value="<%= settings.preloader_color_bg || '#F8E8E2' %>" onchange="syncColorPicker(this, 'color_bg_picker')">
+                </div>
+              </div>
+
+              <!-- 5. Thread Tan -->
+              <div class="pl-color-box">
+                <span class="pl-color-label">Thread Tan</span>
+                <div class="pl-color-input-wrap">
+                  <input type="color" id="color_thread_picker" value="<%= settings.preloader_color_thread || '#EFC09B' %>" oninput="syncColorInput(this, 'preloader_color_thread')">
+                  <input type="text" name="preloader_color_thread" id="preloader_color_thread" value="<%= settings.preloader_color_thread || '#EFC09B' %>" onchange="syncColorPicker(this, 'color_thread_picker')">
+                </div>
+              </div>
+
+              <!-- 6. Stitch Red -->
+              <div class="pl-color-box">
+                <span class="pl-color-label">Stitch Red</span>
+                <div class="pl-color-input-wrap">
+                  <input type="color" id="color_stitch_picker" value="<%= settings.preloader_color_stitch || '#911628' %>" oninput="syncColorInput(this, 'preloader_color_stitch')">
+                  <input type="text" name="preloader_color_stitch" id="preloader_color_stitch" value="<%= settings.preloader_color_stitch || '#911628' %>" onchange="syncColorPicker(this, 'color_stitch_picker')">
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <style>
+          .pl-card {
+            border: 2px solid var(--admin-border, #E2D9D2);
+            border-radius: 12px;
+            background: #FFFFFF;
+            padding: 1rem;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.22s ease;
+            display: flex;
+            flex-direction: column;
+          }
+          .pl-card:hover {
+            border-color: var(--pl-rose, #BB4558);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(75, 15, 28, 0.08);
+          }
+          .pl-card.active {
+            border-color: var(--admin-primary, #4B0F1C);
+            background: #FFF9F7;
+            box-shadow: 0 6px 18px rgba(75, 15, 28, 0.12);
+          }
+          .pl-card-badge {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--admin-primary, #4B0F1C);
+            color: #FFFFFF;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            z-index: 5;
+          }
+          .pl-card.active .pl-card-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+          }
+          .pl-thumb {
+            height: 110px;
+            background: var(--pl-bg, #F8E8E2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.8rem;
+            overflow: hidden;
+            position: relative;
+          }
+          .pl-card-title {
+            font-size: 0.88rem;
+            color: var(--admin-text-dark, #222);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          }
+          .pl-tag-def {
+            background: var(--admin-primary, #4B0F1C);
+            color: #FFF;
+            font-size: 0.62rem;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-weight: 700;
+          }
+          .pl-card-desc {
+            font-size: 0.74rem;
+            color: var(--admin-text-muted, #666);
+            line-height: 1.35;
+            margin: 0;
+          }
+          .pl-pill-label {
+            flex: 1;
+            text-align: center;
+            background: #FFF;
+            border: 1px solid var(--admin-border, #E2D9D2);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--admin-text-dark);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+          }
+          .pl-pill-label:hover {
+            border-color: var(--pl-rose);
+          }
+          .pl-pill-label.selected {
+            background: var(--admin-primary, #4B0F1C);
+            color: #FFF;
+            border-color: var(--admin-primary, #4B0F1C);
+          }
+          .pl-pill-label input[type="radio"] {
+            display: none;
+          }
+          .pl-color-box {
+            background: #FAF6F0;
+            border: 1px solid var(--admin-border);
+            border-radius: 10px;
+            padding: 0.8rem;
+          }
+          .pl-color-label {
+            display: block;
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: var(--admin-text-dark);
+            margin-bottom: 6px;
+          }
+          .pl-color-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .pl-color-input-wrap input[type="color"] {
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+          }
+          .pl-color-input-wrap input[type="text"] {
+            flex: 1;
+            font-family: monospace;
+            font-size: 0.8rem;
+            padding: 6px 8px;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            background: #FFF;
+            text-transform: uppercase;
+          }
+        </style>
 
         <!-- Card 2: Store Information -->
         <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
@@ -991,6 +1529,376 @@
       statusText.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Connection test failed: ${err.message}`;
     }
   }
+
+  // -------------------------------------------------------------
+  // ANIMATED BRANDING & PRELOADER ADMIN FUNCTIONS
+  // -------------------------------------------------------------
+  function selectStyleCard(styleKey) {
+    const radio = document.getElementById('style_' + styleKey);
+    if (radio) radio.checked = true;
+
+    document.querySelectorAll('.pl-card').forEach(card => {
+      card.classList.remove('active');
+    });
+    if (radio) {
+      const parentCard = radio.closest('.pl-card');
+      if (parentCard) parentCard.classList.add('active');
+    }
+
+    const customBox = document.getElementById('plCustomUploadBox');
+    if (customBox) {
+      customBox.style.display = (styleKey === 'custom_upload') ? 'block' : 'none';
+    }
+  }
+
+  function updatePillClasses(input) {
+    if (!input || !input.name) return;
+    const parentContainer = input.closest('div');
+    if (!parentContainer) return;
+    parentContainer.querySelectorAll('.pl-pill-label').forEach(lbl => {
+      lbl.classList.remove('selected');
+    });
+    const label = input.closest('.pl-pill-label');
+    if (label) label.classList.add('selected');
+  }
+
+  function onPreloaderToggleChange(checkbox) {
+    const badge = document.getElementById('plActiveBadge');
+    if (!badge) return;
+    if (checkbox.checked) {
+      badge.textContent = 'Active';
+      badge.style.background = '#E8F5E9';
+      badge.style.color = '#2E7D32';
+    } else {
+      badge.textContent = 'Disabled';
+      badge.style.background = '#FFEBEE';
+      badge.style.color = '#C62828';
+    }
+  }
+
+  function syncColorInput(picker, targetInputId) {
+    const target = document.getElementById(targetInputId);
+    if (target) {
+      target.value = picker.value.toUpperCase();
+    }
+    updateLivePreloaderColors();
+  }
+
+  function syncColorPicker(textInput, targetPickerId) {
+    const hex = textInput.value.trim();
+    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(hex)) {
+      const picker = document.getElementById(targetPickerId);
+      if (picker) {
+        picker.value = hex;
+      }
+      updateLivePreloaderColors();
+    }
+  }
+
+  function updateLivePreloaderColors() {
+    const root = document.documentElement;
+    const maroon = document.getElementById('preloader_color_primary')?.value.trim() || '#4B0F1C';
+    const copper = document.getElementById('preloader_color_secondary')?.value.trim() || '#C7876C';
+    const rose = document.getElementById('preloader_color_rose')?.value.trim() || '#BB4558';
+    const bg = document.getElementById('preloader_color_bg')?.value.trim() || '#F8E8E2';
+    const thread = document.getElementById('preloader_color_thread')?.value.trim() || '#EFC09B';
+    const stitch = document.getElementById('preloader_color_stitch')?.value.trim() || '#911628';
+
+    root.style.setProperty('--pl-maroon', maroon);
+    root.style.setProperty('--pl-copper', copper);
+    root.style.setProperty('--pl-rose', rose);
+    root.style.setProperty('--pl-bg', bg);
+    root.style.setProperty('--pl-thread', thread);
+    root.style.setProperty('--pl-stitch', stitch);
+
+    // Update thumbnail backgrounds dynamically
+    document.querySelectorAll('.pl-thumb').forEach(th => {
+      th.style.backgroundColor = bg;
+    });
+  }
+
+  function resetBrandPaletteColors() {
+    const defaults = {
+      preloader_color_primary: { hex: '#4B0F1C', picker: 'color_primary_picker' },
+      preloader_color_secondary: { hex: '#C7876C', picker: 'color_secondary_picker' },
+      preloader_color_rose: { hex: '#BB4558', picker: 'color_rose_picker' },
+      preloader_color_bg: { hex: '#F8E8E2', picker: 'color_bg_picker' },
+      preloader_color_thread: { hex: '#EFC09B', picker: 'color_thread_picker' },
+      preloader_color_stitch: { hex: '#911628', picker: 'color_stitch_picker' }
+    };
+    for (const [id, val] of Object.entries(defaults)) {
+      const input = document.getElementById(id);
+      const picker = document.getElementById(val.picker);
+      if (input) input.value = val.hex;
+      if (picker) picker.value = val.hex;
+    }
+    updateLivePreloaderColors();
+  }
+
+  function resetPreloaderDefaults() {
+    if (!confirm('Reset all preloader animations, timings, and colors to default brand settings?')) return;
+
+    // Enable
+    const toggle = document.getElementById('preloader_enabled');
+    if (toggle) {
+      toggle.checked = true;
+      onPreloaderToggleChange(toggle);
+    }
+
+    // Style
+    selectStyleCard('stitching_hexagon');
+
+    // Speed: Normal
+    const speedNormal = document.querySelector('input[name="preloader_speed"][value="normal"]');
+    if (speedNormal) {
+      speedNormal.checked = true;
+      updatePillClasses(speedNormal);
+    }
+
+    // Exit: Fade
+    const exitFade = document.querySelector('input[name="preloader_exit_effect"][value="fade"]');
+    if (exitFade) {
+      exitFade.checked = true;
+      updatePillClasses(exitFade);
+    }
+
+    // Frequency: Session
+    const freqSession = document.querySelector('input[name="preloader_frequency"][value="session"]');
+    if (freqSession) freqSession.checked = true;
+
+    // Timings
+    const minInput = document.getElementById('preloader_min_time');
+    if (minInput) minInput.value = '900';
+    const maxInput = document.getElementById('preloader_max_time');
+    if (maxInput) maxInput.value = '3500';
+
+    // Tagline: ON
+    const tagToggle = document.getElementById('preloader_show_tagline');
+    if (tagToggle) tagToggle.checked = true;
+
+    // Colors
+    resetBrandPaletteColors();
+  }
+
+  // -------------------------------------------------------------
+  // FULL LIVE PREVIEW OVERLAY OVER ADMIN SCREEN
+  // -------------------------------------------------------------
+  function previewCurrentPreloader() {
+    // Remove any existing preview
+    const old = document.getElementById('aruvi-preloader');
+    if (old) old.remove();
+
+    const selectedStyleRadio = document.querySelector('input[name="preloader_style"]:checked');
+    const styleKey = selectedStyleRadio ? selectedStyleRadio.value : 'stitching_hexagon';
+
+    const selectedSpeedRadio = document.querySelector('input[name="preloader_speed"]:checked');
+    const speedMode = selectedSpeedRadio ? selectedSpeedRadio.value : 'normal';
+    const speedVal = speedMode === 'slow' ? 1.4 : (speedMode === 'fast' ? 0.7 : 1.0);
+
+    const selectedExitRadio = document.querySelector('input[name="preloader_exit_effect"]:checked');
+    const exitEffect = selectedExitRadio ? selectedExitRadio.value : 'fade';
+
+    const minTime = parseInt(document.getElementById('preloader_min_time')?.value, 10) || 900;
+    const showTagline = document.getElementById('preloader_show_tagline')?.checked !== false;
+
+    const maroon = document.getElementById('preloader_color_primary')?.value.trim() || '#4B0F1C';
+    const copper = document.getElementById('preloader_color_secondary')?.value.trim() || '#C7876C';
+    const rose = document.getElementById('preloader_color_rose')?.value.trim() || '#BB4558';
+    const bg = document.getElementById('preloader_color_bg')?.value.trim() || '#F8E8E2';
+    const thread = document.getElementById('preloader_color_thread')?.value.trim() || '#EFC09B';
+    const stitch = document.getElementById('preloader_color_stitch')?.value.trim() || '#911628';
+
+    const shopName = (document.querySelector('input[name="shop_name"]')?.value || 'ARUVI EMBROIDERY STUDIO').trim();
+    const tagline = (document.querySelector('input[name="tagline"]')?.value || 'Where Threads Tell Stories').trim();
+    const mainLogoUrl = document.getElementById('mainLogoPreview')?.src || '/public/assets/brand/logo.png';
+    const faviconUrl = document.getElementById('faviconPreview')?.src || document.getElementById('mobileLogoPreview')?.src || mainLogoUrl;
+    const customUrl = document.getElementById('plCustomPreviewImg')?.src || '';
+
+    // Build letter spans with staggered delays
+    const nameChars = shopName.split('');
+    const lettersHtml = nameChars.map((ch, idx) => {
+      const displayCh = (ch === ' ') ? '&nbsp;' : ch;
+      return `<span class="aruvi-pl-char" style="--pl-char-idx: ${idx};">${displayCh}</span>`;
+    }).join('');
+
+    // Style-specific inner graphic
+    let graphicHtml = '';
+    if (styleKey === 'stitching_hexagon') {
+      graphicHtml = `
+        <div class="aruvi-pl-hex-stage">
+          <svg class="aruvi-pl-hex-svg" viewBox="0 0 170 170" aria-hidden="true">
+            <path class="aruvi-pl-hex-outline" d="M 85,20 L 140,52 L 140,118 L 85,150 L 30,118 L 30,52 Z" />
+          </svg>
+          <div class="aruvi-pl-hex-needle" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <path d="M 2,12 L 10,7 L 9,12 L 10,17 Z" fill="var(--pl-thread)" />
+              <line x1="9" y1="12" x2="22" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="aruvi-pl-hex-logo-wrap">
+            <img src="${faviconUrl}" alt="A">
+          </div>
+        </div>`;
+    } else if (styleKey === 'needle_loop') {
+      graphicHtml = `
+        <div class="aruvi-pl-loop-stage">
+          <svg class="aruvi-pl-loop-svg" viewBox="0 0 190 160" aria-hidden="true">
+            <path class="aruvi-pl-loop-track" d="M 30,80 C 30,35 75,35 95,80 C 115,125 160,125 160,80 C 160,35 115,35 95,80 C 75,125 30,125 30,80 Z" />
+          </svg>
+          <div class="aruvi-pl-loop-needle" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <path d="M 2,12 L 8,8 L 7,12 L 8,16 Z" fill="var(--pl-thread)" />
+              <line x1="7" y1="12" x2="21" y2="12" stroke="var(--pl-copper)" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="aruvi-pl-loop-logo">
+            <img src="${faviconUrl}" alt="Logo">
+          </div>
+        </div>`;
+    } else if (styleKey === 'spool_progress') {
+      graphicHtml = `
+        <div class="aruvi-pl-spool-stage">
+          <div class="aruvi-pl-spool-logo">
+            <img src="${mainLogoUrl}" alt="${shopName}">
+          </div>
+          <div class="aruvi-pl-spool-row">
+            <div class="aruvi-pl-spool-icon">
+              <svg viewBox="0 0 32 32" width="30" height="30">
+                <rect x="7" y="5" width="18" height="4" rx="2" fill="var(--pl-copper)" />
+                <rect x="7" y="23" width="18" height="4" rx="2" fill="var(--pl-copper)" />
+                <rect x="10" y="9" width="12" height="14" rx="1" fill="var(--pl-maroon)" />
+                <circle cx="16" cy="16" r="2.2" fill="var(--pl-copper)" />
+              </svg>
+            </div>
+            <div class="aruvi-pl-progress-track">
+              <div id="aruviPlProgressBar" class="aruvi-pl-progress-bar"></div>
+            </div>
+            <span id="aruviPlProgressText" class="aruvi-pl-progress-text">20%</span>
+          </div>
+        </div>`;
+    } else if (styleKey === 'logo_reveal') {
+      graphicHtml = `
+        <div class="aruvi-pl-reveal-stage">
+          <div class="aruvi-pl-reveal-box">
+            <img src="${mainLogoUrl}" alt="${shopName}">
+            <div class="aruvi-pl-reveal-shimmer"></div>
+          </div>
+        </div>`;
+    } else if (styleKey === 'dots_stitches') {
+      graphicHtml = `
+        <div class="aruvi-pl-dots-stage">
+          <div class="aruvi-pl-dots-logo">
+            <img src="${mainLogoUrl}" alt="${shopName}">
+          </div>
+          <div class="aruvi-pl-stitches-row">
+            <span class="aruvi-pl-dash" style="--pl-dash-idx: 0;"></span>
+            <span class="aruvi-pl-dash" style="--pl-dash-idx: 1;"></span>
+            <span class="aruvi-pl-dash" style="--pl-dash-idx: 2;"></span>
+            <span class="aruvi-pl-dash" style="--pl-dash-idx: 3;"></span>
+            <span class="aruvi-pl-dash" style="--pl-dash-idx: 4;"></span>
+          </div>
+        </div>`;
+    } else if (styleKey === 'custom_upload' && customUrl) {
+      graphicHtml = `
+        <div class="aruvi-pl-custom-stage">
+          <img src="${customUrl}" alt="Custom Animation">
+        </div>`;
+    } else if (styleKey === 'pulsing_glow') {
+      graphicHtml = `
+        <div class="aruvi-pl-glow-stage">
+          <img src="${faviconUrl}" alt="${shopName}">
+        </div>`;
+    } else if (styleKey === 'progress_ring') {
+      graphicHtml = `
+        <div class="aruvi-pl-ring-stage">
+          <svg class="aruvi-pl-ring-svg" viewBox="0 0 120 120">
+            <circle class="aruvi-pl-ring-circle" cx="60" cy="60" r="50" />
+          </svg>
+          <img src="${faviconUrl}" alt="${shopName}">
+        </div>`;
+    }
+
+    const taglineHtml = showTagline ? `<div class="aruvi-pl-tagline">${tagline}</div>` : '';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'aruvi-preloader';
+    overlay.setAttribute('role', 'status');
+    overlay.style.setProperty('--pl-maroon', maroon);
+    overlay.style.setProperty('--pl-copper', copper);
+    overlay.style.setProperty('--pl-rose', rose);
+    overlay.style.setProperty('--pl-bg', bg);
+    overlay.style.setProperty('--pl-thread', thread);
+    overlay.style.setProperty('--pl-stitch', stitch);
+    overlay.style.setProperty('--pl-speed', speedVal);
+
+    overlay.innerHTML = `
+      <div class="aruvi-pl-curtain-top"></div>
+      <div class="aruvi-pl-curtain-bottom"></div>
+      <button type="button" class="aruvi-pl-preview-close-btn" id="plPreviewCloseBtn">
+        <i class="fa-solid fa-xmark"></i> Close Preview (ESC)
+      </button>
+      <div class="aruvi-pl-content">
+        ${graphicHtml}
+        <div class="aruvi-pl-shopname">${lettersHtml}</div>
+        ${taglineHtml}
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.classList.add('aruvi-preloader-locked');
+
+    // Simulate progress if Spool progress style
+    let progressTimer = null;
+    const bar = overlay.querySelector('#aruviPlProgressBar');
+    const txt = overlay.querySelector('#aruviPlProgressText');
+    if (bar) {
+      let pct = 20;
+      progressTimer = setInterval(() => {
+        pct += 12;
+        if (pct > 100) pct = 100;
+        bar.style.width = pct + '%';
+        if (txt) txt.textContent = pct + '%';
+        if (pct >= 100) clearInterval(progressTimer);
+      }, 100);
+    }
+
+    let isClosed = false;
+    function closePreview() {
+      if (isClosed) return;
+      isClosed = true;
+      if (progressTimer) clearInterval(progressTimer);
+      document.removeEventListener('keydown', onKeyDown);
+
+      // Trigger exit transition
+      overlay.classList.add('aruvi-pl-exit-' + exitEffect);
+      const exitDur = Math.round(650 * speedVal);
+
+      setTimeout(() => {
+        document.body.classList.remove('aruvi-preloader-locked');
+        if (overlay && overlay.parentNode) {
+          overlay.remove();
+        }
+      }, exitDur + 50);
+    }
+
+    function onKeyDown(evt) {
+      if (evt.key === 'Escape') closePreview();
+    }
+    document.addEventListener('keydown', onKeyDown);
+
+    overlay.querySelector('#plPreviewCloseBtn')?.addEventListener('click', closePreview);
+
+    // Auto dismiss after sequence
+    const previewDisplayTime = Math.max(minTime, Math.round(2400 * speedVal));
+    setTimeout(() => {
+      closePreview();
+    }, previewDisplayTime);
+  }
+
+  // Initialize live color listeners on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    updateLivePreloaderColors();
+  });
 </script>
 
 </body>

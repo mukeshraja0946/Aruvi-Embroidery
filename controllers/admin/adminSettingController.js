@@ -267,6 +267,55 @@ exports.postSettings = async (req, res, next) => {
       feature_card4_icon: b.feature_card4_icon !== undefined ? b.feature_card4_icon.trim() : undefined
     };
 
+    // Preloader Settings
+    if (b.preloader_enabled !== undefined) {
+      updates.preloader_enabled = (b.preloader_enabled === '1' || b.preloader_enabled === 'true') ? '1' : '0';
+    }
+    const validStyles = ['stitching_hexagon', 'needle_loop', 'spool_progress', 'logo_reveal', 'dots_stitches', 'custom_upload', 'pulsing_glow', 'progress_ring'];
+    if (b.preloader_style && validStyles.includes(b.preloader_style.trim())) {
+      updates.preloader_style = b.preloader_style.trim();
+    }
+    if (b.preloader_speed && ['slow', 'normal', 'fast'].includes(b.preloader_speed.trim())) {
+      updates.preloader_speed = b.preloader_speed.trim();
+    }
+    if (b.preloader_exit_effect && ['fade', 'curtain', 'zoom'].includes(b.preloader_exit_effect.trim())) {
+      updates.preloader_exit_effect = b.preloader_exit_effect.trim();
+    }
+    if (b.preloader_frequency && ['session', 'always'].includes(b.preloader_frequency.trim())) {
+      updates.preloader_frequency = b.preloader_frequency.trim();
+    }
+    if (b.preloader_show_tagline !== undefined) {
+      updates.preloader_show_tagline = (b.preloader_show_tagline === '1' || b.preloader_show_tagline === 'true') ? '1' : '0';
+    }
+    if (b.preloader_min_time !== undefined && !isNaN(parseInt(b.preloader_min_time, 10))) {
+      updates.preloader_min_time = String(Math.max(200, Math.min(5000, parseInt(b.preloader_min_time, 10))));
+    }
+    if (b.preloader_max_time !== undefined && !isNaN(parseInt(b.preloader_max_time, 10))) {
+      updates.preloader_max_time = String(Math.max(1000, Math.min(10000, parseInt(b.preloader_max_time, 10))));
+    }
+
+    const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+    const colorFields = [
+      { key: 'preloader_color_primary', default: '#4B0F1C' },
+      { key: 'preloader_color_secondary', default: '#C7876C' },
+      { key: 'preloader_color_rose', default: '#BB4558' },
+      { key: 'preloader_color_bg', default: '#F8E8E2' },
+      { key: 'preloader_color_thread', default: '#EFC09B' },
+      { key: 'preloader_color_stitch', default: '#911628' }
+    ];
+    colorFields.forEach(({ key }) => {
+      if (b[key] !== undefined && b[key].trim()) {
+        const val = b[key].trim();
+        if (hexColorRegex.test(val)) {
+          updates[key] = val;
+        }
+      }
+    });
+
+    if (b.remove_preloader_custom === '1') {
+      updates.preloader_custom_url = '';
+    }
+
     if (b.remove_about_story_image === '1') updates.about_story_image = '';
     if (b.remove_contact_map_image === '1') updates.contact_map_image = '';
 
@@ -305,6 +354,20 @@ exports.postSettings = async (req, res, next) => {
         const file = req.files.contact_map_image[0];
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
         updates.contact_map_image = savedUrl;
+      }
+      if (req.files.preloader_custom_file && req.files.preloader_custom_file[0]) {
+        const file = req.files.preloader_custom_file[0];
+        // Enforce 1 MB limit (1,048,576 bytes)
+        if (file.size > 1048576) {
+          const sizeErr = 'Custom preloader animated file must be 1 MB or smaller.';
+          if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
+            return res.status(400).json({ success: false, message: sizeErr });
+          }
+          req.flash('error', sizeErr);
+          return res.redirect('/admin/settings#preloader-settings');
+        }
+        const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
+        updates.preloader_custom_url = savedUrl;
       }
     }
 

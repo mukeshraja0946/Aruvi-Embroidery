@@ -218,7 +218,8 @@ router.post('/admin/settings', upload.fields([
   { name: 'mobile_logo_image', maxCount: 1 },
   { name: 'favicon_image', maxCount: 1 },
   { name: 'about_story_image', maxCount: 1 },
-  { name: 'contact_map_image', maxCount: 1 }
+  { name: 'contact_map_image', maxCount: 1 },
+  { name: 'preloader_custom_file', maxCount: 1 }
 ]), adminSettingController.postSettings);
 
 router.all('/admin/api/test-smtp', adminSettingController.testSmtp);

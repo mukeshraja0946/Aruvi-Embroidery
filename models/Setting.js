@@ -128,7 +128,22 @@ const fallbackSettings = {
   require_checkout_address: '0',
   watermark_enabled: '0',
   watermark_position: 'center',
-  watermark_opacity: '25'
+  watermark_opacity: '25',
+  preloader_enabled: '1',
+  preloader_style: 'stitching_hexagon',
+  preloader_speed: 'normal',
+  preloader_min_time: '900',
+  preloader_max_time: '3500',
+  preloader_exit_effect: 'fade',
+  preloader_frequency: 'session',
+  preloader_show_tagline: '1',
+  preloader_color_primary: '#4B0F1C',
+  preloader_color_secondary: '#C7876C',
+  preloader_color_rose: '#BB4558',
+  preloader_color_bg: '#F8E8E2',
+  preloader_color_thread: '#EFC09B',
+  preloader_color_stitch: '#911628',
+  preloader_custom_url: ''
 };
 
 class Setting {
