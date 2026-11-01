@@ -1148,11 +1148,14 @@ exports.getSystemHealth = async (req, res, next) => {
     }
     const { getRateLimitStatus } = require('../../middleware/rateLimiters');
     const rateLimitStatus = getRateLimitStatus(req);
+    const storageStatus = storage.getStorageStatus ? storage.getStorageStatus() : { uploadsDir: storage.getUploadsDir(), isWritable: true };
 
     res.render('admin/tools/system-health', {
       title: 'Database & System Health - Admin',
       health,
       rateLimitStatus,
+      storageStatus,
+      sessionStoreType: 'express-mysql-session',
       page: 'system-health'
     });
   } catch (err) {
@@ -2011,5 +2014,183 @@ exports.exportRegeneratePreviewsCsv = async (req, res, next) => {
 
 exports.matchFileToDesigns = matchFileToDesigns;
 exports.findCleanOriginalForDesign = findCleanOriginalForDesign;
+
+/**
+ * --------------------------------------------------------------------------
+ * Upload Recovery from Old Ephemeral Deployments (hbuilds/versions/*)
+ * --------------------------------------------------------------------------
+ */
+const uploadRecoveryService = require('../../services/uploadRecoveryService');
+
+exports.triggerDeploymentRecovery = async (req, res, next) => {
+  try {
+    const { dryRun, versionsDir } = req.body || {};
+    const isDryRun = dryRun !== false && dryRun !== 'false';
+    const job = uploadRecoveryService.startRecoveryJob({
+      versionsDir,
+      dryRun: isDryRun
+    });
+    return res.json({
+      success: true,
+      jobId: job.id,
+      dryRun: isDryRun,
+      message: `Recovery ${isDryRun ? 'dry-run scan' : 'copy process'} initiated.`
+    });
+  } catch (err) {
+    console.error('[triggerDeploymentRecovery Error]:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getDeploymentRecoveryStatus = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const status = uploadRecoveryService.getJobStatus(jobId);
+    if (!status) {
+      return res.status(404).json({ success: false, message: 'Recovery job not found' });
+    }
+    return res.json({ success: true, ...status });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.downloadDeploymentRecoveryCsv = async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const csv = uploadRecoveryService.generateCsv(jobId);
+    if (!csv) {
+      return res.status(404).send('Job report not found');
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="recovery_report_${jobId}.csv"`);
+    return res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * --------------------------------------------------------------------------
+ * Backups Management: List, Run, Download, Restore
+ * --------------------------------------------------------------------------
+ */
+const { runBackup, getBackupsList, restoreFromZip, getBackupDir } = require('../../scripts/backup');
+
+exports.getBackups = async (req, res, next) => {
+  try {
+    const storageStatus = storage.getStorageStatus();
+    const backups = getBackupsList();
+    let health = { healthy: true, totalIssues: 0 };
+    try {
+      health = await checkSystemHealth();
+      health.healthy = health.isHealthy;
+    } catch (_) {}
+
+    res.render('admin/tools/backup', {
+      title: 'System Backups & Storage - Admin',
+      backups: backups || [],
+      storageDriver: storageStatus.driver,
+      uploadsDir: storageStatus.uploadsDir,
+      health,
+      page: 'backup'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.postCreateBackup = async (req, res, next) => {
+  try {
+    const result = await runBackup();
+    await ActivityLog.logFromReq(req, 'create', 'backup', null, `Created full system backup: ${result.filename} (${result.sizeMb} MB)`);
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
+      return res.json({ success: true, message: `Backup created: ${result.filename} (${result.sizeMb} MB)`, ...result });
+    }
+    req.flash('success', `Backup successfully created: ${result.filename} (${result.sizeMb} MB)`);
+    return res.redirect('/admin/tools/backup');
+  } catch (err) {
+    console.error('[postCreateBackup Error]:', err);
+    if (req.xhr || (req.headers.accept && req.headers.accept.includes('json'))) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+    req.flash('error', `Backup failed: ${err.message}`);
+    return res.redirect('/admin/tools/backup');
+  }
+};
+
+exports.downloadBackupFile = async (req, res, next) => {
+  try {
+    const { filename } = req.params;
+    const safeFilename = path.basename(filename);
+    const backupDir = getBackupDir();
+    const filePath = path.join(backupDir, safeFilename);
+
+    if (!fs.existsSync(filePath)) {
+      req.flash('error', `Backup archive "${safeFilename}" not found on disk.`);
+      return res.redirect('/admin/tools/backup');
+    }
+
+    return res.download(filePath, safeFilename);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.postRestoreBackup = async (req, res, next) => {
+  try {
+    const { filename } = req.params;
+    const result = await restoreFromZip(filename);
+    await ActivityLog.logFromReq(req, 'restore', 'backup', null, `Restored database from backup: ${filename}`);
+    req.flash('success', `Database successfully restored from ${filename} (${result.executedStatements} statements executed).`);
+    return res.redirect('/admin/tools/backup');
+  } catch (err) {
+    console.error('[postRestoreBackup Error]:', err);
+    req.flash('error', `Restore failed: ${err.message}`);
+    return res.redirect('/admin/tools/backup');
+  }
+};
+
+/**
+ * Storage Health Upload Test
+ */
+exports.postTestStorageHealth = async (req, res, next) => {
+  try {
+    const probeId = Date.now();
+    const probePubFilename = `probe_pub_${probeId}.png`;
+    const probePrivFilename = `probe_priv_${probeId}.zip`;
+
+    // 1. Test public write
+    const pubDest = path.join(storage.getPreviewsDir(), probePubFilename);
+    const testPngBuffer = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2d0b0000000049454e44ae426082', 'hex');
+    fs.writeFileSync(pubDest, testPngBuffer);
+    const publicWriteOk = fs.existsSync(pubDest);
+
+    // 2. Test private write
+    const privFolder = path.join(storage.getDesignsDir(), 'probe_test');
+    if (!fs.existsSync(privFolder)) fs.mkdirSync(privFolder, { recursive: true });
+    const privDest = path.join(privFolder, probePrivFilename);
+    fs.writeFileSync(privDest, 'PK_probe_test_zip');
+    const privateWriteOk = fs.existsSync(privDest);
+
+    // Clean up
+    try { if (fs.existsSync(pubDest)) fs.unlinkSync(pubDest); } catch (_) {}
+    try { if (fs.existsSync(privDest)) fs.unlinkSync(privDest); } catch (_) {}
+    try { if (fs.existsSync(privFolder)) fs.rmdirSync(privFolder); } catch (_) {}
+
+    return res.json({
+      success: true,
+      publicWriteOk,
+      privateWriteOk,
+      uploadsDir: storage.getUploadsDir(),
+      isWritable: publicWriteOk && privateWriteOk,
+      isUploadBlocked: storage.isUploadBlocked(),
+      message: 'Persistent storage write and read test completed successfully.'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 

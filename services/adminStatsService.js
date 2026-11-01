@@ -102,15 +102,25 @@ class AdminStatsService {
         try {
           const [customRes] = await db.query(`
             SELECT COUNT(*) as total,
-                   COALESCE(SUM(CASE WHEN status IN ('pending', 'reviewing') THEN 1 ELSE 0 END), 0) as pending
-            FROM custom_orders
+                   COALESCE(SUM(CASE WHEN status IN ('new', 'in_review') THEN 1 ELSE 0 END), 0) as pending
+            FROM custom_requests
           `);
           if (customRes) {
             customRequests.total = Number(customRes.total || 0);
             customRequests.pending = Number(customRes.pending || 0);
           }
         } catch (cErr) {
-          // Table might not exist yet
+          try {
+            const [customResLegacy] = await db.query(`
+              SELECT COUNT(*) as total,
+                     COALESCE(SUM(CASE WHEN status IN ('pending', 'reviewing') THEN 1 ELSE 0 END), 0) as pending
+              FROM custom_orders
+            `);
+            if (customResLegacy) {
+              customRequests.total = Number(customResLegacy.total || 0);
+              customRequests.pending = Number(customResLegacy.pending || 0);
+            }
+          } catch (_) {}
         }
 
         // 6. Orders by Status

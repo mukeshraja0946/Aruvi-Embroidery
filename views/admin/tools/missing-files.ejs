@@ -281,6 +281,9 @@
           <a href="/admin/tools/missing-files/export-csv" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-file-csv"></i> Download CSV
           </a>
+          <button type="button" onclick="openRecoverDeploymentsModal()" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background: #6A1B9A; border-color: #6A1B9A; color: #fff; cursor: pointer;" title="Recover uploaded files from past Hostinger hbuilds deployment folders">
+            <i class="fa-solid fa-clock-rotate-left"></i> Recover from Old Deployments
+          </button>
           <a href="/admin/tools/bulk-image-relink" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-images"></i> Bulk Image Relink
           </a>
@@ -624,7 +627,233 @@
   </div>
 </div>
 
+<!-- Recover from Old Deployments Modal -->
+<div id="recoverDeploymentsModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+  <div class="modal-container" style="background: #FFF; width: 92%; max-width: 650px; border-radius: 14px; box-shadow: 0 15px 40px rgba(0,0,0,0.25); overflow: hidden; display: flex; flex-direction: column;">
+    <!-- Modal Header -->
+    <div style="background: linear-gradient(135deg, #4A148C 0%, #7B1FA2 100%); color: #FFF; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <i class="fa-solid fa-clock-rotate-left" style="font-size: 1.3rem;"></i>
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #FFF;">Recover from Old Deployments</h3>
+          <span style="font-size: 0.75rem; opacity: 0.85;">Hostinger Business zero-loss file recovery</span>
+        </div>
+      </div>
+      <button type="button" onclick="closeRecoverDeploymentsModal()" style="background: transparent; border: none; color: #FFF; font-size: 1.2rem; cursor: pointer;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding: 1.5rem; max-height: 80vh; overflow-y: auto;">
+      <!-- Config Form -->
+      <div id="recoveryConfigArea">
+        <p style="font-size: 0.85rem; color: #555; line-height: 1.5; margin-bottom: 1.25rem;">
+          Hostinger git deployments build every push into a new version folder (<code>hbuilds/versions/&lt;id&gt;</code>). This background recovery tool scans those past versions, detects uploads that were written there, and <strong>safely copies</strong> them into the permanent <code>UPLOAD_DIR</code> without overwriting existing files or modifying your database paths.
+        </p>
+
+        <div style="margin-bottom: 1.2rem;">
+          <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #333; margin-bottom: 0.35rem;">
+            Hostinger Versions Directory Path:
+          </label>
+          <input type="text" id="recoveryVersionsDir" value="/home/u101925264/domains/aruviembroidery.com/hbuilds/versions" style="width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #CCC; border-radius: 8px; font-size: 0.85rem; font-family: monospace; box-sizing: border-box;">
+          <small style="color: #888; font-size: 0.75rem;">Default Hostinger build root. Subfolders will be recursively scanned for public/uploads, storage_private, etc.</small>
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+          <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #333; margin-bottom: 0.5rem;">
+            Execution Mode:
+          </label>
+          <div style="display: flex; gap: 1rem;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; background: #F9FAFB; padding: 0.6rem 0.9rem; border: 1px solid #E5E7EB; border-radius: 8px; flex: 1;">
+              <input type="radio" name="recoveryMode" value="dry-run" checked>
+              <div>
+                <strong>Dry Run</strong>
+                <div style="font-size: 0.72rem; color: #666;">Scan and report only (no disk writes)</div>
+              </div>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer; background: #F3E5F5; padding: 0.6rem 0.9rem; border: 1px solid #CE93D8; border-radius: 8px; flex: 1;">
+              <input type="radio" name="recoveryMode" value="apply">
+              <div>
+                <strong style="color: #6A1B9A;">Apply Recovery</strong>
+                <div style="font-size: 0.72rem; color: #666;">Safely copy missing files to UPLOAD_DIR</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" onclick="closeRecoverDeploymentsModal()" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1.1rem; border-radius: 8px;">Cancel</button>
+          <button type="button" id="startRecoveryBtn" onclick="startDeploymentRecovery()" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1.3rem; border-radius: 8px; background: #6A1B9A; border-color: #6A1B9A;">
+            <i class="fa-solid fa-play"></i> Start Recovery
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Recovery Status Area -->
+      <div id="recoveryProgressArea" style="display: none;">
+        <div style="text-align: center; margin-bottom: 1.25rem;">
+          <div id="recoverySpinnerIcon" style="font-size: 2rem; color: #6A1B9A; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+          </div>
+          <h4 id="recoveryStatusHeading" style="margin: 0; font-size: 1.05rem; color: #333;">Scanning Old Deployment Folders...</h4>
+          <p id="recoveryStatusMessage" style="font-size: 0.82rem; color: #666; margin-top: 4px;">Locating and comparing file checksums</p>
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">
+            <span id="recoveryPhaseText">Phase: Scanning</span>
+            <span id="recoveryPctBadge">0%</span>
+          </div>
+          <div style="height: 10px; background: #E0E0E0; border-radius: 5px; overflow: hidden;">
+            <div id="recoveryProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #6A1B9A, #AB47BC); transition: width 0.3s ease;"></div>
+          </div>
+        </div>
+
+        <!-- Real-time Stats Grid -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
+          <div style="background: #F3F4F6; padding: 0.75rem; border-radius: 8px; text-align: center;">
+            <div id="recStatScanned" style="font-size: 1.2rem; font-weight: 700; color: #111;">0</div>
+            <div style="font-size: 0.72rem; color: #666;">Scanned</div>
+          </div>
+          <div style="background: #E8F5E9; padding: 0.75rem; border-radius: 8px; text-align: center;">
+            <div id="recStatRecovered" style="font-size: 1.2rem; font-weight: 700; color: #2E7D32;">0</div>
+            <div id="recStatRecoveredLabel" style="font-size: 0.72rem; color: #2E7D32;">Recoverable</div>
+          </div>
+          <div style="background: #EDE7F6; padding: 0.75rem; border-radius: 8px; text-align: center;">
+            <div id="recStatSkipped" style="font-size: 1.2rem; font-weight: 700; color: #5E35B1;">0</div>
+            <div style="font-size: 0.72rem; color: #5E35B1;">Already Exists</div>
+          </div>
+          <div style="background: #FFF8E1; padding: 0.75rem; border-radius: 8px; text-align: center;">
+            <div id="recStatConflicts" style="font-size: 1.2rem; font-weight: 700; color: #F57F17;">0</div>
+            <div style="font-size: 0.72rem; color: #F57F17;">Conflicts</div>
+          </div>
+        </div>
+
+        <div id="recoveryCompleteActions" style="display: none; justify-content: space-between; align-items: center; border-top: 1px solid #EEE; padding-top: 1rem;">
+          <a id="recoveryCsvBtn" href="#" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-file-csv"></i> Download Recovery CSV
+          </a>
+          <button type="button" onclick="window.location.reload()" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1.25rem; border-radius: 8px; background: #6A1B9A; border-color: #6A1B9A;">
+            Done & Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+  let recoveryPollInterval = null;
+  let activeRecoveryJobId = null;
+
+  function openRecoverDeploymentsModal() {
+    document.getElementById('recoverDeploymentsModal').style.display = 'flex';
+    document.getElementById('recoveryConfigArea').style.display = 'block';
+    document.getElementById('recoveryProgressArea').style.display = 'none';
+  }
+
+  function closeRecoverDeploymentsModal() {
+    if (recoveryPollInterval) {
+      clearInterval(recoveryPollInterval);
+      recoveryPollInterval = null;
+    }
+    document.getElementById('recoverDeploymentsModal').style.display = 'none';
+  }
+
+  async function startDeploymentRecovery() {
+    const versionsDir = document.getElementById('recoveryVersionsDir').value.trim();
+    const mode = document.querySelector('input[name="recoveryMode"]:checked').value;
+    const isDryRun = mode === 'dry-run';
+
+    const btn = document.getElementById('startRecoveryBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Initializing...';
+
+    const csrf = '<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>';
+
+    try {
+      const res = await fetch('/admin/tools/missing-files/recover-deployments/trigger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CSRF-Token': csrf
+        },
+        body: JSON.stringify({
+          _csrf: csrf,
+          versionsDir: versionsDir,
+          dryRun: isDryRun
+        })
+      });
+      const data = await res.json();
+
+      if (data.success && data.jobId) {
+        activeRecoveryJobId = data.jobId;
+        document.getElementById('recoveryConfigArea').style.display = 'none';
+        document.getElementById('recoveryProgressArea').style.display = 'block';
+        document.getElementById('recoveryCompleteActions').style.display = 'none';
+        document.getElementById('recStatRecoveredLabel').innerText = isDryRun ? 'Recoverable' : 'Copied';
+
+        startPollingRecoveryStatus(activeRecoveryJobId, isDryRun);
+      } else {
+        alert(data.message || 'Could not start deployment recovery');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Recovery';
+      }
+    } catch (err) {
+      alert('Network error while starting recovery: ' + err.message);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Recovery';
+    }
+  }
+
+  function startPollingRecoveryStatus(jobId, isDryRun) {
+    if (recoveryPollInterval) clearInterval(recoveryPollInterval);
+
+    recoveryPollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/admin/tools/missing-files/recover-deployments/status/${jobId}`);
+        const data = await res.json();
+
+        if (data.success && data.job) {
+          const job = data.job;
+          const s = job.stats || {};
+          const pct = job.progress || 0;
+
+          document.getElementById('recoveryProgressBar').style.width = pct + '%';
+          document.getElementById('recoveryPctBadge').innerText = pct + '%';
+          document.getElementById('recoveryPhaseText').innerText = 'Phase: ' + (job.phase || job.status);
+
+          document.getElementById('recStatScanned').innerText = s.scanned || 0;
+          document.getElementById('recStatRecovered').innerText = isDryRun ? (s.found || 0) : (s.copied || 0);
+          document.getElementById('recStatSkipped').innerText = s.skipped || 0;
+          document.getElementById('recStatConflicts').innerText = s.conflicts || 0;
+
+          if (job.status === 'completed') {
+            clearInterval(recoveryPollInterval);
+            document.getElementById('recoverySpinnerIcon').innerHTML = '<i class="fa-solid fa-circle-check" style="color: #2E7D32;"></i>';
+            document.getElementById('recoveryStatusHeading').innerText = isDryRun ? 'Dry Run Complete!' : 'Recovery Successfully Applied!';
+            document.getElementById('recoveryStatusMessage').innerText = isDryRun 
+              ? `Found ${s.found || 0} missing files that can be recovered from past versions.`
+              : `Successfully copied ${s.copied || 0} files to UPLOAD_DIR. Relative paths preserved.`;
+
+            const csvBtn = document.getElementById('recoveryCsvBtn');
+            csvBtn.href = `/admin/tools/missing-files/recover-deployments/csv/${jobId}`;
+            document.getElementById('recoveryCompleteActions').style.display = 'flex';
+          } else if (job.status === 'failed') {
+            clearInterval(recoveryPollInterval);
+            document.getElementById('recoverySpinnerIcon').innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color: #C62828;"></i>';
+            document.getElementById('recoveryStatusHeading').innerText = 'Recovery Encountered An Error';
+            document.getElementById('recoveryStatusMessage').innerText = job.error || 'Job failed';
+            document.getElementById('recoveryCompleteActions').style.display = 'flex';
+          }
+        }
+      } catch (err) {
+        console.warn('Polling recovery error:', err);
+      }
+    }, 1500);
+  }
+
   let scanPollingInterval = null;
 
   async function triggerFullScan() {

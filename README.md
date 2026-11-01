@@ -207,41 +207,88 @@ When pushing or pulling code updates to production:
 
 ---
 
+---
+
+## 🚀 Safe Deployment on Hostinger Business (Zero-Loss Architecture)
+
+### 1. The Hostinger Deployment Reality
+Hostinger Business plan runs Node.js web applications using an automated git build system. Each git push creates a new deployment folder:
+```
+/home/u101925264/domains/aruviembroidery.com/hbuilds/versions/<commit_id>/
+```
+Any upload saved inside the project directory or inside `public/uploads` will be wiped on the next push. To guarantee that **uploaded images, ZIP/machine files, thumbnails, logos, banners, and custom-request images NEVER go missing**, this application uses an isolated persistent storage directory located outside all build paths.
+
+### 2. Configure Persistent Storage in hPanel
+1. Log into **Hostinger hPanel**.
+2. Navigate to **Websites** &rarr; **aruviembroidery.com** &rarr; **Node.js**.
+3. Under **Environment variables**, set:
+   ```env
+   UPLOAD_DIR=/home/u101925264/aruvi-uploads
+   BACKUP_DIR=/home/u101925264/aruvi-backups
+   NODE_ENV=production
+   ```
+4. Click **Save** and then click **Restart** (or trigger a Redeploy).
+5. On boot, the app will automatically verify write permissions, create the persistent subdirectories (`public/previews`, `public/cards`, `public/thumbs`, `public/branding`, `public/banners`, `private/designs`, `private/originals`, `private/custom-requests`), and log:
+   ```
+   [STORAGE]: Persistent upload directory active: /home/u101925264/aruvi-uploads (writable: yes)
+   ```
+
+### 3. Recover Uploads from Old Deployments
+If past git pushes caused uploads to be scattered across older `hbuilds/versions/<id>` folders:
+- **Via Admin UI:**
+  Navigate to **Admin Panel** &rarr; **Storage & Recovery** &rarr; **Missing Files Report** &rarr; Click **"Recover from Old Deployments"**.
+  - Choose **Dry Run** to scan and inspect recoverable files.
+  - Choose **Apply Recovery** to safely copy all missing previews, machine files, and branding into your persistent `UPLOAD_DIR` without touching existing database keys.
+- **Via SSH / Terminal:**
+  ```bash
+  # Test scan (dry run)
+  npm run recover-uploads
+
+  # Apply copy to persistent UPLOAD_DIR
+  npm run recover-uploads -- --apply
+  ```
+
+### 4. Database Migrations & phpMyAdmin Sync
+- The application executes idempotent migrations automatically at startup via `schema_migrations`.
+- To manually synchronize a MariaDB database in phpMyAdmin:
+  1. Open phpMyAdmin from hPanel.
+  2. Select your database `u101925264_...`.
+  3. Go to the **Import** or **SQL** tab and execute the file:
+     `migrations/production_sync.sql`
+  4. This script uses strictly MariaDB 10.x compatible `IF NOT EXISTS` syntax and will never overwrite or drop existing tables or catalog records.
+
+### 5. Automated Daily Backups (hPanel Cron)
+In **hPanel** &rarr; **Advanced** &rarr; **Cron Jobs**, set up a daily scheduled backup at 02:00 AM:
+```bash
+0 2 * * * cd /home/u101925264/domains/aruviembroidery.com/public_html && /usr/bin/node scripts/backup.js >> /home/u101925264/aruvi-backups/backup.log 2>&1
+```
+Backups include both the database dump (with pure Node.js fallback if `mysqldump` is unavailable) and all uploads, with automatic 30-day retention pruning.
+
+---
+
 ## 🛡️ Safe Deployment & Persistent Storage Architecture
 
 ### 1. Storage Architecture (`STORAGE_DRIVER`)
 All uploaded files are decoupled from application code and git revisions:
-- **`STORAGE_DRIVER=local` (Default):** Saves to `UPLOAD_DIR` (an absolute path outside the project, e.g. `/var/data/aruvi-uploads`), mounted as a persistent disk volume.
-- **`STORAGE_DRIVER=s3`:** Cloudflare R2 / AWS S3 compatible object storage (via `@aws-sdk/client-s3`). Public preview images are delivered via CDN; paid design files (DST, PES, JEF, EXP, ZIP) are placed in private storage and served only through authenticated, time-limited presigned URLs.
-- **`STORAGE_DRIVER=cloudinary`:** High-speed preview image hosting.
+- **`STORAGE_DRIVER=local` (Default):** Saves to `UPLOAD_DIR` (e.g. `/home/u101925264/aruvi-uploads`), mounted as a persistent disk volume.
+- **`STORAGE_DRIVER=s3`:** Cloudflare R2 / AWS S3 compatible object storage (via `@aws-sdk/client-s3`). Public preview images are delivered via CDN; paid design files (DST, PES, JEF, EXP, ZIP) are placed in private storage and served only through authenticated routes.
 - **Unique Filenames:** Generated with collision-free timestamps + random hex IDs (`file-<timestamp>-<hex>.<ext>`), preventing accidental overwrites.
 
 ### 2. Git & Deploy Safety Rules
-1. **Never track uploads in Git:** All upload directories (`public/uploads/*`, `uploads/*`, `private_uploads/*`, `backups/*`) are explicitly ignored in `.gitignore`.
-2. **Startup Safety Check:** On boot, `storage.validateStorageConfiguration()` verifies the upload path and warns if `UPLOAD_DIR` is inside the git repository.
+1. **Never track uploads in Git:** All upload directories (`public/uploads/*`, `uploads/*`, `private_uploads/*`, `backups/*`, `aruvi-uploads/*`, `aruvi-backups/*`) are explicitly ignored in `.gitignore`.
+2. **Startup Safety Guard:** On boot, `storage.validateStorageConfiguration()` verifies the upload path. In production, if `UPLOAD_DIR` is missing, relative, or located inside the repository or any `hbuilds/versions` folder, an error is logged, a red banner is displayed in the Admin Dashboard, and new uploads are blocked (preventing silent data loss) while existing files remain readable.
 3. **Database Integrity:** No auto-seeding, `DROP`, or `TRUNCATE` operations on deploy or startup. Database updates are handled solely through safe numbered migrations (`npm run migrate`).
 
 ### 3. Brand Assets (Logo, Favicon, Banners)
 - **Committed Defaults:** Default brand assets live permanently in `/public/assets/brand/` (`logo.png`, `logo.jpg`, `favicon.ico`, `hero_embroidery.jpg`) and are committed to Git.
 - **Permanent Fallback:** `storage.resolveBrandAsset(type, candidateUrl)` verifies physical existence on disk. If a custom uploaded asset is missing or corrupt, it seamlessly falls back to `/public/assets/brand/`—**never showing a broken image**.
 
-### 4. Bulk Recovery Tools (For 2000+ Designs)
+### 4. Admin Diagnostic Tools
 Located in **Admin Panel → Storage & Recovery**:
-- **Bulk Image Relink (`/admin/tools/bulk-image-relink`):** Upload a ZIP or provide a folder path. The engine automatically matches files to products by SKU (`AED-BLO-01.jpg` → `AED-BLO-01`), design title, or ID. Displays an interactive **Match Preview Report** (Matched / Unmatched / Duplicates) before committing to persistent storage.
-- **Bulk Machine File Relink (`/admin/tools/bulk-file-relink`):** Matches DST/PES/JEF/EXP/ZIP files by SKU or title, detects machine formats, and links them into private storage.
-- **Missing Files Report (`/admin/tools/missing-files`):** Real-time diagnostic scan identifying any product with missing preview images or machine archives. Features:
-  - Filters (Missing Image, Missing Machine File, Missing Both).
-  - Export CSV Report.
-  - One-click "Upload & Relink" modal for instantaneous replacement.
-
-### 5. Automated Backups & Daily Cron Schedule
-- **Manual / CLI Backup:** Run `npm run backup` to dump MySQL and archive all uploads to a timestamped archive: `backups/aruvi_backup_<timestamp>.zip`.
-- **Admin Dashboard:** Download and manage backups directly from `/admin/tools/backup`.
-- **Automated Daily Cron (Midnight):**
-  ```bash
-  0 2 * * * cd /var/www/aruvi-embroidery && npm run backup >> /var/log/aruvi-backup.log 2>&1
-  ```
-  *(Archives are automatically pruned after 30 days to save disk space).*
+- **System Health (`/admin/tools/system-health`):** Real-time database schema inspector, live UPLOAD_DIR status, rate limiter exemptions, and one-click database migration runner.
+- **Missing Files Report (`/admin/tools/missing-files`):** Real-time diagnostic scan identifying any product with missing preview images or machine archives, with recovery from old deployments.
+- **Regenerate Previews (`/admin/tools/regenerate-previews`):** Rebuilds preview, card, and thumb sizes directly from private originals in batches of 50.
+- **Backup & Storage (`/admin/tools/backup`):** One-click manual backups, list and download past archives, and one-click database restore.
 
 ---
 

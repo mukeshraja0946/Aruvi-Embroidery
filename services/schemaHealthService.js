@@ -23,6 +23,7 @@ const REQUIRED_SCHEMA = {
   cart_items: ['id', 'user_id', 'session_id', 'design_id', 'quantity', 'created_at'],
   orders: ['id', 'order_number', 'user_id', 'total_amount', 'discount_amount', 'final_amount', 'coupon_code', 'status', 'razorpay_order_id', 'razorpay_payment_id', 'payment_gateway', 'cashfree_order_id', 'cashfree_payment_id', 'created_at'],
   order_items: ['id', 'order_id', 'design_id', 'quantity', 'price_at_purchase', 'mrp', 'discount_amount', 'created_at'],
+  custom_requests: ['id', 'request_number', 'user_id', 'name', 'email', 'phone', 'design_title', 'description', 'category_id', 'preferred_formats', 'size_hoop', 'budget', 'deadline', 'reference_image_key', 'status', 'admin_notes', 'quoted_price', 'created_at', 'updated_at'],
   custom_orders: ['id', 'user_id', 'full_name', 'email', 'phone', 'design_details', 'status', 'created_at'],
   banners: ['id', 'title', 'image_url', 'link_url', 'display_order', 'is_active', 'created_at'],
   payments: ['id', 'order_id', 'amount', 'status', 'payment_method', 'created_at'],

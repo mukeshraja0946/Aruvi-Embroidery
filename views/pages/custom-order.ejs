@@ -6,14 +6,14 @@
     <a href="/">Home</a> &nbsp;>&nbsp; <span>Custom Order</span>
   </div>
 
-  <!-- Hero Banner matching Reference without promotional hoop image -->
+  <!-- Hero Banner matching Reference -->
   <div class="page-banner-card clean-banner custom-order-hero-banner">
     <div class="banner-content">
       <h1 class="page-banner-title custom-order-title">
         Request a <span class="highlight-italic">Custom</span> Design
       </h1>
       <p class="page-banner-subtitle custom-order-subtitle">
-        Share your ideas and get a unique embroidery design crafted just for you. Perfect for personal use, business, branding and more.
+        Share your ideas and get a unique embroidery design crafted just for you. Perfect for personal use, bridal wear, boutique business, and commercial production.
       </p>
 
       <!-- 4 Hero Feature Badges (Desktop Flex Row, Mobile 2x2 Grid) -->
@@ -38,6 +38,48 @@
     </div>
   </div>
 
+  <%
+    const _fd = (typeof formData !== 'undefined' && formData) ? formData : {};
+    const _fe = (typeof fieldErrors !== 'undefined' && fieldErrors) ? fieldErrors : {};
+    const _u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
+    const defaultName = _fd.name || _fd.full_name || (_u ? _u.full_name : '');
+    const defaultEmail = _fd.email || (_u ? _u.email : '');
+    const defaultPhone = _fd.phone || (_u ? _u.phone : '');
+    const defaultTitle = _fd.design_title || '';
+    const defaultDesc = _fd.description || _fd.design_details || '';
+    const defaultCategory = _fd.category_id || _fd.design_type || '';
+    const defaultPurpose = _fd.purpose || '';
+    const defaultSize = _fd.size_hoop || '';
+    const defaultBudget = _fd.budget || '';
+    const defaultDeadline = _fd.deadline || '';
+    const defaultFormats = Array.isArray(_fd.formats) ? _fd.formats : (_fd.formats ? [_fd.formats] : ['DST', 'PES', 'JEF', 'EXP']);
+    const _csrf = (typeof csrfToken !== 'undefined') ? csrfToken : '';
+    const _idemp = (typeof idempotencyToken !== 'undefined') ? idempotencyToken : '';
+  %>
+
+  <!-- Flash Alerts -->
+  <% if (typeof flash !== 'undefined' && flash) { %>
+    <% if (flash.success && flash.success.length > 0) { %>
+      <div class="alert-box alert-success" style="margin-bottom: 1.5rem; border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 12px; background: #EDF7ED; color: #1E4620; border: 1px solid #C8E6C9;">
+        <i class="fa-solid fa-circle-check" style="font-size: 1.25rem; margin-top: 2px; color: #2E7D32;"></i>
+        <div>
+          <strong style="display: block; font-size: 0.95rem; margin-bottom: 2px;">Request Submitted Successfully!</strong>
+          <span style="font-size: 0.88rem; line-height: 1.5;"><%= flash.success[0] %></span>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (flash.error && flash.error.length > 0) { %>
+      <div class="alert-box alert-error" style="margin-bottom: 1.5rem; border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 12px; background: #FDEDED; color: #5F2120; border: 1px solid #FFCDD2;">
+        <i class="fa-solid fa-circle-exclamation" style="font-size: 1.25rem; margin-top: 2px; color: #C62828;"></i>
+        <div>
+          <strong style="display: block; font-size: 0.95rem; margin-bottom: 2px;">Please Check Your Input</strong>
+          <span style="font-size: 0.88rem; line-height: 1.5;"><%= flash.error[0] %></span>
+        </div>
+      </div>
+    <% } %>
+  <% } %>
+
   <!-- Main Custom Order Layout Grid (Left Form + Right Sidebar) -->
   <div class="checkout-main-grid">
     <!-- Left Main Custom Order Form Container -->
@@ -47,17 +89,17 @@
         <div class="step-item active">
           <div class="step-num">1</div>
           <div class="step-info">
-            <strong>Design Details</strong>
-            <span>Tell us about your design</span>
+            <strong>Contact Info</strong>
+            <span>Your details</span>
           </div>
         </div>
         <i class="fa-solid fa-chevron-right step-chevron"></i>
         
-        <div class="step-item">
+        <div class="step-item active">
           <div class="step-num">2</div>
           <div class="step-info">
-            <strong>Requirements</strong>
-            <span>Provide specific details</span>
+            <strong>Design Specs</strong>
+            <span>Artwork & size</span>
           </div>
         </div>
         <i class="fa-solid fa-chevron-right step-chevron"></i>
@@ -65,96 +107,193 @@
         <div class="step-item">
           <div class="step-num">3</div>
           <div class="step-info">
-            <strong>Review & Submit</strong>
-            <span>Check your information</span>
+            <strong>Quote & Delivery</strong>
+            <span>Get files in 24h</span>
           </div>
         </div>
       </div>
 
       <!-- Request Form Box -->
       <div class="checkout-section-box">
-        <form action="/custom-order?_csrf=<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" method="POST" enctype="multipart/form-data">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <form action="/custom-order?_csrf=<%= _csrf %>" method="POST" enctype="multipart/form-data" id="customOrderForm" novalidate>
+          <input type="hidden" name="_csrf" value="<%= _csrf %>">
+          <input type="hidden" name="idempotency_token" value="<%= _idemp %>">
 
-          <!-- Design Title -->
-          <div class="form-group-field" style="margin-bottom: 1.2rem;">
-            <label>Design Title <span class="req">*</span></label>
-            <input type="text" name="design_title" placeholder="E.g., Wedding Monogram, Logo Design, Name Design..." required>
+          <!-- Anti-spam Honeypot (invisible to humans) -->
+          <div style="position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">
+            <label for="company_website_hp">Do not fill this field</label>
+            <input type="text" id="company_website_hp" name="company_website_hp" tabindex="-1" autocomplete="off">
           </div>
 
-          <!-- Design Type & Purpose -->
-          <div class="form-grid-2" style="margin-bottom: 1.2rem;">
-            <div class="form-group-field">
-              <label>Design Type <span class="req">*</span></label>
-              <select name="design_type" required>
-                <option value="">Select design type</option>
-                <option value="Bridal Blouse">Bridal Blouse Design</option>
-                <option value="Monogram">Wedding Monogram</option>
-                <option value="Logo">Boutique Logo / Branding</option>
-                <option value="Saree Border">Saree Border / Dupatta</option>
-                <option value="Traditional">Traditional / Temple Art</option>
-                <option value="Kids">Kids / Cartoon Art</option>
-              </select>
-            </div>
+          <!-- Section 1: Customer Information -->
+          <div style="margin-bottom: 1.8rem; border-bottom: 1px solid var(--border-light); padding-bottom: 1.4rem;">
+            <h3 style="font-size: 1.1rem; color: var(--text-dark); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-regular fa-user" style="color: var(--primary);"></i> 1. Your Contact Details
+            </h3>
 
-            <div class="form-group-field">
-              <label>Purpose <span class="req">*</span></label>
-              <select name="purpose" required>
-                <option value="">Select purpose</option>
-                <option value="Personal Use">Personal Use</option>
-                <option value="Boutique Business">Boutique Business</option>
-                <option value="Commercial Production">Commercial Production</option>
-                <option value="Gift">Gift / Custom Present</option>
-              </select>
-            </div>
-          </div>
+            <div class="form-grid-2" style="margin-bottom: 1rem;">
+              <!-- Full Name -->
+              <div class="form-group-field">
+                <label for="co_name">Full Name <span class="req">*</span></label>
+                <input type="text" id="co_name" name="name" value="<%= defaultName %>" placeholder="e.g., Priya Sharma" required class="<%= _fe.name ? 'is-invalid' : '' %>">
+                <% if (_fe.name) { %>
+                  <div class="field-error-text"><i class="fa-solid fa-circle-exclamation"></i> <%= _fe.name %></div>
+                <% } %>
+              </div>
 
-          <!-- Design Description -->
-          <div class="form-group-field" style="margin-bottom: 1.5rem; position: relative;">
-            <label>Design Description <span class="req">*</span></label>
-            <textarea name="design_details" rows="5" placeholder="Describe your design idea, theme, text, size, colors, style or any specific details..." required></textarea>
-            <span style="position: absolute; right: 10px; bottom: 8px; font-size: 0.75rem; color: var(--text-muted);">0/500</span>
-          </div>
-
-          <!-- Lower 2-Column: Reference Images + Preferred Size & Formats -->
-          <div class="form-grid-2" style="margin-bottom: 1.8rem;">
-            <!-- Left: Reference Images Dropzone -->
-            <div class="form-group-field">
-              <label>Reference Images</label>
-              <div class="dropzone-upload-box">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                <p>Upload images (Optional)</p>
-                <span>JPG, PNG (Max 10MB each)</span>
-                <input type="file" name="reference_image" accept="image/*" class="dropzone-file-input">
+              <!-- Email Address -->
+              <div class="form-group-field">
+                <label for="co_email">Email Address <span class="req">*</span></label>
+                <input type="email" id="co_email" name="email" value="<%= defaultEmail %>" placeholder="e.g., priya@example.com" required class="<%= _fe.email ? 'is-invalid' : '' %>">
+                <% if (_fe.email) { %>
+                  <div class="field-error-text"><i class="fa-solid fa-circle-exclamation"></i> <%= _fe.email %></div>
+                <% } %>
               </div>
             </div>
 
-            <!-- Right: Preferred Size & Formats -->
-            <div style="display: flex; flex-direction: column; gap: 1.2rem;">
+            <!-- Phone Number -->
+            <div class="form-group-field">
+              <label for="co_phone">Phone / WhatsApp Number <span class="req">*</span></label>
+              <input type="tel" id="co_phone" name="phone" value="<%= defaultPhone %>" placeholder="e.g., +91 98765 43210" required class="<%= _fe.phone ? 'is-invalid' : '' %>">
+              <span style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">We will use this to share quick updates or clarify artwork details.</span>
+              <% if (_fe.phone) { %>
+                <div class="field-error-text"><i class="fa-solid fa-circle-exclamation"></i> <%= _fe.phone %></div>
+              <% } %>
+            </div>
+          </div>
+
+          <!-- Section 2: Design Specifications -->
+          <div style="margin-bottom: 1.8rem; border-bottom: 1px solid var(--border-light); padding-bottom: 1.4rem;">
+            <h3 style="font-size: 1.1rem; color: var(--text-dark); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-pen-nib" style="color: var(--primary);"></i> 2. Design Specifications
+            </h3>
+
+            <!-- Design Title -->
+            <div class="form-group-field" style="margin-bottom: 1.2rem;">
+              <label for="co_title">Design Title / Name <span class="req">*</span></label>
+              <input type="text" id="co_title" name="design_title" value="<%= defaultTitle %>" placeholder="e.g., Bridal Peacock Blouse Back Neck, Boutique Logo..." required class="<%= _fe.design_title ? 'is-invalid' : '' %>">
+              <% if (_fe.design_title) { %>
+                <div class="field-error-text"><i class="fa-solid fa-circle-exclamation"></i> <%= _fe.design_title %></div>
+              <% } %>
+            </div>
+
+            <!-- Design Category & Purpose -->
+            <div class="form-grid-2" style="margin-bottom: 1.2rem;">
               <div class="form-group-field">
-                <label>Preferred Size (Optional)</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <input type="text" name="width_mm" placeholder="Width (mm)">
-                  <input type="text" name="height_mm" placeholder="Height (mm)">
-                </div>
+                <label for="co_category">Category / Design Type</label>
+                <select id="co_category" name="category_id">
+                  <option value="">Select Category (Optional)</option>
+                  <% if (typeof categories !== 'undefined' && categories && categories.length > 0) { %>
+                    <% categories.forEach(cat => { %>
+                      <option value="<%= cat.id %>" <%= String(defaultCategory) === String(cat.id) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                  <% } %>
+                  <option value="" disabled>──────────</option>
+                  <option value="Bridal Blouse" <%= defaultCategory === 'Bridal Blouse' ? 'selected' : '' %>>Bridal Blouse Design</option>
+                  <option value="Monogram" <%= defaultCategory === 'Monogram' ? 'selected' : '' %>>Wedding Monogram / Name</option>
+                  <option value="Logo" <%= defaultCategory === 'Logo' ? 'selected' : '' %>>Boutique Logo / Branding</option>
+                  <option value="Saree Border" <%= defaultCategory === 'Saree Border' ? 'selected' : '' %>>Saree Border / Dupatta</option>
+                  <option value="Traditional" <%= defaultCategory === 'Traditional' ? 'selected' : '' %>>Traditional / Temple Art</option>
+                  <option value="Kids" <%= defaultCategory === 'Kids' ? 'selected' : '' %>>Kids / Cartoon Art</option>
+                </select>
+              </div>
+
+              <div class="form-group-field">
+                <label for="co_purpose">Intended Purpose</label>
+                <select id="co_purpose" name="purpose">
+                  <option value="Personal Use" <%= defaultPurpose === 'Personal Use' ? 'selected' : '' %>>Personal Use</option>
+                  <option value="Boutique Business" <%= defaultPurpose === 'Boutique Business' ? 'selected' : '' %>>Boutique / Tailoring Studio</option>
+                  <option value="Commercial Production" <%= defaultPurpose === 'Commercial Production' ? 'selected' : '' %>>Commercial Production</option>
+                  <option value="Gift" <%= defaultPurpose === 'Gift' ? 'selected' : '' %>>Gift / Special Occasion</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Design Description -->
+            <div class="form-group-field" style="margin-bottom: 1.2rem; position: relative;">
+              <label for="co_desc">Design Description & Requirements <span class="req">*</span></label>
+              <textarea id="co_desc" name="description" rows="5" placeholder="Describe your design idea in detail: theme, motifs, dimensions, stitch preference, thread colors, garment type, or any custom instructions..." required class="<%= _fe.description ? 'is-invalid' : '' %>"><%= defaultDesc %></textarea>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                <% if (_fe.description) { %>
+                  <div class="field-error-text"><i class="fa-solid fa-circle-exclamation"></i> <%= _fe.description %></div>
+                <% } else { %>
+                  <span style="font-size: 0.74rem; color: var(--text-muted);">Please provide as much detail as possible to get an exact quote.</span>
+                <% } %>
+                <span id="descCharCounter" style="font-size: 0.75rem; color: var(--text-muted);"><%= defaultDesc.length %>/1000</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Technical Details & Reference Artwork -->
+          <div style="margin-bottom: 1.8rem;">
+            <h3 style="font-size: 1.1rem; color: var(--text-dark); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-sliders" style="color: var(--primary);"></i> 3. Machine Files & Reference Image
+            </h3>
+
+            <div class="form-grid-2" style="margin-bottom: 1.2rem;">
+              <!-- Preferred Hoop / Size -->
+              <div class="form-group-field">
+                <label for="co_size">Preferred Size / Hoop (Optional)</label>
+                <input type="text" id="co_size" name="size_hoop" value="<%= defaultSize %>" placeholder="e.g., 200mm x 280mm or 8x12 inch hoop">
+              </div>
+
+              <!-- Target Budget -->
+              <div class="form-group-field">
+                <label for="co_budget">Target Budget (INR ₹) (Optional)</label>
+                <input type="number" id="co_budget" name="budget" value="<%= defaultBudget %>" placeholder="e.g., 500" min="0" step="50">
+              </div>
+            </div>
+
+            <!-- Target Deadline & Formats -->
+            <div class="form-grid-2" style="margin-bottom: 1.2rem;">
+              <div class="form-group-field">
+                <label for="co_deadline">Needed By / Deadline (Optional)</label>
+                <input type="date" id="co_deadline" name="deadline" value="<%= defaultDeadline %>">
               </div>
 
               <div class="form-group-field">
                 <label>Preferred Formats</label>
-                <div style="display: flex; gap: 1rem; align-items: center; margin-top: 4px;">
-                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="DST" checked> DST</label>
-                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="PES"> PES</label>
-                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="JEF"> JEF</label>
-                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="EXP"> EXP</label>
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 8px;">
+                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="DST" <%= defaultFormats.includes('DST') ? 'checked' : '' %>> DST</label>
+                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="PES" <%= defaultFormats.includes('PES') ? 'checked' : '' %>> PES</label>
+                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="JEF" <%= defaultFormats.includes('JEF') ? 'checked' : '' %>> JEF</label>
+                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="EXP" <%= defaultFormats.includes('EXP') ? 'checked' : '' %>> EXP</label>
+                  <label class="checkbox-item" style="font-size: 0.85rem;"><input type="checkbox" name="formats" value="VP3" <%= defaultFormats.includes('VP3') ? 'checked' : '' %>> VP3</label>
                 </div>
               </div>
             </div>
+
+            <!-- Reference Image Dropzone -->
+            <div class="form-group-field" style="margin-bottom: 1.2rem;">
+              <label>Reference Image / Sketch / Photo (Optional)</label>
+              <div class="dropzone-upload-box" id="dropzoneBox" style="cursor: pointer; border: 2px dashed var(--border-light); border-radius: 12px; padding: 1.5rem; text-align: center; background: #FAF6F0; transition: all 0.2s ease;">
+                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; color: var(--primary); margin-bottom: 8px;"></i>
+                <p style="margin: 0 0 4px; font-weight: 600; font-size: 0.95rem; color: var(--text-dark);" id="dropzoneText">Click to upload or drag & drop reference image</p>
+                <span style="font-size: 0.78rem; color: var(--text-muted); display: block;" id="dropzoneHint">JPG, PNG, or WEBP (Maximum 5 MB)</span>
+                <input type="file" id="reference_image_input" name="reference_image" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="dropzone-file-input" style="display: none;">
+                <div id="filePreviewWrap" style="display: none; margin-top: 10px; align-items: center; justify-content: center; gap: 10px;">
+                  <img id="filePreviewImg" src="" alt="Selected Preview" style="max-height: 80px; max-width: 120px; border-radius: 6px; border: 1px solid var(--border-light); object-fit: cover;">
+                  <div style="text-align: left;">
+                    <strong id="previewFileName" style="display: block; font-size: 0.82rem; color: var(--text-dark);"></strong>
+                    <span id="previewFileSize" style="font-size: 0.74rem; color: var(--text-muted);"></span>
+                    <button type="button" id="clearFileBtn" style="background: none; border: none; color: #C62828; font-size: 0.75rem; cursor: pointer; padding: 2px 0; text-decoration: underline; display: block;">Remove image</button>
+                  </div>
+                </div>
+              </div>
+              <% if (_fe.reference_image) { %>
+                <div class="field-error-text"><i class="fa-solid fa-circle-exclamation"></i> <%= _fe.reference_image %></div>
+              <% } %>
+            </div>
           </div>
 
-          <!-- Primary Submit CTA Button -->
-          <button type="submit" class="btn btn-primary btn-block place-order-btn" style="margin-top: 1rem;">
-            Submit Custom Order <i class="fa-solid fa-arrow-right"></i>
+          <!-- Primary Submit CTA Button with Double-Submit Prevention -->
+          <button type="submit" id="submitCustomOrderBtn" class="btn btn-primary btn-block place-order-btn" style="height: 48px; font-size: 1rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span id="btnText">Submit Custom Design Request</span>
+            <i class="fa-solid fa-arrow-right" id="btnIcon"></i>
           </button>
+          <span style="font-size: 0.76rem; color: var(--text-muted); text-align: center; display: block; margin-top: 8px;">
+            <i class="fa-solid fa-lock"></i> No payment required now. You will receive a quote and timeline within 24 hours.
+          </span>
         </form>
       </div>
     </div>
@@ -163,60 +302,60 @@
     <aside class="checkout-summary-sidebar">
       <!-- Card 1: How It Works? -->
       <div class="summary-box-card">
-        <h3 class="summary-title" style="margin-bottom: 1.5rem;">How It Works?</h3>
+        <h3 class="summary-title" style="margin-bottom: 1.5rem; font-size: 1.15rem; color: var(--text-dark);">How It Works</h3>
 
         <div class="how-it-works-list">
           <div class="how-step-item">
             <div class="how-icon-box"><i class="fa-regular fa-file-lines"></i></div>
             <div>
               <h4>1. Submit Your Request</h4>
-              <p>Share your design idea, details and reference images.</p>
+              <p>Share your design idea, required hoop size, and optional reference sketch.</p>
             </div>
           </div>
 
           <div class="how-step-item">
             <div class="how-icon-box"><i class="fa-solid fa-magnifying-glass"></i></div>
             <div>
-              <h4>2. Review & Quote</h4>
-              <p>We will review your request and send you a quote.</p>
+              <h4>2. Review & Free Quote</h4>
+              <p>Our digitizers evaluate stitch count and send you an exact quote within 24 hours.</p>
             </div>
           </div>
 
           <div class="how-step-item">
             <div class="how-icon-box"><i class="fa-regular fa-credit-card"></i></div>
             <div>
-              <h4>3. Make Payment</h4>
-              <p>After you approve the quote, complete the payment.</p>
+              <h4>3. Confirm & Pay</h4>
+              <p>Approve the quote and pay securely online via UPI, Cards, or NetBanking.</p>
             </div>
           </div>
 
           <div class="how-step-item">
             <div class="how-icon-box"><i class="fa-solid fa-gear"></i></div>
             <div>
-              <h4>4. Design Creation</h4>
-              <p>Our team will create and test the design.</p>
+              <h4>4. Master Digitizing</h4>
+              <p>Our team creates precise embroidery paths with zero-pucker stitch densities.</p>
             </div>
           </div>
 
           <div class="how-step-item">
             <div class="how-icon-box"><i class="fa-solid fa-download"></i></div>
             <div>
-              <h4>5. Get Your Files</h4>
-              <p>Receive high-quality files in your selected formats.</p>
+              <h4>5. Download Your Files</h4>
+              <p>Download instant production-ready files in DST, PES, JEF, EXP, or VP3.</p>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Card 2: Need Help? -->
-      <div class="trust-features-card custom-order-need-help-card">
+      <div class="trust-features-card custom-order-need-help-card" style="margin-top: 1.5rem;">
         <div class="help-icon-circle"><i class="fa-solid fa-headset"></i></div>
-        <h4 class="help-heading">Need Help?</h4>
+        <h4 class="help-heading">Need Quick Advice?</h4>
         <p class="help-desc">
-          Have questions about custom designs?<br>We're here to help you.
+          Unsure about machine compatibility, hoop dimensions, or stitch formats? We are here to guide you.
         </p>
         <a href="/contact" class="btn btn-outline help-btn">
-          Contact Us <i class="fa-solid fa-arrow-right"></i>
+          Contact Support <i class="fa-solid fa-arrow-right"></i>
         </a>
       </div>
     </aside>
@@ -227,5 +366,174 @@
     <%- include('../partials/feature-cards') %>
   </div>
 </div>
+
+<style>
+  .field-error-text {
+    color: #C62828;
+    font-size: 0.78rem;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+  }
+  .is-invalid {
+    border-color: #C62828 !important;
+    background-color: #FFFDFD !important;
+  }
+  .dropzone-upload-box:hover {
+    border-color: var(--primary) !important;
+    background: #FFF !important;
+  }
+  @media (max-width: 600px) {
+    .form-grid-2 {
+      grid-template-columns: 1fr !important;
+      gap: 1rem !important;
+    }
+    .custom-order-page-container {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+    .checkout-steps-bar {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  (function() {
+    const form = document.getElementById('customOrderForm');
+    const submitBtn = document.getElementById('submitCustomOrderBtn');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
+    const dropzoneBox = document.getElementById('dropzoneBox');
+    const fileInput = document.getElementById('reference_image_input');
+    const filePreviewWrap = document.getElementById('filePreviewWrap');
+    const filePreviewImg = document.getElementById('filePreviewImg');
+    const previewFileName = document.getElementById('previewFileName');
+    const previewFileSize = document.getElementById('previewFileSize');
+    const clearFileBtn = document.getElementById('clearFileBtn');
+    const descTextarea = document.getElementById('co_desc');
+    const charCounter = document.getElementById('descCharCounter');
+
+    // Live character counter for description
+    if (descTextarea && charCounter) {
+      descTextarea.addEventListener('input', function() {
+        charCounter.textContent = this.value.length + '/1000';
+      });
+    }
+
+    // Dropzone click & drag triggers
+    if (dropzoneBox && fileInput) {
+      dropzoneBox.addEventListener('click', function(e) {
+        if (e.target !== clearFileBtn) {
+          fileInput.click();
+        }
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzoneBox.addEventListener(eventName, function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzoneBox.style.borderColor = 'var(--primary)';
+          dropzoneBox.style.background = '#FFF';
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzoneBox.addEventListener(eventName, function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          dropzoneBox.style.borderColor = 'var(--border-light)';
+          dropzoneBox.style.background = '#FAF6F0';
+        });
+      });
+
+      dropzoneBox.addEventListener('drop', function(e) {
+        const dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) {
+          fileInput.files = dt.files;
+          handleFileSelected(dt.files[0]);
+        }
+      });
+
+      fileInput.addEventListener('change', function() {
+        if (this.files && this.files.length > 0) {
+          handleFileSelected(this.files[0]);
+        }
+      });
+    }
+
+    function handleFileSelected(file) {
+      if (!file) return;
+
+      // 5 MB limit check in browser before upload
+      const maxBytes = 5 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        alert('The selected reference image is ' + (file.size / (1024 * 1024)).toFixed(1) + ' MB. Maximum allowed size is 5 MB. Please select a smaller image.');
+        fileInput.value = '';
+        filePreviewWrap.style.display = 'none';
+        return;
+      }
+
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type) && !/\.(jpg|jpeg|png|webp)$/i.test(file.name)) {
+        alert('Invalid file format. Only JPG, PNG, and WEBP image files are allowed.');
+        fileInput.value = '';
+        filePreviewWrap.style.display = 'none';
+        return;
+      }
+
+      previewFileName.textContent = file.name;
+      previewFileSize.textContent = (file.size / 1024).toFixed(0) + ' KB';
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        filePreviewImg.src = e.target.result;
+        filePreviewWrap.style.display = 'flex';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if (clearFileBtn) {
+      clearFileBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInput.value = '';
+        filePreviewWrap.style.display = 'none';
+        filePreviewImg.src = '';
+      });
+    }
+
+    // Double submit protection
+    if (form && submitBtn) {
+      form.addEventListener('submit', function(e) {
+        // Basic required check
+        const nameVal = (document.getElementById('co_name')?.value || '').trim();
+        const emailVal = (document.getElementById('co_email')?.value || '').trim();
+        const phoneVal = (document.getElementById('co_phone')?.value || '').trim();
+        const descVal = (document.getElementById('co_desc')?.value || '').trim();
+
+        if (!nameVal || !emailVal || !phoneVal || !descVal) {
+          return; // Let standard browser validation show or submit continue
+        }
+
+        if (submitBtn.disabled) {
+          e.preventDefault();
+          return false;
+        }
+
+        // Disable button & show spinner
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.75';
+        submitBtn.style.cursor = 'not-allowed';
+        if (btnText) btnText.textContent = 'Submitting Request...';
+        if (btnIcon) {
+          btnIcon.className = 'fa-solid fa-spinner fa-spin';
+        }
+      });
+    }
+  })();
+</script>
 
 <%- include('../partials/footer') %>

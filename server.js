@@ -59,7 +59,14 @@ app.use(cookieParser());
 // Persistent Storage & Static Files
 const storage = require('./config/storage');
 storage.initStorage();
-storage.validateStorageConfiguration();
+const initialStorageStatus = storage.validateStorageConfiguration();
+app.locals.storageAlert = {
+  isSafe: !initialStorageStatus.isBlocked,
+  isBlocked: initialStorageStatus.isBlocked,
+  warningMessage: initialStorageStatus.warningMessage,
+  uploadsDir: initialStorageStatus.uploadsDir,
+  driver: initialStorageStatus.driver
+};
 
 // Strict Security: Block unauthenticated static access to paid design archives, raw uploads & private files
 // Paid design files must be downloaded ONLY through authenticated customer/user download routes
@@ -89,18 +96,25 @@ app.use(['/public', '/uploads', '/public/uploads'], (req, res, next) => {
   next();
 });
 
-// Serve preview images and public uploads from persistent storage
-app.use('/public/uploads/previews', express.static(storage.getPreviewsDir()));
-app.use('/uploads/previews', express.static(storage.getPreviewsDir()));
-app.use('/public/uploads', express.static(storage.getUploadsDir()));
-app.use('/uploads', express.static(storage.getUploadsDir()));
+// Serve preview images and public uploads from persistent storage (long cache for assets)
+const staticCacheOptions = { maxAge: '7d', index: false };
+app.use('/public/uploads/previews', express.static(storage.getPreviewsDir(), staticCacheOptions));
+app.use('/uploads/previews', express.static(storage.getPreviewsDir(), staticCacheOptions));
+app.use('/public/uploads/branding', express.static(storage.getBrandingDir(), staticCacheOptions));
+app.use('/uploads/branding', express.static(storage.getBrandingDir(), staticCacheOptions));
+app.use('/public/uploads/banners', express.static(storage.getBannersDir(), staticCacheOptions));
+app.use('/uploads/banners', express.static(storage.getBannersDir(), staticCacheOptions));
+app.use('/public/uploads', express.static(storage.getPublicDir(), staticCacheOptions));
+app.use('/uploads', express.static(storage.getPublicDir(), staticCacheOptions));
+app.use('/public/uploads', express.static(storage.getUploadsDir(), staticCacheOptions));
+app.use('/uploads', express.static(storage.getUploadsDir(), staticCacheOptions));
 
 // Fallback to project default public/uploads if custom persistent directory is configured
 if (path.resolve(storage.getUploadsDir()) !== path.resolve(storage.defaultUploadsDir)) {
-  app.use('/public/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews')));
-  app.use('/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews')));
-  app.use('/public/uploads', express.static(storage.defaultUploadsDir));
-  app.use('/uploads', express.static(storage.defaultUploadsDir));
+  app.use('/public/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews'), staticCacheOptions));
+  app.use('/uploads/previews', express.static(path.join(storage.defaultUploadsDir, 'previews'), staticCacheOptions));
+  app.use('/public/uploads', express.static(storage.defaultUploadsDir, staticCacheOptions));
+  app.use('/uploads', express.static(storage.defaultUploadsDir, staticCacheOptions));
 }
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
@@ -216,7 +230,8 @@ app.use(
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production'
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
     }
   })
 );
@@ -346,6 +361,8 @@ app.use(errorHandler);
 app.locals.schemaAlert = { isHealthy: true, missingCount: 0, missingSummary: '' };
 
 let hasInitializedDatabase = false;
+let databaseServerVersion = 'Unknown';
+
 async function initializeDatabaseAndSchema() {
   if (hasInitializedDatabase) return;
   hasInitializedDatabase = true;
@@ -353,12 +370,17 @@ async function initializeDatabaseAndSchema() {
   // 1. Automatically apply any pending database migrations before accepting requests
   try {
     const { runPendingMigrations } = require('./services/migrationRunner');
-    await runPendingMigrations({ silent: false });
+    const migResult = await runPendingMigrations({ silent: false });
+    if (migResult && migResult.dbServerVersion) {
+      databaseServerVersion = migResult.dbServerVersion;
+    }
   } catch (migErr) {
+    const { formatErrorMessage } = require('./services/migrationRunner');
+    const cleanMsg = formatErrorMessage(migErr);
     console.error('====================================================');
     console.error('❌ [DATABASE MIGRATION STARTUP ERROR]');
-    console.error(`   Message: ${migErr.message}`);
-    console.error('   Action: Check migrations or run "npm run migrate"');
+    console.error(`   Message: ${cleanMsg}`);
+    console.error('   Action: Verify DB credentials in hPanel or run "npm run migrate"');
     console.error('====================================================');
   }
 
@@ -374,11 +396,11 @@ async function initializeDatabaseAndSchema() {
   // 3. Run auto-repairs for slugs and stitch counts
   try {
     const Design = require('./models/Design');
-    await Design.ensureDatabaseColumns();
-    await Design.repairInvalidDatabaseSlugs();
-    await Design.repairExistingStitchCounts();
+    if (typeof Design.ensureDatabaseColumns === 'function') await Design.ensureDatabaseColumns();
+    if (typeof Design.repairInvalidDatabaseSlugs === 'function') await Design.repairInvalidDatabaseSlugs();
+    if (typeof Design.repairExistingStitchCounts === 'function') await Design.repairExistingStitchCounts();
   } catch (err) {
-    console.warn('[Startup Repair] Repair warning:', err.message);
+    console.warn('[Startup Repair Notice]:', err.message);
   }
 }
 
@@ -389,11 +411,18 @@ const initPromise = initializeDatabaseAndSchema();
 async function startServer() {
   await initPromise;
 
+  const storageStatus = storage.getStorageStatus();
+  const sessionType = (sessionStore && db.isConnected()) ? 'express-mysql-session' : 'SafeStore (resilient)';
+
   app.listen(PORT, '0.0.0.0', async () => {
     console.log('====================================================');
     console.log(`🌸 Aruvi Embroidery Web App running on port ${PORT}`);
     console.log('📌 Tagline: "Where Threads Tell Stories"');
     console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
+    console.log(`📦 Storage Driver: ${storageStatus.driver.toUpperCase()}`);
+    console.log(`📁 UPLOAD_DIR: ${storageStatus.uploadsDir}, writable: ${storageStatus.isWritable ? 'yes' : 'no'}`);
+    console.log(`🔐 Session Store: ${sessionType}`);
+    console.log(`🐬 DB Version: ${databaseServerVersion}`);
     console.log('====================================================');
   });
 }

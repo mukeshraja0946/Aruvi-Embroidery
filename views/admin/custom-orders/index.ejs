@@ -13,9 +13,26 @@
   <link rel="stylesheet" href="/public/css/admin.css">
   <style>
     .action-icon-btn {
-      width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; text-decoration: none; transition: var(--transition);
+      width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--admin-border); background: #FFFFFF; color: var(--admin-text-dark); display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; text-decoration: none; transition: var(--transition); cursor: pointer;
     }
     .action-icon-btn:hover { border-color: var(--admin-primary); color: var(--admin-primary); background: #FAF6F0; }
+    .badge-status-pill {
+      display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .badge-status-new { background: #E3F2FD; color: #1565C0; border: 1px solid #BBDEFB; }
+    .badge-status-in_review { background: #FFF8E1; color: #E65100; border: 1px solid #FFE082; }
+    .badge-status-quoted { background: #F3E5F5; color: #6A1B9A; border: 1px solid #E1BEE7; }
+    .badge-status-accepted { background: #E0F2F1; color: #00695C; border: 1px solid #B2DFDB; }
+    .badge-status-completed { background: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9; }
+    .badge-status-rejected { background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
+    
+    /* Modal styles */
+    .custom-modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .custom-modal-card {
+      background: #FFFFFF; border-radius: 14px; max-width: 680px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); border: 1px solid var(--admin-border);
+    }
   </style>
 </head>
 <body class="admin-body">
@@ -98,43 +115,29 @@
             </a>
           </li>
           <li class="sidebar-nav-item"><a href="/admin/orders?status=completed"><span><i class="fa-regular fa-circle-check"></i> Completed Orders</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/orders?status=cancelled"><span><i class="fa-regular fa-circle-xmark"></i> Cancelled Orders</span></a></li>
         </ul>
       </div>
 
-      <!-- CUSTOMERS Section -->
+      <!-- MARKETING Section -->
       <div class="admin-sidebar-section">
-        <div class="sidebar-heading">CUSTOMERS</div>
+        <div class="sidebar-heading">MARKETING</div>
         <ul class="sidebar-nav-list">
-          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> All Customers</span></a></li>
-          <li class="sidebar-nav-item">
-            <a href="/admin/messages">
-              <span><i class="fa-regular fa-comment-dots"></i> Enquiries</span>
-              <% if (typeof adminNavBadges !== 'undefined' && adminNavBadges.unreadMessages > 0) { %>
-                <span class="sidebar-badge"><%= adminNavBadges.unreadMessages %></span>
-              <% } %>
-            </a>
-          </li>
-          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Reviews</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-images"></i> Banners</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/coupons"><span><i class="fa-solid fa-ticket"></i> Coupons</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/email-campaigns"><span><i class="fa-regular fa-paper-plane"></i> Email Campaigns</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-table-cells-large"></i> Homepage Layout</span></a></li>
         </ul>
       </div>
 
-      <!-- CONTENT Section -->
+      <!-- SYSTEM Section -->
       <div class="admin-sidebar-section">
-        <div class="sidebar-heading">CONTENT</div>
+        <div class="sidebar-heading">SYSTEM</div>
         <ul class="sidebar-nav-list">
-          <li class="sidebar-nav-item"><a href="/admin/homepage"><span><i class="fa-solid fa-house-chimney"></i> Homepage</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/banners"><span><i class="fa-regular fa-image"></i> Banners</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/homepage#about"><span><i class="fa-regular fa-circle-info"></i> About Page</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/settings#contact"><span><i class="fa-solid fa-location-dot"></i> Contact Info</span></a></li>
-          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/messages"><span><i class="fa-regular fa-envelope"></i> Enquiries</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/reviews"><span><i class="fa-regular fa-star"></i> Customer Reviews</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/customers"><span><i class="fa-solid fa-users"></i> Customers</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Settings</span></a></li>
         </ul>
-      </div>
-
-      <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--admin-border);">
-        <a href="/admin/logout" style="display: flex; align-items: center; gap: 8px; color: var(--admin-primary); font-size: 0.85rem; font-weight: 600; text-decoration: none; padding: 0.5rem 0.8rem;">
-          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout Admin
-        </a>
       </div>
     </aside>
 
@@ -148,13 +151,19 @@
             <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp; <span style="color: var(--admin-primary); font-weight: 600;">Custom Orders</span>
           </div>
           <h1 style="font-family: var(--font-heading); font-size: 2.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">Custom Orders</h1>
-          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Manage customer requests for custom embroidery designs.</p>
+          <p style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0;">Manage customer requests for custom embroidery digitization and quotes.</p>
         </div>
       </div>
 
       <% if (flash && flash.success && flash.success.length > 0) { %>
         <div class="alert alert-success" style="margin-bottom: 1.5rem; border-radius: 10px;">
           <i class="fa-solid fa-circle-check"></i> <%= flash.success[0] %>
+        </div>
+      <% } %>
+
+      <% if (flash && flash.error && flash.error.length > 0) { %>
+        <div class="alert alert-danger" style="margin-bottom: 1.5rem; border-radius: 10px;">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
         </div>
       <% } %>
 
@@ -167,40 +176,40 @@
             <div style="display: flex; align-items: baseline;">
               <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.total !== undefined) ? stats.total : (requests ? requests.length : 0) %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">custom digitization inquiries</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">custom inquiries</span>
           </div>
         </div>
 
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-regular fa-clock"></i></div>
+          <div class="card-icon-badge" style="background: #E3F2FD; color: #1565C0;"><i class="fa-regular fa-clock"></i></div>
           <div class="card-info-content">
-            <div class="stat-title">New Requests</div>
+            <div class="stat-title">New / In Review</div>
             <div style="display: flex; align-items: baseline;">
               <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.pending !== undefined) ? stats.pending : 0 %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">awaiting review</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">awaiting review / quote</span>
           </div>
         </div>
 
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-solid fa-spinner"></i></div>
+          <div class="card-icon-badge" style="background: #F3E5F5; color: #6A1B9A;"><i class="fa-solid fa-tag"></i></div>
           <div class="card-info-content">
-            <div class="stat-title">In Progress</div>
+            <div class="stat-title">Quoted</div>
             <div style="display: flex; align-items: baseline;">
-              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.in_progress !== undefined) ? stats.in_progress : 0 %></span>
+              <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.quoted !== undefined) ? stats.quoted : 0 %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">being digitized</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">quotes sent to client</span>
           </div>
         </div>
 
         <div class="admin-summary-card">
-          <div class="card-icon-badge"><i class="fa-regular fa-circle-check"></i></div>
+          <div class="card-icon-badge" style="background: #E8F5E9; color: #2E7D32;"><i class="fa-regular fa-circle-check"></i></div>
           <div class="card-info-content">
             <div class="stat-title">Completed</div>
             <div style="display: flex; align-items: baseline;">
               <span class="stat-num"><%= (typeof stats !== 'undefined' && stats.completed !== undefined) ? stats.completed : 0 %></span>
             </div>
-            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">delivered files</span>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">digitized & delivered</span>
           </div>
         </div>
       </div>
@@ -210,16 +219,17 @@
         <form action="/admin/custom-orders" method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
           <div style="flex: 1; min-width: 280px; position: relative;">
             <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--admin-text-muted); font-size: 0.88rem;"></i>
-            <input type="text" name="search" placeholder="Search request ID, customer name or details..." style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding-left: 2.5rem; font-size: 0.85rem;">
+            <input type="text" name="search" value="<%= typeof currentSearch !== 'undefined' ? currentSearch : '' %>" placeholder="Search request #, customer name, email, phone, or title..." style="width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding-left: 2.5rem; font-size: 0.85rem;">
           </div>
 
           <select name="status" style="height: 40px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 1rem; font-size: 0.85rem; background: #FFFFFF; color: var(--admin-text-dark);">
-            <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="reviewing">Reviewing</option>
-            <option value="accepted">Accepted</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
+            <option value="">All Statuses</option>
+            <option value="new" <%= currentStatus === 'new' ? 'selected' : '' %>>New</option>
+            <option value="in_review" <%= currentStatus === 'in_review' ? 'selected' : '' %>>In Review</option>
+            <option value="quoted" <%= currentStatus === 'quoted' ? 'selected' : '' %>>Quoted</option>
+            <option value="accepted" <%= currentStatus === 'accepted' ? 'selected' : '' %>>Accepted</option>
+            <option value="completed" <%= currentStatus === 'completed' ? 'selected' : '' %>>Completed</option>
+            <option value="rejected" <%= currentStatus === 'rejected' ? 'selected' : '' %>>Rejected</option>
           </select>
 
           <!-- Standardized Sort Filter -->
@@ -240,89 +250,120 @@
         </form>
       </div>
 
-      <!-- Main Custom Orders Table Card matching Master Manage Designs UI -->
+      <!-- Main Custom Orders Table Card -->
       <div class="admin-card-box" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
         <table class="admin-table-styled">
           <thead>
             <tr>
-              <th style="width: 38px; text-align: center;"><input type="checkbox"></th>
-              <th style="width: 110px;">Request ID</th>
+              <th style="width: 120px;">Request #</th>
               <th>Customer</th>
               <th>Design Request</th>
               <th>Reference Image</th>
               <th>Status</th>
-              <th>Submitted Date</th>
+              <th>Quote Price</th>
+              <th>Submitted</th>
               <th style="text-align: right;">Actions</th>
             </tr>
           </thead>
           <tbody>
             <% if (requests && requests.length > 0) { %>
               <% requests.forEach(r => { %>
+                <%
+                  const st = r.status || 'new';
+                  const badgeClass = 'badge-status-' + st;
+                  const reqNum = r.request_number || ('CR-LEGACY-' + r.id);
+                  const custName = r.name || r.full_name || 'Customer';
+                  const custEmail = r.email || '';
+                  const custPhone = r.phone || '';
+                  const title = r.design_title || 'Custom Design';
+                  const desc = r.description || r.design_details || '';
+                  const hasImage = Boolean(r.reference_image_key || r.reference_image_url);
+                  const previewUrl = hasImage ? ('/admin/custom-orders/preview/' + r.id) : null;
+                %>
                 <tr id="customOrderRow-<%= r.id %>">
-                  <td style="text-align: center;"><input type="checkbox"></td>
-                  <td><strong style="color: var(--admin-text-dark); font-size: 0.85rem;">#CST-<%= r.id %></strong></td>
                   <td>
-                    <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);"><%= r.full_name %></strong>
-                    <span style="font-size: 0.74rem; color: var(--admin-text-muted);"><%= r.email %></span>
-                  </td>
-                  <td style="max-width: 260px;">
-                    <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);"><%= r.design_title || ('Custom Request #' + r.id) %></strong>
-                    <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"><%= r.design_details %></span>
+                    <strong style="color: var(--admin-primary); font-size: 0.82rem; font-family: monospace;"><%= reqNum %></strong>
                   </td>
                   <td>
-                    <% if (r.reference_image_url) { %>
-                      <a href="<%= r.reference_image_url %>" target="_blank">
-                        <img src="<%= r.reference_image_url %>" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; border: 1px solid var(--admin-border);">
+                    <strong style="display: block; font-size: 0.88rem; color: var(--admin-text-dark);"><%= custName %></strong>
+                    <span style="font-size: 0.74rem; color: var(--admin-text-muted); display: block;"><%= custEmail %></span>
+                    <% if (custPhone) { %>
+                      <span style="font-size: 0.72rem; color: var(--admin-text-muted);"><i class="fa-solid fa-phone" style="font-size: 0.65rem;"></i> <%= custPhone %></span>
+                    <% } %>
+                  </td>
+                  <td style="max-width: 250px;">
+                    <strong style="display: block; font-size: 0.82rem; color: var(--admin-text-dark);"><%= title %></strong>
+                    <span style="font-size: 0.75rem; color: var(--admin-text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"><%= desc %></span>
+                  </td>
+                  <td style="text-align: center;">
+                    <% if (hasImage) { %>
+                      <a href="<%= previewUrl %>" target="_blank" title="Click to view full reference image">
+                        <img src="<%= previewUrl %>" alt="Reference Image" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; border: 1px solid var(--admin-border);" onerror="this.onerror=null; this.src='/public/images/logo.jpg';">
                       </a>
                     <% } else { %>
-                      <img src="/public/images/hero_embroidery.jpg" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; border: 1px solid var(--admin-border);">
+                      <span style="font-size: 0.72rem; color: var(--admin-text-muted); font-style: italic;">No image</span>
                     <% } %>
                   </td>
                   <td>
                     <form action="/admin/custom-orders/status/<%= r.id %>" method="POST" style="display: inline-flex; gap: 4px;">
                       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                      <select name="status" onchange="this.form.submit()" style="height: 32px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--admin-border); background: #FAF6F0;">
-                        <option value="pending" <%= r.status === 'pending' ? 'selected' : '' %>>Pending</option>
-                        <option value="reviewing" <%= r.status === 'reviewing' ? 'selected' : '' %>>Reviewing</option>
-                        <option value="accepted" <%= r.status === 'accepted' ? 'selected' : '' %>>Accepted</option>
-                        <option value="in_progress" <%= r.status === 'in_progress' ? 'selected' : '' %>>In Progress</option>
-                        <option value="completed" <%= r.status === 'completed' ? 'selected' : '' %>>Completed</option>
+                      <select name="status" onchange="this.form.submit()" style="height: 30px; border-radius: 6px; font-size: 0.74rem; font-weight: 600; border: 1px solid var(--admin-border); background: #FAF6F0;">
+                        <option value="new" <%= st === 'new' ? 'selected' : '' %>>New</option>
+                        <option value="in_review" <%= st === 'in_review' ? 'selected' : '' %>>In Review</option>
+                        <option value="quoted" <%= st === 'quoted' ? 'selected' : '' %>>Quoted</option>
+                        <option value="accepted" <%= st === 'accepted' ? 'selected' : '' %>>Accepted</option>
+                        <option value="completed" <%= st === 'completed' ? 'selected' : '' %>>Completed</option>
+                        <option value="rejected" <%= st === 'rejected' ? 'selected' : '' %>>Rejected</option>
                       </select>
                     </form>
+                  </td>
+                  <td>
+                    <% if (r.quoted_price) { %>
+                      <strong style="color: #2E7D32; font-size: 0.88rem;">₹<%= Number(r.quoted_price).toFixed(2) %></strong>
+                    <% } else { %>
+                      <span style="color: var(--admin-text-muted); font-size: 0.76rem;">Pending quote</span>
+                    <% } %>
                   </td>
                   <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
                     <%= formatDateTime(r.created_at) %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
-                      <a href="#" class="action-icon-btn" title="View Request Details"><i class="fa-regular fa-eye"></i></a>
-                      <a href="mailto:<%= r.email %>" class="action-icon-btn" title="Reply Email"><i class="fa-regular fa-envelope"></i></a>
-                      <button type="button" onclick="confirmDeleteCustomOrder('<%= r.id %>')" class="action-icon-btn" style="color: #C62828; border: none; background: transparent; cursor: pointer;" title="Delete Custom Order"><i class="fa-regular fa-trash-can"></i></button>
+                      <button type="button" class="action-icon-btn" onclick="openCustomOrderModal(<%= JSON.stringify(r) %>)" title="View Full Details & Quote"><i class="fa-regular fa-eye"></i></button>
+                      <a href="mailto:<%= custEmail %>?subject=Regarding%20Your%20Custom%20Embroidery%20Request%20[<%= encodeURIComponent(reqNum) %>]" class="action-icon-btn" title="Reply Email"><i class="fa-regular fa-envelope"></i></a>
+                      <button type="button" onclick="confirmDeleteCustomOrder('<%= r.id %>')" class="action-icon-btn" style="color: #C62828; border: none; background: transparent;" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
                   </td>
                 </tr>
               <% }) %>
             <% } else { %>
               <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
-                  No custom order requests found.
+                <td colspan="8" style="text-align: center; padding: 3rem 1rem;">
+                  <div style="max-width: 360px; margin: 0 auto; color: var(--admin-text-muted);">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 2.5rem; color: #D1C4E9; margin-bottom: 12px; display: block;"></i>
+                    <h3 style="font-size: 1.1rem; color: var(--admin-text-dark); margin-bottom: 6px;">No Custom Orders Found</h3>
+                    <p style="font-size: 0.84rem; line-height: 1.5;">There are no custom design requests matching your current filter. Clear your filters or check back later.</p>
+                    <a href="/admin/custom-orders" class="btn btn-outline btn-sm" style="margin-top: 10px; display: inline-block;">Reset Filter</a>
+                  </div>
                 </td>
               </tr>
             <% } %>
           </tbody>
         </table>
 
-        <!-- Pagination Bar matching Master Manage Designs UI -->
+        <!-- Pagination Bar -->
         <div style="padding: 1rem 1.4rem; background: #FAF6F0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-size: 0.82rem; color: var(--admin-text-muted);">
-            Showing 1 to <%= requests ? requests.length : 0 %> of <strong><%= typeof total !== 'undefined' ? total : (requests ? requests.length : 0) %></strong> requests
+            Showing 1 to <%= requests ? requests.length : 0 %> of <strong><%= typeof total !== 'undefined' ? total : 0 %></strong> requests
           </div>
 
-          <div style="display: flex; gap: 6px;">
-            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-left" style="font-size: 0.7rem;"></i></a>
-            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px; background: var(--admin-primary); color: #FFFFFF; border-color: var(--admin-primary); font-weight: 700;">1</a>
-            <a href="#" class="action-icon-btn" style="width: 32px; height: 32px;"><i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i></a>
-          </div>
+          <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+            <div style="display: flex; gap: 6px;">
+              <% for (let p = 1; p <= totalPages; p++) { %>
+                <a href="/admin/custom-orders?page=<%= p %>&status=<%= currentStatus %>&search=<%= currentSearch %>&sort=<%= currentSort %>" class="action-icon-btn" style="<%= p === currentPage ? 'background: var(--admin-primary); color: #FFF; font-weight: 700;' : '' %>"><%= p %></a>
+              <% } %>
+            </div>
+          <% } %>
         </div>
       </div>
 
@@ -330,91 +371,167 @@
   </div>
 </div>
 
-<!-- Modal Confirmation Dialog for Deleting Custom Order -->
-<div id="deleteCustomOrderModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-  <div class="modal-box" style="background: white; padding: 2rem; border-radius: 12px; max-width: 440px; width: 90%; text-align: center;">
-    <div style="width: 56px; height: 56px; border-radius: 50%; background: #FFEBEE; color: #C62828; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 1.2rem;">
-      <i class="fa-regular fa-trash-can"></i>
+<!-- Custom Order Detail & Price Quote Modal -->
+<div class="custom-modal-overlay" id="orderModalOverlay">
+  <div class="custom-modal-card">
+    <div style="padding: 1.4rem 1.6rem; border-bottom: 1px solid var(--admin-border); display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h3 style="margin: 0; font-size: 1.25rem; color: var(--admin-text-dark);" id="modalReqNumber">Request Details</h3>
+        <span style="font-size: 0.78rem; color: var(--admin-text-muted);" id="modalSubmittedDate"></span>
+      </div>
+      <button type="button" onclick="closeCustomOrderModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--admin-text-muted); cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <h3 style="font-size: 1.3rem; color: var(--admin-text-dark); margin-bottom: 0.6rem;">Delete Custom Order?</h3>
-    <p style="font-size: 0.9rem; color: var(--admin-text-muted); margin-bottom: 1.8rem; line-height: 1.5;">Are you sure you want to delete this custom order?</p>
-    <div style="display: flex; gap: 12px; justify-content: center;">
-      <button type="button" onclick="closeDeleteCustomOrderModal()" class="btn btn-outline" style="min-width: 110px; height: 40px; border-radius: 8px;">Cancel</button>
-      <button type="button" id="confirmDeleteCustomOrderBtn" onclick="executeDeleteCustomOrder()" class="btn btn-danger" style="min-width: 110px; height: 40px; border-radius: 8px; background: #C62828; color: white; border: none;">Delete</button>
+
+    <div style="padding: 1.6rem;">
+      <!-- Customer Information Grid -->
+      <div style="background: #FAF6F0; border-radius: 10px; padding: 1.2rem; margin-bottom: 1.4rem; border: 1px solid var(--admin-border);">
+        <h4 style="margin: 0 0 10px; font-size: 0.95rem; color: var(--admin-primary); display: flex; align-items: center; gap: 6px;">
+          <i class="fa-regular fa-user"></i> Customer Information
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem;">
+          <div><strong style="color: var(--admin-text-muted);">Name:</strong> <span id="modalCustName" style="color: var(--admin-text-dark); font-weight: 600;"></span></div>
+          <div><strong style="color: var(--admin-text-muted);">Email:</strong> <a id="modalCustEmail" href="#" style="color: var(--admin-primary);"></a></div>
+          <div><strong style="color: var(--admin-text-muted);">Phone:</strong> <span id="modalCustPhone"></span></div>
+          <div><strong style="color: var(--admin-text-muted);">Target Budget:</strong> <span id="modalCustBudget"></span></div>
+          <div><strong style="color: var(--admin-text-muted);">Size / Hoop:</strong> <span id="modalCustSize"></span></div>
+          <div><strong style="color: var(--admin-text-muted);">Formats:</strong> <span id="modalCustFormats"></span></div>
+          <div><strong style="color: var(--admin-text-muted);">Deadline:</strong> <span id="modalCustDeadline"></span></div>
+        </div>
+      </div>
+
+      <!-- Design Title & Description -->
+      <div style="margin-bottom: 1.4rem;">
+        <h4 style="margin: 0 0 6px; font-size: 0.92rem; color: var(--admin-text-dark);" id="modalDesignTitle"></h4>
+        <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 8px; padding: 12px; font-size: 0.86rem; color: #444; white-space: pre-wrap; line-height: 1.6;" id="modalDesignDesc"></div>
+      </div>
+
+      <!-- Reference Image -->
+      <div id="modalImageSection" style="margin-bottom: 1.4rem; display: none;">
+        <h4 style="margin: 0 0 8px; font-size: 0.9rem; color: var(--admin-text-dark);"><i class="fa-regular fa-image"></i> Reference Image</h4>
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <img id="modalReferenceImg" src="" alt="Reference Preview" style="max-height: 120px; max-width: 180px; border-radius: 8px; border: 1px solid var(--admin-border); object-fit: cover;">
+          <div>
+            <a id="modalFullImageLink" href="#" target="_blank" class="btn btn-outline btn-sm"><i class="fa-solid fa-up-right-from-square"></i> Open Full Image</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Update Quote & Notes Form -->
+      <form id="modalQuoteForm" method="POST" action="">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <h4 style="margin: 0 0 10px; font-size: 0.95rem; color: var(--admin-primary);"><i class="fa-solid fa-calculator"></i> Quote Price & Status</h4>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1rem;">
+          <div class="form-group-field">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px; display: block;">Status</label>
+            <select name="status" id="modalStatusSelect" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.85rem;">
+              <option value="new">New</option>
+              <option value="in_review">In Review</option>
+              <option value="quoted">Quoted</option>
+              <option value="accepted">Accepted</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+
+          <div class="form-group-field">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px; display: block;">Quoted Price (INR ₹)</label>
+            <input type="number" step="10" name="quoted_price" id="modalQuotedPriceInput" placeholder="e.g., 750" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--admin-border); padding: 0 10px; font-size: 0.85rem;">
+          </div>
+        </div>
+
+        <div class="form-group-field" style="margin-bottom: 1.2rem;">
+          <label style="font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px; display: block;">Admin Private Notes</label>
+          <textarea name="admin_notes" id="modalAdminNotesInput" rows="3" placeholder="Internal digitizer notes, stitch count estimate, color changes..." style="width: 100%; border-radius: 8px; border: 1px solid var(--admin-border); padding: 8px 10px; font-size: 0.85rem;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--admin-border); padding-top: 1rem;">
+          <a id="modalMailtoBtn" href="#" class="btn btn-outline btn-sm"><i class="fa-regular fa-envelope"></i> Email Customer</a>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="closeCustomOrderModal()" class="btn btn-outline btn-sm">Close</button>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk"></i> Save Quote & Notes</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 </div>
 
 <script>
-  let pendingDeleteCustomOrderId = null;
+  function openCustomOrderModal(req) {
+    if (!req) return;
+    const reqNum = req.request_number || ('CR-LEGACY-' + req.id);
+    document.getElementById('modalReqNumber').textContent = 'Request #' + reqNum;
+    document.getElementById('modalSubmittedDate').textContent = 'Submitted on: ' + (req.created_at ? new Date(req.created_at).toLocaleString() : 'N/A');
+    document.getElementById('modalCustName').textContent = req.name || req.full_name || 'Customer';
+    
+    const emailEl = document.getElementById('modalCustEmail');
+    emailEl.textContent = req.email || 'N/A';
+    emailEl.href = 'mailto:' + (req.email || '');
+
+    document.getElementById('modalCustPhone').textContent = req.phone || 'N/A';
+    document.getElementById('modalCustBudget').textContent = req.budget ? ('₹' + req.budget) : 'Not specified';
+    document.getElementById('modalCustSize').textContent = req.size_hoop || 'Standard machine';
+    document.getElementById('modalCustFormats').textContent = req.preferred_formats || 'DST, PES, JEF, EXP';
+    document.getElementById('modalCustDeadline').textContent = req.deadline || 'Standard (24-48h)';
+
+    document.getElementById('modalDesignTitle').textContent = req.design_title || 'Custom Design';
+    document.getElementById('modalDesignDesc').textContent = req.description || req.design_details || 'No description provided.';
+
+    // Image section
+    const imgSection = document.getElementById('modalImageSection');
+    const previewImg = document.getElementById('modalReferenceImg');
+    const fullLink = document.getElementById('modalFullImageLink');
+    if (req.reference_image_key || req.reference_image_url) {
+      const previewUrl = '/admin/custom-orders/preview/' + req.id;
+      previewImg.src = previewUrl;
+      fullLink.href = previewUrl;
+      imgSection.style.display = 'block';
+    } else {
+      imgSection.style.display = 'none';
+    }
+
+    // Form settings
+    document.getElementById('modalQuoteForm').action = '/admin/custom-orders/quote/' + req.id;
+    document.getElementById('modalStatusSelect').value = req.status || 'new';
+    document.getElementById('modalQuotedPriceInput').value = req.quoted_price || '';
+    document.getElementById('modalAdminNotesInput').value = req.admin_notes || '';
+
+    // Mailto button
+    const subject = encodeURIComponent('Regarding Your Custom Embroidery Request [' + reqNum + ']');
+    const body = encodeURIComponent('Hello ' + (req.name || req.full_name || 'Customer') + ',\n\nRegarding your custom embroidery request (' + reqNum + '):\n\n');
+    document.getElementById('modalMailtoBtn').href = 'mailto:' + (req.email || '') + '?subject=' + subject + '&body=' + body;
+
+    document.getElementById('orderModalOverlay').style.display = 'flex';
+  }
+
+  function closeCustomOrderModal() {
+    document.getElementById('orderModalOverlay').style.display = 'none';
+  }
 
   function confirmDeleteCustomOrder(id) {
-    pendingDeleteCustomOrderId = id;
-    const modal = document.getElementById('deleteCustomOrderModal');
-    if (modal) modal.style.display = 'flex';
-  }
-
-  function closeDeleteCustomOrderModal() {
-    pendingDeleteCustomOrderId = null;
-    const modal = document.getElementById('deleteCustomOrderModal');
-    if (modal) modal.style.display = 'none';
-  }
-
-  function executeDeleteCustomOrder() {
-    if (!pendingDeleteCustomOrderId) return;
-    const id = pendingDeleteCustomOrderId;
-    const btn = document.getElementById('confirmDeleteCustomOrderBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Deleting...'; }
-
-    const csrfToken = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
-
-    fetch('/admin/custom-orders/delete/' + id + '?format=json', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-Token': csrfToken
-      },
-      body: JSON.stringify({ _csrf: csrfToken })
-    })
-    .then(res => res.json())
-    .then(data => {
-      closeDeleteCustomOrderModal();
-      if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
-      if (data.success) {
-        const row = document.getElementById('customOrderRow-' + id);
-        if (row) {
-          row.style.opacity = '0';
-          row.style.transition = 'opacity 0.3s ease';
-          setTimeout(() => row.remove(), 300);
-        }
-        showAdminToast(data.message || 'Custom order deleted successfully.');
-      } else {
-        alert(data.message || 'Unable to delete custom order. Please try again.');
-      }
-    })
-    .catch(err => {
-      console.error('Custom order delete error:', err);
-      closeDeleteCustomOrderModal();
-      if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
-      alert('Unable to delete custom order. Please try again.');
-    });
-  }
-
-  function showAdminToast(msg) {
-    let toast = document.getElementById('adminToastPopup');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'adminToastPopup';
-      toast.style.cssText = 'position: fixed; top: 25px; right: 25px; background: #1B5E20; color: white; padding: 1.1rem 1.8rem; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 999999; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 1rem; border: 2px solid #81C784;';
-      document.body.appendChild(toast);
+    if (confirm('Are you sure you want to delete this custom order request? This action cannot be undone.')) {
+      const csrf = '<%= csrfToken %>';
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/admin/custom-orders/delete/' + id;
+      
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = '_csrf';
+      csrfInput.value = csrf;
+      form.appendChild(csrfInput);
+      
+      document.body.appendChild(form);
+      form.submit();
     }
-    toast.innerHTML = `<i class="fa-solid fa-circle-check" style="font-size: 1.5rem; color: #66BB6A;"></i><span>${msg}</span><button type="button" onclick="this.parentElement.style.display='none'" style="background: none; border: none; color: white; margin-left: 15px; cursor: pointer; font-size: 1.3rem;">&times;</button>`;
-    toast.style.display = 'flex';
-    setTimeout(() => { if (toast) toast.style.display = 'none'; }, 4000);
   }
+
+  // Close modal on escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeCustomOrderModal();
+  });
 </script>
-<script src="/public/js/sort-dropdown.js"></script>
+
 </body>
 </html>

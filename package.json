@@ -11,6 +11,7 @@
     "seed": "node scripts/seed.js",
     "seed:demo": "node scripts/seed-demo.js",
     "backup": "node scripts/backup.js",
+    "recover-uploads": "node scripts/recover-uploads.js",
     "test:mobile": "node scripts/test-mobile-overflow.js"
   },
   "keywords": [

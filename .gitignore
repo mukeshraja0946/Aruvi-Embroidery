@@ -27,6 +27,7 @@ private_uploads/*
 
 storage_private/*
 !storage_private/.gitkeep
-!storage_private/**/.gitkeep
-
 temp_chunks/*
+aruvi-uploads/
+aruvi-backups/
+recovery-reports/

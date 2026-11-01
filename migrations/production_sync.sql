@@ -710,7 +710,150 @@ INSERT INTO `settings` (`setting_key`, `setting_value`) VALUES
 ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
 
 -- ----------------------------------------------------------------------------
--- 6. Record Applied Migrations in schema_migrations
+-- 6. Migrations 018 - 028: Modern Schema Sync
+-- ----------------------------------------------------------------------------
+
+-- Migration 019: Multiple Download Files per Design & Design Images Variants
+CREATE TABLE IF NOT EXISTS `design_files` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `design_id` INT NOT NULL,
+  `file_kind` VARCHAR(50) NOT NULL DEFAULT 'archive',
+  `label` VARCHAR(150) DEFAULT NULL,
+  `original_name` VARCHAR(255) NOT NULL,
+  `storage_key` VARCHAR(500) NOT NULL,
+  `mime_type` VARCHAR(100) DEFAULT 'application/zip',
+  `file_size` BIGINT UNSIGNED DEFAULT 0,
+  `checksum_sha256` VARCHAR(64) DEFAULT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `is_primary_preview` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_df_design_id (`design_id`),
+  INDEX idx_df_checksum (`checksum_sha256`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `design_images` ADD COLUMN IF NOT EXISTS `thumb_key` VARCHAR(500) DEFAULT NULL;
+ALTER TABLE `design_images` ADD COLUMN IF NOT EXISTS `card_key` VARCHAR(500) DEFAULT NULL;
+ALTER TABLE `design_images` ADD COLUMN IF NOT EXISTS `original_key` VARCHAR(500) DEFAULT NULL;
+
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `thumbnail_image` VARCHAR(500) DEFAULT NULL;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `needs_reupload` TINYINT(1) DEFAULT 0;
+
+-- Migration 020: Test Data and Reset Support Flags
+ALTER TABLE `orders` ADD COLUMN IF NOT EXISTS `is_test` TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE `payments` ADD COLUMN IF NOT EXISTS `is_test` TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE `designs` ADD COLUMN IF NOT EXISTS `is_demo` TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `is_demo` TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Migration 022: Image Replacement and Revert Logs
+CREATE TABLE IF NOT EXISTS `image_replace_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `admin_id` INT DEFAULT NULL,
+  `admin_email` VARCHAR(150) DEFAULT NULL,
+  `category_id` INT DEFAULT NULL,
+  `category_name` VARCHAR(150) DEFAULT NULL,
+  `scope_summary` VARCHAR(255) DEFAULT NULL,
+  `replacement_mode` VARCHAR(50) DEFAULT 'single_primary',
+  `total_files` INT NOT NULL DEFAULT 0,
+  `matched_designs` INT NOT NULL DEFAULT 0,
+  `replaced_count` INT NOT NULL DEFAULT 0,
+  `skipped_count` INT NOT NULL DEFAULT 0,
+  `failed_count` INT NOT NULL DEFAULT 0,
+  `is_undone` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `image_replace_log_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `log_id` INT NOT NULL,
+  `design_id` INT NOT NULL,
+  `sku` VARCHAR(100) DEFAULT NULL,
+  `title` VARCHAR(255) DEFAULT NULL,
+  `old_primary_image` TEXT DEFAULT NULL,
+  `new_primary_image` TEXT DEFAULT NULL,
+  `old_images_json` MEDIUMTEXT DEFAULT NULL,
+  `new_images_json` MEDIUMTEXT DEFAULT NULL,
+  `status` VARCHAR(50) NOT NULL DEFAULT 'replaced',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_irl_log_id (`log_id`),
+  INDEX idx_irl_design_id (`design_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migration 023: Orders shipping address nullable
+ALTER TABLE `orders` MODIFY COLUMN `shipping_address` TEXT NULL;
+
+-- Migration 025: Upload Sessions for Resumable Chunked Uploads
+CREATE TABLE IF NOT EXISTS `upload_sessions` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT DEFAULT NULL,
+  `filename` VARCHAR(255) NOT NULL,
+  `file_size` BIGINT NOT NULL,
+  `total_chunks` INT NOT NULL,
+  `uploaded_chunks` INT NOT NULL DEFAULT 0,
+  `upload_type` VARCHAR(50) NOT NULL,
+  `status` ENUM('uploading', 'assembling', 'completed', 'failed') NOT NULL DEFAULT 'uploading',
+  `error_message` TEXT DEFAULT NULL,
+  `reference_id` VARCHAR(100) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_us_status (`status`),
+  INDEX idx_us_ref (`reference_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migration 027: Preloader & Branding Animation Settings
+INSERT INTO `settings` (`setting_key`, `setting_value`) VALUES
+  ('preloader_enabled', '1'),
+  ('preloader_style', 'stitching_hexagon'),
+  ('preloader_speed', 'normal'),
+  ('preloader_exit_effect', 'fade'),
+  ('preloader_frequency', 'session'),
+  ('preloader_show_tagline', '1'),
+  ('preloader_min_time', '800'),
+  ('preloader_max_time', '3000'),
+  ('preloader_color_primary', '#4B0F1C'),
+  ('preloader_color_secondary', '#C7876C'),
+  ('preloader_color_accent', '#BB4558'),
+  ('preloader_color_bg', '#FAF6F0')
+ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
+
+-- Migration 028: Custom Embroidery Design Requests
+CREATE TABLE IF NOT EXISTS `custom_requests` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `request_number` VARCHAR(50) NOT NULL UNIQUE,
+  `user_id` INT DEFAULT NULL,
+  `name` VARCHAR(150) NOT NULL,
+  `email` VARCHAR(150) NOT NULL,
+  `phone` VARCHAR(50) NOT NULL,
+  `design_title` VARCHAR(255) NOT NULL,
+  `description` TEXT NOT NULL,
+  `category_id` INT DEFAULT NULL,
+  `preferred_formats` VARCHAR(255) DEFAULT 'DST, PES, JEF, EXP',
+  `size_hoop` VARCHAR(100) DEFAULT NULL,
+  `budget` DECIMAL(10,2) DEFAULT NULL,
+  `deadline` DATE DEFAULT NULL,
+  `reference_image_key` VARCHAR(500) DEFAULT NULL,
+  `status` ENUM('new', 'in_review', 'quoted', 'accepted', 'completed', 'rejected') NOT NULL DEFAULT 'new',
+  `admin_notes` TEXT DEFAULT NULL,
+  `quoted_price` DECIMAL(10,2) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_cr_status (`status`),
+  INDEX idx_cr_user (`user_id`),
+  INDEX idx_cr_email (`email`),
+  INDEX idx_cr_created (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `request_number` VARCHAR(50) NOT NULL UNIQUE AFTER `id`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `design_title` VARCHAR(255) NOT NULL AFTER `phone`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `category_id` INT DEFAULT NULL AFTER `description`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `preferred_formats` VARCHAR(255) DEFAULT 'DST, PES, JEF, EXP' AFTER `category_id`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `size_hoop` VARCHAR(100) DEFAULT NULL AFTER `preferred_formats`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `budget` DECIMAL(10,2) DEFAULT NULL AFTER `size_hoop`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `deadline` DATE DEFAULT NULL AFTER `budget`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `reference_image_key` VARCHAR(500) DEFAULT NULL AFTER `deadline`;
+ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `quoted_price` DECIMAL(10,2) DEFAULT NULL AFTER `admin_notes`;
+
+-- ----------------------------------------------------------------------------
+-- 7. Record All Applied Migrations in schema_migrations
 -- ----------------------------------------------------------------------------
 INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('001', '001_initial_schema.sql'),
@@ -729,8 +872,20 @@ INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('014', '014_create_price_update_logs.sql'),
   ('015', '015_add_stitch_counts_to_designs.sql'),
   ('016', '016_production_schema_sync.sql'),
-  ('017', '017_stitch_counts_and_bulk_update.sql');
+  ('017', '017_stitch_counts_and_bulk_update.sql'),
+  ('018', '018_clean_autogenerated_stitch_counts.sql'),
+  ('019', '019_multiple_files_per_design.sql'),
+  ('020', '020_test_data_and_reset_support.sql'),
+  ('021', '021_unique_design_files.sql'),
+  ('022', '022_image_replace_and_preview_download.sql'),
+  ('023', '023_make_orders_shipping_address_nullable.sql'),
+  ('024', '024_preview_thumbnails_and_card_keys.sql'),
+  ('025', '025_create_upload_sessions.sql'),
+  ('026', '026_clean_previews_and_original_keys.sql'),
+  ('027', '027_add_preloader_settings.sql'),
+  ('028', '028_create_custom_requests.sql');
 
 -- ============================================================================
 -- End of production_sync.sql
 -- ============================================================================
+

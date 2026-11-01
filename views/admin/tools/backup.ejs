@@ -241,10 +241,10 @@
           To ensure backups run automatically every midnight without manual intervention, configure this cron job on your production server:
         </p>
         <div style="background: #2D3748; color: #E2E8F0; padding: 0.75rem 1rem; border-radius: 6px; font-family: monospace; font-size: 0.85rem; overflow-x: auto;">
-          0 2 * * * cd /var/www/aruvi-embroidery && npm run backup >> /var/log/aruvi-backup.log 2>&1
+          0 2 * * * cd /home/u101925264/domains/aruviembroidery.com/public_html &amp;&amp; /usr/bin/node scripts/backup.js &gt;&gt; /home/u101925264/aruvi-backups/backup.log 2&gt;&amp;1
         </div>
         <small style="display: block; color: var(--admin-text-muted); margin-top: 6px; font-size: 0.75rem;">
-          Runs at 02:00 AM every night, exports the database, archives uploads, and keeps the last 30 days of archives.
+          Configure in <strong>hPanel &rarr; Advanced &rarr; Cron Jobs</strong>. Runs daily at 2:00 AM, dumps MySQL database, archives UPLOAD_DIR, and retains 30 days of backups in <code>/home/u101925264/aruvi-backups</code> outside the deploy folder.
         </small>
       </div>
     </main>

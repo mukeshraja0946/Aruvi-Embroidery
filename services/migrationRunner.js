@@ -8,6 +8,20 @@ dotenv.config();
 const migrationsDir = path.resolve(__dirname, '..', 'migrations');
 
 /**
+ * Extracts a human-readable, descriptive message from any error, including AggregateError
+ */
+function formatErrorMessage(err) {
+  if (!err) return 'Unknown database error';
+  if (err.message && err.message.trim() !== '') return err.message;
+  if (Array.isArray(err.errors) && err.errors.length > 0) {
+    return err.errors.map(e => e.message || e.code || String(e)).filter(Boolean).join('; ');
+  }
+  if (err.code) return `Database error: ${err.code}`;
+  if (err.sqlMessage) return err.sqlMessage;
+  return String(err);
+}
+
+/**
  * Helper to get DB connection config
  */
 function getDbConfig() {
@@ -31,7 +45,7 @@ function getDbConfig() {
       dbConfig.password = decodeURIComponent(parsedUrl.password || dbConfig.password);
       dbConfig.database = parsedUrl.pathname ? parsedUrl.pathname.replace(/^\//, '') : dbConfig.database;
     } catch (urlErr) {
-      console.warn('[Migration Config Warning] Failed to parse DATABASE_URL string:', urlErr.message);
+      console.warn('[Migration Config Notice] Failed to parse DATABASE_URL string:', urlErr.message);
     }
   }
 
@@ -66,14 +80,14 @@ async function ensureMigrationTable(connection) {
   `);
 
   // 2. Check if legacy _migrations table exists
-  const [legacyCheck] = await connection.query(`
-    SELECT COUNT(*) AS count 
-    FROM information_schema.tables 
-    WHERE table_schema = DATABASE() AND table_name = '_migrations'
-  `);
+  try {
+    const [legacyCheck] = await connection.query(`
+      SELECT COUNT(*) AS count 
+      FROM information_schema.tables 
+      WHERE table_schema = DATABASE() AND table_name = '_migrations'
+    `);
 
-  if (legacyCheck && legacyCheck[0] && legacyCheck[0].count > 0) {
-    try {
+    if (legacyCheck && legacyCheck[0] && legacyCheck[0].count > 0) {
       await connection.query(`
         INSERT IGNORE INTO \`schema_migrations\` (\`version\`, \`name\`, \`applied_at\`)
         SELECT 
@@ -82,9 +96,9 @@ async function ensureMigrationTable(connection) {
           \`applied_at\`
         FROM \`_migrations\`
       `);
-    } catch (legacyCopyErr) {
-      console.warn('[Migration Runner] Note on legacy _migrations sync:', legacyCopyErr.message);
     }
+  } catch (legacyCopyErr) {
+    console.warn('[Migration Runner] Note on legacy _migrations sync:', legacyCopyErr.message);
   }
 }
 
@@ -161,7 +175,6 @@ async function executeMigrationSql(conn, sql, file) {
       try {
         await conn.query(stmt);
       } catch (err) {
-        // If older MySQL lacks "IF NOT EXISTS" syntax support (MariaDB supports it natively)
         if (err.message && (err.message.includes('IF NOT EXISTS') || err.errno === 1064)) {
           const [chk] = await conn.query(
             'SELECT COUNT(*) as count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?',
@@ -171,7 +184,7 @@ async function executeMigrationSql(conn, sql, file) {
             await conn.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${colDef}`);
           }
         } else if (err.errno === 1060 || (err.message && err.message.includes('Duplicate column name'))) {
-          // Column already exists, safe to ignore
+          // Column already exists, safe to continue
         } else {
           throw err;
         }
@@ -179,17 +192,22 @@ async function executeMigrationSql(conn, sql, file) {
       continue;
     }
 
-    // Default statement execution
+    // Default statement execution with defensive error code handling
     try {
       await conn.query(stmt);
     } catch (err) {
-      // 1050: Table already exists, 1060: Duplicate column name, 1061: Duplicate key name
-      if (err.errno === 1050 || err.errno === 1060 || err.errno === 1061) {
+      // 1050: Table already exists, 1060: Duplicate column name, 1061: Duplicate key name, 1068: Multiple primary key
+      if (err.errno === 1050 || err.errno === 1060 || err.errno === 1061 || err.errno === 1068) {
         continue;
       }
       // 1054: Unknown column (e.g., if settings table lacks setting_group/description column)
       if (err.errno === 1054 && /INSERT\s+INTO\s+[`"]?settings[`"]?/i.test(stmt)) {
         console.warn('[Migration Runner] Safe notice: column in settings insert not present, skipping optional metadata');
+        continue;
+      }
+      // 1146: Table doesn't exist on legacy migration check (e.g. custom_orders for insert ignore copy)
+      if (err.errno === 1146 && (/custom_orders/i.test(stmt) || /_migrations/i.test(stmt))) {
+        console.log('[Migration Runner] Safe notice: legacy table referenced in data sync does not exist, continuing.');
         continue;
       }
       throw err;
@@ -207,8 +225,13 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
 
   try {
     if (!conn) {
-      conn = await mysql.createConnection(config);
-      shouldClose = true;
+      try {
+        conn = await mysql.createConnection(config);
+        shouldClose = true;
+      } catch (connErr) {
+        const errorDesc = formatErrorMessage(connErr);
+        throw new Error(`Database connection failed (${errorDesc}). Verify DB_HOST, DB_USER, DB_NAME in environment.`);
+      }
     }
 
     await ensureMigrationTable(conn);
@@ -253,18 +276,19 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
 
         // Record in schema_migrations
         await conn.query(
-          'INSERT INTO `schema_migrations` (`version`, `name`) VALUES (?, ?)',
+          'INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES (?, ?)',
           [version, file]
         );
 
         appliedThisRun.push(file);
         if (!silent) console.log(`  ✅ [SUCCESS] ${file} applied successfully.`);
       } catch (fileErr) {
+        const cleanMsg = formatErrorMessage(fileErr);
         console.error(`\n❌ [MIGRATION FAILED] Error applying migration file: ${file}`);
-        console.error(`   Message: ${fileErr.message}`);
+        console.error(`   Message: ${cleanMsg}`);
         console.error(`   SQL State: ${fileErr.sqlState || 'N/A'}`);
         console.error('   Existing data has not been touched.\n');
-        throw new Error(`Migration ${file} failed: ${fileErr.message}`);
+        throw new Error(`Migration ${file} failed: ${cleanMsg}`);
       }
     }
 
@@ -281,7 +305,8 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
     return {
       success: true,
       appliedCount: appliedThisRun.length,
-      appliedFiles: appliedThisRun
+      appliedFiles: appliedThisRun,
+      dbServerVersion
     };
 
   } finally {
@@ -298,47 +323,42 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
  */
 async function getMigrationStatus() {
   const config = getDbConfig();
-  let conn;
+  let conn = null;
+
   try {
     conn = await mysql.createConnection(config);
     await ensureMigrationTable(conn);
     const { rows, namesSet, versionsSet } = await getAppliedMigrations(conn);
     const allFiles = getAvailableMigrationFiles();
 
-    const statusList = allFiles.map(file => {
+    const migrationsList = allFiles.map(file => {
       const version = file.split('_')[0];
       const appliedRow = rows.find(r => r.name === file || r.version === version);
       return {
-        file,
+        filename: file,
         version,
-        isApplied: !!appliedRow,
+        isApplied: Boolean(appliedRow || namesSet.has(file) || versionsSet.has(version)),
         appliedAt: appliedRow ? appliedRow.applied_at : null
       };
     });
 
-    const pending = statusList.filter(s => !s.isApplied);
-    const applied = statusList.filter(s => s.isApplied);
+    const pendingCount = migrationsList.filter(m => !m.isApplied).length;
 
     return {
       total: allFiles.length,
-      appliedCount: applied.length,
-      pendingCount: pending.length,
-      isUpToDate: pending.length === 0,
-      migrations: statusList,
-      pending,
-      applied
+      appliedCount: migrationsList.filter(m => m.isApplied).length,
+      pendingCount,
+      isUpToDate: pendingCount === 0,
+      migrations: migrationsList
     };
   } catch (err) {
-    console.error('[getMigrationStatus error]:', err.message);
     return {
       total: 0,
       appliedCount: 0,
       pendingCount: 0,
       isUpToDate: false,
-      error: err.message,
-      migrations: [],
-      pending: [],
-      applied: []
+      error: formatErrorMessage(err),
+      migrations: []
     };
   } finally {
     if (conn) {
@@ -348,9 +368,9 @@ async function getMigrationStatus() {
 }
 
 module.exports = {
-  getAvailableMigrationFiles,
   runPendingMigrations,
   getMigrationStatus,
-  ensureMigrationTable,
-  getAppliedMigrations
+  splitSqlStatements,
+  getAvailableMigrationFiles,
+  formatErrorMessage
 };

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Wishlist = require('../models/Wishlist');
+const CustomRequest = require('../models/CustomRequest');
 const Design = require('../models/Design');
 const Setting = require('../models/Setting');
 const db = require('../config/db');
@@ -59,11 +60,20 @@ exports.getDashboard = async (req, res, next) => {
       }
     }
 
+    // Fetch customer's custom design requests
+    let customRequests = [];
+    try {
+      customRequests = await CustomRequest.getByUser(userId);
+    } catch (crErr) {
+      console.warn('[User Dashboard Warning] CustomRequest fetch error:', crErr.message);
+    }
+
     res.render('user/dashboard', {
       title: 'My Account - Aruvi Embroidery',
       orders,
       purchasedDesigns,
-      wishlistItems
+      wishlistItems,
+      customRequests: customRequests || []
     });
   } catch (err) {
     next(err);

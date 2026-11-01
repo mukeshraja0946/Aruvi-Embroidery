@@ -177,10 +177,16 @@ async function isAdmin(req, res, next) {
       try {
         const [pOrd] = await db.query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
         const [uMsg] = await db.query("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'");
-        const [pCust] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
-        const pendingOrders = pOrd ? (pOrd.count || 0) : 0;
-        const unreadMessages = uMsg ? (uMsg.count || 0) : 0;
-        const pendingCustomOrders = pCust ? (pCust.count || 0) : 0;
+        let pendingCustomOrders = 0;
+        try {
+          const [pCust] = await db.query("SELECT COUNT(*) as count FROM custom_requests WHERE status IN ('new', 'in_review')");
+          pendingCustomOrders = pCust ? (pCust.count || 0) : 0;
+        } catch (_) {
+          try {
+            const [pCustLegacy] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
+            pendingCustomOrders = pCustLegacy ? (pCustLegacy.count || 0) : 0;
+          } catch (_) {}
+        }
         res.locals.adminNavBadges = {
           pendingOrders,
           unreadMessages,

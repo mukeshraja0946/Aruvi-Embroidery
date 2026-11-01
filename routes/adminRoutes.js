@@ -178,7 +178,10 @@ router.post('/admin/orders/delete/:id', adminOrderController.deleteOrder);
 
 // Custom Orders Requests
 router.get('/admin/custom-orders', adminCustomOrderController.getCustomOrders);
+router.get('/admin/custom-orders/detail/:id', adminCustomOrderController.getCustomOrderDetail);
+router.get('/admin/custom-orders/preview/:id', adminCustomOrderController.previewReferenceImage);
 router.post('/admin/custom-orders/status/:id', adminCustomOrderController.updateStatus);
+router.post('/admin/custom-orders/quote/:id', adminCustomOrderController.quotePrice);
 router.post('/admin/custom-orders/delete/:id', adminCustomOrderController.deleteCustomOrder);
 
 // Customers Directory
@@ -246,6 +249,9 @@ router.get('/admin/tools/missing-files/clean-broken-images/dry-run', adminToolsC
 router.post('/admin/tools/missing-files/clean-broken-images', adminToolsController.cleanBrokenImageRows);
 router.get('/admin/tools/missing-files/clean-broken-images/download-sql', adminToolsController.downloadCleanBrokenImagesSql);
 router.post('/admin/tools/replace-file-quick', upload.single('file'), adminToolsController.replaceDesignFileQuick);
+router.post('/admin/tools/missing-files/recover-deployments/trigger', adminToolsController.triggerDeploymentRecovery);
+router.get('/admin/tools/missing-files/recover-deployments/status/:jobId', adminToolsController.getDeploymentRecoveryStatus);
+router.get('/admin/tools/missing-files/recover-deployments/csv/:jobId', adminToolsController.downloadDeploymentRecoveryCsv);
 
 router.get('/admin/tools/regenerate-previews', adminToolsController.getRegeneratePreviews);
 router.post('/admin/tools/regenerate-previews', adminToolsController.postRegeneratePreviews);
@@ -270,6 +276,7 @@ router.post('/admin/tools/backup/restore', adminToolsController.postRestoreBacku
 // Database & System Health Dashboard
 router.get('/admin/tools/system-health', adminToolsController.getSystemHealth);
 router.post('/admin/tools/system-health/migrate', adminToolsController.postRunMigrations);
+router.post('/admin/tools/system-health/test-storage', adminToolsController.postTestStorageHealth);
 router.get('/admin/tools/system-health/download-sync-sql', adminToolsController.downloadProductionSyncSql);
 
 // Price Update History & Audit

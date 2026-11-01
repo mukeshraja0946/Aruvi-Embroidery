@@ -365,6 +365,45 @@
           </button>
         </div>
 
+        <!-- Persistent Storage Overview (Hostinger Environment) -->
+        <% if (locals.storageStatus) { %>
+          <div style="background: <%= storageStatus.isBlocked ? '#FFF5F5' : '#F8FAFC' %>; border: 1px solid <%= storageStatus.isBlocked ? '#FEB2B2' : '#E2E8F0' %>; border-radius: 10px; padding: 14px 18px; margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-hard-drive" style="color: <%= storageStatus.isBlocked ? '#E53E3E' : '#4B0F1C' %>; font-size: 1.1rem;"></i>
+                <strong style="font-size: 0.9rem; color: #1E293B;">Active Storage Configuration:</strong>
+                <span class="badge" style="background: <%= storageStatus.isWritable ? '#DCFCE7' : '#FEE2E2' %>; color: <%= storageStatus.isWritable ? '#166534' : '#991B1B' %>; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                  <%= storageStatus.isWritable ? 'WRITABLE' : 'READ-ONLY / BLOCKED' %>
+                </span>
+                <% if (storageStatus.isBlocked) { %>
+                  <span class="badge" style="background: #E53E3E; color: #FFF; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                    INSIDE DEPLOY DIRECTORY
+                  </span>
+                <% } else { %>
+                  <span class="badge" style="background: #EDE9FE; color: #5B21B6; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
+                    PERSISTENT (SAFE)
+                  </span>
+                <% } %>
+              </div>
+              <div style="font-size: 0.78rem; color: #64748B;">
+                Driver: <strong><%= storageStatus.driver || 'LOCAL' %></strong> | Session Store: <strong><%= locals.sessionStoreType || 'express-mysql-session' %></strong>
+              </div>
+            </div>
+
+            <div style="font-size: 0.82rem; color: #334155; margin-bottom: 8px; word-break: break-all; font-family: monospace; background: #FFF; padding: 6px 10px; border-radius: 6px; border: 1px solid #E2E8F0;">
+              <strong>UPLOAD_DIR:</strong> <%= storageStatus.uploadsDir %>
+            </div>
+
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: #475569;">
+              <div>Public Files: <strong style="color: #0F172A;"><%= storageStatus.publicFilesCount || 0 %></strong></div>
+              <div>Private Files: <strong style="color: #0F172A;"><%= storageStatus.privateFilesCount || 0 %></strong></div>
+              <% if (storageStatus.isAutoDetected) { %>
+                <div style="color: #059669;"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-detected Hostinger Persistent Directory</div>
+              <% } %>
+            </div>
+          </div>
+        <% } %>
+
         <!-- Live Rate Limit & Proxy Status Overview -->
         <% if (locals.rateLimitStatus) { %>
           <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem;">

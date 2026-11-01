@@ -30,10 +30,7 @@ function verifyLocalFileExists(publicUrl) {
   if (!publicUrl || typeof publicUrl !== 'string') return false;
   const clean = publicUrl.split('?')[0].trim();
   if (!clean || clean.includes('placeholder-preview.svg')) return false;
-  if (!clean.startsWith('/public/uploads/')) return true;
-  const rel = clean.replace(/^\/public\//, '');
-  const absPath = path.join(__dirname, '..', 'public', rel);
-  return fs.existsSync(absPath);
+  return storage.fileExists(clean);
 }
 
 class PreviewService {
@@ -142,8 +139,9 @@ class PreviewService {
       cardUrl = cleanAndVersionUrl(rawCard, versionTag);
     } else {
       const baseNameWithoutExt = path.basename(rawLarge.split('?')[0], path.extname(rawLarge.split('?')[0]));
-      const candidateCard = path.join(storage.getPreviewsDir(), 'cards', `${baseNameWithoutExt}.webp`);
-      if (fs.existsSync(candidateCard)) {
+      const cardFile1 = path.join(storage.getCardsDir(), `${baseNameWithoutExt}.webp`);
+      const cardFile2 = path.join(storage.getPreviewsDir(), 'cards', `${baseNameWithoutExt}.webp`);
+      if (fs.existsSync(cardFile1) || fs.existsSync(cardFile2)) {
         cardUrl = cleanAndVersionUrl(`/public/uploads/previews/cards/${baseNameWithoutExt}.webp`, versionTag);
       } else {
         cardUrl = largeUrl; // Fallback to large preview so cards NEVER show placeholder
@@ -156,8 +154,9 @@ class PreviewService {
       thumbUrl = cleanAndVersionUrl(rawThumb, versionTag);
     } else {
       const baseNameWithoutExt = path.basename(rawLarge.split('?')[0], path.extname(rawLarge.split('?')[0]));
-      const candidateThumb = path.join(storage.getThumbsDir(), `${baseNameWithoutExt}.webp`);
-      if (fs.existsSync(candidateThumb)) {
+      const thumbFile1 = path.join(storage.getThumbsDir(), `${baseNameWithoutExt}.webp`);
+      const thumbFile2 = path.join(storage.getPreviewsDir(), 'thumbs', `${baseNameWithoutExt}.webp`);
+      if (fs.existsSync(thumbFile1) || fs.existsSync(thumbFile2)) {
         thumbUrl = cleanAndVersionUrl(`/public/uploads/previews/thumbs/${baseNameWithoutExt}.webp`, versionTag);
       } else {
         thumbUrl = cardUrl || largeUrl; // Guaranteed fallback: NEVER show placeholder if large exists

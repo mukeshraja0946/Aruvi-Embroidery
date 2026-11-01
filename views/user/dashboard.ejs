@@ -1042,6 +1042,9 @@
         <a href="#order-history" class="dash-mobile-tab" data-tab="orders">
           <i class="fa-solid fa-box"></i> My Orders
         </a>
+        <a href="#custom-requests" class="dash-mobile-tab">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Custom
+        </a>
         <a href="/user/wishlist" class="dash-mobile-tab">
           <i class="fa-regular fa-heart"></i> Wishlist
         </a>
@@ -1086,6 +1089,9 @@
           </a>
           <a href="#purchased-downloads" class="dash-nav-link" onclick="document.getElementById('purchased-downloads').scrollIntoView({behavior:'smooth'})">
             <i class="fa-solid fa-download"></i> Purchased Downloads
+          </a>
+          <a href="#custom-requests" class="dash-nav-link" onclick="document.getElementById('custom-requests')?.scrollIntoView({behavior:'smooth'})">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> My Custom Requests
           </a>
           <a href="/user/wishlist" class="dash-nav-link">
             <i class="fa-regular fa-heart"></i> Saved Wishlist
@@ -1318,6 +1324,80 @@
             </div>
           <% } %>
         </div>
+
+        <!-- SECTION 3: MY CUSTOM REQUESTS -->
+        <div class="dash-section-card" id="custom-requests">
+          <div class="dash-table-header-flex">
+            <div style="display: flex; align-items: flex-start; gap: 16px;">
+              <div class="dash-header-icon-box">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+              </div>
+              <div>
+                <h2 class="dash-card-title">My Custom Requests</h2>
+                <p class="dash-card-subtitle">Track your custom design inquiries, quotes, and digitizing status.</p>
+              </div>
+            </div>
+
+            <a href="/custom-order" class="btn btn-primary btn-sm" style="border-radius: 20px; padding: 8px 18px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-plus"></i> New Request
+            </a>
+          </div>
+
+          <% const _crList = (typeof customRequests !== 'undefined' && customRequests) ? customRequests : []; %>
+          <% if (_crList.length === 0) { %>
+            <div style="text-align: center; padding: 2.5rem 1rem; background: var(--dash-bg-soft); border-radius: 16px; border: 1px dashed var(--dash-border);">
+              <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 2.2rem; color: var(--dash-text-muted); opacity: 0.6; margin-bottom: 0.8rem; display: block;"></i>
+              <h4 style="font-size: 1.05rem; color: var(--dash-text-dark); margin-bottom: 0.3rem;">No Custom Requests Yet</h4>
+              <p style="color: var(--dash-text-muted); font-size: 0.88rem; max-width: 440px; margin: 0 auto 1.2rem auto;">Have a unique design in mind for bridal blouses, boutique branding, or commercial orders? Request a custom embroidery design today!</p>
+              <a href="/custom-order" class="btn btn-primary btn-sm" style="border-radius: 20px; padding: 8px 22px;">Request a Custom Design</a>
+            </div>
+          <% } else { %>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+              <% _crList.forEach(cr => { %>
+                <%
+                  const st = cr.status || 'new';
+                  const stLabels = {
+                    'new': 'Received (Reviewing)',
+                    'in_review': 'Under Digitizer Review',
+                    'quoted': 'Price Quoted',
+                    'accepted': 'Accepted (Digitizing)',
+                    'completed': 'Completed',
+                    'rejected': 'Declined'
+                  };
+                  const label = stLabels[st] || st;
+                  const reqDate = cr.created_at ? new Date(cr.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+                %>
+                <div style="background: #FFFFFF; border: 1px solid var(--dash-border); border-radius: 14px; padding: 1.2rem; display: flex; flex-direction: column; gap: 10px; transition: box-shadow 0.2s ease;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
+                    <div>
+                      <span style="font-family: monospace; font-weight: 700; color: var(--dash-primary); font-size: 0.88rem;"><%= cr.request_number %></span>
+                      <h4 style="margin: 4px 0 2px; font-size: 1.05rem; color: var(--dash-text-dark);"><%= cr.design_title %></h4>
+                      <span style="font-size: 0.78rem; color: var(--dash-text-muted);"><i class="fa-regular fa-calendar"></i> <%= reqDate %> &bull; Formats: <%= cr.preferred_formats || 'DST, PES, JEF, EXP' %></span>
+                    </div>
+
+                    <div style="text-align: right;">
+                      <span style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; text-transform: uppercase; background: <%= st === 'completed' ? '#E8F5E9' : (st === 'quoted' ? '#F3E5F5' : '#E3F2FD') %>; color: <%= st === 'completed' ? '#2E7D32' : (st === 'quoted' ? '#6A1B9A' : '#1565C0') %>;">
+                        <%= label %>
+                      </span>
+                      <% if (cr.quoted_price) { %>
+                        <div style="margin-top: 4px; font-size: 0.95rem; font-weight: 700; color: #2E7D32;">Quoted: ₹<%= Number(cr.quoted_price).toFixed(2) %></div>
+                      <% } %>
+                    </div>
+                  </div>
+
+                  <p style="margin: 0; font-size: 0.86rem; color: #555; background: var(--dash-bg-soft); border-radius: 8px; padding: 10px 12px; line-height: 1.5; white-space: pre-wrap;"><%= cr.description %></p>
+
+                  <% if (cr.admin_notes) { %>
+                    <div style="background: #FAF0EE; border-left: 3px solid var(--dash-primary); border-radius: 4px; padding: 8px 12px; font-size: 0.82rem; color: var(--dash-text-dark);">
+                      <strong>Studio Note:</strong> <%= cr.admin_notes %>
+                    </div>
+                  <% } %>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+
 
         <!-- SECTION 3: NEED HELP (Mobile Full Width Card) -->
         <div class="dash-mobile-help-card">

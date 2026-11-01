@@ -1,143 +1,60 @@
-const db = require('../config/db');
+const CustomRequest = require('./CustomRequest');
 
-// Empty fallback in-memory store for offline DB mode (no fake custom orders)
-const fallbackCustomOrders = [];
-
+/**
+ * Backward compatibility adapter: CustomOrder redirects to CustomRequest
+ */
 class CustomOrder {
-  static async create({ userId = null, full_name, email, phone = null, design_details, reference_image_url = null }) {
-    if (db.isConnected()) {
-      const res = await db.query(
-        `INSERT INTO custom_orders (user_id, full_name, email, phone, design_details, reference_image_url, status)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-        [userId || null, full_name, email, phone, design_details, reference_image_url]
-      );
-      return res.insertId;
-    }
-
-    const newId = fallbackCustomOrders.length + 1;
-    const req = {
-      id: newId,
-      user_id: userId,
-      full_name,
+  static async create({ userId = null, full_name, name, email, phone = null, design_details, description, reference_image_url = null, reference_image_key = null }) {
+    const res = await CustomRequest.create({
+      userId,
+      name: name || full_name,
       email,
-      phone,
-      design_details,
-      reference_image_url: reference_image_url || '/public/images/logo.jpg',
-      status: 'pending',
-      created_at: new Date()
-    };
-    fallbackCustomOrders.push(req);
-    return newId;
+      phone: phone || '',
+      design_title: 'Custom Embroidery Request',
+      description: description || design_details,
+      reference_image_key: reference_image_key || reference_image_url
+    });
+    return res.id;
   }
 
-  static async getAll({ page = 1, limit = 20, status = null, search = null, sort = 'newest' } = {}) {
-    if (db.isConnected()) {
-      try {
-        let whereClauses = [];
-        let params = [];
-        if (status) {
-          whereClauses.push('status = ?');
-          params.push(status);
-        }
-        if (search && search.trim()) {
-          const q = `%${search.trim()}%`;
-          whereClauses.push('(full_name LIKE ? OR email LIKE ? OR phone LIKE ? OR design_details LIKE ?)');
-          params.push(q, q, q, q);
-        }
-        const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
-        const offset = (page - 1) * limit;
-
-        const orderSql = sort === 'oldest' ? 'ORDER BY created_at ASC' : 'ORDER BY created_at DESC';
-        const requests = await db.query(`SELECT * FROM custom_orders ${whereClause} ${orderSql} LIMIT ? OFFSET ?`, [...params, parseInt(limit), parseInt(offset)]);
-        const countRes = await db.query(`SELECT COUNT(*) as total FROM custom_orders ${whereClause}`, params);
-        if (requests && Array.isArray(requests)) {
-          return { requests, total: (countRes && countRes[0] && countRes[0].total !== undefined) ? countRes[0].total : requests.length };
-        }
-      } catch (err) {
-        console.error('CustomOrder.getAll DB error:', err.message);
-      }
-    }
-    let list = [...fallbackCustomOrders];
-    if (status) list = list.filter(r => r.status === status);
-    if (search && search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(r => (r.full_name && r.full_name.toLowerCase().includes(q)) || (r.email && r.email.toLowerCase().includes(q)) || (r.design_details && r.design_details.toLowerCase().includes(q)));
-    }
-    if (sort === 'oldest') list.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-    else list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-    return { requests: list, total: list.length };
+  static async getAll(options = {}) {
+    const res = await CustomRequest.getAll(options);
+    // Map back for legacy views if needed
+    const requests = (res.requests || []).map(r => ({
+      ...r,
+      full_name: r.name,
+      design_details: r.description,
+      reference_image_url: r.reference_image_key
+    }));
+    return { requests, total: res.total };
   }
 
   static async getById(id) {
-    if (db.isConnected()) {
-      const rows = await db.query('SELECT * FROM custom_orders WHERE id = ? LIMIT 1', [id]);
-      return (rows && rows[0]) ? rows[0] : null;
-    }
-    return fallbackCustomOrders.find(r => r.id == id) || null;
-  }
-
-  static async updateStatus(id, status, admin_notes = null) {
-    if (db.isConnected()) {
-      await db.query('UPDATE custom_orders SET status = ?, admin_notes = COALESCE(?, admin_notes) WHERE id = ?', [status, admin_notes, id]);
-      return true;
-    }
-    const r = fallbackCustomOrders.find(item => item.id == id);
-    if (r) {
-      r.status = status;
-      if (admin_notes) r.admin_notes = admin_notes;
-    }
-    return true;
-  }
-
-  static async count() {
-    if (db.isConnected()) {
-      try {
-        const res = await db.query('SELECT COUNT(*) as total FROM custom_orders');
-        if (res && res[0] && res[0].total !== undefined) return res[0].total;
-      } catch (err) {
-        console.error('CustomOrder.count DB error:', err.message);
-      }
-    }
-    return fallbackCustomOrders.length;
-  }
-
-  static async getStats() {
-    if (db.isConnected()) {
-      try {
-        const [counts] = await db.query(`
-          SELECT
-            COUNT(*) as total,
-            COALESCE(SUM(CASE WHEN status IN ('pending', 'reviewing') THEN 1 ELSE 0 END), 0) as pending,
-            COALESCE(SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END), 0) as in_progress,
-            COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completed
-          FROM custom_orders
-        `);
-        return {
-          total: Number(counts.total || 0),
-          pending: Number(counts.pending || 0),
-          in_progress: Number(counts.in_progress || 0),
-          completed: Number(counts.completed || 0)
-        };
-      } catch (e) {
-        console.error('CustomOrder.getStats error:', e.message);
-      }
-    }
+    const r = await CustomRequest.getById(id);
+    if (!r) return null;
     return {
-      total: fallbackCustomOrders.length,
-      pending: fallbackCustomOrders.filter(r => ['pending', 'reviewing'].includes(r.status)).length,
-      in_progress: fallbackCustomOrders.filter(r => r.status === 'in_progress').length,
-      completed: fallbackCustomOrders.filter(r => r.status === 'completed').length
+      ...r,
+      full_name: r.name,
+      design_details: r.description,
+      reference_image_url: r.reference_image_key
     };
   }
 
+  static async updateStatus(id, status, admin_notes = null) {
+    return CustomRequest.updateStatus(id, status, admin_notes);
+  }
+
+  static async count() {
+    const stats = await CustomRequest.getStats();
+    return stats.total;
+  }
+
+  static async getStats() {
+    return CustomRequest.getStats();
+  }
+
   static async delete(id) {
-    if (db.isConnected()) {
-      await db.query('DELETE FROM custom_orders WHERE id = ?', [id]);
-      return true;
-    }
-    const idx = fallbackCustomOrders.findIndex(r => r.id == id);
-    if (idx !== -1) fallbackCustomOrders.splice(idx, 1);
-    return true;
+    return CustomRequest.delete(id);
   }
 }
 

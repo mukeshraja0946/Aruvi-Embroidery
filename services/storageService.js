@@ -6,17 +6,27 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 /**
  * Aruvi Embroidery — Universal Persistent Storage Service
+ * Designed for Hostinger Business Plan (Node.js web app, user u101925264)
  * 
- * Supports:
- * 1. "local": Persistent volume/directory OUTSIDE the git code repo (e.g. UPLOAD_DIR=/var/data/aruvi-uploads).
- * 2. "s3": Cloudflare R2 / AWS S3 / MinIO compatible object storage with private signed URLs for paid files.
- * 3. "cloudinary": Direct preview image upload driver.
+ * Storage Architecture:
+ * - Local Persistent Disk: UPLOAD_DIR outside ephemeral git deploys (hbuilds/versions/<id>)
+ *   Primary candidate:   /home/u101925264/aruvi-uploads
+ *   Fallback candidate:  /home/u101925264/domains/aruviembroidery.com/aruvi-uploads
+ * - Subfolders:
+ *   - public/: Previews, thumbnails, card images, branding (logos/favicons), banners.
+ *     Served with express.static, long cache + versioned query strings.
+ *   - private/: Paid machine files (DST, PES, JEF, EXP, ZIP), pristine originals, custom-requests, backups.
+ *     Strictly private, accessed only via authenticated customer/admin routes.
+ * - Driver Options:
+ *   - "local" (Default): Hostinger persistent filesystem.
+ *   - "s3": Cloudflare R2 / AWS S3 / MinIO compatible object storage with private signed URLs.
+ *   - "cloudinary": Direct preview image upload driver.
  * 
- * Architectural Guarantees:
- * - Public preview images, banners, logo, favicon: publicly accessible.
- * - Paid machine files (DST, PES, JEF, EXP, ZIP): strictly private, downloaded only via authenticated signed links.
- * - Brand assets: fallback to committed /public/assets/brand/ files if user-uploaded asset is missing.
- * - Deploy Safety: Startup check warns if UPLOAD_DIR is located inside the project repository.
+ * Deploy Safety Guarantees:
+ * - Auto-detects writable persistent directories outside hbuilds.
+ * - Startup Guard: If UPLOAD_DIR is inside the git repository or hbuilds/versions on production,
+ *   logs a clear error, triggers admin dashboard warning banner, and blocks new uploads.
+ * - Safe writes: Unique collision-free names, never overwrites; writes new file first.
  */
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -30,105 +40,320 @@ const BRAND_DEFAULTS = {
   preloader_custom: ''
 };
 
+const HOSTINGER_PERSISTENT_CANDIDATES = [
+  '/home/u101925264/aruvi-uploads',
+  '/home/u101925264/domains/aruviembroidery.com/aruvi-uploads'
+];
+
+/**
+ * Checks if a target path is inside the project repository or ephemeral deploy directories
+ */
+function isPathInsideRepoOrHbuilds(targetPath) {
+  if (!targetPath || typeof targetPath !== 'string') return true;
+  const resolved = path.resolve(targetPath);
+  const rel = path.relative(projectRoot, resolved);
+  const isInsideProject = !rel.startsWith('..') && !path.isAbsolute(rel);
+
+  const normalized = resolved.replace(/\\/g, '/').toLowerCase();
+  const hasHbuilds = normalized.includes('/hbuilds/') || normalized.includes('/versions/');
+
+  return isInsideProject || hasHbuilds;
+}
+
+/**
+ * Tests write permission on a directory
+ */
+function testDirectoryWritable(dirPath) {
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+    const probe = path.join(dirPath, `.write_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+    fs.writeFileSync(probe, 'aruvi_write_test', 'utf8');
+    fs.unlinkSync(probe);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Counts all files recursively inside a directory
+ */
+function countFilesInDirectory(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return 0;
+  let count = 0;
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        count += countFilesInDirectory(fullPath);
+      } else if (entry.isFile()) {
+        count++;
+      }
+    }
+  } catch (_) {}
+  return count;
+}
+
 class StorageService {
   constructor() {
     this.s3Client = null;
     this.initS3Client();
+    this._resolvedUploadsDir = null;
+    this._detectionDetails = null;
+    this._missingBrandAssets = new Set();
   }
 
   getDriver() {
     return (process.env.STORAGE_DRIVER || 'local').toLowerCase().trim();
   }
 
-  getUploadsDir() {
-    const custom = process.env.UPLOAD_DIR || process.env.PERSISTENT_UPLOADS_DIR || process.env.UPLOADS_DIR;
-    if (custom && custom.trim() !== '') {
-      return path.resolve(custom.trim());
-    }
-    return defaultUploadsDir;
+  resetLocationCache() {
+    this._resolvedUploadsDir = null;
+    this._detectionDetails = null;
   }
 
-  getPrivateUploadsDir() {
-    const custom = process.env.PRIVATE_UPLOADS_DIR;
-    if (custom && custom.trim() !== '') {
-      return path.resolve(custom.trim());
+  /**
+   * Resolves persistent upload directory outside ephemeral git deploys
+   */
+  resolveStorageLocation() {
+    if (this._resolvedUploadsDir && this._detectionDetails) {
+      return this._detectionDetails;
     }
-    // Strictly outside public web root and not served by express.static
-    const dir = path.join(projectRoot, 'storage_private');
+
+    const envCustom = process.env.UPLOAD_DIR || process.env.PERSISTENT_UPLOADS_DIR || process.env.UPLOADS_DIR;
+
+    // 1. Explicit environment variable configured in hPanel / .env
+    if (envCustom && envCustom.trim() !== '') {
+      const resolved = path.resolve(envCustom.trim());
+      const insideRepo = isPathInsideRepoOrHbuilds(resolved);
+      const isWritable = testDirectoryWritable(resolved);
+
+      this._resolvedUploadsDir = resolved;
+      this._detectionDetails = {
+        path: resolved,
+        source: 'env',
+        isInsideRepo: insideRepo,
+        isWritable,
+        isSafe: !insideRepo && isWritable,
+        candidateMatched: null
+      };
+      return this._detectionDetails;
+    }
+
+    // 2. Auto-detect Hostinger persistent folders outside hbuilds
+    for (const candidate of HOSTINGER_PERSISTENT_CANDIDATES) {
+      if (testDirectoryWritable(candidate)) {
+        const resolved = path.resolve(candidate);
+        this._resolvedUploadsDir = resolved;
+        this._detectionDetails = {
+          path: resolved,
+          source: 'auto-detected',
+          isInsideRepo: false,
+          isWritable: true,
+          isSafe: true,
+          candidateMatched: candidate
+        };
+        return this._detectionDetails;
+      }
+    }
+
+    // 3. Fallback to local default (inside project root)
+    const fallbackDir = defaultUploadsDir;
+    const isWritable = testDirectoryWritable(fallbackDir);
+    this._resolvedUploadsDir = fallbackDir;
+    this._detectionDetails = {
+      path: fallbackDir,
+      source: 'default',
+      isInsideRepo: true,
+      isWritable,
+      isSafe: false,
+      candidateMatched: null
+    };
+    return this._detectionDetails;
+  }
+
+  getUploadsDir() {
+    return this.resolveStorageLocation().path;
+  }
+
+  getPublicDir() {
+    const dir = path.join(this.getUploadsDir(), 'public');
     if (!fs.existsSync(dir)) {
-      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
     }
     return dir;
   }
 
-  getPreviewsDir() {
-    const dir = path.join(this.getUploadsDir(), 'previews');
+  getPrivateDir() {
+    const custom = process.env.PRIVATE_UPLOADS_DIR;
+    if (custom && custom.trim() !== '') {
+      return path.resolve(custom.trim());
+    }
+    const dir = path.join(this.getUploadsDir(), 'private');
     if (!fs.existsSync(dir)) {
-      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    }
+    return dir;
+  }
+
+  // Alias for backward compatibility
+  getPrivateUploadsDir() {
+    return this.getPrivateDir();
+  }
+
+  getPreviewsDir() {
+    const dir = path.join(this.getPublicDir(), 'previews');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
     }
     return dir;
   }
 
   getCardsDir() {
-    const dir = path.join(this.getPreviewsDir(), 'cards');
+    const dir = path.join(this.getPublicDir(), 'cards');
     if (!fs.existsSync(dir)) {
-      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
     }
     return dir;
   }
 
   getThumbsDir() {
-    const dir = path.join(this.getPreviewsDir(), 'thumbs');
+    const dir = path.join(this.getPublicDir(), 'thumbs');
     if (!fs.existsSync(dir)) {
-      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    }
+    return dir;
+  }
+
+  getBrandingDir() {
+    const dir = path.join(this.getPublicDir(), 'branding');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    }
+    return dir;
+  }
+
+  getBannersDir() {
+    const dir = path.join(this.getPublicDir(), 'banners');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
     }
     return dir;
   }
 
   getDesignsDir() {
-    const dir = this.getPrivateUploadsDir();
+    const dir = path.join(this.getPrivateDir(), 'designs');
     if (!fs.existsSync(dir)) {
-      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
     }
     return dir;
   }
 
   getOriginalsDir() {
-    const dir = path.join(this.getUploadsDir(), 'private', 'originals');
+    const dir = path.join(this.getPrivateDir(), 'originals');
     if (!fs.existsSync(dir)) {
-      try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
     }
     return dir;
   }
 
+  getCustomRequestsDir() {
+    const dir = path.join(this.getPrivateDir(), 'custom-requests');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    }
+    return dir;
+  }
+
+  getBackupsDir() {
+    const custom = process.env.BACKUP_DIR || process.env.BACKUPS_DIR;
+    if (custom && custom.trim() !== '') {
+      return path.resolve(custom.trim());
+    }
+    const hostingerBackup = '/home/u101925264/aruvi-backups';
+    if (testDirectoryWritable(hostingerBackup)) {
+      return hostingerBackup;
+    }
+    const dir = path.join(this.getPrivateDir(), 'backups');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    }
+    return dir;
+  }
+
+  /**
+   * Initializes all required storage subdirectories
+   */
   initStorageDirs() {
     try {
+      this.getPublicDir();
+      this.getPrivateDir();
       this.getPreviewsDir();
       this.getCardsDir();
       this.getThumbsDir();
+      this.getBrandingDir();
+      this.getBannersDir();
       this.getDesignsDir();
       this.getOriginalsDir();
-      
-      // Fallback local dirs inside project root
-      const defaultPreviews = path.join(defaultUploadsDir, 'previews');
-      const defaultCards = path.join(defaultPreviews, 'cards');
-      const defaultThumbs = path.join(defaultPreviews, 'thumbs');
-      const defaultDesigns = path.join(defaultUploadsDir, 'designs');
-      if (!fs.existsSync(defaultPreviews)) {
-        try { fs.mkdirSync(defaultPreviews, { recursive: true }); } catch (e) {}
-      }
-      if (!fs.existsSync(defaultCards)) {
-        try { fs.mkdirSync(defaultCards, { recursive: true }); } catch (e) {}
-      }
-      if (!fs.existsSync(defaultThumbs)) {
-        try { fs.mkdirSync(defaultThumbs, { recursive: true }); } catch (e) {}
-      }
-      if (!fs.existsSync(defaultDesigns)) {
-        try { fs.mkdirSync(defaultDesigns, { recursive: true }); } catch (e) {}
+      this.getCustomRequestsDir();
+      this.getBackupsDir();
+
+      // Legacy/fallback paths for compatibility
+      const legacyPreviews = path.join(this.getUploadsDir(), 'previews');
+      if (!fs.existsSync(legacyPreviews)) {
+        try { fs.mkdirSync(legacyPreviews, { recursive: true }); } catch (_) {}
       }
     } catch (err) {
-      console.warn('[StorageService] Directory initialization warning:', err.message);
+      console.warn('[StorageService] Directory initialization notice:', err.message);
     }
+  }
+
+  /**
+   * Returns whether new uploads should be blocked on production due to insecure storage configuration
+   */
+  isUploadBlocked() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction) return false;
+    const info = this.resolveStorageLocation();
+    return !info.isSafe || info.isInsideRepo || !info.isWritable;
+  }
+
+  /**
+   * Checks health and status of the storage subsystem
+   */
+  getStorageStatus() {
+    const info = this.resolveStorageLocation();
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isBlocked = isProduction && (!info.isSafe || info.isInsideRepo || !info.isWritable);
+
+    const publicFilesCount = countFilesInDirectory(this.getPublicDir()) + countFilesInDirectory(path.join(info.path, 'previews'));
+    const privateFilesCount = countFilesInDirectory(this.getPrivateDir()) + countFilesInDirectory(path.join(projectRoot, 'storage_private'));
+
+    let warningMessage = null;
+    if (info.isInsideRepo) {
+      warningMessage = 'UPLOAD_DIR must point to a folder OUTSIDE the deploy folder, e.g. /home/u101925264/aruvi-uploads. Set it in hPanel -> Node.js app -> Environment variables and restart.';
+    } else if (!info.isWritable) {
+      warningMessage = `UPLOAD_DIR (${info.path}) is not writable by current user. Check folder permissions in Hostinger SSH/File Manager.`;
+    }
+
+    return {
+      driver: this.getDriver(),
+      uploadsDir: info.path,
+      source: info.source,
+      candidateMatched: info.candidateMatched,
+      isInsideRepo: info.isInsideRepo,
+      isWritable: info.isWritable,
+      isSafe: info.isSafe,
+      isBlocked,
+      publicFilesCount,
+      privateFilesCount,
+      warningMessage,
+      missingBrandAssets: Array.from(this._missingBrandAssets)
+    };
   }
 
   /**
@@ -136,9 +361,7 @@ class StorageService {
    */
   validateStorageConfiguration() {
     const driver = this.getDriver();
-    const uploadsDir = this.getUploadsDir();
-    const relativeToRoot = path.relative(projectRoot, uploadsDir);
-    const isInsideProject = !relativeToRoot.startsWith('..') && !path.isAbsolute(relativeToRoot);
+    const status = this.getStorageStatus();
 
     console.log('====================================================');
     console.log(`📦 Storage Driver: ${driver.toUpperCase()}`);
@@ -150,23 +373,38 @@ class StorageService {
       console.log(`   - Bucket: ${bucket || 'NOT CONFIGURED'}`);
       console.log(`   - Endpoint: ${endpoint || 'Default AWS S3'}`);
       if (!bucket || !process.env.S3_ACCESS_KEY_ID) {
-        console.warn('   ⚠️ [WARNING]: S3 credentials incomplete. Local storage will act as fallback.');
+        console.warn('   ⚠️ [STORAGE WARNING]: S3 credentials incomplete. Local storage will act as fallback.');
       }
     } else if (driver === 'cloudinary') {
       console.log(`   - Cloudinary Cloud: ${process.env.CLOUDINARY_CLOUD_NAME || 'NOT CONFIGURED'}`);
     } else {
-      console.log(`   - Persistent Disk: ${uploadsDir}`);
-      if (isInsideProject) {
-        console.warn('   ⚠️ [STORAGE WARNING]: UPLOAD_DIR is located INSIDE the project repository!');
-        console.warn('      On ephemeral deploy platforms (Render, Railway, Heroku), all files uploaded here');
-        console.warn('      will be lost on every git push or redeploy.');
-        console.warn('      FIX: Mount a persistent disk and set UPLOAD_DIR=/var/data/aruvi-uploads in .env');
-        console.warn('           or switch to STORAGE_DRIVER=s3 (Cloudflare R2 / AWS S3).');
+      console.log(`   - Persistent Disk: ${status.uploadsDir}`);
+      console.log(`   - Writable: ${status.isWritable ? 'YES' : 'NO'}`);
+      console.log(`   - Auto-detected: ${status.candidateMatched ? `YES (${status.candidateMatched})` : 'NO'}`);
+      console.log(`   - Public Files: ${status.publicFilesCount} (previews, thumbs, branding, banners)`);
+      console.log(`   - Private Files: ${status.privateFilesCount} (machine archives, originals, backups)`);
+
+      if (status.isInsideRepo) {
+        console.error('====================================================');
+        console.error('❌ [STORAGE ERROR]: UPLOAD_DIR is located INSIDE the deploy folder!');
+        console.error(`   Current path: ${status.uploadsDir}`);
+        console.error('   Hostinger creates a NEW hbuilds/versions/<id> folder on every git push / redeploy,');
+        console.error('   which causes all uploads written inside the deploy folder to disappear.');
+        console.error('   FIX: UPLOAD_DIR must point to a folder OUTSIDE the deploy folder,');
+        console.error('        e.g. /home/u101925264/aruvi-uploads');
+        console.error('        Set it in hPanel -> Node.js app -> Environment variables and restart.');
+        if (status.isBlocked) {
+          console.error('   [SECURITY GUARD]: NEW UPLOADS ARE CURRENTLY BLOCKED UNTIL SAFE STORAGE IS CONFIGURED.');
+          console.error('   (Existing files remain fully readable).');
+        }
+        console.error('====================================================');
       } else {
-        console.log(`   ✓ Persistent volume confirmed outside git repository: ${uploadsDir}`);
+        console.log(`   ✓ Persistent volume confirmed outside deploy folder: ${status.uploadsDir}`);
       }
     }
     console.log('====================================================');
+
+    return status;
   }
 
   /**
@@ -191,12 +429,12 @@ class StorageService {
 
         if (endpoint) {
           config.endpoint = endpoint;
-          config.forcePathStyle = true; // Required for Cloudflare R2 & MinIO
+          config.forcePathStyle = true;
         }
 
         this.s3Client = new S3Client(config);
       } catch (err) {
-        console.warn('[StorageService] S3 Client initialization error:', err.message);
+        console.warn('[StorageService] S3 Client initialization notice:', err.message);
         this.s3Client = null;
       }
     }
@@ -206,7 +444,7 @@ class StorageService {
    * Generates a collision-free unique filename
    */
   generateUniqueFilename(originalName, prefix = 'file') {
-    const ext = path.extname(originalName).toLowerCase();
+    const ext = path.extname(originalName || '').toLowerCase();
     const randomHex = crypto.randomBytes(8).toString('hex');
     return `${prefix}-${Date.now()}-${randomHex}${ext || ''}`;
   }
@@ -231,26 +469,31 @@ class StorageService {
       }
 
       await imagePipeline
+        .rotate()
         .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 85 })
         .toFile(thumbDestPath);
 
       return `/public/uploads/previews/thumbs/${thumbFilename}`;
     } catch (err) {
-      console.warn('[Thumbnail Generation Warning]:', err.message);
+      console.warn('[Thumbnail Generation Notice]:', err.message);
       return null;
     }
   }
 
   /**
-   * Saves a PUBLIC preview image, banner, logo, or favicon.
-   * Generates a 300px WebP thumbnail for fast admin listing.
-   * Returns web-accessible URL or path.
+   * Saves a PUBLIC preview image, banner, logo, or category image.
+   * Never overwrites existing files; writes new file first.
    */
-  async savePublicFile(filePathOrBuffer, originalName, mimeType = null) {
+  async savePublicFile(filePathOrBuffer, originalName, mimeType = null, subFolder = 'previews') {
+    if (this.isUploadBlocked()) {
+      throw new Error('Uploads are currently disabled: UPLOAD_DIR is located inside the deploy folder. UPLOAD_DIR must point to a folder OUTSIDE the deploy folder, e.g. /home/u101925264/aruvi-uploads. Set it in hPanel -> Node.js app -> Environment variables and restart.');
+    }
+
     const driver = this.getDriver();
-    const ext = path.extname(originalName).toLowerCase();
-    const uniqueFilename = this.generateUniqueFilename(originalName, 'preview');
+    const ext = path.extname(originalName || '').toLowerCase();
+    const prefix = subFolder === 'branding' ? 'brand' : (subFolder === 'banners' ? 'banner' : 'preview');
+    const uniqueFilename = this.generateUniqueFilename(originalName, prefix);
 
     // 1. Cloudinary driver
     if (driver === 'cloudinary' && process.env.CLOUDINARY_CLOUD_NAME) {
@@ -266,7 +509,7 @@ class StorageService {
     if (driver === 's3' && this.s3Client) {
       try {
         const bucket = process.env.S3_BUCKET || process.env.R2_BUCKET;
-        const key = `previews/${uniqueFilename}`;
+        const key = `${subFolder}/${uniqueFilename}`;
         const fileBuffer = Buffer.isBuffer(filePathOrBuffer) ? filePathOrBuffer : fs.readFileSync(filePathOrBuffer);
 
         await this.s3Client.send(new PutObjectCommand({
@@ -290,19 +533,69 @@ class StorageService {
     }
 
     // 3. Local persistent storage
-    const destPath = path.join(this.getPreviewsDir(), uniqueFilename);
+    let targetDir;
+    if (subFolder === 'branding') {
+      targetDir = this.getBrandingDir();
+    } else if (subFolder === 'banners') {
+      targetDir = this.getBannersDir();
+    } else {
+      targetDir = this.getPreviewsDir();
+    }
+
+    const destPath = path.join(targetDir, uniqueFilename);
+    const tempDest = `${destPath}.tmp_${Date.now()}`;
+
+    // Write new file first to temp, then atomically rename
+    if (Buffer.isBuffer(filePathOrBuffer)) {
+      fs.writeFileSync(tempDest, filePathOrBuffer);
+    } else {
+      fs.copyFileSync(filePathOrBuffer, tempDest);
+    }
+    fs.renameSync(tempDest, destPath);
+
+    // Also mirror into legacy previews folder if custom subFolder is previews
+    if (subFolder === 'previews') {
+      const legacyPath = path.join(this.getUploadsDir(), 'previews', uniqueFilename);
+      if (legacyPath !== destPath && !fs.existsSync(legacyPath)) {
+        try { fs.copyFileSync(destPath, legacyPath); } catch (_) {}
+      }
+    }
+
+    // Generate 300px WebP thumbnail for preview images
+    if (subFolder === 'previews' && ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.jfif', '.bmp'].includes(ext)) {
+      await this.generateThumbnail(destPath, uniqueFilename);
+    }
+
+    return `/public/uploads/${subFolder}/${uniqueFilename}`;
+  }
+
+  /**
+   * Saves a dedicated branding asset (logo, favicon, preloader image) into UPLOAD_DIR/public/branding/
+   */
+  async saveBrandingFile(filePathOrBuffer, originalName, mimeType = null) {
+    return this.savePublicFile(filePathOrBuffer, originalName, mimeType, 'branding');
+  }
+
+  /**
+   * Saves a custom order reference image into UPLOAD_DIR/private/custom-requests/
+   */
+  async saveCustomRequestFile(filePathOrBuffer, originalName, mimeType = null) {
+    if (this.isUploadBlocked()) {
+      throw new Error('Uploads are currently disabled: UPLOAD_DIR is located inside the deploy folder. UPLOAD_DIR must point to a folder OUTSIDE the deploy folder, e.g. /home/u101925264/aruvi-uploads. Set it in hPanel -> Node.js app -> Environment variables and restart.');
+    }
+
+    const ext = path.extname(originalName || '').toLowerCase() || '.jpg';
+    const randomHex = crypto.randomBytes(6).toString('hex');
+    const uniqueFilename = `cr-${Date.now()}-${randomHex}${ext}`;
+    const destPath = path.join(this.getCustomRequestsDir(), uniqueFilename);
+
     if (Buffer.isBuffer(filePathOrBuffer)) {
       fs.writeFileSync(destPath, filePathOrBuffer);
     } else {
       fs.copyFileSync(filePathOrBuffer, destPath);
     }
 
-    // Generate 300px WebP thumbnail for images
-    if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.jfif', '.bmp'].includes(ext)) {
-      await this.generateThumbnail(destPath, uniqueFilename);
-    }
-
-    return `/public/uploads/previews/${uniqueFilename}`;
+    return `custom-requests/${uniqueFilename}`;
   }
 
   /**
@@ -313,15 +606,12 @@ class StorageService {
     const clean = keyOrPath.trim();
     if (!clean) return null;
 
-    // Remote HTTP / HTTPS URL
     if (clean.startsWith('http://') || clean.startsWith('https://')) {
       return clean;
     }
 
-    // Normalizing slashes
     const normalized = clean.replace(/\\/g, '/');
 
-    // Already public URL
     if (normalized.startsWith('/public/uploads/')) {
       return normalized;
     }
@@ -335,12 +625,22 @@ class StorageService {
       return '/public/' + normalized;
     }
 
-    // Relative key e.g. "previews/xyz.jpg" or "previews/thumbs/xyz.webp"
+    if (normalized.startsWith('branding/') || normalized.startsWith('/branding/')) {
+      return `/public/uploads/branding/${path.basename(normalized)}`;
+    }
+    if (normalized.startsWith('banners/') || normalized.startsWith('/banners/')) {
+      return `/public/uploads/banners/${path.basename(normalized)}`;
+    }
+    if (normalized.startsWith('previews/cards/') || normalized.startsWith('/previews/cards/')) {
+      return `/public/uploads/previews/cards/${path.basename(normalized)}`;
+    }
+    if (normalized.startsWith('previews/thumbs/') || normalized.startsWith('/previews/thumbs/')) {
+      return `/public/uploads/previews/thumbs/${path.basename(normalized)}`;
+    }
     if (normalized.startsWith('previews/') || normalized.startsWith('/previews/')) {
-      return `/public/uploads/${normalized.replace(/^\/+/, '')}`;
+      return `/public/uploads/previews/${path.basename(normalized)}`;
     }
 
-    // Plain filename e.g. "preview-123.jpg"
     return `/public/uploads/previews/${path.basename(normalized)}`;
   }
 
@@ -369,9 +669,14 @@ class StorageService {
 
   /**
    * Saves a PRIVATE paid design file (DST, PES, JEF, EXP, ZIP).
-   * Returns storage key or relative private path (outside public web root).
+   * Stored in UPLOAD_DIR/private/designs/<subFolder>/
+   * Returns storage key (relative path).
    */
   async savePrivateFile(filePathOrBuffer, originalName, mimeType = 'application/octet-stream', designId = null) {
+    if (this.isUploadBlocked()) {
+      throw new Error('Uploads are currently disabled: UPLOAD_DIR is located inside the deploy folder. UPLOAD_DIR must point to a folder OUTSIDE the deploy folder, e.g. /home/u101925264/aruvi-uploads. Set it in hPanel -> Node.js app -> Environment variables and restart.');
+    }
+
     const driver = this.getDriver();
     const cleanOrig = path.basename(originalName || 'design.zip').replace(/[/\\?%*:|"<>]/g, '_').trim();
     const ext = path.extname(cleanOrig).toLowerCase() || '.zip';
@@ -402,24 +707,26 @@ class StorageService {
     }
 
     // 2. Local private storage strictly outside public web root
-    const targetFolder = path.join(this.getPrivateUploadsDir(), 'design-files', subFolder);
+    const targetFolder = path.join(this.getDesignsDir(), subFolder);
     if (!fs.existsSync(targetFolder)) {
-      try { fs.mkdirSync(targetFolder, { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(targetFolder, { recursive: true }); } catch (_) {}
     }
 
     const destPath = path.join(targetFolder, uniqueFilename);
+    const tempDest = `${destPath}.tmp_${Date.now()}`;
+
     if (Buffer.isBuffer(filePathOrBuffer)) {
-      fs.writeFileSync(destPath, filePathOrBuffer);
+      fs.writeFileSync(tempDest, filePathOrBuffer);
     } else {
-      fs.copyFileSync(filePathOrBuffer, destPath);
+      fs.copyFileSync(filePathOrBuffer, tempDest);
     }
+    fs.renameSync(tempDest, destPath);
 
     return relativeKey;
   }
 
   /**
    * Generates a signed temporary download URL for paid design files.
-   * Expires after expiresInSeconds (default: 3600s / 1 hour).
    */
   async getSignedDownloadUrl(storageKeyOrPath, expiresInSeconds = 3600) {
     if (!storageKeyOrPath) return null;
@@ -446,12 +753,10 @@ class StorageService {
 
   /**
    * Asynchronously checks whether a file physically exists in persistent storage or remote storage.
-   * Uses fs.promises.access and wraps all checks in try/catch so corrupted paths never throw.
    */
   async fileExistsAsync(filePathOrUrl) {
     if (!filePathOrUrl || typeof filePathOrUrl !== 'string' || !filePathOrUrl.trim()) return false;
 
-    // Remote HTTP / HTTPS URLs (Cloudinary, Cloudflare R2 CDN, S3)
     if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
       return true;
     }
@@ -473,7 +778,6 @@ class StorageService {
   fileExists(filePathOrUrl) {
     if (!filePathOrUrl || typeof filePathOrUrl !== 'string' || !filePathOrUrl.trim()) return false;
 
-    // Remote HTTP / HTTPS URLs (Cloudinary, Cloudflare R2 CDN, S3)
     if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
       return true;
     }
@@ -501,7 +805,6 @@ class StorageService {
       clean = decodeURIComponent(clean);
     } catch (_) {}
 
-    // If already absolute on disk
     if (path.isAbsolute(clean) && fs.existsSync(clean)) {
       return clean;
     }
@@ -509,42 +812,62 @@ class StorageService {
     clean = clean.replace(/\\/g, '/').replace(/^\/+/, '');
     const baseName = path.basename(clean);
 
-    // 1. Direct path check inside UPLOAD_DIR
-    const directUploads = path.join(this.getUploadsDir(), clean);
+    // 1. Direct checks inside UPLOAD_DIR
+    const uploadsDir = this.getUploadsDir();
+
+    // 1a. Inside UPLOAD_DIR/public
+    const inPublic = path.join(this.getPublicDir(), clean.replace(/^public\/uploads\//, '').replace(/^uploads\//, ''));
+    if (fs.existsSync(inPublic)) return inPublic;
+
+    // 1b. Inside UPLOAD_DIR/private
+    const inPrivate = path.join(this.getPrivateDir(), clean.replace(/^(storage_private|private)\//, ''));
+    if (fs.existsSync(inPrivate)) return inPrivate;
+
+    // 1c. Direct path inside uploadsDir
+    const directUploads = path.join(uploadsDir, clean);
     if (fs.existsSync(directUploads)) return directUploads;
 
-    // 1b. Direct path check inside private uploads dir (outside web root)
-    const privateDirect = path.join(this.getPrivateUploadsDir(), clean);
-    if (fs.existsSync(privateDirect)) return privateDirect;
+    // 1d. Subfolder specific checks
+    const inPreviews = path.join(this.getPreviewsDir(), baseName);
+    if (fs.existsSync(inPreviews)) return inPreviews;
 
-    const cleanWithoutPrivate = clean.replace(/^(storage_private\/)+/, '');
-    const privateFromClean = path.join(this.getPrivateUploadsDir(), cleanWithoutPrivate);
-    if (fs.existsSync(privateFromClean)) return privateFromClean;
+    const inCards = path.join(this.getCardsDir(), baseName);
+    if (fs.existsSync(inCards)) return inCards;
 
-    const privateFiles = path.join(this.getPrivateUploadsDir(), cleanWithoutPrivate.replace(/^design-files\//, 'design-files/'));
-    if (fs.existsSync(privateFiles)) return privateFiles;
+    const inThumbs = path.join(this.getThumbsDir(), baseName);
+    if (fs.existsSync(inThumbs)) return inThumbs;
 
-    // 2. Direct path check inside projectRoot
+    const inBranding = path.join(this.getBrandingDir(), baseName);
+    if (fs.existsSync(inBranding)) return inBranding;
+
+    const inBanners = path.join(this.getBannersDir(), baseName);
+    if (fs.existsSync(inBanners)) return inBanners;
+
+    const inDesigns = path.join(this.getDesignsDir(), baseName);
+    if (fs.existsSync(inDesigns)) return inDesigns;
+
+    const inOriginals = path.join(this.getOriginalsDir(), baseName);
+    if (fs.existsSync(inOriginals)) return inOriginals;
+
+    const inCustomRequests = path.join(this.getCustomRequestsDir(), baseName);
+    if (fs.existsSync(inCustomRequests)) return inCustomRequests;
+
+    // Check design subfolders (e.g. design-files/12/name.zip or designs/12/name.zip)
+    const matchDesignFolder = clean.match(/(?:design-files|designs)\/([^/]+)\/(.+)$/);
+    if (matchDesignFolder) {
+      const p1 = path.join(this.getDesignsDir(), matchDesignFolder[1], matchDesignFolder[2]);
+      if (fs.existsSync(p1)) return p1;
+      const p2 = path.join(this.getPrivateDir(), 'design-files', matchDesignFolder[1], matchDesignFolder[2]);
+      if (fs.existsSync(p2)) return p2;
+    }
+
+    // 2. Direct path check inside projectRoot (fallbacks)
     const rootDirect = path.join(projectRoot, clean);
     if (fs.existsSync(rootDirect)) return rootDirect;
 
     const publicDirect = path.join(projectRoot, 'public', clean.replace(/^public\//, ''));
     if (fs.existsSync(publicDirect)) return publicDirect;
 
-    // 3. Check by filename in persistent previews, thumbs, designs
-    const persistentPreviews = path.join(this.getPreviewsDir(), baseName);
-    if (fs.existsSync(persistentPreviews)) return persistentPreviews;
-
-    const persistentThumbs = path.join(this.getThumbsDir(), baseName);
-    if (fs.existsSync(persistentThumbs)) return persistentThumbs;
-
-    const persistentDesigns = path.join(this.getDesignsDir(), baseName);
-    if (fs.existsSync(persistentDesigns)) return persistentDesigns;
-
-    const persistentOriginals = path.join(this.getOriginalsDir(), baseName);
-    if (fs.existsSync(persistentOriginals)) return persistentOriginals;
-
-    // 4. Check by filename in default project uploads
     const inDefaultPreviews = path.join(defaultUploadsDir, 'previews', baseName);
     if (fs.existsSync(inDefaultPreviews)) return inDefaultPreviews;
 
@@ -554,7 +877,10 @@ class StorageService {
     const inDefaultDesigns = path.join(defaultUploadsDir, 'designs', baseName);
     if (fs.existsSync(inDefaultDesigns)) return inDefaultDesigns;
 
-    // 5. Check in brand assets folder
+    const inPrivateStorage = path.join(projectRoot, 'storage_private', clean.replace(/^storage_private\//, ''));
+    if (fs.existsSync(inPrivateStorage)) return inPrivateStorage;
+
+    // 3. Check in brand assets folder
     if (clean.includes('brand') || clean.includes('assets')) {
       const inBrand = path.join(projectRoot, 'public', 'assets', 'brand', baseName);
       if (fs.existsSync(inBrand)) return inBrand;
@@ -577,25 +903,29 @@ class StorageService {
 
     const clean = candidateUrl.trim();
 
-    // If it is a remote cloud URL (Cloudinary / S3)
     if (clean.startsWith('http://') || clean.startsWith('https://')) {
       return clean;
     }
 
-    // Direct check: does the file actually exist at the requested project path or persistent uploads path?
-    const cleanRel = clean.replace(/^\/+/, '');
-    const inRoot = path.join(projectRoot, cleanRel);
-    if (fs.existsSync(inRoot) && fs.statSync(inRoot).isFile()) {
+    // Check if candidate file actually exists on disk
+    if (this.fileExists(clean)) {
       return clean.startsWith('/') ? clean : '/' + clean;
     }
 
+    // Check branding subfolder in persistent storage
     const baseName = path.basename(clean);
+    const inBranding = path.join(this.getBrandingDir(), baseName);
+    if (fs.existsSync(inBranding)) {
+      return `/public/uploads/branding/${baseName}`;
+    }
+
     const inPreviews = path.join(this.getPreviewsDir(), baseName);
-    if (fs.existsSync(inPreviews) && fs.statSync(inPreviews).isFile()) {
+    if (fs.existsSync(inPreviews)) {
       return `/public/uploads/previews/${baseName}`;
     }
 
-    // Candidate file is missing on disk; fall back safely to committed brand asset
+    // Candidate file is missing on disk; record notice and fall back safely to committed brand asset
+    this._missingBrandAssets.add(`${type}: ${candidateUrl}`);
     return defaultAsset;
   }
 
@@ -645,7 +975,7 @@ class StorageService {
         return data.secure_url || null;
       }
     } catch (e) {
-      console.warn('[Cloudinary Upload Error]:', e.message);
+      console.warn('[Cloudinary Upload Notice]:', e.message);
     }
     return null;
   }
