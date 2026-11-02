@@ -18,8 +18,8 @@ const REQUIRED_SCHEMA = {
     'tags', 'total_sales', 'average_rating', 'reviews_count', 'import_image_filename',
     'import_zip_filename', 'primary_image', 'original_image_url', 'deleted_at', 'created_at'
   ],
-  design_images: ['id', 'design_id', 'image_url', 'thumb_key', 'card_key', 'original_key', 'is_primary', 'display_order'],
-  design_files: ['id', 'design_id', 'file_kind', 'label', 'original_name', 'storage_key', 'mime_type', 'file_size', 'checksum_sha256', 'sort_order', 'is_primary_preview', 'created_at'],
+  design_images: ['id', 'design_id', 'image_url', 'thumb_key', 'card_key', 'original_key', 'is_primary', 'display_order', 'retired_at'],
+  design_files: ['id', 'design_id', 'file_kind', 'label', 'original_name', 'storage_key', 'mime_type', 'file_size', 'checksum_sha256', 'sort_order', 'is_primary_preview', 'created_at', 'retired_at'],
   cart_items: ['id', 'user_id', 'session_id', 'design_id', 'quantity', 'created_at'],
   orders: ['id', 'order_number', 'user_id', 'total_amount', 'discount_amount', 'final_amount', 'coupon_code', 'status', 'razorpay_order_id', 'razorpay_payment_id', 'payment_gateway', 'cashfree_order_id', 'cashfree_payment_id', 'created_at'],
   order_items: ['id', 'order_id', 'design_id', 'quantity', 'price_at_purchase', 'mrp', 'discount_amount', 'created_at'],
@@ -47,8 +47,10 @@ const REQUIRED_SCHEMA = {
   stitch_update_logs: ['id', 'admin_id', 'admin_email', 'filter_summary', 'method_summary', 'total_affected', 'is_undone', 'created_at'],
   stitch_update_log_items: ['id', 'log_id', 'design_id', 'sku', 'old_front', 'old_back', 'old_sleeve', 'old_total', 'old_manual', 'new_front', 'new_back', 'new_sleeve', 'new_total', 'new_manual', 'created_at'],
   image_replace_logs: ['id', 'admin_id', 'admin_email', 'category_id', 'category_name', 'scope_summary', 'replacement_mode', 'total_files', 'matched_designs', 'replaced_count', 'skipped_count', 'failed_count', 'is_undone', 'created_at'],
-  image_replace_log_items: ['id', 'log_id', 'design_id', 'sku', 'title', 'old_primary_image', 'new_primary_image', 'old_images_json', 'new_images_json', 'status', 'created_at'],
-  upload_sessions: ['id', 'user_id', 'filename', 'file_size', 'total_chunks', 'uploaded_chunks', 'upload_type', 'status', 'error_message', 'reference_id', 'created_at', 'updated_at']
+  image_replace_log_items: ['id', 'log_id', 'design_id', 'sku', 'title', 'old_primary_image', 'new_primary_image', 'old_images_json', 'new_images_json', 'old_files_json', 'new_files_json', 'status', 'created_at'],
+  upload_sessions: ['id', 'user_id', 'filename', 'file_size', 'total_chunks', 'uploaded_chunks', 'upload_type', 'status', 'error_message', 'reference_id', 'created_at', 'updated_at'],
+  bulk_replace_jobs: ['id', 'admin_id', 'admin_email', 'category_id', 'category_name', 'scope_summary', 'replacement_mode', 'total_files', 'matched_designs', 'replaced_count', 'status', 'created_at'],
+  bulk_replace_job_items: ['id', 'job_id', 'design_id', 'sku', 'title', 'status', 'created_at']
 };
 
 /**

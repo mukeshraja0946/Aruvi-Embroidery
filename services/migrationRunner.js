@@ -201,9 +201,9 @@ async function executeMigrationSql(conn, sql, file) {
       if (err.errno === 1050 || err.errno === 1060 || err.errno === 1061 || err.errno === 1068) {
         continue;
       }
-      // 1054: Unknown column (e.g., if settings table lacks setting_group/description column)
-      if (err.errno === 1054 && /INSERT\s+INTO\s+[`"]?settings[`"]?/i.test(stmt)) {
-        console.warn('[Migration Runner] Safe notice: column in settings insert not present, skipping optional metadata');
+      // 1054: Unknown column (e.g., if settings table lacks setting_group/description column or legacy custom_orders lacks quoted_price)
+      if (err.errno === 1054 && (/INSERT\s+INTO\s+[`"]?settings[`"]?/i.test(stmt) || /custom_orders/i.test(stmt))) {
+        console.warn('[Migration Runner] Safe notice: optional column in data sync not present, skipping');
         continue;
       }
       // 1146: Table doesn't exist on legacy migration check (e.g. custom_orders for insert ignore copy)
@@ -229,7 +229,15 @@ const MIGRATION_REQUIRED_TABLES = {
   '022': 'image_replace_logs',
   '024': 'design_images',
   '025': 'upload_sessions',
-  '028': 'custom_requests'
+  '028': 'custom_requests',
+  '031': 'bulk_replace_jobs'
+};
+
+const MIGRATION_REQUIRED_COLUMNS = {
+  '028': { table: 'custom_requests', column: 'request_number' },
+  '029': { table: 'design_files', column: 'retired_at' },
+  '030': { table: 'settings', column: 'setting_key' },
+  '031': { table: 'design_files', column: 'retired_at' }
 };
 
 const CANONICAL_REQUIRED_TABLES = [
@@ -237,7 +245,8 @@ const CANONICAL_REQUIRED_TABLES = [
   'orders', 'order_items', 'custom_requests', 'settings', 'banners',
   'coupons', 'reviews', 'wishlist', 'contact_messages', 'activity_logs',
   'download_logs', 'file_scan_results', 'import_jobs', 'email_campaigns',
-  'price_update_logs', 'stitch_update_logs', 'image_replace_logs', 'upload_sessions'
+  'price_update_logs', 'stitch_update_logs', 'image_replace_logs', 'upload_sessions',
+  'bulk_replace_jobs', 'bulk_replace_job_items'
 ];
 
 /**
@@ -269,12 +278,19 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       if (vRows && vRows[0]) dbServerVersion = vRows[0].version;
     } catch {}
 
-    // Fetch all currently existing tables to catch false-positive migration skips
+    // Fetch all currently existing tables and columns to catch false-positive migration skips
     const [existingTableRows] = await conn.query(
       'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()'
     );
     const existingTableNames = new Set(
       (existingTableRows || []).map(r => (r.TABLE_NAME || r.table_name || Object.values(r)[0]).toLowerCase())
+    );
+
+    const [existingColRows] = await conn.query(
+      'SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE()'
+    );
+    const existingColumnKeys = new Set(
+      (existingColRows || []).map(r => `${(r.TABLE_NAME || r.table_name || '').toLowerCase()}.${(r.COLUMN_NAME || r.column_name || '').toLowerCase()}`)
     );
 
     if (!silent) {
@@ -292,15 +308,25 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
     for (const file of allFiles) {
       const version = file.split('_')[0];
       const expectedTable = MIGRATION_REQUIRED_TABLES[version];
+      const expectedCol = MIGRATION_REQUIRED_COLUMNS[version];
 
       let tableActuallyExists = true;
       if (expectedTable && !existingTableNames.has(expectedTable.toLowerCase())) {
         tableActuallyExists = false;
       }
 
-      // If recorded as applied but the required table is missing, purge stale record & re-run
-      if (!tableActuallyExists && (namesSet.has(file) || versionsSet.has(version))) {
-        if (!silent) console.warn(`  ⚠️ [SCHEMA SYNC] Migration ${file} was recorded in schema_migrations but table "${expectedTable}" is missing. Purging stale record and re-running...`);
+      let colActuallyExists = true;
+      if (expectedCol) {
+        const key = `${expectedCol.table.toLowerCase()}.${expectedCol.column.toLowerCase()}`;
+        if (!existingColumnKeys.has(key)) {
+          colActuallyExists = false;
+        }
+      }
+
+      // If recorded as applied but the required table or column is missing, purge stale record & re-run
+      if ((!tableActuallyExists || !colActuallyExists) && (namesSet.has(file) || versionsSet.has(version))) {
+        const missingDesc = !tableActuallyExists ? `table "${expectedTable}"` : `column "${expectedCol.table}.${expectedCol.column}"`;
+        if (!silent) console.warn(`  ⚠️ [SCHEMA SYNC] Migration ${file} was recorded in schema_migrations but ${missingDesc} is missing. Purging stale record and re-running...`);
         try {
           await conn.query('DELETE FROM `schema_migrations` WHERE `version` = ? OR `name` = ?', [version, file]);
           namesSet.delete(file);
@@ -308,7 +334,7 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
         } catch (_) {}
       }
 
-      const isApplied = (namesSet.has(file) || versionsSet.has(version)) && tableActuallyExists;
+      const isApplied = (namesSet.has(file) || versionsSet.has(version)) && tableActuallyExists && colActuallyExists;
 
       if (isApplied) {
         if (!silent) console.log(`  [SKIPPED] ${file} (already applied)`);

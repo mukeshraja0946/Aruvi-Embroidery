@@ -436,9 +436,23 @@
       const matchedCountEl = document.getElementById('confMatchedDesignsCount');
       const unmatchedBadge = document.getElementById('confUnmatchedFilesBadge');
       const unmatchedCountEl = document.getElementById('confUnmatchedCount');
+      const confirmBtn = document.getElementById('bulkReplaceConfirmBtn');
+      const retryBtn = document.getElementById('bulkReplaceRetryPreviewBtn');
+
+      this.previewLoaded = false;
+      this.previewList = [];
+
+      // Guard: Disable Replace Files button while preview is generating
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.style.opacity = '0.5';
+        confirmBtn.style.cursor = 'not-allowed';
+        confirmBtn.title = 'Preparing preview...';
+      }
+      if (retryBtn) retryBtn.style.display = 'none';
 
       if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #0284C7;"><i class="fa-solid fa-spinner fa-spin"></i> Matching files against scoped designs...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: #0284C7;"><i class="fa-solid fa-spinner fa-spin"></i> Matching files against scoped designs and verifying schema...</td></tr>';
       }
 
       try {
@@ -466,7 +480,11 @@
 
         const data = await res.json();
         if (!data.success) {
-          throw new Error(data.message || 'Failed to generate preview');
+          const customErr = new Error(data.message || 'Failed to generate preview');
+          customErr.refId = data.refId || `REF_PREVIEW_${Date.now()}`;
+          customErr.schemaError = Boolean(data.schemaError);
+          customErr.data = data;
+          throw customErr;
         }
 
         const previewList = data.previewList || [];
@@ -495,9 +513,29 @@
         if (tbody) {
           tbody.innerHTML = '';
           if (previewList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #DC2626;"><i class="fa-solid fa-circle-exclamation"></i> No designs matched the selected file names in this category. Files must match SKU or Title.</td></tr>';
+            this.previewLoaded = false;
+            if (confirmBtn) {
+              confirmBtn.disabled = true;
+              confirmBtn.style.opacity = '0.5';
+              confirmBtn.style.cursor = 'not-allowed';
+              confirmBtn.title = 'Cannot replace: 0 designs matched the selected file names';
+            }
+            if (retryBtn) retryBtn.style.display = 'inline-flex';
+            tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: #DC2626; background: #FEF2F2;"><i class="fa-solid fa-circle-exclamation"></i> <strong>0 matched designs.</strong> No designs matched the selected file names in this category. Files must match SKU or Title.</td></tr>';
             return;
           }
+
+          // Successfully generated preview with >= 1 matched design
+          this.previewLoaded = true;
+          this.previewList = previewList;
+
+          if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+            confirmBtn.title = `Ready to replace files for ${previewList.length} design(s)`;
+          }
+          if (retryBtn) retryBtn.style.display = 'none';
 
           previewList.forEach((item, idx) => {
             const tr = document.createElement('tr');
@@ -539,9 +577,74 @@
         }
       } catch (err) {
         console.error('loadStep3Preview error:', err);
-        if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #DC2626;">Error preparing preview: ${this.escapeHtml(err.message)}</td></tr>`;
+        this.previewLoaded = false;
+        this.previewList = [];
+
+        if (confirmBtn) {
+          confirmBtn.disabled = true;
+          confirmBtn.style.opacity = '0.5';
+          confirmBtn.style.cursor = 'not-allowed';
+          confirmBtn.title = `Replace disabled: ${err.message || 'Preview generation failed'}`;
         }
+        if (retryBtn) retryBtn.style.display = 'inline-flex';
+
+        const refId = err.refId || `REF_ERR_${Date.now()}`;
+        const errorPayload = {
+          error: err.message,
+          refId,
+          schemaError: Boolean(err.schemaError),
+          timestamp: new Date().toISOString(),
+          category: this.currentCategoryName,
+          selectedFilesCount: (this.selectedFiles || []).length
+        };
+
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" style="padding: 24px; text-align: center; background: #FEF2F2; border-radius: 8px;">
+                <div style="font-size: 1.6rem; color: #DC2626; margin-bottom: 8px;">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div style="font-weight: 700; color: #991B1B; font-size: 0.95rem; margin-bottom: 6px;">
+                  ${err.schemaError ? 'Database Update Needed' : 'Preview Generation Failed'}
+                </div>
+                <div style="color: #B91C1C; font-size: 0.85rem; max-width: 680px; margin: 0 auto 12px; line-height: 1.45; font-weight: 500;">
+                  ${this.escapeHtml(err.message)}
+                </div>
+                <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center;">
+                  <span style="background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; padding: 3px 10px; border-radius: 6px; font-size: 0.74rem; font-family: monospace;">
+                    Ref: ${this.escapeHtml(refId)}
+                  </span>
+                  <button type="button" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 6px; background: #FFF; color: #991B1B; border-color: #FCA5A5; cursor: pointer;" onclick="window.bulkImageReplaceInstance.copyErrorDetails(this)">
+                    <i class="fa-solid fa-copy"></i> Copy details
+                  </button>
+                </div>
+                <div>
+                  <button type="button" class="btn btn-sm btn-primary" style="font-size: 0.85rem; padding: 6px 18px; border-radius: 6px; background: #0284C7; border-color: #0284C7; color: #FFF; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="window.bulkImageReplaceInstance.loadStep3Preview()">
+                    <i class="fa-solid fa-rotate-right"></i> Retry Preview
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+          this.lastErrorPayload = errorPayload;
+        }
+      }
+    }
+
+    copyErrorDetails(btn) {
+      const payload = this.lastErrorPayload || { error: 'Unknown preview error', timestamp: new Date().toISOString() };
+      const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+            setTimeout(() => { btn.innerHTML = original; }, 2000);
+          }
+        });
+      } else {
+        prompt('Copy Error Details:', text);
       }
     }
 
@@ -549,6 +652,12 @@
     // STEP 4: APPLY REPLACEMENT & REPORT
     // ==============================================================
     async executeReplace() {
+      // Guard: Never allow apply if preview did not load or has 0 matched designs
+      if (!this.previewLoaded || !this.previewList || this.previewList.length === 0) {
+        alert('Cannot apply replacement: The preview did not load successfully or shows 0 matched designs.');
+        return;
+      }
+
       if (this.isUploading) return;
       if (!this.selectedGroup) {
         alert('Missing target group or category to replace.');

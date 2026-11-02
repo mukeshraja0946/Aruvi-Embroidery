@@ -4315,7 +4315,14 @@ exports.postBulkReplacePreviewMatch = async (req, res, next) => {
     res.json({ success: true, ...matchResult });
   } catch (err) {
     console.error('postBulkReplacePreviewMatch error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    const refId = err.refId || `REF_PREVIEW_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    res.status(500).json({
+      success: false,
+      message: err.message,
+      refId,
+      schemaError: Boolean(err.schemaError),
+      missing: err.missing || []
+    });
   }
 };
 
@@ -4406,7 +4413,14 @@ exports.postBulkReplaceCommit = async (req, res, next) => {
     res.json(result);
   } catch (err) {
     console.error('postBulkReplaceCommit error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    const refId = err.refId || `REF_COMMIT_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    res.status(500).json({
+      success: false,
+      message: err.message,
+      refId,
+      schemaError: Boolean(err.schemaError),
+      missing: err.missing || []
+    });
   }
 };
 

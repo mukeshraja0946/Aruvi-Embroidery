@@ -2735,9 +2735,12 @@
       <button type="button" onclick="window.bulkImageReplaceInstance.currentStep = 2; window.bulkImageReplaceInstance.updateStepView();" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">
         <i class="fa-solid fa-arrow-left"></i> Back to Files
       </button>
-      <div style="display: flex; gap: 10px;">
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" id="bulkReplaceRetryPreviewBtn" style="display: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; color: #0284C7; border: 1px solid #0284C7; background: #F0F9FF; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" onclick="window.bulkImageReplaceInstance.loadStep3Preview()">
+          <i class="fa-solid fa-rotate-right"></i> Retry Preview
+        </button>
         <button type="button" onclick="closeBulkReplaceImagesModal()" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">Cancel</button>
-        <button type="button" id="bulkReplaceConfirmBtn" onclick="window.bulkImageReplaceInstance.executeReplace()" class="btn btn-primary" style="font-size: 0.9rem; padding: 10px 24px; border-radius: 8px; background: #16A34A; border-color: #16A34A; color: #FFF; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+        <button type="button" id="bulkReplaceConfirmBtn" disabled title="Preview must be loaded before replacing files" onclick="window.bulkImageReplaceInstance.executeReplace()" class="btn btn-primary" style="font-size: 0.9rem; padding: 10px 24px; border-radius: 8px; background: #16A34A; border-color: #16A34A; color: #FFF; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: not-allowed; opacity: 0.5;">
           <i class="fa-solid fa-bolt"></i> Replace Files Now
         </button>
       </div>

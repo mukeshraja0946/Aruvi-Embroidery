@@ -263,6 +263,56 @@ class BulkImageReplaceService {
   }
 
   /**
+   * Schema Pre-Check: verifies all required tables and columns for Bulk Replace exist.
+   * If anything is missing, returns clear diagnostics instead of executing queries that would crash.
+   */
+  async checkBulkReplaceSchema() {
+    if (!db.isConnected()) {
+      try { await db.initPool(); } catch (_) {}
+    }
+    if (!db.isConnected()) return { ok: true, missing: [] };
+
+    const requiredColumns = [
+      { table: 'design_files', column: 'retired_at' },
+      { table: 'design_images', column: 'retired_at' },
+      { table: 'image_replace_log_items', column: 'old_files_json' },
+      { table: 'image_replace_log_items', column: 'new_files_json' }
+    ];
+
+    try {
+      const colRows = await db.query(
+        'SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name IN ("design_files", "design_images", "image_replace_log_items", "image_replace_logs")'
+      );
+      const existingSet = new Set(
+        (colRows || []).map(r => `${(r.TABLE_NAME || r.table_name || '').toLowerCase()}.${(r.COLUMN_NAME || r.column_name || '').toLowerCase()}`)
+      );
+
+      const missing = [];
+      for (const req of requiredColumns) {
+        const key = `${req.table.toLowerCase()}.${req.column.toLowerCase()}`;
+        if (!existingSet.has(key)) {
+          missing.push(`${req.table}.${req.column}`);
+        }
+      }
+
+      if (missing.length > 0) {
+        const refId = `REF_SCHEMA_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+        return {
+          ok: false,
+          refId,
+          missing,
+          message: `Database update needed: missing ${missing.join(', ')}. Run the migration / see Admin -> Tools -> System Health`
+        };
+      }
+
+      return { ok: true, missing: [] };
+    } catch (err) {
+      console.warn('checkBulkReplaceSchema query notice:', err.message);
+      return { ok: true, missing: [], warning: err.message };
+    }
+  }
+
+  /**
    * Returns categories with design counts and scoped designs
    */
   async getScopeSummary(options = {}) {
@@ -419,6 +469,15 @@ class BulkImageReplaceService {
    * Matches uploaded filenames against designs in the chosen scope (Images & ZIP packages)
    */
   async matchFilesToScope(files = [], options = {}) {
+    const schemaCheck = await this.checkBulkReplaceSchema();
+    if (!schemaCheck.ok) {
+      const err = new Error(schemaCheck.message);
+      err.refId = schemaCheck.refId;
+      err.schemaError = true;
+      err.missing = schemaCheck.missing;
+      throw err;
+    }
+
     const { targetDesignId = null } = options;
 
     if (targetDesignId) {
@@ -474,10 +533,19 @@ class BulkImageReplaceService {
         let existingImgCount = 0;
         let existingZipCount = 0;
         if (db.isConnected()) {
-          const iRes = await db.query('SELECT COUNT(*) AS cnt FROM design_images WHERE design_id = ? AND retired_at IS NULL', [targetDesign.id]);
-          const fRes = await db.query('SELECT COUNT(*) AS cnt FROM design_files WHERE design_id = ? AND is_preview = 0 AND retired_at IS NULL', [targetDesign.id]);
-          existingImgCount = (iRes && iRes[0]) ? iRes[0].cnt : 0;
-          existingZipCount = (fRes && fRes[0]) ? fRes[0].cnt : 0;
+          try {
+            const iRes = await db.query('SELECT COUNT(*) AS cnt FROM design_images WHERE design_id = ? AND retired_at IS NULL', [targetDesign.id]);
+            const fRes = await db.query('SELECT COUNT(*) AS cnt FROM design_files WHERE design_id = ? AND is_preview = 0 AND retired_at IS NULL', [targetDesign.id]);
+            existingImgCount = (iRes && iRes[0]) ? iRes[0].cnt : 0;
+            existingZipCount = (fRes && fRes[0]) ? fRes[0].cnt : 0;
+          } catch (cntErr) {
+            try {
+              const iRes = await db.query('SELECT COUNT(*) AS cnt FROM design_images WHERE design_id = ?', [targetDesign.id]);
+              const fRes = await db.query('SELECT COUNT(*) AS cnt FROM design_files WHERE design_id = ? AND is_preview = 0', [targetDesign.id]);
+              existingImgCount = (iRes && iRes[0]) ? iRes[0].cnt : 0;
+              existingZipCount = (fRes && fRes[0]) ? fRes[0].cnt : 0;
+            } catch (_) {}
+          }
         } else {
           existingImgCount = (targetDesign.images && Array.isArray(targetDesign.images)) ? targetDesign.images.length : (targetDesign.primary_image ? 1 : 0);
           existingZipCount = (targetDesign.files && Array.isArray(targetDesign.files)) ? targetDesign.files.filter(f => !f.is_preview).length : (targetDesign.machine_file_name ? 1 : 0);
@@ -2348,6 +2416,15 @@ class BulkImageReplaceService {
   async replaceFileGroup(params = {}) {
     if (!db.isConnected()) {
       try { await db.initPool(); } catch (_) {}
+    }
+
+    const schemaCheck = await this.checkBulkReplaceSchema();
+    if (!schemaCheck.ok) {
+      const err = new Error(schemaCheck.message);
+      err.refId = schemaCheck.refId;
+      err.schemaError = true;
+      err.missing = schemaCheck.missing;
+      throw err;
     }
 
     const {
