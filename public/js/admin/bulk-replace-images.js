@@ -472,6 +472,16 @@
         const previewList = data.previewList || [];
         if (matchedCountEl) matchedCountEl.textContent = previewList.length;
 
+        const filesToRetireCountEl = document.getElementById('confFilesToRetireCount');
+        const retirementNoteEl = document.getElementById('confRetirementNote');
+        const filesToRetire = data.summary?.filesToRetireCount ?? 0;
+        if (filesToRetireCountEl) filesToRetireCountEl.textContent = filesToRetire;
+        if (retirementNoteEl) {
+          retirementNoteEl.textContent = filesToRetire > 0 
+            ? `${filesToRetire} existing file(s) will be retired to 7-day backup` 
+            : 'No existing files will be retired';
+        }
+
         const unmatchedFiles = data.unmatchedFiles || [];
         if (unmatchedBadge && unmatchedCountEl) {
           if (unmatchedFiles.length > 0) {
@@ -485,7 +495,7 @@
         if (tbody) {
           tbody.innerHTML = '';
           if (previewList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #DC2626;"><i class="fa-solid fa-circle-exclamation"></i> No designs matched the selected file names in this category. Files must match SKU or Title.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #DC2626;"><i class="fa-solid fa-circle-exclamation"></i> No designs matched the selected file names in this category. Files must match SKU or Title.</td></tr>';
             return;
           }
 
@@ -508,6 +518,11 @@
               statusBadge = '<span style="background: #E0F2FE; color: #0369A1; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; border: 1px solid #BAE6FD;"><i class="fa-solid fa-image"></i> Image Replaced</span>';
             }
 
+            const retireText = item.retirementPreview || (item.willRetireCount > 0 ? `${item.willRetireCount} old file(s) to retire` : 'None');
+            const retireCellHtml = item.willRetireCount > 0 
+              ? `<span style="background: #FFF7ED; color: #C2410C; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; border: 1px solid #FFEDD5;"><i class="fa-solid fa-box-archive"></i> ${this.escapeHtml(retireText)}</span>`
+              : `<span style="color: #94A3B8; font-size: 0.72rem;">None</span>`;
+
             tr.innerHTML = `
               <td style="padding: 8px 12px; text-align: center; color: #94A3B8;">${idx + 1}</td>
               <td style="padding: 8px 12px; font-weight: 600; color: #1E293B;">
@@ -516,6 +531,7 @@
               </td>
               <td style="padding: 8px 12px;">${imgNames}</td>
               <td style="padding: 8px 12px;">${zipNames}</td>
+              <td style="padding: 8px 12px; text-align: center;">${retireCellHtml}</td>
               <td style="padding: 8px 12px; text-align: center;">${statusBadge}</td>
             `;
             tbody.appendChild(tr);
@@ -524,7 +540,7 @@
       } catch (err) {
         console.error('loadStep3Preview error:', err);
         if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #DC2626;">Error preparing preview: ${this.escapeHtml(err.message)}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #DC2626;">Error preparing preview: ${this.escapeHtml(err.message)}</td></tr>`;
         }
       }
     }
@@ -669,26 +685,82 @@
         if (reportSection) reportSection.style.display = 'block';
 
         const reportSummaryEl = document.getElementById('reportGroupSummaryText');
-        if (reportSummaryEl) {
-          reportSummaryEl.textContent = commitData.message || `File replacement finished successfully. Newly selected files are active.`;
-        }
-
-        const replacedImgEl = document.getElementById('reportCountReplacedImages');
-        const replacedZipEl = document.getElementById('reportCountReplacedZips');
-        const unchangedEl = document.getElementById('reportCountUnchanged');
-        const removedOldEl = document.getElementById('reportCountRemovedOld');
-        const failedEl = document.getElementById('reportCountFailed');
-
+        const removedOldCount = commitData.removedOldFilesCount ?? 0;
         const failedCount = commitData.failedCount ?? 0;
         const replacedImgs = commitData.replacedImagesCount ?? 0;
-        const replacedZips = (commitData.replacedZipsCount ?? 0) + (commitData.addedCount ?? 0);
-        const succeededCount = (replacedImgs + replacedZips) || (commitData.replacedDesignsCount ?? 0);
+        const replacedZips = commitData.replacedZipsCount ?? 0;
+        const restoredCount = commitData.restoredCount ?? 0;
+        const unchangedCount = commitData.unchangedCount ?? 0;
+        const skippedCount = commitData.skippedCount ?? 0;
+        const succeededCount = (replacedImgs + replacedZips + restoredCount);
+
+        if (reportSummaryEl) {
+          if (commitData.message) {
+            reportSummaryEl.textContent = commitData.message;
+          } else if (removedOldCount === 0) {
+            reportSummaryEl.textContent = `File replacement finished. ${succeededCount} file(s) active. Old files remain untouched.`;
+          } else {
+            reportSummaryEl.textContent = `File replacement finished. ${succeededCount} file(s) active. ${removedOldCount} old file(s) safely retired to 7-day rollback backup.`;
+          }
+        }
+
+        // Stats Cards (6 Cards)
+        const replacedImgEl = document.getElementById('reportCountReplacedImages');
+        const replacedZipEl = document.getElementById('reportCountReplacedZips');
+        const restoredEl = document.getElementById('reportCountRestored');
+        const unchangedEl = document.getElementById('reportCountUnchanged');
+        const skippedEl = document.getElementById('reportCountSkipped');
+        const failedEl = document.getElementById('reportCountFailed');
+        const removedOldEl = document.getElementById('reportCountRemovedOld');
 
         if (replacedImgEl) replacedImgEl.textContent = replacedImgs;
         if (replacedZipEl) replacedZipEl.textContent = replacedZips;
-        if (unchangedEl) unchangedEl.textContent = commitData.unchangedCount ?? 0;
-        if (removedOldEl) removedOldEl.textContent = commitData.removedOldFilesCount ?? 0;
+        if (restoredEl) restoredEl.textContent = restoredCount;
+        if (unchangedEl) unchangedEl.textContent = unchangedCount;
+        if (skippedEl) skippedEl.textContent = skippedCount;
         if (failedEl) failedEl.textContent = failedCount;
+        if (removedOldEl) removedOldEl.textContent = removedOldCount;
+
+        // Invariant Equation: selected = replaced + restored + unchanged + skipped + failed
+        const selectedTotal = commitData.totalSelectedFiles || (commitData.fileLogs ? commitData.fileLogs.length : this.selectedFiles.length);
+        const eqSel = document.getElementById('reportEquationSelected');
+        const eqDone = document.getElementById('reportEquationDone');
+        const eqRest = document.getElementById('reportEquationRestored');
+        const eqUnch = document.getElementById('reportEquationUnchanged');
+        const eqSkip = document.getElementById('reportEquationSkipped');
+        const eqFail = document.getElementById('reportEquationFailed');
+
+        if (eqSel) eqSel.textContent = selectedTotal;
+        if (eqDone) eqDone.textContent = replacedImgs + replacedZips;
+        if (eqRest) eqRest.textContent = restoredCount;
+        if (eqUnch) eqUnch.textContent = unchangedCount;
+        if (eqSkip) eqSkip.textContent = skippedCount;
+        if (eqFail) eqFail.textContent = failedCount;
+
+        // Separate Sub-Counters: Images vs ZIPs
+        const subImgSel = document.getElementById('reportSubImagesSelected');
+        const subImgDone = document.getElementById('reportSubImagesDone');
+        const subImgRest = document.getElementById('reportSubImagesRestored');
+        const subImgUnch = document.getElementById('reportSubImagesUnchanged');
+        const subImgFail = document.getElementById('reportSubImagesFailed');
+
+        if (subImgSel) subImgSel.textContent = commitData.selectedImagesCount ?? this.selectedFiles.filter(f => !f.name.toLowerCase().endsWith('.zip')).length;
+        if (subImgDone) subImgDone.textContent = replacedImgs;
+        if (subImgRest) subImgRest.textContent = commitData.restoredImagesCount ?? 0;
+        if (subImgUnch) subImgUnch.textContent = commitData.unchangedImagesCount ?? 0;
+        if (subImgFail) subImgFail.textContent = commitData.failedImagesCount ?? 0;
+
+        const subZipSel = document.getElementById('reportSubZipsSelected');
+        const subZipDone = document.getElementById('reportSubZipsDone');
+        const subZipRest = document.getElementById('reportSubZipsRestored');
+        const subZipUnch = document.getElementById('reportSubZipsUnchanged');
+        const subZipFail = document.getElementById('reportSubZipsFailed');
+
+        if (subZipSel) subZipSel.textContent = commitData.selectedZipsCount ?? this.selectedFiles.filter(f => f.name.toLowerCase().endsWith('.zip')).length;
+        if (subZipDone) subZipDone.textContent = replacedZips;
+        if (subZipRest) subZipRest.textContent = commitData.restoredZipsCount ?? 0;
+        if (subZipUnch) subZipUnch.textContent = commitData.unchangedZipsCount ?? 0;
+        if (subZipFail) subZipFail.textContent = commitData.failedZipsCount ?? 0;
 
         // Honest Header Badge
         const headerBadge = document.getElementById('bulkReplaceHeaderBadge');
@@ -739,7 +811,8 @@
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid #F1F5F9';
             const isZip = (f.fileType || '').toLowerCase().includes('zip');
-            const isVerified = f.result === 'Verified';
+            const resState = (f.result || '').toLowerCase();
+            const dbState = (f.dbStatus || '').toLowerCase();
 
             const typeIcon = isZip 
               ? '<i class="fa-solid fa-file-zipper" style="color: #0891B2;"></i>' 
@@ -751,23 +824,32 @@
 
             const sizeText = this.formatFileSize(f.fileSize);
 
-            const storageBadge = f.storageStatus === 'Stored'
+            // Storage badge
+            let storageBadge = f.storageStatus === 'Stored'
               ? '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-circle-check"></i> Stored</span>'
-              : `<span style="color: #DC2626; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-circle-xmark"></i> ${this.escapeHtml(f.storageStatus || 'Failed')}</span>`;
+              : (resState === 'skipped' || dbState === 'skipped')
+                ? '<span style="color: #64748B; font-weight: 500;">—</span>'
+                : `<span style="color: #DC2626; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-circle-xmark"></i> ${this.escapeHtml(f.storageStatus || 'Failed')}</span>`;
 
-            let dbBadge = '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Updated</span>';
-            if (f.dbStatus === 'Unchanged') {
-              dbBadge = '<span style="color: #475569; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-equals"></i> Unchanged</span>';
-            } else if (f.dbStatus === 'Failed' || !isVerified) {
-              dbBadge = `<span style="color: #DC2626; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-xmark"></i> ${this.escapeHtml(f.dbStatus || 'Failed')}</span>`;
-            }
-
+            // Database badge & Status Details (Neutral/Blue for Unchanged & Restored)
+            let dbBadge = '';
             let statusDetailsHtml = '';
             let actionBtnHtml = '<span style="color: #94A3B8; font-size: 0.75rem;">—</span>';
 
-            if (isVerified) {
-              statusDetailsHtml = '<span style="background: #DCFCE7; color: #166534; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BBF7D0; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Verified</span>';
-            } else {
+            if (resState === 'unchanged' || dbState === 'unchanged') {
+              dbBadge = '<span style="color: #475569; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-equals"></i> Unchanged</span>';
+              statusDetailsHtml = '<span style="background: #F1F5F9; color: #475569; font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #CBD5E1; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-equals"></i> Identical (Kept)</span>';
+            } else if (resState === 'restored' || dbState === 'restored') {
+              dbBadge = '<span style="color: #1D4ED8; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-rotate-left"></i> Restored</span>';
+              statusDetailsHtml = '<span style="background: #EFF6FF; color: #1D4ED8; font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BFDBFE; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-rotate-left"></i> Restored</span>';
+            } else if (resState === 'skipped' || dbState === 'skipped') {
+              dbBadge = '<span style="color: #D97706; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-forward-step"></i> Skipped</span>';
+              statusDetailsHtml = `<span style="background: #FFFBEB; color: #D97706; font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #FDE68A; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-forward-step"></i> ${this.escapeHtml(f.error || 'Duplicate in selection (skipped)')}</span>`;
+            } else if (resState === 'not_processed') {
+              dbBadge = '<span style="color: #64748B; font-weight: 500;">Not processed</span>';
+              statusDetailsHtml = `<span style="background: #F1F5F9; color: #64748B; font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid #E2E8F0;">${this.escapeHtml(f.error || 'Job halted before this file')}</span>`;
+            } else if (resState === 'failed' || dbState === 'failed') {
+              dbBadge = `<span style="color: #DC2626; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-xmark"></i> Failed</span>`;
               const code = f.errorCode || 'FAILED';
               const stage = f.stage || 'storage_write';
               const errMsg = f.errorMessage || f.error || 'Operation failed';
@@ -787,6 +869,10 @@
                   <i class="fa-regular fa-copy"></i> Copy details
                 </button>
               `;
+            } else {
+              // Verified / Updated
+              dbBadge = '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Updated</span>';
+              statusDetailsHtml = '<span style="background: #DCFCE7; color: #166534; font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BBF7D0; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Replaced</span>';
             }
 
             tr.innerHTML = `
@@ -806,6 +892,29 @@
             `;
             tbodyEl.appendChild(tr);
           });
+        }
+
+        // Populate Retired Files Table
+        const retiredList = commitData.retiredOldFilesList || commitData.retiredFiles || [];
+        this.lastRetiredFiles = retiredList;
+        const retiredTbody = document.getElementById('bulkReplaceRetiredFilesTbody');
+        if (retiredTbody) {
+          if (retiredList.length === 0) {
+            retiredTbody.innerHTML = '<tr><td colspan="4" style="padding: 10px; text-align: center; color: #94A3B8;">No existing files needed retirement.</td></tr>';
+          } else {
+            retiredTbody.innerHTML = '';
+            retiredList.forEach(r => {
+              const rtr = document.createElement('tr');
+              rtr.style.borderBottom = '1px solid #FED7AA';
+              rtr.innerHTML = `
+                <td style="padding: 6px 10px; font-weight: 600;"><code>${this.escapeHtml(r.sku || ('Design #' + r.designId))}</code></td>
+                <td style="padding: 6px 10px;"><span style="background: #FFEDD5; color: #9A3412; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${this.escapeHtml(r.type || 'File')}</span></td>
+                <td style="padding: 6px 10px; font-family: monospace; font-size: 0.72rem; word-break: break-all;">${this.escapeHtml(r.fileName || r.path || '-')}</td>
+                <td style="padding: 6px 10px; color: #64748B;">${this.escapeHtml(r.reason || 'Superseded by replacement')}</td>
+              `;
+              retiredTbody.appendChild(rtr);
+            });
+          }
         }
 
         // Retry button if there are failures
@@ -845,6 +954,13 @@
         // Allow user to return to Step 3 to review
         this.currentStep = 3;
         this.updateStepView();
+      }
+    }
+
+    toggleRetiredFiles() {
+      const el = document.getElementById('bulkReplaceRetiredFilesContainer');
+      if (el) {
+        el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
       }
     }
 

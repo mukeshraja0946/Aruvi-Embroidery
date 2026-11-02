@@ -229,6 +229,8 @@ router.post('/admin/settings', upload.fields([
 router.all('/admin/api/test-smtp', adminSettingController.testSmtp);
 router.all('/admin/api/test-razorpay', adminSettingController.testRazorpay);
 router.all('/admin/settings/test-razorpay', adminSettingController.testRazorpay);
+router.get('/admin/api/feature-cards', adminSettingController.getFeatureCardsApi);
+router.post('/admin/api/feature-cards', adminSettingController.postFeatureCardsApi);
 
 // Email Campaigns Management
 router.get('/admin/email-campaigns', adminEmailCampaignController.getCampaignsPage);

@@ -35,37 +35,8 @@
     <% }) %>
   </div>
 
-  <!-- Middle Trust Feature Strip matching Reference -->
-  <div class="hero-feature-pills categories-trust-pills">
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-award"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">Premium Quality Designs</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">Crafted with precision</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-download"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">Instant Download</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">Get files immediately</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-shield-halved"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">100% Tested Machine Fills</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">Quality assured designs</span>
-      </div>
-    </div>
-    <div class="hero-pill-item">
-      <div class="pill-icon"><i class="fa-solid fa-headset"></i></div>
-      <div>
-        <strong style="display: block; font-size: 0.88rem;">Dedicated Support</strong>
-        <span style="font-size: 0.76rem; color: var(--text-muted);">We're here to help you</span>
-      </div>
-    </div>
-  </div>
+  <!-- Reusable Trust/Feature Cards Bar (Controls via Admin Homepage/Settings) -->
+  <%- include('../partials/feature-cards', { page: 'categories' }) %>
 
   <!-- Bottom Featured Designs Section matching Reference -->
   <% if (typeof featuredDesigns !== 'undefined' && featuredDesigns.length > 0) { %>

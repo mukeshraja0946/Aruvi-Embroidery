@@ -361,10 +361,8 @@
     </aside>
   </div>
 
-  <!-- Reusable Trust/Feature Cards Bar -->
-  <div class="custom-order-feature-cards-wrap" style="margin-top: 2.5rem;">
-    <%- include('../partials/feature-cards') %>
-  </div>
+  <!-- Reusable Trust/Feature Cards Bar (Controls via Admin Homepage/Settings) -->
+  <%- include('../partials/feature-cards', { page: 'custom_order', wrapperClass: 'custom-order-feature-cards-wrap' }) %>
 </div>
 
 <style>

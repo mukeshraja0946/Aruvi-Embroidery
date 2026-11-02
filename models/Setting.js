@@ -43,7 +43,58 @@ function maskSecret(secret) {
   return '••••••••' + clean.slice(-4);
 }
 
+const defaultFeatureCards = {
+  master: true,
+  pages: {
+    home: false,          // Default OFF for Home hero so hero stays clean
+    custom_order: true,   // Default ON
+    about: true,          // Default ON
+    design_detail: true,  // Default ON
+    contact: true,        // Default ON
+    categories: true      // Default ON
+  },
+  cards: [
+    {
+      id: 'card_1',
+      title: 'Premium Quality',
+      subtitle: 'Crafted with precision',
+      icon: 'fa-solid fa-award',
+      enabled: true,
+      link: '',
+      order: 1
+    },
+    {
+      id: 'card_2',
+      title: 'Instant Download',
+      subtitle: 'Get files immediately',
+      icon: 'fa-solid fa-download',
+      enabled: true,
+      link: '',
+      order: 2
+    },
+    {
+      id: 'card_3',
+      title: '100% Tested',
+      subtitle: 'Quality assured designs',
+      icon: 'fa-solid fa-shield-halved',
+      enabled: true,
+      link: '',
+      order: 3
+    },
+    {
+      id: 'card_4',
+      title: 'Dedicated Support',
+      subtitle: "We're here to help you",
+      icon: 'fa-solid fa-headset',
+      enabled: true,
+      link: '',
+      order: 4
+    }
+  ]
+};
+
 const fallbackSettings = {
+  feature_cards: JSON.stringify(defaultFeatureCards),
   shop_name: 'ARUVI EMBROIDERY STUDIO',
   tagline: 'Where Threads Tell Stories',
   logo_url: '/public/assets/brand/logo.png',
@@ -147,6 +198,122 @@ const fallbackSettings = {
 };
 
 class Setting {
+  static getDefaultFeatureCardsConfig() {
+    return JSON.parse(JSON.stringify(defaultFeatureCards));
+  }
+
+  static parseFeatureCards(raw) {
+    let parsed = null;
+    if (raw && typeof raw === 'object') {
+      parsed = raw;
+    } else if (typeof raw === 'string') {
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        parsed = null;
+      }
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      parsed = Setting.getDefaultFeatureCardsConfig();
+    }
+
+    const master = (parsed.master !== false && parsed.master !== 'false' && parsed.master !== 0 && parsed.master !== '0');
+
+    const defaultPages = {
+      home: false,
+      custom_order: true,
+      about: true,
+      design_detail: true,
+      contact: true,
+      categories: true
+    };
+    const incomingPages = (parsed.pages && typeof parsed.pages === 'object') ? parsed.pages : {};
+    const pages = {
+      home: incomingPages.home !== undefined ? (incomingPages.home === true || incomingPages.home === 'true' || incomingPages.home === 1 || incomingPages.home === '1') : defaultPages.home,
+      custom_order: incomingPages.custom_order !== undefined ? (incomingPages.custom_order === true || incomingPages.custom_order === 'true' || incomingPages.custom_order === 1 || incomingPages.custom_order === '1') : defaultPages.custom_order,
+      about: incomingPages.about !== undefined ? (incomingPages.about === true || incomingPages.about === 'true' || incomingPages.about === 1 || incomingPages.about === '1') : defaultPages.about,
+      design_detail: incomingPages.design_detail !== undefined ? (incomingPages.design_detail === true || incomingPages.design_detail === 'true' || incomingPages.design_detail === 1 || incomingPages.design_detail === '1') : defaultPages.design_detail,
+      contact: incomingPages.contact !== undefined ? (incomingPages.contact === true || incomingPages.contact === 'true' || incomingPages.contact === 1 || incomingPages.contact === '1') : defaultPages.contact,
+      categories: incomingPages.categories !== undefined ? (incomingPages.categories === true || incomingPages.categories === 'true' || incomingPages.categories === 1 || incomingPages.categories === '1') : defaultPages.categories
+    };
+
+    const cleanText = (str, maxLen) => {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/<[^>]*>/g, '').trim().slice(0, maxLen);
+    };
+
+    const cleanIcon = (iconStr, fallbackIcon) => {
+      if (!iconStr || typeof iconStr !== 'string') return fallbackIcon;
+      const trimmed = iconStr.trim();
+      // Whitelist format: fa-solid fa-xxx or fa-xxx (alphanumeric and dashes only)
+      if (/^fa-(solid|regular|brands)\s+fa-[a-z0-9-]+$/i.test(trimmed)) {
+        return trimmed;
+      }
+      if (/^[a-z0-9- ]+$/i.test(trimmed) && !/[<>"'`;()]/.test(trimmed)) {
+        return trimmed;
+      }
+      return fallbackIcon;
+    };
+
+    const defaultList = defaultFeatureCards.cards;
+    const incomingCards = Array.isArray(parsed.cards) ? parsed.cards : [];
+
+    const cards = defaultList.map((defCard, idx) => {
+      const found = incomingCards.find(c => c && String(c.id).trim() === String(defCard.id).trim()) || incomingCards[idx] || {};
+      const enabled = found.enabled !== undefined ? (found.enabled === true || found.enabled === 'true' || found.enabled === 1 || found.enabled === '1') : defCard.enabled;
+      const title = cleanText(found.title !== undefined ? found.title : defCard.title, 40) || defCard.title;
+      const subtitle = cleanText(found.subtitle !== undefined ? found.subtitle : defCard.subtitle, 80);
+      const icon = cleanIcon(found.icon !== undefined ? found.icon : defCard.icon, defCard.icon);
+      const link = cleanText(found.link !== undefined ? found.link : '', 255);
+      const order = Number(found.order) || (idx + 1);
+
+      return {
+        id: defCard.id,
+        title,
+        subtitle,
+        icon,
+        enabled,
+        link,
+        order
+      };
+    });
+
+    cards.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+
+    return {
+      master,
+      pages,
+      cards
+    };
+  }
+
+  static getFeatureCards(page = null, settingsSource = null) {
+    let raw = null;
+    if (settingsSource && settingsSource.feature_cards) {
+      raw = settingsSource.feature_cards;
+    } else if (fallbackSettings.feature_cards) {
+      raw = fallbackSettings.feature_cards;
+    }
+
+    const config = Setting.parseFeatureCards(raw);
+
+    if (!config.master) {
+      return [];
+    }
+
+    if (page) {
+      const pageKey = String(page).toLowerCase().trim().replace(/[-\s]/g, '_');
+      if (config.pages && config.pages[pageKey] === false) {
+        return [];
+      }
+    }
+
+    return (config.cards || [])
+      .filter(c => c && c.enabled !== false)
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  }
+
   static syncAliases(key, value) {
     fallbackSettings[key] = String(value);
 
@@ -268,6 +435,65 @@ class Setting {
       } else {
         payload.razorpay_webhook_secret = encryptSecret(trimmed);
       }
+    }
+
+    // Process feature_cards structured configuration with bidirectional sync
+    if (payload.feature_cards !== undefined) {
+      const parsedConfig = Setting.parseFeatureCards(payload.feature_cards);
+      payload.feature_cards = JSON.stringify(parsedConfig);
+
+      // Keep legacy individual card keys in sync
+      const cardMap = {};
+      (parsedConfig.cards || []).forEach(c => { cardMap[c.id] = c; });
+      if (cardMap['card_1']) {
+        payload.feature_card1_title = cardMap['card_1'].title;
+        payload.feature_card1_subtitle = cardMap['card_1'].subtitle;
+        payload.feature_card1_icon = cardMap['card_1'].icon;
+      }
+      if (cardMap['card_2']) {
+        payload.feature_card2_title = cardMap['card_2'].title;
+        payload.feature_card2_subtitle = cardMap['card_2'].subtitle;
+        payload.feature_card2_icon = cardMap['card_2'].icon;
+      }
+      if (cardMap['card_3']) {
+        payload.feature_card3_title = cardMap['card_3'].title;
+        payload.feature_card3_subtitle = cardMap['card_3'].subtitle;
+        payload.feature_card3_icon = cardMap['card_3'].icon;
+      }
+      if (cardMap['card_4']) {
+        payload.feature_card4_title = cardMap['card_4'].title;
+        payload.feature_card4_subtitle = cardMap['card_4'].subtitle;
+        payload.feature_card4_icon = cardMap['card_4'].icon;
+      }
+    } else if (
+      payload.feature_card1_title !== undefined ||
+      payload.feature_card2_title !== undefined ||
+      payload.feature_card3_title !== undefined ||
+      payload.feature_card4_title !== undefined
+    ) {
+      // Legacy form submission without explicit feature_cards: update feature_cards in sync
+      const currentConfig = Setting.parseFeatureCards(fallbackSettings.feature_cards);
+      if (payload.feature_card1_title !== undefined && currentConfig.cards[0]) {
+        currentConfig.cards[0].title = String(payload.feature_card1_title).replace(/<[^>]*>/g, '').trim().slice(0, 40);
+        if (payload.feature_card1_subtitle !== undefined) currentConfig.cards[0].subtitle = String(payload.feature_card1_subtitle).replace(/<[^>]*>/g, '').trim().slice(0, 80);
+        if (payload.feature_card1_icon !== undefined) currentConfig.cards[0].icon = String(payload.feature_card1_icon).trim();
+      }
+      if (payload.feature_card2_title !== undefined && currentConfig.cards[1]) {
+        currentConfig.cards[1].title = String(payload.feature_card2_title).replace(/<[^>]*>/g, '').trim().slice(0, 40);
+        if (payload.feature_card2_subtitle !== undefined) currentConfig.cards[1].subtitle = String(payload.feature_card2_subtitle).replace(/<[^>]*>/g, '').trim().slice(0, 80);
+        if (payload.feature_card2_icon !== undefined) currentConfig.cards[1].icon = String(payload.feature_card2_icon).trim();
+      }
+      if (payload.feature_card3_title !== undefined && currentConfig.cards[2]) {
+        currentConfig.cards[2].title = String(payload.feature_card3_title).replace(/<[^>]*>/g, '').trim().slice(0, 40);
+        if (payload.feature_card3_subtitle !== undefined) currentConfig.cards[2].subtitle = String(payload.feature_card3_subtitle).replace(/<[^>]*>/g, '').trim().slice(0, 80);
+        if (payload.feature_card3_icon !== undefined) currentConfig.cards[2].icon = String(payload.feature_card3_icon).trim();
+      }
+      if (payload.feature_card4_title !== undefined && currentConfig.cards[3]) {
+        currentConfig.cards[3].title = String(payload.feature_card4_title).replace(/<[^>]*>/g, '').trim().slice(0, 40);
+        if (payload.feature_card4_subtitle !== undefined) currentConfig.cards[3].subtitle = String(payload.feature_card4_subtitle).replace(/<[^>]*>/g, '').trim().slice(0, 80);
+        if (payload.feature_card4_icon !== undefined) currentConfig.cards[3].icon = String(payload.feature_card4_icon).trim();
+      }
+      payload.feature_cards = JSON.stringify(currentConfig);
     }
 
     // 1. Synchronize in-memory fallback settings immediately

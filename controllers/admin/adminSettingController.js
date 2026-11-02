@@ -267,6 +267,14 @@ exports.postSettings = async (req, res, next) => {
       feature_card4_icon: b.feature_card4_icon !== undefined ? b.feature_card4_icon.trim() : undefined
     };
 
+    if (b.feature_cards_json) {
+      try {
+        updates.feature_cards = JSON.parse(b.feature_cards_json);
+      } catch (e) {
+        updates.feature_cards = b.feature_cards_json;
+      }
+    }
+
     // Preloader Settings
     if (b.preloader_enabled !== undefined) {
       updates.preloader_enabled = (b.preloader_enabled === '1' || b.preloader_enabled === 'true') ? '1' : '0';
@@ -457,6 +465,14 @@ exports.postHomepageEditor = async (req, res, next) => {
       feature_card4_icon: feature_card4_icon !== undefined ? feature_card4_icon.trim() : undefined
     };
 
+    if (req.body.feature_cards_json) {
+      try {
+        updates.feature_cards = JSON.parse(req.body.feature_cards_json);
+      } catch (e) {
+        updates.feature_cards = req.body.feature_cards_json;
+      }
+    }
+
     if (req.file) {
       const storage = require('../../config/storage');
       const savedHeroUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
@@ -469,5 +485,78 @@ exports.postHomepageEditor = async (req, res, next) => {
     res.redirect('/admin/homepage');
   } catch (err) {
     next(err);
+  }
+};
+
+exports.getFeatureCardsApi = async (req, res, next) => {
+  try {
+    const settings = await Setting.getAll();
+    return res.json({
+      success: true,
+      feature_cards: Setting.parseFeatureCards(settings.feature_cards)
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.postFeatureCardsApi = async (req, res, next) => {
+  try {
+    const rawData = req.body.feature_cards || req.body;
+    const config = Setting.parseFeatureCards(rawData);
+
+    // Server-side validation
+    for (const card of config.cards) {
+      if (!card.title || !card.title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: `Title is required for Card ${card.order || card.id} (max 40 characters).`
+        });
+      }
+      if (card.title.length > 40) {
+        return res.status(400).json({
+          success: false,
+          message: `Title for "${card.title}" exceeds the 40 characters limit.`
+        });
+      }
+      if (card.subtitle && card.subtitle.length > 80) {
+        return res.status(400).json({
+          success: false,
+          message: `Subtitle for "${card.title}" exceeds the 80 characters limit.`
+        });
+      }
+    }
+
+    if (config.master) {
+      const enabledCount = (config.cards || []).filter(c => c.enabled).length;
+      if (enabledCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one card must be enabled when feature cards are visible on the website.'
+        });
+      }
+    }
+
+    await Setting.updateAll({ feature_cards: config });
+
+    const refreshedSettings = await Setting.getAll();
+    if (req.app) {
+      req.app.locals.siteSettings = {
+        ...(req.app.locals.siteSettings || {}),
+        ...refreshedSettings
+      };
+    }
+
+    return res.json({
+      success: true,
+      message: 'Feature cards updated and synchronized across all pages successfully!',
+      feature_cards: Setting.parseFeatureCards(refreshedSettings.feature_cards)
+    });
+  } catch (err) {
+    console.error('[postFeatureCardsApi error]:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update feature cards: ' + err.message
+    });
   }
 };

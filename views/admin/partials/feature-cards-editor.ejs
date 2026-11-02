@@ -1,0 +1,452 @@
+<%
+  const _s = (typeof settings !== 'undefined' && settings) ? settings : ((typeof siteSettings !== 'undefined' && siteSettings) ? siteSettings : {});
+  const _rawConfig = (typeof Setting !== 'undefined' && Setting.parseFeatureCards) 
+    ? Setting.parseFeatureCards(_s.feature_cards)
+    : {
+        master: true,
+        pages: { home: false, custom_order: true, about: true, design_detail: true, contact: true, categories: true },
+        cards: [
+          { id: 'card_1', title: _s.feature_card1_title || 'Premium Quality', subtitle: _s.feature_card1_subtitle || 'Crafted with precision', icon: _s.feature_card1_icon || 'fa-solid fa-award', enabled: true, link: '', order: 1 },
+          { id: 'card_2', title: _s.feature_card2_title || 'Instant Download', subtitle: _s.feature_card2_subtitle || 'Get files immediately', icon: _s.feature_card2_icon || 'fa-solid fa-download', enabled: true, link: '', order: 2 },
+          { id: 'card_3', title: _s.feature_card3_title || '100% Tested', subtitle: _s.feature_card3_subtitle || 'Quality assured designs', icon: _s.feature_card3_icon || 'fa-solid fa-shield-halved', enabled: true, link: '', order: 3 },
+          { id: 'card_4', title: _s.feature_card4_title || 'Dedicated Support', subtitle: _s.feature_card4_subtitle || "We're here to help you", icon: _s.feature_card4_icon || 'fa-solid fa-headset', enabled: true, link: '', order: 4 }
+        ]
+      };
+%>
+
+<div class="admin-card-box feature-cards-manager-card" id="featureCardsManagerBox" style="margin-bottom: 2rem; padding: 1.8rem; background: #FFFFFF; border: 1px solid var(--admin-border, #E2E8F0); border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+
+  <!-- Hidden CSRF and JSON payload sync input -->
+  <input type="hidden" name="feature_cards_json" id="featureCardsJsonInput" value="<%= JSON.stringify(_rawConfig) %>">
+  <input type="hidden" id="featureCardsCsrfToken" value="<%= (typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : '' %>">
+
+  <!-- Header & Master Toggle -->
+  <div style="border-bottom: 1px solid var(--admin-border, #E2E8F0); padding-bottom: 1.2rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+    <div style="max-width: 620px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: #FDF4E7; color: #A93226; font-size: 1rem;">
+          <i class="fa-solid fa-award"></i>
+        </span>
+        <h3 style="font-family: var(--font-heading, inherit); font-size: 1.25rem; font-weight: 700; color: var(--admin-text-dark, #1E293B); margin: 0;">
+          Trust & Feature Cards
+        </h3>
+        <span id="fcSyncStatusBadge" style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+          <i class="fa-solid fa-check"></i> Synchronized Across Pages
+        </span>
+      </div>
+      <p style="font-size: 0.82rem; color: var(--admin-text-muted, #64748B); margin: 0; line-height: 1.5;">
+        Configure customer trust cards with live preview, mobile 2-column wrapping, individual enable/disable toggles, custom icons, and optional links.
+      </p>
+    </div>
+
+    <!-- Master Website Toggle -->
+    <div style="background: #FAF6F0; border: 1px solid #EADDCF; border-radius: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 14px;">
+      <div>
+        <label for="fcMasterToggle" style="font-size: 0.85rem; font-weight: 700; color: #2C1810; display: block; margin: 0; cursor: pointer;">
+          Show feature cards on the website
+        </label>
+        <span id="fcMasterStatusText" style="font-size: 0.74rem; color: #64748B; font-weight: 500;">
+          <%= _rawConfig.master ? 'Active on enabled pages' : 'Hidden globally' %>
+        </span>
+      </div>
+      <label class="fc-switch">
+        <input type="checkbox" id="fcMasterToggle" <%= _rawConfig.master ? 'checked' : '' %>>
+        <span class="fc-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Page Visibility Selection Strip -->
+  <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1.8rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+      <span style="font-size: 0.82rem; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: 6px;">
+        <i class="fa-solid fa-eye" style="color: #64748B;"></i> Page Visibility (Where cards may appear):
+      </span>
+      <span style="font-size: 0.72rem; color: #64748B;">
+        Toggling a page OFF cleanly removes cards with zero leftover gap.
+      </span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+      <label class="fc-page-checkbox-label">
+        <input type="checkbox" id="fcPageHome" class="fc-page-checkbox" <%= _rawConfig.pages && _rawConfig.pages.home ? 'checked' : '' %>>
+        <span><strong>Home hero</strong> <small style="color: #64748B;">(Default OFF: clean hero)</small></span>
+      </label>
+      <label class="fc-page-checkbox-label">
+        <input type="checkbox" id="fcPageCustomOrder" class="fc-page-checkbox" <%= (!_rawConfig.pages || _rawConfig.pages.custom_order !== false) ? 'checked' : '' %>>
+        <span><strong>Custom Order page</strong></span>
+      </label>
+      <label class="fc-page-checkbox-label">
+        <input type="checkbox" id="fcPageAbout" class="fc-page-checkbox" <%= (!_rawConfig.pages || _rawConfig.pages.about !== false) ? 'checked' : '' %>>
+        <span><strong>About page</strong></span>
+      </label>
+      <label class="fc-page-checkbox-label">
+        <input type="checkbox" id="fcPageDesignDetail" class="fc-page-checkbox" <%= (!_rawConfig.pages || _rawConfig.pages.design_detail !== false) ? 'checked' : '' %>>
+        <span><strong>Design detail page</strong></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 4 Feature Cards Grid -->
+  <div id="fcCardsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.2rem; margin-bottom: 1.8rem;">
+    <% (_rawConfig.cards || []).forEach((card, idx) => { %>
+      <% const isEnabled = card.enabled !== false; %>
+      <div class="fc-card-editor-item <%= isEnabled ? '' : 'is-dimmed' %>" id="fcCardItem_<%= card.id %>" data-card-id="<%= card.id %>" data-order="<%= card.order || (idx + 1) %>">
+        <!-- Card Header -->
+        <div class="fc-card-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="fc-card-icon-preview-mini" id="fcMiniIcon_<%= card.id %>">
+              <i class="<%= card.icon || 'fa-solid fa-award' %>"></i>
+            </span>
+            <strong class="fc-card-title-heading">Card <%= idx + 1 %></strong>
+            <span class="fc-hidden-badge" id="fcBadgeHidden_<%= card.id %>" style="<%= isEnabled ? 'display: none;' : '' %>">
+              Hidden on website
+            </span>
+          </div>
+
+          <!-- Reorder & Toggle Buttons -->
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="fc-reorder-btn" title="Move Left / Up" onclick="window.featureCardsManager.moveCard('<%= card.id %>', -1)">
+              <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button type="button" class="fc-reorder-btn" title="Move Right / Down" onclick="window.featureCardsManager.moveCard('<%= card.id %>', 1)">
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+            <label class="fc-switch fc-switch-sm" title="Enable or Disable this card">
+              <input type="checkbox" class="fc-card-toggle" data-card-id="<%= card.id %>" <%= isEnabled ? 'checked' : '' %>>
+              <span class="fc-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Card Body -->
+        <div class="fc-card-body">
+          <!-- Title -->
+          <div class="fc-field-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="fc-field-label">Title <span style="color: #A93226;">*</span></label>
+              <span class="fc-char-count" id="fcTitleCount_<%= card.id %>"><%= (card.title || '').length %>/40</span>
+            </div>
+            <input type="text" class="form-control fc-card-input-title" data-card-id="<%= card.id %>" maxlength="40" value="<%= card.title || '' %>" placeholder="e.g. Premium Quality" required>
+          </div>
+
+          <!-- Subtitle -->
+          <div class="fc-field-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="fc-field-label">Subtitle</label>
+              <span class="fc-char-count" id="fcSubCount_<%= card.id %>"><%= (card.subtitle || '').length %>/80</span>
+            </div>
+            <input type="text" class="form-control fc-card-input-subtitle" data-card-id="<%= card.id %>" maxlength="80" value="<%= card.subtitle || '' %>" placeholder="e.g. Crafted with precision">
+          </div>
+
+          <!-- Icon Picker -->
+          <div class="fc-field-group">
+            <label class="fc-field-label">Icon</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select class="form-control fc-icon-select" data-card-id="<%= card.id %>" style="flex: 1;">
+                <option value="fa-solid fa-award" <%= card.icon === 'fa-solid fa-award' ? 'selected' : '' %>>Award / Quality</option>
+                <option value="fa-solid fa-download" <%= card.icon === 'fa-solid fa-download' ? 'selected' : '' %>>Download / Instant</option>
+                <option value="fa-solid fa-shield-halved" <%= (card.icon === 'fa-solid fa-shield-halved' || card.icon === 'fa-solid fa-shield') ? 'selected' : '' %>>Shield / Tested</option>
+                <option value="fa-solid fa-headset" <%= card.icon === 'fa-solid fa-headset' ? 'selected' : '' %>>Headset / Support</option>
+                <option value="fa-solid fa-truck" <%= card.icon === 'fa-solid fa-truck' ? 'selected' : '' %>>Truck / Fast Shipping</option>
+                <option value="fa-solid fa-lock" <%= card.icon === 'fa-solid fa-lock' ? 'selected' : '' %>>Lock / Secure</option>
+                <option value="fa-solid fa-star" <%= card.icon === 'fa-solid fa-star' ? 'selected' : '' %>>Star / Top Rated</option>
+                <option value="fa-solid fa-heart" <%= card.icon === 'fa-solid fa-heart' ? 'selected' : '' %>>Heart / Handcrafted</option>
+                <option value="fa-solid fa-gift" <%= card.icon === 'fa-solid fa-gift' ? 'selected' : '' %>>Gift / Special</option>
+                <option value="fa-solid fa-clock" <%= card.icon === 'fa-solid fa-clock' ? 'selected' : '' %>>Clock / 24x7</option>
+                <option value="fa-solid fa-check" <%= card.icon === 'fa-solid fa-check' ? 'selected' : '' %>>Check / Verified</option>
+                <option value="fa-solid fa-thumbs-up" <%= card.icon === 'fa-solid fa-thumbs-up' ? 'selected' : '' %>>Thumbs Up / Satisfaction</option>
+                <option value="fa-solid fa-file-zipper" <%= card.icon === 'fa-solid fa-file-zipper' ? 'selected' : '' %>>File / ZIP Package</option>
+                <option value="fa-solid fa-tag" <%= card.icon === 'fa-solid fa-tag' ? 'selected' : '' %>>Tag / Best Price</option>
+                <option value="__custom__" <%= !['fa-solid fa-award','fa-solid fa-download','fa-solid fa-shield-halved','fa-solid fa-shield','fa-solid fa-headset','fa-solid fa-truck','fa-solid fa-lock','fa-solid fa-star','fa-solid fa-heart','fa-solid fa-gift','fa-solid fa-clock','fa-solid fa-check','fa-solid fa-thumbs-up','fa-solid fa-file-zipper','fa-solid fa-tag'].includes(card.icon) ? 'selected' : '' %>>Advanced: Custom class...</option>
+              </select>
+              <div class="fc-icon-display-box" id="fcIconPreviewBox_<%= card.id %>" title="Current icon preview">
+                <i class="<%= card.icon || 'fa-solid fa-award' %>"></i>
+              </div>
+            </div>
+
+            <!-- Custom Icon Class Input (Visible if __custom__ selected) -->
+            <% const isCustomIcon = !['fa-solid fa-award','fa-solid fa-download','fa-solid fa-shield-halved','fa-solid fa-shield','fa-solid fa-headset','fa-solid fa-truck','fa-solid fa-lock','fa-solid fa-star','fa-solid fa-heart','fa-solid fa-gift','fa-solid fa-clock','fa-solid fa-check','fa-solid fa-thumbs-up','fa-solid fa-file-zipper','fa-solid fa-tag'].includes(card.icon); %>
+            <div class="fc-custom-icon-row" id="fcCustomIconRow_<%= card.id %>" style="<%= isCustomIcon ? 'display: block;' : 'display: none;' %> margin-top: 6px;">
+              <input type="text" class="form-control fc-custom-icon-input" data-card-id="<%= card.id %>" placeholder="e.g. fa-solid fa-gem" value="<%= card.icon || '' %>">
+              <small class="fc-icon-feedback-text" id="fcIconFeedback_<%= card.id %>" style="display: block; font-size: 0.72rem; color: #64748B; margin-top: 2px;">
+                Enter a valid FontAwesome class (e.g. fa-solid fa-gem).
+              </small>
+            </div>
+          </div>
+
+          <!-- Optional Link URL -->
+          <div class="fc-field-group">
+            <label class="fc-field-label">Optional Link URL</label>
+            <input type="text" class="form-control fc-card-input-link" data-card-id="<%= card.id %>" value="<%= card.link || '' %>" placeholder="e.g. /designs or https://... (empty = plain text)">
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+
+  <!-- Live Customer Preview Section -->
+  <div class="fc-live-preview-box" style="background: #FAF8F5; border: 1px solid #EADDCF; border-radius: 14px; padding: 1.4rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h4 style="font-size: 0.95rem; font-weight: 700; color: #2C1810; margin: 0 0 2px; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-desktop" style="color: #A93226;"></i> Live Customer Preview
+        </h4>
+        <span style="font-size: 0.76rem; color: #7D7168;">
+          Exact real-time preview of how cards appear on the customer website.
+        </span>
+      </div>
+
+      <!-- Preview Viewport Switcher -->
+      <div class="fc-viewport-switcher" style="display: inline-flex; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 2px;">
+        <button type="button" class="fc-view-btn active" id="fcViewDesktopBtn" onclick="window.featureCardsManager.switchPreviewMode('desktop')">
+          <i class="fa-solid fa-desktop"></i> Desktop (Row)
+        </button>
+        <button type="button" class="fc-view-btn" id="fcViewMobileBtn" onclick="window.featureCardsManager.switchPreviewMode('mobile')">
+          <i class="fa-solid fa-mobile-screen"></i> Mobile (2 Columns, 360-390px)
+        </button>
+      </div>
+    </div>
+
+    <!-- Preview Container Frame -->
+    <div id="fcPreviewStage" class="fc-preview-stage mode-desktop">
+      <!-- Injected by feature-cards.js in real time -->
+    </div>
+
+    <!-- Master Hidden Alert in Preview -->
+    <div id="fcPreviewHiddenAlert" style="display: none; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 12px; text-align: center; color: #92400E; font-size: 0.82rem; font-weight: 600; margin-top: 10px;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="fcPreviewHiddenReason">Feature cards are currently turned OFF. Enable at least one card and turn on the master toggle to display them on the website.</span>
+    </div>
+  </div>
+
+  <!-- Bottom Action Buttons: Save & Reset -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-top: 1px solid #E2E8F0; padding-top: 1.2rem;">
+    <div>
+      <button type="button" class="btn btn-outline btn-sm" id="fcResetDefaultsBtn" onclick="window.featureCardsManager.resetToDefaults()" style="font-size: 0.8rem; color: #64748B; border-color: #CBD5E1; background: #FFF;">
+        <i class="fa-solid fa-arrow-rotate-left"></i> Reset to Defaults
+      </button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span id="fcSaveFeedbackText" style="font-size: 0.82rem; font-weight: 600; color: #16A34A; display: none;">
+        <i class="fa-solid fa-circle-check"></i> Changes saved!
+      </span>
+      <button type="button" class="btn btn-primary btn-md" id="fcSaveBtn" onclick="window.featureCardsManager.saveChanges()" style="min-width: 160px; height: 42px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+        <i class="fa-solid fa-floppy-disk"></i>
+        <span>Save Changes</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Styles specifically for the admin feature cards editor -->
+<style>
+  .fc-switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 24px;
+    margin: 0;
+  }
+  .fc-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .fc-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #CBD5E1;
+    transition: .25s ease;
+    border-radius: 24px;
+  }
+  .fc-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .25s ease;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .fc-switch input:checked + .fc-slider {
+    background-color: #16A34A;
+  }
+  .fc-switch input:checked + .fc-slider:before {
+    transform: translateX(22px);
+  }
+  .fc-switch-sm {
+    width: 38px;
+    height: 20px;
+  }
+  .fc-switch-sm .fc-slider:before {
+    height: 14px;
+    width: 14px;
+  }
+  .fc-switch-sm input:checked + .fc-slider:before {
+    transform: translateX(18px);
+  }
+
+  .fc-page-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+  .fc-page-checkbox-label:hover {
+    border-color: #94A3B8;
+  }
+  .fc-page-checkbox-label input:checked + span {
+    color: #0F172A;
+  }
+
+  .fc-card-editor-item {
+    background: #FAF6F0;
+    border: 1px solid var(--admin-border, #EADDCF);
+    border-radius: 12px;
+    padding: 1.1rem;
+    transition: opacity 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+  }
+  .fc-card-editor-item.is-dimmed {
+    opacity: 0.55;
+    background: #F8F9FA;
+    border-color: #E2E8F0;
+  }
+  .fc-card-editor-item.is-dimmed:hover {
+    opacity: 0.85;
+  }
+
+  .fc-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  .fc-card-icon-preview-mini {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: #FDF4E7;
+    color: #A93226;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+  }
+  .fc-card-title-heading {
+    font-size: 0.88rem;
+    color: var(--admin-primary, #A93226);
+  }
+  .fc-hidden-badge {
+    background: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #CBD5E1;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .fc-reorder-btn {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    color: #64748B;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .fc-reorder-btn:hover {
+    background: #F1F5F9;
+    color: #1E293B;
+    border-color: #94A3B8;
+  }
+
+  .fc-field-group {
+    margin-bottom: 10px;
+  }
+  .fc-field-label {
+    display: block;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--admin-text-dark, #334155);
+    margin: 0;
+  }
+  .fc-char-count {
+    font-size: 0.7rem;
+    color: #94A3B8;
+  }
+
+  .fc-icon-display-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #FDF4E7;
+    color: #A93226;
+    border: 1px solid #EADDCF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  /* Live Preview Section */
+  .fc-viewport-switcher button {
+    background: transparent;
+    border: none;
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: #64748B;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+  .fc-viewport-switcher button.active {
+    background: #A93226;
+    color: #FFFFFF;
+  }
+
+  .fc-preview-stage {
+    width: 100%;
+    margin: 0 auto;
+    transition: max-width 0.3s ease;
+  }
+  .fc-preview-stage.mode-desktop {
+    max-width: 100%;
+  }
+  .fc-preview-stage.mode-mobile {
+    max-width: 390px;
+    border: 2px dashed #CBD5E1;
+    border-radius: 18px;
+    padding: 12px;
+    background: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+</style>
+
+<!-- Load feature-cards.js controller -->
+<script src="/public/js/admin/feature-cards.js"></script>

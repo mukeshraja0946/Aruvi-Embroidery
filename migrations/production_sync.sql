@@ -889,7 +889,51 @@ SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `quot
 PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ----------------------------------------------------------------------------
--- 7. Record All Applied Migrations in schema_migrations
+-- 7. Fix design_files Unique Constraint for Active Rows Only (Migration 029)
+-- ----------------------------------------------------------------------------
+
+-- Add retired_at to design_files
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'design_files' AND column_name = 'retired_at';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `design_files` ADD COLUMN `retired_at` TIMESTAMP NULL DEFAULT NULL AFTER `created_at`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add retired_at to design_images
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'design_images' AND column_name = 'retired_at';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `design_images` ADD COLUMN `retired_at` TIMESTAMP NULL DEFAULT NULL AFTER `updated_at`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add generated virtual column active_checksum on design_files
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'design_files' AND column_name = 'active_checksum';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `design_files` ADD COLUMN `active_checksum` VARCHAR(64) GENERATED ALWAYS AS (IF(`retired_at` IS NULL, `checksum_sha256`, NULL)) VIRTUAL AFTER `retired_at`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Drop old blocking idx_design_file_unique (which blocked retired files)
+SET @idx_exist = 0;
+SELECT COUNT(*) INTO @idx_exist FROM information_schema.statistics WHERE table_schema = @dbname AND table_name = 'design_files' AND index_name = 'idx_design_file_unique';
+SET @query = IF(@idx_exist > 0, 'ALTER TABLE `design_files` DROP INDEX `idx_design_file_unique`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Create active-only unique index idx_design_file_active_unique on (design_id, active_checksum)
+SET @idx_exist = 0;
+SELECT COUNT(*) INTO @idx_exist FROM information_schema.statistics WHERE table_schema = @dbname AND table_name = 'design_files' AND index_name = 'idx_design_file_active_unique';
+SET @query = IF(@idx_exist = 0, 'ALTER TABLE `design_files` ADD UNIQUE INDEX `idx_design_file_active_unique` (`design_id`, `active_checksum`)', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ----------------------------------------------------------------------------
+-- 8. Seed Feature Cards Structured Setting (Migration 030)
+-- ----------------------------------------------------------------------------
+INSERT INTO `settings` (`setting_key`, `setting_value`, `updated_at`)
+SELECT 'feature_cards', '{"master":true,"pages":{"home":false,"custom_order":true,"about":true,"design_detail":true,"contact":true,"categories":true},"cards":[{"id":"card_1","title":"Premium Quality","subtitle":"Crafted with precision","icon":"fa-solid fa-award","enabled":true,"link":"","order":1},{"id":"card_2","title":"Instant Download","subtitle":"Get files immediately","icon":"fa-solid fa-download","enabled":true,"link":"","order":2},{"id":"card_3","title":"100% Tested","subtitle":"Quality assured designs","icon":"fa-solid fa-shield-halved","enabled":true,"link":"","order":3},{"id":"card_4","title":"Dedicated Support","subtitle":"We''re here to help you","icon":"fa-solid fa-headset","enabled":true,"link":"","order":4}]}', NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `settings` WHERE `setting_key` = 'feature_cards'
+);
+
+-- ----------------------------------------------------------------------------
+-- 9. Record All Applied Migrations in schema_migrations
 -- ----------------------------------------------------------------------------
 INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('001', '001_initial_schema.sql'),
@@ -919,7 +963,9 @@ INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('025', '025_create_upload_sessions.sql'),
   ('026', '026_clean_previews_and_original_keys.sql'),
   ('027', '027_add_preloader_settings.sql'),
-  ('028', '028_create_custom_requests.sql');
+  ('028', '028_create_custom_requests.sql'),
+  ('029', '029_fix_design_files_unique_index.sql'),
+  ('030', '030_seed_feature_cards_settings.sql');
 
 -- ============================================================================
 -- End of production_sync.sql

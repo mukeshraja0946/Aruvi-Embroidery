@@ -18,6 +18,7 @@ async function attachUserAndCart(req, res, next) {
   res.locals.csrfToken = '';
   res.locals.schemaAlert = (req.app && req.app.locals && req.app.locals.schemaAlert) ? req.app.locals.schemaAlert : { isHealthy: true, missingCount: 0, missingSummary: '' };
   res.locals.getPrimaryPreview = (d) => previewService.getPrimaryPreview(d);
+  res.locals.getFeatureCards = (page) => Setting.getFeatureCards(page, res.locals.siteSettings);
 
   try {
     // 1. Session customer or admin user
