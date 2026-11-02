@@ -95,6 +95,23 @@ async function initPool() {
 // Initial attempt
 initPool();
 
+const missingTableWarnings = new Map();
+
+function logQueryError(error, sql) {
+  if (error.errno === 1146 || error.code === 'ER_NO_SUCH_TABLE') {
+    const tableMatch = error.message.match(/Table '([^']+)' doesn't exist/i);
+    const tableName = tableMatch ? tableMatch[1] : 'unknown';
+    const lastLogged = missingTableWarnings.get(tableName) || 0;
+    const now = Date.now();
+    if (now - lastLogged > 600000) { // Log rate-limited: at most once every 10 minutes as WARN
+      missingTableWarnings.set(tableName, now);
+      console.warn(`[DB Schema Warning] Table "${tableName}" does not exist in database. Feature operating in safe fallback mode. (Run "npm run migrate" or import migrations/production_sync.sql).`);
+    }
+    return;
+  }
+  console.error('[DB Query Error]:', error.message, 'SQL:', sql);
+}
+
 /**
  * Execute parameterized query
  */
@@ -108,7 +125,7 @@ async function query(sql, params = []) {
     } catch (error) {
       error.sql = sql;
       error.params = params;
-      console.error('[DB Query Error]:', error.message, 'SQL:', sql);
+      logQueryError(error, sql);
       throw error;
     }
   } else {
@@ -123,7 +140,7 @@ async function query(sql, params = []) {
         } catch (error) {
           error.sql = sql;
           error.params = params;
-          console.error('[DB Query Error]:', error.message, 'SQL:', sql);
+          logQueryError(error, sql);
           throw error;
         }
       }

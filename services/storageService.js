@@ -1013,9 +1013,14 @@ class StorageService {
     };
     return map[ext] || 'application/octet-stream';
   }
+
+  isPathInsideRepoOrHbuilds(targetPath) {
+    return isPathInsideRepoOrHbuilds(targetPath);
+  }
 }
 
 const storageService = new StorageService();
 storageService.initStorageDirs();
+storageService.isPathInsideRepoOrHbuilds = isPathInsideRepoOrHbuilds;
 
 module.exports = storageService;

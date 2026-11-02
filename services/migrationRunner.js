@@ -32,6 +32,7 @@ function getDbConfig() {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'aruvi_embroidery',
     multipleStatements: true,
+    connectTimeout: 5000,
     charset: 'utf8mb4'
   };
 
@@ -215,8 +216,32 @@ async function executeMigrationSql(conn, sql, file) {
   }
 }
 
+const MIGRATION_REQUIRED_TABLES = {
+  '001': 'designs',
+  '004': 'activity_logs',
+  '005': 'download_logs',
+  '007': 'file_scan_results',
+  '008': 'import_jobs',
+  '009': 'email_campaigns',
+  '014': 'price_update_logs',
+  '017': 'stitch_update_logs',
+  '021': 'design_files',
+  '022': 'image_replace_logs',
+  '024': 'design_images',
+  '025': 'upload_sessions',
+  '028': 'custom_requests'
+};
+
+const CANONICAL_REQUIRED_TABLES = [
+  'users', 'categories', 'designs', 'design_images', 'design_files',
+  'orders', 'order_items', 'custom_requests', 'settings', 'banners',
+  'coupons', 'reviews', 'wishlist', 'contact_messages', 'activity_logs',
+  'download_logs', 'file_scan_results', 'import_jobs', 'email_campaigns',
+  'price_update_logs', 'stitch_update_logs', 'image_replace_logs', 'upload_sessions'
+];
+
 /**
- * Runs all pending numbered migrations in sequence
+ * Runs all pending numbered migrations in sequence with table presence verification
  */
 async function runPendingMigrations({ connection: existingConn, silent = false } = {}) {
   const config = getDbConfig();
@@ -244,38 +269,60 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       if (vRows && vRows[0]) dbServerVersion = vRows[0].version;
     } catch {}
 
+    // Fetch all currently existing tables to catch false-positive migration skips
+    const [existingTableRows] = await conn.query(
+      'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()'
+    );
+    const existingTableNames = new Set(
+      (existingTableRows || []).map(r => (r.TABLE_NAME || r.table_name || Object.values(r)[0]).toLowerCase())
+    );
+
     if (!silent) {
       console.log('====================================================');
       console.log(' 🌸 Aruvi Embroidery — Automated Database Migrations');
       console.log(` 🐬 DB Server Version: ${dbServerVersion} (Charset: utf8mb4)`);
       console.log(` 📂 Total numbered migration files detected: ${allFiles.length}`);
+      console.log(` 📊 Existing database tables verified: ${existingTableNames.size}`);
       console.log('====================================================');
     }
 
     const appliedThisRun = [];
     const failedThisRun = [];
-    let pendingCount = 0;
 
     for (const file of allFiles) {
       const version = file.split('_')[0];
-      const isApplied = namesSet.has(file) || versionsSet.has(version);
+      const expectedTable = MIGRATION_REQUIRED_TABLES[version];
+
+      let tableActuallyExists = true;
+      if (expectedTable && !existingTableNames.has(expectedTable.toLowerCase())) {
+        tableActuallyExists = false;
+      }
+
+      // If recorded as applied but the required table is missing, purge stale record & re-run
+      if (!tableActuallyExists && (namesSet.has(file) || versionsSet.has(version))) {
+        if (!silent) console.warn(`  ⚠️ [SCHEMA SYNC] Migration ${file} was recorded in schema_migrations but table "${expectedTable}" is missing. Purging stale record and re-running...`);
+        try {
+          await conn.query('DELETE FROM `schema_migrations` WHERE `version` = ? OR `name` = ?', [version, file]);
+          namesSet.delete(file);
+          versionsSet.delete(version);
+        } catch (_) {}
+      }
+
+      const isApplied = (namesSet.has(file) || versionsSet.has(version)) && tableActuallyExists;
 
       if (isApplied) {
         if (!silent) console.log(`  [SKIPPED] ${file} (already applied)`);
         continue;
       }
 
-      pendingCount++;
       if (!silent) console.log(`  [APPLYING] ${file}...`);
 
       const filePath = path.join(migrationsDir, file);
       const sql = fs.readFileSync(filePath, 'utf8');
 
-      // Execute migration safely statement-by-statement inside transaction
-      let inTransaction = false;
+      // Execute DDL statements directly without transaction wrapping
+      // (MySQL/MariaDB implicitly commits transactions on DDL statements)
       try {
-        await conn.query('START TRANSACTION');
-        inTransaction = true;
         await executeMigrationSql(conn, sql, file);
 
         // Record in schema_migrations
@@ -283,26 +330,31 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
           'INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES (?, ?)',
           [version, file]
         );
-        await conn.query('COMMIT');
-        inTransaction = false;
 
         appliedThisRun.push(file);
-        if (!silent) console.log(`  ✅ [SUCCESS] ${file} applied successfully.`);
+        if (expectedTable) existingTableNames.add(expectedTable.toLowerCase());
+        if (!silent) console.log(`  Applied migration ${file}`);
       } catch (fileErr) {
-        if (inTransaction) {
-          try { await conn.query('ROLLBACK'); } catch (_) {}
-        }
         const cleanMsg = formatErrorMessage(fileErr);
-        console.error(`\n❌ [MIGRATION FAILED] Error applying migration file: ${file}`);
-        console.error(`   Message: ${cleanMsg}`);
-        console.error(`   SQL State: ${fileErr.sqlState || 'N/A'}`);
-        console.error('   Existing data has not been touched. Boot continuing in resilient mode.\n');
+        console.error(`  FAILED: ${file}: ${cleanMsg}`);
         failedThisRun.push({
           file,
           version,
           error: cleanMsg,
           sqlState: fileErr.sqlState || 'N/A'
         });
+      }
+    }
+
+    // Post-migration table presence audit
+    const missingTables = [];
+    for (const tName of CANONICAL_REQUIRED_TABLES) {
+      const [recheck] = await conn.query(
+        'SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
+        [tName]
+      );
+      if (!recheck || !recheck[0] || recheck[0].count === 0) {
+        missingTables.push(tName);
       }
     }
 
@@ -315,15 +367,23 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       } else {
         console.log(` ✨ Successfully applied ${appliedThisRun.length} pending migration(s).`);
       }
+
+      if (missingTables.length > 0) {
+        console.warn(` ⚠️ [WARNING] Detected ${missingTables.length} missing table(s): ${missingTables.join(', ')}`);
+        console.warn('    Import migrations/production_sync.sql in phpMyAdmin to complete synchronization.');
+      } else {
+        console.log(' ✓ All canonical database tables verified present.');
+      }
       console.log('====================================================');
     }
 
     return {
-      success: failedThisRun.length === 0,
+      success: failedThisRun.length === 0 && missingTables.length === 0,
       appliedCount: appliedThisRun.length,
       appliedFiles: appliedThisRun,
       failedCount: failedThisRun.length,
       failedFiles: failedThisRun,
+      missingTables,
       dbServerVersion
     };
 
@@ -349,13 +409,30 @@ async function getMigrationStatus() {
     const { rows, namesSet, versionsSet } = await getAppliedMigrations(conn);
     const allFiles = getAvailableMigrationFiles();
 
+    // Fetch all currently existing tables to catch false-positive migration status
+    let existingTableNames = new Set();
+    try {
+      const [existingTableRows] = await conn.query(
+        'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()'
+      );
+      existingTableNames = new Set(
+        (existingTableRows || []).map(r => (r.TABLE_NAME || r.table_name || Object.values(r)[0]).toLowerCase())
+      );
+    } catch (_) {}
+
     const migrationsList = allFiles.map(file => {
       const version = file.split('_')[0];
       const appliedRow = rows.find(r => r.name === file || r.version === version);
+      const expectedTable = MIGRATION_REQUIRED_TABLES[version];
+      let tableExists = true;
+      if (expectedTable && !existingTableNames.has(expectedTable.toLowerCase())) {
+        tableExists = false;
+      }
+      const isApplied = Boolean(appliedRow || namesSet.has(file) || versionsSet.has(version)) && tableExists;
       return {
         filename: file,
         version,
-        isApplied: Boolean(appliedRow || namesSet.has(file) || versionsSet.has(version)),
+        isApplied,
         appliedAt: appliedRow ? appliedRow.applied_at : null
       };
     });

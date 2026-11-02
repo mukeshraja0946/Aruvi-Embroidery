@@ -2558,10 +2558,10 @@
 
         <!-- Completion Report Section -->
         <div id="uploadReportSection" style="display: none; padding: 1.5rem 0.5rem; text-align: center;">
-          <div style="width: 56px; height: 56px; border-radius: 50%; background: #E8F5E9; color: #2E7D32; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 0.75rem; box-shadow: 0 4px 14px rgba(46, 125, 50, 0.15);">
+          <div id="reportSuccessIcon" style="width: 56px; height: 56px; border-radius: 50%; background: #E8F5E9; color: #2E7D32; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 0.75rem; box-shadow: 0 4px 14px rgba(46, 125, 50, 0.15);">
             <i class="fa-solid fa-circle-check"></i>
           </div>
-          <h3 style="font-size: 1.35rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
+          <h3 id="reportTitleText" style="font-size: 1.35rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 6px;">
             File Replacement Completed!
           </h3>
           <p id="reportGroupSummaryText" style="font-size: 0.88rem; color: var(--admin-text-muted); margin: 0 auto 1.5rem; max-width: 600px; line-height: 1.5;">
@@ -2598,22 +2598,23 @@
               <strong style="font-size: 0.88rem; color: var(--admin-text-dark); display: inline-flex; align-items: center; gap: 8px;">
                 <i class="fa-solid fa-list-check" style="color: #0284C7;"></i> Per-File Operation Log (<span id="bulkReplaceFileLogCount">0</span> files)
               </strong>
-              <span style="font-size: 0.76rem; color: #2E7D32; font-weight: 600; background: #E8F5E9; padding: 3px 10px; border-radius: 999px; border: 1px solid #C8E6C9; display: inline-flex; align-items: center; gap: 5px;">
+              <span id="bulkReplaceHeaderBadge" style="font-size: 0.76rem; color: #2E7D32; font-weight: 600; background: #E8F5E9; padding: 3px 10px; border-radius: 999px; border: 1px solid #C8E6C9; display: inline-flex; align-items: center; gap: 5px;">
                 <i class="fa-solid fa-circle-check"></i> Verified storage & database activation
               </span>
             </div>
-            <div style="max-height: 260px; overflow-y: auto;">
+            <div style="max-height: 280px; overflow-y: auto;">
               <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
                 <thead style="background: #F8FAFC; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid #E2E8F0;">
                   <tr style="text-align: left; color: #475569;">
                     <th style="padding: 10px 14px; width: 45px; text-align: center;">#</th>
-                    <th style="padding: 10px 14px;">File Name</th>
+                    <th style="padding: 10px 14px; min-width: 160px;">File Name</th>
                     <th style="padding: 10px 14px; width: 85px;">Type</th>
                     <th style="padding: 10px 14px; width: 85px;">Size</th>
                     <th style="padding: 10px 14px; width: 140px;">Target Design / SKU</th>
-                    <th style="padding: 10px 14px; width: 120px;">Storage Status</th>
-                    <th style="padding: 10px 14px; width: 120px;">Database Status</th>
-                    <th style="padding: 10px 14px; width: 105px; text-align: center;">Result</th>
+                    <th style="padding: 10px 14px; width: 105px;">Storage</th>
+                    <th style="padding: 10px 14px; width: 105px;">Database</th>
+                    <th style="padding: 10px 14px; min-width: 180px;">Status / Error Details</th>
+                    <th style="padding: 10px 14px; width: 100px; text-align: center;">Action</th>
                   </tr>
                 </thead>
                 <tbody id="bulkReplaceFileLogTbody">

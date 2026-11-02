@@ -842,15 +842,51 @@ CREATE TABLE IF NOT EXISTS `custom_requests` (
   INDEX idx_cr_created (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `request_number` VARCHAR(50) NOT NULL UNIQUE AFTER `id`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `design_title` VARCHAR(255) NOT NULL AFTER `phone`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `category_id` INT DEFAULT NULL AFTER `description`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `preferred_formats` VARCHAR(255) DEFAULT 'DST, PES, JEF, EXP' AFTER `category_id`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `size_hoop` VARCHAR(100) DEFAULT NULL AFTER `preferred_formats`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `budget` DECIMAL(10,2) DEFAULT NULL AFTER `size_hoop`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `deadline` DATE DEFAULT NULL AFTER `budget`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `reference_image_key` VARCHAR(500) DEFAULT NULL AFTER `deadline`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `quoted_price` DECIMAL(10,2) DEFAULT NULL AFTER `admin_notes`;
+-- custom_requests column guards (safe for MariaDB 10.x and MySQL 5.7/8.x)
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'request_number';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `request_number` VARCHAR(50) NOT NULL AFTER `id`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'design_title';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `design_title` VARCHAR(255) NOT NULL AFTER `phone`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'category_id';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `category_id` INT DEFAULT NULL AFTER `description`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'preferred_formats';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `preferred_formats` VARCHAR(255) DEFAULT \'DST, PES, JEF, EXP\' AFTER `category_id`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'size_hoop';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `size_hoop` VARCHAR(100) DEFAULT NULL AFTER `preferred_formats`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'budget';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `budget` DECIMAL(10,2) DEFAULT NULL AFTER `size_hoop`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'deadline';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `deadline` DATE DEFAULT NULL AFTER `budget`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'reference_image_key';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `reference_image_key` VARCHAR(500) DEFAULT NULL AFTER `deadline`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = 0;
+SELECT COUNT(*) INTO @col_exists FROM information_schema.columns WHERE table_schema = @dbname AND table_name = 'custom_requests' AND column_name = 'quoted_price';
+SET @query = IF(@col_exists = 0, 'ALTER TABLE `custom_requests` ADD COLUMN `quoted_price` DECIMAL(10,2) DEFAULT NULL AFTER `admin_notes`', 'SELECT 1');
+PREPARE stmt FROM @query; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ----------------------------------------------------------------------------
 -- 7. Record All Applied Migrations in schema_migrations

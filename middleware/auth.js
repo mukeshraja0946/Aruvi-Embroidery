@@ -169,33 +169,69 @@ function isAuthenticated(req, res, next) {
   return res.redirect('/auth/login');
 }
 
+// Rate-limited warning tracker for missing tables in admin badge counting
+const badgeMissingTableWarnings = new Map();
+
+function logBadgeWarningOnce(tableName, err) {
+  const now = Date.now();
+  const lastWarn = badgeMissingTableWarnings.get(tableName) || 0;
+  if (now - lastWarn > 10 * 60 * 1000) {
+    badgeMissingTableWarnings.set(tableName, now);
+    console.warn(`[Admin Badges WARN]: Table '${tableName}' is missing. Counter returning 0 until migrated. (${err && err.message ? err.message : 'ER_NO_SUCH_TABLE'})`);
+  }
+}
+
 async function isAdmin(req, res, next) {
   if (req.user && req.user.role === 'admin') {
     // Populate dynamic live notification & pending counts for admin views
     const db = require('../config/db');
     if (db.isConnected()) {
+      let pendingOrders = 0;
+      let unreadMessages = 0;
+      let pendingCustomOrders = 0;
+
       try {
         const [pOrd] = await db.query("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'");
-        const [uMsg] = await db.query("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'");
-        let pendingCustomOrders = 0;
-        try {
-          const [pCust] = await db.query("SELECT COUNT(*) as count FROM custom_requests WHERE status IN ('new', 'in_review')");
-          pendingCustomOrders = pCust ? (pCust.count || 0) : 0;
-        } catch (_) {
-          try {
-            const [pCustLegacy] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
-            pendingCustomOrders = pCustLegacy ? (pCustLegacy.count || 0) : 0;
-          } catch (_) {}
+        pendingOrders = pOrd ? Number(pOrd.count || 0) : 0;
+      } catch (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146) {
+          logBadgeWarningOnce('orders', err);
         }
-        res.locals.adminNavBadges = {
-          pendingOrders,
-          unreadMessages,
-          pendingCustomOrders,
-          unreadNotifications: unreadMessages + pendingCustomOrders
-        };
-      } catch (badgeErr) {
-        // Keep default zeros
       }
+
+      try {
+        const [uMsg] = await db.query("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'");
+        unreadMessages = uMsg ? Number(uMsg.count || 0) : 0;
+      } catch (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146) {
+          logBadgeWarningOnce('contact_messages', err);
+        }
+      }
+
+      try {
+        const [pCust] = await db.query("SELECT COUNT(*) as count FROM custom_requests WHERE status IN ('new', 'in_review')");
+        pendingCustomOrders = pCust ? Number(pCust.count || 0) : 0;
+      } catch (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146) {
+          logBadgeWarningOnce('custom_requests', err);
+        }
+        // Fallback to legacy custom_orders table if custom_requests is not yet migrated
+        try {
+          const [pCustLegacy] = await db.query("SELECT COUNT(*) as count FROM custom_orders WHERE status IN ('pending', 'reviewing')");
+          pendingCustomOrders = pCustLegacy ? Number(pCustLegacy.count || 0) : 0;
+        } catch (errLegacy) {
+          if (errLegacy.code === 'ER_NO_SUCH_TABLE' || errLegacy.errno === 1146) {
+            logBadgeWarningOnce('custom_orders', errLegacy);
+          }
+        }
+      }
+
+      res.locals.adminNavBadges = {
+        pendingOrders,
+        unreadMessages,
+        pendingCustomOrders,
+        unreadNotifications: unreadMessages + pendingCustomOrders
+      };
     }
     return next();
   }

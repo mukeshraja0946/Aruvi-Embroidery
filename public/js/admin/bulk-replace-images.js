@@ -563,6 +563,28 @@
       const progressPercent = document.getElementById('bulkReplaceProgressPercent');
       const progressStatus = document.getElementById('bulkReplaceProgressStatus');
 
+      // 1. PRE-FLIGHT CHECK
+      if (progressStatus) progressStatus.textContent = 'Running pre-flight storage & environment checks...';
+      try {
+        const pfUrl = `/admin/designs/bulk-replace/preflight?categoryId=${encodeURIComponent(this.currentCategoryId || 'all')}&targetDesignId=${encodeURIComponent(this.selectedTargetDesignId || '')}&fileCount=${this.selectedFiles.length}`;
+        const pfRes = await fetch(pfUrl);
+        const pfData = await pfRes.json();
+        if (!pfData.ok) {
+          this.isUploading = false;
+          if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Replace Files Now';
+          }
+          if (progressStatus) progressStatus.textContent = `Pre-Flight Blocked: ${pfData.message}`;
+          alert(`PRE-FLIGHT CHECK BLOCKED [${pfData.code}]:\n\n${pfData.message}\n\nFIX: ${pfData.fix || 'Check environment configuration'}`);
+          this.currentStep = 3;
+          this.updateStepView();
+          return;
+        }
+      } catch (pfErr) {
+        console.warn('Pre-flight fetch error:', pfErr);
+      }
+
       this.abortController = new AbortController();
 
       let uploadedProcessedItems = [];
@@ -657,14 +679,56 @@
         const removedOldEl = document.getElementById('reportCountRemovedOld');
         const failedEl = document.getElementById('reportCountFailed');
 
-        if (replacedImgEl) replacedImgEl.textContent = commitData.replacedImagesCount ?? 0;
-        if (replacedZipEl) replacedZipEl.textContent = (commitData.replacedZipsCount ?? 0) + (commitData.addedCount ?? 0);
+        const failedCount = commitData.failedCount ?? 0;
+        const replacedImgs = commitData.replacedImagesCount ?? 0;
+        const replacedZips = (commitData.replacedZipsCount ?? 0) + (commitData.addedCount ?? 0);
+        const succeededCount = (replacedImgs + replacedZips) || (commitData.replacedDesignsCount ?? 0);
+
+        if (replacedImgEl) replacedImgEl.textContent = replacedImgs;
+        if (replacedZipEl) replacedZipEl.textContent = replacedZips;
         if (unchangedEl) unchangedEl.textContent = commitData.unchangedCount ?? 0;
         if (removedOldEl) removedOldEl.textContent = commitData.removedOldFilesCount ?? 0;
-        if (failedEl) failedEl.textContent = commitData.failedCount ?? 0;
+        if (failedEl) failedEl.textContent = failedCount;
+
+        // Honest Header Badge
+        const headerBadge = document.getElementById('bulkReplaceHeaderBadge');
+        if (headerBadge) {
+          if (failedCount > 0) {
+            headerBadge.style.background = '#FFEBEE';
+            headerBadge.style.color = '#C62828';
+            headerBadge.style.borderColor = '#FFCDD2';
+            headerBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Completed: ${succeededCount} succeeded, ${failedCount} failed`;
+          } else {
+            headerBadge.style.background = '#E8F5E9';
+            headerBadge.style.color = '#2E7D32';
+            headerBadge.style.borderColor = '#C8E6C9';
+            headerBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Completed: ${succeededCount} succeeded, 0 failed`;
+          }
+        }
+
+        const reportIcon = document.getElementById('reportSuccessIcon');
+        if (reportIcon) {
+          if (failedCount > 0) {
+            reportIcon.style.background = '#FFF3E0';
+            reportIcon.style.color = '#E65100';
+            reportIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+          } else {
+            reportIcon.style.background = '#E8F5E9';
+            reportIcon.style.color = '#2E7D32';
+            reportIcon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+          }
+        }
+
+        const reportTitle = document.getElementById('reportTitleText');
+        if (reportTitle) {
+          reportTitle.textContent = failedCount > 0 
+            ? `File Replacement Finished (${succeededCount} Succeeded, ${failedCount} Failed)`
+            : 'File Replacement Completed!';
+        }
 
         // Populate Per-File Operation Log Table
         const fileLogs = commitData.fileLogs || [];
+        this.lastFileLogs = fileLogs;
         const countEl = document.getElementById('bulkReplaceFileLogCount');
         const tbodyEl = document.getElementById('bulkReplaceFileLogTbody');
         if (countEl) countEl.textContent = fileLogs.length;
@@ -689,18 +753,41 @@
 
             const storageBadge = f.storageStatus === 'Stored'
               ? '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-circle-check"></i> Stored</span>'
-              : `<span style="color: #DC2626; font-weight: 600;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-circle-xmark"></i> Failed</span>`;
+              : `<span style="color: #DC2626; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || '')}"><i class="fa-solid fa-circle-xmark"></i> ${this.escapeHtml(f.storageStatus || 'Failed')}</span>`;
 
             let dbBadge = '<span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Updated</span>';
             if (f.dbStatus === 'Unchanged') {
               dbBadge = '<span style="color: #475569; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-equals"></i> Unchanged</span>';
-            } else if (f.dbStatus === 'Failed') {
-              dbBadge = '<span style="color: #DC2626; font-weight: 600;"><i class="fa-solid fa-xmark"></i> Failed</span>';
+            } else if (f.dbStatus === 'Failed' || !isVerified) {
+              dbBadge = `<span style="color: #DC2626; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-xmark"></i> ${this.escapeHtml(f.dbStatus || 'Failed')}</span>`;
             }
 
-            const resultBadge = isVerified
-              ? '<span style="background: #DCFCE7; color: #166534; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BBF7D0; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Verified</span>'
-              : `<span style="background: #FEE2E2; color: #991B1B; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #FECACA; display: inline-flex; align-items: center; gap: 4px;" title="${this.escapeHtml(f.error || 'Failed')}"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
+            let statusDetailsHtml = '';
+            let actionBtnHtml = '<span style="color: #94A3B8; font-size: 0.75rem;">—</span>';
+
+            if (isVerified) {
+              statusDetailsHtml = '<span style="background: #DCFCE7; color: #166534; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid #BBF7D0; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-check"></i> Verified</span>';
+            } else {
+              const code = f.errorCode || 'FAILED';
+              const stage = f.stage || 'storage_write';
+              const errMsg = f.errorMessage || f.error || 'Operation failed';
+              const ref = f.refId || '-';
+              statusDetailsHtml = `
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; border: 1px solid #FECACA;">${this.escapeHtml(code)}</span>
+                    <span style="font-size: 0.72rem; color: #64748B; font-weight: 600;">Stage: ${this.escapeHtml(stage)}</span>
+                  </div>
+                  <div style="font-size: 0.72rem; color: #DC2626; font-weight: 500; word-break: break-word; line-height: 1.3;">${this.escapeHtml(errMsg)}</div>
+                  <div style="font-size: 0.68rem; color: #94A3B8; font-family: monospace;">Ref: ${this.escapeHtml(ref)}</div>
+                </div>
+              `;
+              actionBtnHtml = `
+                <button type="button" onclick="window.bulkImageReplaceInstance.copyErrorDetails('${this.escapeHtml(ref)}')" class="btn btn-sm" style="font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; background: #F8FAFC; border: 1px solid #CBD5E1; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: 600;" title="Copy full error details to clipboard">
+                  <i class="fa-regular fa-copy"></i> Copy details
+                </button>
+              `;
+            }
 
             tr.innerHTML = `
               <td style="padding: 10px 14px; text-align: center; color: #94A3B8; font-weight: 500;">${idx + 1}</td>
@@ -714,7 +801,8 @@
               </td>
               <td style="padding: 10px 14px;">${storageBadge}</td>
               <td style="padding: 10px 14px;">${dbBadge}</td>
-              <td style="padding: 10px 14px; text-align: center;">${resultBadge}</td>
+              <td style="padding: 10px 14px;">${statusDetailsHtml}</td>
+              <td style="padding: 10px 14px; text-align: center;">${actionBtnHtml}</td>
             `;
             tbodyEl.appendChild(tr);
           });
@@ -757,6 +845,20 @@
         // Allow user to return to Step 3 to review
         this.currentStep = 3;
         this.updateStepView();
+      }
+    }
+
+    copyErrorDetails(refId) {
+      const item = (this.lastFileLogs || []).find(l => l.refId === refId) || { refId, error: 'Details not found' };
+      const text = JSON.stringify(item, null, 2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert(`Error details (${refId}) copied to clipboard!`);
+        }).catch(() => {
+          prompt('Copy error details:', text);
+        });
+      } else {
+        prompt('Copy error details:', text);
       }
     }
 

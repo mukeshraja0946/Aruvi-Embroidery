@@ -4254,6 +4254,31 @@ exports.downloadAdminFile = async (req, res, next) => {
 const bulkImageReplaceService = require('../../services/bulkImageReplaceService');
 
 /**
+ * Pre-flight health and storage check before starting Bulk Replace
+ * GET /admin/designs/bulk-replace/preflight
+ */
+exports.getBulkReplacePreflight = async (req, res, next) => {
+  try {
+    const { targetDesignId, categoryId, fileCount } = req.query;
+    const preflight = await bulkImageReplaceService.runPreflightCheck({
+      targetDesignId: targetDesignId ? parseInt(targetDesignId, 10) : null,
+      categoryId: categoryId || null,
+      fileCount: fileCount ? parseInt(fileCount, 10) : 0
+    });
+    return res.json(preflight);
+  } catch (err) {
+    console.error('getBulkReplacePreflight error:', err);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      code: 'PREFLIGHT_ERROR',
+      message: err.message,
+      fix: 'Review application logs and verify storage configuration.'
+    });
+  }
+};
+
+/**
  * Scope summary and design count for Bulk Image Replace modal
  * GET /admin/designs/bulk-replace/scope-summary
  */

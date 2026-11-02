@@ -31,18 +31,23 @@ CREATE TABLE IF NOT EXISTS `custom_requests` (
   INDEX `idx_cr_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 2. Idempotent column check if table already existed prior to migration
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `request_number` VARCHAR(50) NOT NULL UNIQUE AFTER `id`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `design_title` VARCHAR(255) NOT NULL AFTER `phone`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `category_id` INT DEFAULT NULL AFTER `description`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `preferred_formats` VARCHAR(255) DEFAULT 'DST, PES, JEF, EXP' AFTER `category_id`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `size_hoop` VARCHAR(100) DEFAULT NULL AFTER `preferred_formats`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `budget` DECIMAL(10,2) DEFAULT NULL AFTER `size_hoop`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `deadline` DATE DEFAULT NULL AFTER `budget`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `reference_image_key` VARCHAR(500) DEFAULT NULL AFTER `deadline`;
-ALTER TABLE `custom_requests` ADD COLUMN IF NOT EXISTS `quoted_price` DECIMAL(10,2) DEFAULT NULL AFTER `admin_notes`;
+-- 2. Ensure legacy custom_orders table exists so copy query never fails
+CREATE TABLE IF NOT EXISTS `custom_orders` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT DEFAULT NULL,
+  `full_name` VARCHAR(150) DEFAULT NULL,
+  `email` VARCHAR(150) DEFAULT NULL,
+  `phone` VARCHAR(50) DEFAULT NULL,
+  `design_details` TEXT DEFAULT NULL,
+  `reference_image_url` VARCHAR(500) DEFAULT NULL,
+  `status` VARCHAR(50) DEFAULT 'pending',
+  `admin_notes` TEXT DEFAULT NULL,
+  `quoted_price` DECIMAL(10,2) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. Safely copy legacy custom_orders data if custom_orders exists
+-- 3. Safely copy legacy custom_orders data if any exists
 INSERT IGNORE INTO `custom_requests` (
   `id`, `request_number`, `user_id`, `name`, `email`, `phone`, 
   `design_title`, `description`, `reference_image_key`, `status`, 

@@ -90,6 +90,179 @@ function detectDesignFolderGroup(design) {
 
 class BulkImageReplaceService {
   /**
+   * Pre-flight health and safety checks before Bulk Replace starts
+   * Validates: UPLOAD_DIR set, absolute, outside project/hbuilds, writable in public & private,
+   * free disk space, required tables/columns exist, target design / batch file limits.
+   */
+  async runPreflightCheck(options = {}) {
+    const { targetDesignId = null, categoryId = null, fileCount = 0 } = options;
+
+    // 1. Check UPLOAD_DIR is set
+    const rawUploadDir = process.env.UPLOAD_DIR ? process.env.UPLOAD_DIR.trim() : '';
+    if (!rawUploadDir) {
+      return {
+        ok: false,
+        success: false,
+        code: 'UPLOAD_DIR_UNSET',
+        stage: 'preflight',
+        message: 'UPLOAD_DIR is not set: add UPLOAD_DIR=/home/u101925264/aruvi-uploads in hPanel -> Node.js -> Environment variables and restart.',
+        fix: 'Add UPLOAD_DIR=/home/u101925264/aruvi-uploads in hPanel -> Node.js -> Environment variables and restart.'
+      };
+    }
+
+    // 2. Check UPLOAD_DIR is an absolute path
+    if (!path.isAbsolute(rawUploadDir)) {
+      return {
+        ok: false,
+        success: false,
+        code: 'UPLOAD_DIR_RELATIVE',
+        stage: 'preflight',
+        message: `UPLOAD_DIR "${rawUploadDir}" is a relative path. Persistent storage requires an absolute path.`,
+        fix: 'Set an absolute path like UPLOAD_DIR=/home/u101925264/aruvi-uploads in hPanel -> Node.js -> Environment variables.'
+      };
+    }
+
+    // 3. Check UPLOAD_DIR is outside the project repository and outside hbuilds/versions
+    const storageService = storage.storageService || require('./storageService');
+    if (storageService.isPathInsideRepoOrHbuilds(rawUploadDir)) {
+      return {
+        ok: false,
+        success: false,
+        code: 'UPLOAD_DIR_BLOCKED',
+        stage: 'preflight',
+        message: `UPLOAD_DIR is located inside the project repository or ephemeral deploy directory (${rawUploadDir}). All uploads will be erased on every deploy!`,
+        fix: 'Change UPLOAD_DIR to an external persistent folder like /home/u101925264/aruvi-uploads in hPanel -> Node.js -> Environment variables.'
+      };
+    }
+
+    // 4. Test directory writability in public/ and private/
+    const publicDir = storageService.getPublicDir();
+    const privateDir = storageService.getPrivateDir();
+
+    try {
+      if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+      const testPub = path.join(publicDir, `.write_test_${Date.now()}_pub.tmp`);
+      fs.writeFileSync(testPub, 'aruvi_preflight_write_test', 'utf8');
+      fs.unlinkSync(testPub);
+    } catch (err) {
+      return {
+        ok: false,
+        success: false,
+        code: err.code || 'EACCES',
+        stage: 'storage_check',
+        message: `Storage public directory is not writable (${publicDir}): ${err.message}`,
+        fix: 'Check directory permissions in File Manager or run chmod 755 on the uploads directory.'
+      };
+    }
+
+    try {
+      if (!fs.existsSync(privateDir)) fs.mkdirSync(privateDir, { recursive: true });
+      const testPriv = path.join(privateDir, `.write_test_${Date.now()}_priv.tmp`);
+      fs.writeFileSync(testPriv, 'aruvi_preflight_write_test', 'utf8');
+      fs.unlinkSync(testPriv);
+    } catch (err) {
+      return {
+        ok: false,
+        success: false,
+        code: err.code || 'EACCES',
+        stage: 'storage_check',
+        message: `Storage private directory is not writable (${privateDir}): ${err.message}`,
+        fix: 'Check directory permissions in File Manager or run chmod 755 on the uploads directory.'
+      };
+    }
+
+    // 5. Free disk space check
+    if (typeof fs.statfsSync === 'function') {
+      try {
+        const stats = fs.statfsSync(rawUploadDir);
+        const freeBytes = (stats.bavail || stats.bfree || 0) * (stats.bsize || 4096);
+        const minRequiredBytes = 50 * 1024 * 1024; // 50MB
+        if (freeBytes > 0 && freeBytes < minRequiredBytes) {
+          return {
+            ok: false,
+            success: false,
+            code: 'ENOSPC',
+            stage: 'storage_check',
+            message: `Insufficient free disk space on upload storage (Free: ${(freeBytes / (1024 * 1024)).toFixed(1)} MB, Minimum required: 50 MB).`,
+            fix: 'Free up disk space on your Hostinger account or upgrade your hosting plan.'
+          };
+        }
+      } catch (_) {}
+    }
+
+    // 6. Required database tables check
+    if (db.isConnected()) {
+      try {
+        const requiredTables = ['designs', 'design_images', 'design_files', 'categories', 'image_replace_logs', 'image_replace_log_items'];
+        const dbConfig = db.getDbConfig ? db.getDbConfig() : {};
+        const dbName = dbConfig.database || process.env.DB_NAME;
+        if (dbName) {
+          const rows = await db.query(
+            'SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name IN (?)',
+            [dbName, requiredTables]
+          );
+          const found = new Set((rows || []).map(r => (r.table_name || r.TABLE_NAME || '').toLowerCase()));
+          const missing = requiredTables.filter(t => !found.has(t.toLowerCase()));
+          if (missing.length > 0) {
+            return {
+              ok: false,
+              success: false,
+              code: 'ER_NO_SUCH_TABLE',
+              stage: 'database_check',
+              message: `Database is missing required table(s): ${missing.join(', ')}.`,
+              fix: 'Run pending migrations or import production_sync.sql in phpMyAdmin to create missing tables.'
+            };
+          }
+        }
+      } catch (dbErr) {
+        return {
+          ok: false,
+          success: false,
+          code: dbErr.code || 'ER_NO_SUCH_TABLE',
+          stage: 'database_check',
+          message: `Database health check error: ${dbErr.message}`,
+          fix: 'Verify database connectivity and check tables in phpMyAdmin.'
+        };
+      }
+    }
+
+    // 7. Target design / file limit check
+    if (targetDesignId) {
+      const targetDesign = await Design.getById(targetDesignId);
+      if (!targetDesign) {
+        return {
+          ok: false,
+          success: false,
+          code: 'TARGET_NOT_FOUND',
+          stage: 'preflight',
+          message: `Target design #${targetDesignId} not found in database.`,
+          fix: 'Select a valid target design to replace.'
+        };
+      }
+    }
+
+    if (fileCount > 200) {
+      return {
+        ok: false,
+        success: false,
+        code: 'FILE_LIMIT_REACHED',
+        stage: 'preflight',
+        message: `Selected file count (${fileCount}) exceeds the recommended batch limit of 200 files.`,
+        fix: 'Upload in batches of 200 files or fewer for memory stability.'
+      };
+    }
+
+    return {
+      ok: true,
+      success: true,
+      code: 'PREFLIGHT_PASSED',
+      stage: 'preflight',
+      message: 'Pre-flight check passed. Storage and database are ready for file replacement.',
+      storageStatus: storageService.getStorageStatus()
+    };
+  }
+
+  /**
    * Returns categories with design counts and scoped designs
    */
   async getScopeSummary(options = {}) {
@@ -668,20 +841,28 @@ class BulkImageReplaceService {
     for (const file of files) {
       const originalName = file.originalname || file.name || 'file';
       const ext = path.extname(originalName).toLowerCase();
+      let currentStage = 'upload_read';
+      const refId = `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
       try {
         const inputBuffer = file.buffer || (file.path ? fs.readFileSync(file.path) : null);
 
         if (!inputBuffer || inputBuffer.length === 0) {
-          throw new Error(`Empty file received: ${originalName}`);
+          const emptyErr = new Error(`Empty file received: ${originalName}`);
+          emptyErr.code = 'EMPTY_FILE';
+          throw emptyErr;
         }
 
         const isZip = ext === '.zip';
 
         if (isZip) {
+          currentStage = 'validate_zip';
           // 1. Validate ZIP magic bytes: PK\x03\x04
           const isZipBytes = inputBuffer.length >= 4 && inputBuffer[0] === 0x50 && inputBuffer[1] === 0x4B;
           if (!isZipBytes) {
-            throw new Error(`Invalid ZIP archive for ${originalName}. Authentic ZIP header required.`);
+            const zipErr = new Error(`Invalid ZIP archive for ${originalName}. Authentic ZIP header required.`);
+            zipErr.code = 'INVALID_FORMAT';
+            throw zipErr;
           }
 
           // 2. Validate zip entries: prevent Zip Slip and executable files
@@ -694,10 +875,14 @@ class BulkImageReplaceService {
               if (entry.isDirectory) continue;
               const entryName = entry.entryName.toLowerCase();
               if (entryName.includes('..') || path.isAbsolute(entryName)) {
-                throw new Error(`Security violation: Zip slip detected in ${originalName}`);
+                const secErr = new Error(`Security violation: Zip slip detected in ${originalName}`);
+                secErr.code = 'SECURITY_VIOLATION';
+                throw secErr;
               }
               if (entryName.endsWith('.exe') || entryName.endsWith('.bat') || entryName.endsWith('.sh') || entryName.endsWith('.cmd')) {
-                throw new Error(`Security violation: Executable detected in ${originalName}`);
+                const execErr = new Error(`Security violation: Executable detected in ${originalName}`);
+                execErr.code = 'SECURITY_VIOLATION';
+                throw execErr;
               }
               const entryExt = entryName.split('.').pop();
               if (machineExts.has(entryExt)) {
@@ -705,39 +890,54 @@ class BulkImageReplaceService {
               }
             }
           } catch (zipErr) {
-            if (zipErr.message.includes('Security violation')) throw zipErr;
+            if (zipErr.code === 'SECURITY_VIOLATION' || zipErr.message.includes('Security violation')) throw zipErr;
             console.warn('[ZIP Inspection Warning]:', zipErr.message);
           }
 
           // 3. Save to private design storage using storage.savePrivateFile
+          currentStage = 'storage_write';
           const savedKey = await storage.savePrivateFile(inputBuffer, originalName, 'application/zip');
           const checksum = crypto.createHash('sha256').update(inputBuffer).digest('hex');
 
           processedFiles.push({
             originalName,
+            fileName: originalName,
             storageKey: savedKey,
             fileSize: inputBuffer.length,
             checksum,
             isZip: true,
             detectedFormats: Array.from(new Set(detectedFormats)),
-            status: 'processed'
+            stage: 'completed',
+            status: 'processed',
+            refId
           });
 
         } else {
           // Image validation & processing
+          currentStage = 'validate_image';
           const isPng = inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 && inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
           const isJpg = inputBuffer[0] === 0xFF && inputBuffer[1] === 0xD8 && inputBuffer[2] === 0xFF;
           const isWebp = inputBuffer.length > 12 && inputBuffer.toString('utf8', 8, 12) === 'WEBP';
 
           if (!isPng && !isJpg && !isWebp) {
-            throw new Error(`Invalid image content for ${originalName}. Authentic PNG, JPG, or WEBP required.`);
+            const imgErr = new Error(`Invalid image content for ${originalName}. Authentic PNG, JPG, or WEBP required.`);
+            imgErr.code = 'INVALID_FORMAT';
+            throw imgErr;
           }
 
+          currentStage = 'thumbnails';
           // Generate 3 synchronized preview variants (large watermarked, 600px card, 300px thumbnail)
-          const variants = await previewService.generatePreviewVariants(inputBuffer, originalName);
+          let variants;
+          try {
+            variants = await previewService.generatePreviewVariants(inputBuffer, originalName);
+          } catch (sharpErr) {
+            sharpErr.code = sharpErr.code || 'SHARP_FAILED';
+            throw sharpErr;
+          }
 
           processedFiles.push({
             originalName,
+            fileName: originalName,
             uniqueFilename: path.basename(variants.largeKey),
             publicUrl: variants.largeKey,
             cardUrl: variants.cardKey,
@@ -748,17 +948,32 @@ class BulkImageReplaceService {
             fileSize: variants.fileSize,
             checksum: variants.checksum,
             isZip: false,
-            status: 'processed'
+            stage: 'completed',
+            status: 'processed',
+            refId
           });
         }
       } catch (fileErr) {
-        console.warn(`[BulkReplace] File ${originalName} failed processing:`, fileErr.message);
+        let errorCode = fileErr.code;
+        if (!errorCode) {
+          if (fileErr.message.includes('Sharp') || fileErr.message.includes('Vips') || fileErr.message.includes('Input buffer')) errorCode = 'SHARP_FAILED';
+          else if (fileErr.message.includes('Empty')) errorCode = 'EMPTY_FILE';
+          else if (fileErr.message.includes('Invalid') || fileErr.message.includes('Authentic')) errorCode = 'INVALID_FORMAT';
+          else if (fileErr.message.includes('UPLOAD_DIR')) errorCode = 'UPLOAD_DIR_BLOCKED';
+          else errorCode = 'STORAGE_FAILED';
+        }
+        console.error(`[BulkReplace Error][${refId}] File "${originalName}" failed at stage "${currentStage}" [${errorCode}]:`, fileErr.stack || fileErr);
         processedFiles.push({
           originalName,
+          fileName: originalName,
           fileSize: (file.size || (file.buffer ? file.buffer.length : 0)),
           isZip: ext === '.zip',
           status: 'failed',
-          error: fileErr.message
+          stage: currentStage,
+          errorCode: errorCode,
+          errorMessage: fileErr.message,
+          refId: refId,
+          error: `[${errorCode}] ${fileErr.message} (Ref: ${refId})`
         });
       } finally {
         // Clean up multer temporary file on disk if it was created
@@ -840,16 +1055,21 @@ class BulkImageReplaceService {
     const failedUploadItems = items.filter(it => it.status === 'failed' || it.error);
     for (const f of failedUploadItems) {
       failedCount++;
+      const refId = f.refId || `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
       fileLogs.push({
-        fileName: f.originalName,
+        fileName: f.originalName || f.fileName,
         fileType: f.isZip ? 'ZIP Package' : 'Image',
         fileSize: f.fileSize || 0,
         uploadStatus: 'Failed',
         storageStatus: 'Failed',
         dbStatus: 'Skipped',
         cleanupStatus: '-',
+        stage: f.stage || 'storage_write',
+        errorCode: f.errorCode || 'STORAGE_FAILED',
+        errorMessage: f.errorMessage || f.error || 'Upload validation failed',
+        refId,
         result: 'Failed',
-        error: f.error || 'Upload validation failed'
+        error: f.error || `[${f.errorCode || 'STORAGE_FAILED'}] ${f.errorMessage || 'Upload validation failed'} (Ref: ${refId})`
       });
     }
 
@@ -1240,11 +1460,75 @@ class BulkImageReplaceService {
         });
 
       } catch (itemErr) {
-        console.error(`[BulkReplace] Error replacing design #${dId}:`, itemErr);
+        const refId = `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        let stage = 'db_save';
+        let errorCode = itemErr.code || 'DB_ERROR';
+        if (itemErr.message && itemErr.message.includes('Verification failed')) {
+          stage = 'verification';
+          errorCode = 'VERIFICATION_FAILED';
+        } else if (itemErr.code === 'ER_NO_SUCH_TABLE' || itemErr.errno === 1146) {
+          stage = 'db_save';
+          errorCode = 'ER_NO_SUCH_TABLE';
+        } else if (itemErr.code === 'ENOSPC') {
+          stage = 'storage_write';
+          errorCode = 'ENOSPC';
+        } else if (itemErr.code === 'EACCES') {
+          stage = 'storage_write';
+          errorCode = 'EACCES';
+        }
+
+        console.error(`[BulkReplace Error][${refId}] Design #${dId} failed at stage "${stage}" [${errorCode}]:`, itemErr.stack || itemErr);
         failedCount++;
+
+        (entry.images || []).forEach(img => {
+          fileLogs.push({
+            fileName: img.originalName || img.fileName,
+            fileType: 'Image',
+            targetSku: entry.sku || `Design #${dId}`,
+            targetDesignId: dId,
+            fileSize: img.fileSize || 0,
+            uploadStatus: 'Uploaded',
+            storageStatus: 'Failed',
+            storagePath: img.publicUrl || null,
+            dbStatus: 'Failed',
+            cleanupStatus: 'Kept',
+            stage,
+            errorCode,
+            errorMessage: itemErr.message,
+            refId,
+            result: 'Failed',
+            error: `[${errorCode}] ${itemErr.message} (Ref: ${refId})`
+          });
+        });
+
+        (entry.downloadFiles || []).forEach(zip => {
+          fileLogs.push({
+            fileName: zip.originalName || zip.fileName,
+            fileType: 'ZIP Package',
+            targetSku: entry.sku || `Design #${dId}`,
+            targetDesignId: dId,
+            fileSize: zip.fileSize || 0,
+            uploadStatus: 'Uploaded',
+            storageStatus: 'Failed',
+            storagePath: zip.storageKey || zip.publicUrl || null,
+            dbStatus: 'Failed',
+            cleanupStatus: 'Kept',
+            stage,
+            errorCode,
+            errorMessage: itemErr.message,
+            refId,
+            result: 'Failed',
+            error: `[${errorCode}] ${itemErr.message} (Ref: ${refId})`
+          });
+        });
+
         reportItems.push({
           designId: dId,
+          sku: entry.sku,
           status: 'Failed',
+          stage,
+          errorCode,
+          refId,
           error: itemErr.message
         });
       }
@@ -1521,20 +1805,23 @@ class BulkImageReplaceService {
       csv += `Failed,${log.failedCount ?? (manifest ? manifest.failedCount : 0)}\n\n`;
 
       csv += '=== PER-FILE OPERATION VERIFICATION LOG ===\n';
-      csv += '#,File Name,Type,Size (Bytes),Upload Status,Storage Status,Database Status,Cleanup Status,Result,Storage Path,Error\n';
+      csv += '#,File Name,Type,Size (Bytes),Target SKU,Upload Status,Storage Status,Database Status,Stage,Error Code,Reference ID,Result,Error Details,Storage Path\n';
       fileLogs.forEach((fl, idx) => {
         csv += [
           idx + 1,
           escape(fl.fileName),
           escape(fl.fileType),
           fl.fileSize || 0,
+          escape(fl.targetSku || ''),
           escape(fl.uploadStatus),
           escape(fl.storageStatus),
           escape(fl.dbStatus),
-          escape(fl.cleanupStatus),
+          escape(fl.stage || '-'),
+          escape(fl.errorCode || '-'),
+          escape(fl.refId || '-'),
           escape(fl.result),
-          escape(fl.storagePath),
-          escape(fl.error)
+          escape(fl.errorMessage || fl.error || ''),
+          escape(fl.storagePath)
         ].join(',') + '\n';
       });
     } else {
@@ -2148,7 +2435,24 @@ class BulkImageReplaceService {
         });
 
       } catch (designErr) {
-        console.error(`[BulkReplace Error on Design #${dId}]:`, designErr.message);
+        const refId = `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        let stage = 'db_save';
+        let errorCode = designErr.code || 'DB_ERROR';
+        if (designErr.message && designErr.message.includes('Verification failed')) {
+          stage = 'verification';
+          errorCode = 'VERIFICATION_FAILED';
+        } else if (designErr.code === 'ER_NO_SUCH_TABLE' || designErr.errno === 1146) {
+          stage = 'db_save';
+          errorCode = 'ER_NO_SUCH_TABLE';
+        } else if (designErr.code === 'ENOSPC') {
+          stage = 'storage_write';
+          errorCode = 'ENOSPC';
+        } else if (designErr.code === 'EACCES') {
+          stage = 'storage_write';
+          errorCode = 'EACCES';
+        }
+
+        console.error(`[BulkReplace Error][${refId}] Design #${dId} (${targetSku}) failed at stage "${stage}" [${errorCode}]:`, designErr.stack || designErr);
         if (conn) {
           try { await conn.rollback(); } catch (_) {}
         }
@@ -2167,8 +2471,12 @@ class BulkImageReplaceService {
             storagePath: cleanDbUrl(img.publicUrl),
             dbStatus: 'Failed',
             cleanupStatus: 'Kept',
+            stage,
+            errorCode,
+            errorMessage: designErr.message,
+            refId,
             result: 'Failed',
-            error: designErr.message
+            error: `[${errorCode}] ${designErr.message} (Ref: ${refId})`
           });
         });
 
@@ -2184,8 +2492,12 @@ class BulkImageReplaceService {
             storagePath: cleanDbUrl(zip.storageKey || zip.publicUrl),
             dbStatus: 'Failed',
             cleanupStatus: 'Kept',
+            stage,
+            errorCode,
+            errorMessage: designErr.message,
+            refId,
             result: 'Failed',
-            error: designErr.message
+            error: `[${errorCode}] ${designErr.message} (Ref: ${refId})`
           });
         });
 

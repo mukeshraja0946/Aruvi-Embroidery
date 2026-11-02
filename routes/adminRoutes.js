@@ -98,6 +98,7 @@ router.get('/admin/designs/bulk-upload-check', adminDesignController.bulkUploadC
 router.post('/admin/designs/bulk-link-single-image', adminDesignController.linkSingleImage);
 
 // Bulk Image Replace by Category (Task 2)
+router.get('/admin/designs/bulk-replace/preflight', adminDesignController.getBulkReplacePreflight);
 router.get('/admin/designs/bulk-replace/scope-summary', adminDesignController.getBulkReplaceScopeSummary);
 router.get('/admin/designs/bulk-replace/groups', adminDesignController.getBulkReplaceCategoryGroups);
 router.post('/admin/designs/bulk-replace/preview-match', adminDesignController.postBulkReplacePreviewMatch);

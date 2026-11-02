@@ -1,6 +1,15 @@
 const serverStartTime = Date.now();
 
 // ---------------------------------------------------------------------------
+// Node.js Deprecation Fix [DEP0044]: util.isArray -> Array.isArray
+// Polyfills deprecated util.isArray used by legacy packages (connect-flash v0.1.1)
+// ---------------------------------------------------------------------------
+const util = require('util');
+if (typeof util.isArray === 'function') {
+  util.isArray = Array.isArray;
+}
+
+// ---------------------------------------------------------------------------
 // Process-Level Crash Protection (Hostinger Business Resilient Operation)
 // Keeps the Node.js process alive for recoverable errors and logs with reference IDs
 // ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@
     "backup": "node scripts/backup.js",
     "recover-uploads": "node scripts/recover-uploads.js",
     "preflight": "node scripts/preflight.js",
+    "trace-deprecation": "node --trace-deprecation server.js",
     "test:mobile": "node scripts/test-mobile-overflow.js"
   },
   "keywords": [

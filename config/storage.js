@@ -5,6 +5,7 @@ module.exports = {
   validateStorageConfiguration: () => storageService.validateStorageConfiguration(),
   getStorageStatus: () => storageService.getStorageStatus(),
   isUploadBlocked: () => storageService.isUploadBlocked(),
+  isPathInsideRepoOrHbuilds: (targetPath) => storageService.isPathInsideRepoOrHbuilds(targetPath),
   resetLocationCache: () => storageService.resetLocationCache(),
   getUploadsDir: () => storageService.getUploadsDir(),
   getPublicDir: () => storageService.getPublicDir(),
