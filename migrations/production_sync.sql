@@ -1038,7 +1038,8 @@ INSERT IGNORE INTO `schema_migrations` (`version`, `name`) VALUES
   ('028', '028_create_custom_requests.sql'),
   ('029', '029_fix_design_files_unique_index.sql'),
   ('030', '030_seed_feature_cards_settings.sql'),
-  ('031', '031_bulk_replace_schema_and_retirement_tracking.sql');
+  ('031', '031_bulk_replace_schema_and_retirement_tracking.sql'),
+  ('032', '032_bulk_replace_schema_and_job_tracking.sql');
 
 -- ============================================================================
 -- End of production_sync.sql

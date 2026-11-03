@@ -9140,6 +9140,17 @@ a.site-feature-card:focus-visible,
     width: 100% !important;
   }
 
+  .site-feature-cards-grid.cards-count-1 {
+    grid-template-columns: 1fr !important;
+    max-width: 100% !important;
+  }
+
+  .site-feature-cards-grid.cards-count-2,
+  .site-feature-cards-grid.cards-count-3,
+  .site-feature-cards-grid.cards-count-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
   .site-feature-card {
     background: #FFFFFF !important;
     border: 1px solid #EFE7DD !important;

@@ -1,17 +1,64 @@
 <%
   const _s = (typeof settings !== 'undefined' && settings) ? settings : ((typeof siteSettings !== 'undefined' && siteSettings) ? siteSettings : {});
-  const _rawConfig = (typeof Setting !== 'undefined' && Setting.parseFeatureCards) 
-    ? Setting.parseFeatureCards(_s.feature_cards)
-    : {
-        master: true,
-        pages: { home: false, custom_order: true, about: true, design_detail: true, contact: true, categories: true },
-        cards: [
-          { id: 'card_1', title: _s.feature_card1_title || 'Premium Quality', subtitle: _s.feature_card1_subtitle || 'Crafted with precision', icon: _s.feature_card1_icon || 'fa-solid fa-award', enabled: true, link: '', order: 1 },
-          { id: 'card_2', title: _s.feature_card2_title || 'Instant Download', subtitle: _s.feature_card2_subtitle || 'Get files immediately', icon: _s.feature_card2_icon || 'fa-solid fa-download', enabled: true, link: '', order: 2 },
-          { id: 'card_3', title: _s.feature_card3_title || '100% Tested', subtitle: _s.feature_card3_subtitle || 'Quality assured designs', icon: _s.feature_card3_icon || 'fa-solid fa-shield-halved', enabled: true, link: '', order: 3 },
-          { id: 'card_4', title: _s.feature_card4_title || 'Dedicated Support', subtitle: _s.feature_card4_subtitle || "We're here to help you", icon: _s.feature_card4_icon || 'fa-solid fa-headset', enabled: true, link: '', order: 4 }
-        ]
+
+  const _toBool = (val, def = false) => {
+    if (val === undefined || val === null) return def;
+    if (val === true || val === 1 || val === '1' || val === 'true' || val === 'on') return true;
+    if (val === false || val === 0 || val === '0' || val === 'false' || val === 'off') return false;
+    return Boolean(val);
+  };
+
+  let _parsedFromSource = null;
+  if (_s && _s.feature_cards) {
+    if (typeof _s.feature_cards === 'object') {
+      _parsedFromSource = _s.feature_cards;
+    } else if (typeof _s.feature_cards === 'string') {
+      try {
+        _parsedFromSource = JSON.parse(_s.feature_cards);
+      } catch (_) {}
+    }
+  }
+
+  const _defaultCards = [
+    { id: 'card_1', title: _s.feature_card1_title || 'Premium Quality', subtitle: _s.feature_card1_subtitle || 'Crafted with precision', icon: _s.feature_card1_icon || 'fa-solid fa-award', enabled: true, link: '', order: 1 },
+    { id: 'card_2', title: _s.feature_card2_title || 'Instant Download', subtitle: _s.feature_card2_subtitle || 'Get files immediately', icon: _s.feature_card2_icon || 'fa-solid fa-download', enabled: true, link: '', order: 2 },
+    { id: 'card_3', title: _s.feature_card3_title || '100% Tested', subtitle: _s.feature_card3_subtitle || 'Quality assured designs', icon: _s.feature_card3_icon || 'fa-solid fa-shield-halved', enabled: true, link: '', order: 3 },
+    { id: 'card_4', title: _s.feature_card4_title || 'Dedicated Support', subtitle: _s.feature_card4_subtitle || "We're here to help you", icon: _s.feature_card4_icon || 'fa-solid fa-headset', enabled: true, link: '', order: 4 }
+  ];
+
+  let _rawConfig = {
+    master: true,
+    pages: { home: false, custom_order: true, about: true, design_detail: true, contact: true, categories: true },
+    cards: _defaultCards
+  };
+
+  if (_parsedFromSource && typeof _parsedFromSource === 'object') {
+    _rawConfig.master = _toBool(_parsedFromSource.master, true);
+    if (_parsedFromSource.pages && typeof _parsedFromSource.pages === 'object') {
+      _rawConfig.pages = {
+        home: _toBool(_parsedFromSource.pages.home, false),
+        custom_order: _toBool(_parsedFromSource.pages.custom_order, true),
+        about: _toBool(_parsedFromSource.pages.about, true),
+        design_detail: _toBool(_parsedFromSource.pages.design_detail, true),
+        contact: _toBool(_parsedFromSource.pages.contact, true),
+        categories: _toBool(_parsedFromSource.pages.categories, true)
       };
+    }
+    if (Array.isArray(_parsedFromSource.cards) && _parsedFromSource.cards.length > 0) {
+      _rawConfig.cards = _defaultCards.map((defCard, idx) => {
+        const found = _parsedFromSource.cards.find(c => c && String(c.id).trim() === String(defCard.id).trim()) || _parsedFromSource.cards[idx] || {};
+        return {
+          id: defCard.id,
+          title: (found.title !== undefined && found.title !== null) ? String(found.title).trim() : defCard.title,
+          subtitle: (found.subtitle !== undefined && found.subtitle !== null) ? String(found.subtitle).trim() : defCard.subtitle,
+          icon: found.icon || defCard.icon,
+          enabled: found.enabled !== undefined ? _toBool(found.enabled, defCard.enabled) : defCard.enabled,
+          link: found.link || '',
+          order: Number(found.order) || (idx + 1)
+        };
+      }).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+    }
+  }
 %>
 
 <div class="admin-card-box feature-cards-manager-card" id="featureCardsManagerBox" style="margin-bottom: 2rem; padding: 1.8rem; background: #FFFFFF; border: 1px solid var(--admin-border, #E2E8F0); border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">

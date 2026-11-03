@@ -28,6 +28,7 @@
       this.state = this.loadInitialState();
       this.previewMode = 'desktop';
       this.initDom();
+      this.syncDomSwitches();
       this.bindEvents();
       this.renderPreview();
     }
@@ -38,17 +39,62 @@
         try {
           const parsed = JSON.parse(inputEl.value);
           if (parsed && typeof parsed === 'object') {
-            return {
-              master: parsed.master !== false,
-              pages: Object.assign({}, defaultState.pages, parsed.pages || {}),
-              cards: Array.isArray(parsed.cards) && parsed.cards.length > 0 ? parsed.cards : JSON.parse(JSON.stringify(defaultState.cards))
+            const master = parsed.master !== false && parsed.master !== 'false' && parsed.master !== 0 && parsed.master !== '0';
+            const incomingPages = parsed.pages || {};
+            const pages = {
+              home: incomingPages.home === true || incomingPages.home === 'true' || incomingPages.home === 1 || incomingPages.home === '1',
+              custom_order: incomingPages.custom_order !== false && incomingPages.custom_order !== 'false' && incomingPages.custom_order !== 0 && incomingPages.custom_order !== '0',
+              about: incomingPages.about !== false && incomingPages.about !== 'false' && incomingPages.about !== 0 && incomingPages.about !== '0',
+              design_detail: incomingPages.design_detail !== false && incomingPages.design_detail !== 'false' && incomingPages.design_detail !== 0 && incomingPages.design_detail !== '0'
             };
+            const rawCards = Array.isArray(parsed.cards) && parsed.cards.length > 0 ? parsed.cards : defaultState.cards;
+            const cards = rawCards.map((c, i) => ({
+              id: c.id || `card_${i + 1}`,
+              title: c.title || `Card ${i + 1}`,
+              subtitle: c.subtitle || '',
+              icon: c.icon || 'fa-solid fa-award',
+              enabled: c.enabled !== false && c.enabled !== 'false' && c.enabled !== 0 && c.enabled !== '0',
+              link: c.link || '',
+              order: Number(c.order) || (i + 1)
+            })).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            return { master, pages, cards };
           }
         } catch (e) {
           console.warn('[FeatureCardsManager] Failed to parse initial JSON, using defaults:', e);
         }
       }
       return JSON.parse(JSON.stringify(defaultState));
+    }
+
+    syncDomSwitches() {
+      if (this.dom.masterToggle) {
+        this.dom.masterToggle.checked = Boolean(this.state.master);
+        if (this.dom.masterStatusText) {
+          this.dom.masterStatusText.textContent = this.state.master ? 'Active on enabled pages' : 'Hidden globally';
+        }
+      }
+      if (this.dom.pageCheckboxes) {
+        Object.keys(this.dom.pageCheckboxes).forEach(p => {
+          if (this.dom.pageCheckboxes[p]) {
+            this.dom.pageCheckboxes[p].checked = this.state.pages[p] !== false;
+          }
+        });
+      }
+      if (Array.isArray(this.state.cards)) {
+        this.state.cards.forEach((card, i) => {
+          const toggle = this.dom.container ? this.dom.container.querySelector(`.fc-card-toggle[data-card-id="${card.id}"]`) : null;
+          const cardEl = document.getElementById(`fcCardItem_${card.id}`);
+          const badgeEl = document.getElementById(`fcBadgeHidden_${card.id}`);
+          const isEnabled = card.enabled !== false;
+          if (toggle) toggle.checked = isEnabled;
+          if (cardEl) {
+            if (isEnabled) cardEl.classList.remove('is-dimmed');
+            else cardEl.classList.add('is-dimmed');
+          }
+          if (badgeEl) badgeEl.style.display = isEnabled ? 'none' : 'inline-block';
+        });
+      }
     }
 
     initDom() {
@@ -77,6 +123,14 @@
 
     bindEvents() {
       if (!this.dom.container) return;
+
+      // Sync hidden JSON whenever enclosing form is submitted
+      const formEl = this.dom.container.closest('form');
+      if (formEl) {
+        formEl.addEventListener('submit', () => {
+          this.syncJsonInput();
+        });
+      }
 
       // Master Toggle
       if (this.dom.masterToggle) {
@@ -238,14 +292,19 @@
       sorted[idx].order = sorted[targetIdx].order || (targetIdx + 1);
       sorted[targetIdx].order = tempOrder;
 
-      // Re-sort state.cards
+      // Re-sort state.cards and normalize order
       this.state.cards.sort((a, b) => (a.order || 0) - (b.order || 0));
+      this.state.cards.forEach((c, i) => { c.order = i + 1; });
 
-      // Reorder cards in DOM
+      // Reorder cards in DOM and update Card 1..4 headings
       if (this.dom.cardsContainer) {
-        this.state.cards.forEach((c) => {
+        this.state.cards.forEach((c, i) => {
           const el = document.getElementById(`fcCardItem_${c.id}`);
-          if (el) this.dom.cardsContainer.appendChild(el);
+          if (el) {
+            this.dom.cardsContainer.appendChild(el);
+            const heading = el.querySelector('.fc-card-title-heading');
+            if (heading) heading.textContent = `Card ${i + 1}`;
+          }
         });
       }
 
@@ -378,13 +437,6 @@
         }
       }
 
-      if (this.state.master) {
-        const enabledCount = this.state.cards.filter(c => c.enabled !== false).length;
-        if (enabledCount === 0) {
-          return { valid: false, message: 'At least one card must be enabled when feature cards are visible on the website.' };
-        }
-      }
-
       return { valid: true };
     }
 
@@ -422,19 +474,20 @@
         const data = await response.json();
 
         if (response.ok && data.success) {
-          this.showToast('Feature cards updated and synchronized across all pages!', 'success');
+          this.showToast('Saved', 'success');
           if (this.dom.saveFeedbackText) {
+            this.dom.saveFeedbackText.textContent = '✓ Saved';
             this.dom.saveFeedbackText.style.display = 'inline-block';
             setTimeout(() => {
               if (this.dom.saveFeedbackText) this.dom.saveFeedbackText.style.display = 'none';
             }, 3000);
           }
         } else {
-          this.showToast(data.message || 'Failed to save feature cards.', 'error');
+          this.showToast(data.message || 'Saving failed.', 'error');
         }
       } catch (err) {
         console.error('[FeatureCardsManager save error]:', err);
-        this.showToast('Network error while saving feature cards: ' + err.message, 'error');
+        this.showToast('Saving failed: ' + err.message, 'error');
       } finally {
         if (saveBtn) {
           saveBtn.disabled = false;

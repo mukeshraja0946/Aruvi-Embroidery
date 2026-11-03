@@ -218,7 +218,14 @@ class Setting {
       parsed = Setting.getDefaultFeatureCardsConfig();
     }
 
-    const master = (parsed.master !== false && parsed.master !== 'false' && parsed.master !== 0 && parsed.master !== '0');
+    const toBoolean = (val, defaultVal = false) => {
+      if (val === undefined || val === null) return defaultVal;
+      if (val === true || val === 1 || val === '1' || val === 'true' || val === 'on') return true;
+      if (val === false || val === 0 || val === '0' || val === 'false' || val === 'off') return false;
+      return Boolean(val);
+    };
+
+    const master = toBoolean(parsed.master, true);
 
     const defaultPages = {
       home: false,
@@ -230,12 +237,12 @@ class Setting {
     };
     const incomingPages = (parsed.pages && typeof parsed.pages === 'object') ? parsed.pages : {};
     const pages = {
-      home: incomingPages.home !== undefined ? (incomingPages.home === true || incomingPages.home === 'true' || incomingPages.home === 1 || incomingPages.home === '1') : defaultPages.home,
-      custom_order: incomingPages.custom_order !== undefined ? (incomingPages.custom_order === true || incomingPages.custom_order === 'true' || incomingPages.custom_order === 1 || incomingPages.custom_order === '1') : defaultPages.custom_order,
-      about: incomingPages.about !== undefined ? (incomingPages.about === true || incomingPages.about === 'true' || incomingPages.about === 1 || incomingPages.about === '1') : defaultPages.about,
-      design_detail: incomingPages.design_detail !== undefined ? (incomingPages.design_detail === true || incomingPages.design_detail === 'true' || incomingPages.design_detail === 1 || incomingPages.design_detail === '1') : defaultPages.design_detail,
-      contact: incomingPages.contact !== undefined ? (incomingPages.contact === true || incomingPages.contact === 'true' || incomingPages.contact === 1 || incomingPages.contact === '1') : defaultPages.contact,
-      categories: incomingPages.categories !== undefined ? (incomingPages.categories === true || incomingPages.categories === 'true' || incomingPages.categories === 1 || incomingPages.categories === '1') : defaultPages.categories
+      home: toBoolean(incomingPages.home, defaultPages.home),
+      custom_order: toBoolean(incomingPages.custom_order, defaultPages.custom_order),
+      about: toBoolean(incomingPages.about, defaultPages.about),
+      design_detail: toBoolean(incomingPages.design_detail, defaultPages.design_detail),
+      contact: toBoolean(incomingPages.contact, defaultPages.contact),
+      categories: toBoolean(incomingPages.categories, defaultPages.categories)
     };
 
     const cleanText = (str, maxLen) => {
@@ -261,7 +268,7 @@ class Setting {
 
     const cards = defaultList.map((defCard, idx) => {
       const found = incomingCards.find(c => c && String(c.id).trim() === String(defCard.id).trim()) || incomingCards[idx] || {};
-      const enabled = found.enabled !== undefined ? (found.enabled === true || found.enabled === 'true' || found.enabled === 1 || found.enabled === '1') : defCard.enabled;
+      const enabled = found.enabled !== undefined ? toBoolean(found.enabled, defCard.enabled) : defCard.enabled;
       const title = cleanText(found.title !== undefined ? found.title : defCard.title, 40) || defCard.title;
       const subtitle = cleanText(found.subtitle !== undefined ? found.subtitle : defCard.subtitle, 80);
       const icon = cleanIcon(found.icon !== undefined ? found.icon : defCard.icon, defCard.icon);

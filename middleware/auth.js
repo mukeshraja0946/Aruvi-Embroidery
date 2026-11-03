@@ -17,8 +17,17 @@ async function attachUserAndCart(req, res, next) {
   res.locals.messages = { success: '', error: '', info: '' };
   res.locals.csrfToken = '';
   res.locals.schemaAlert = (req.app && req.app.locals && req.app.locals.schemaAlert) ? req.app.locals.schemaAlert : { isHealthy: true, missingCount: 0, missingSummary: '' };
+  res.locals.Setting = Setting;
+  res.locals.parseFeatureCards = (raw) => Setting.parseFeatureCards(raw);
   res.locals.getPrimaryPreview = (d) => previewService.getPrimaryPreview(d);
   res.locals.getFeatureCards = (page) => Setting.getFeatureCards(page, res.locals.siteSettings);
+
+  // Cache-Control protection for dynamic customer and admin pages (prevents LiteSpeed / proxy / browser stale HTML caching)
+  if (req.method === 'GET' && !req.path.startsWith('/public') && !req.path.startsWith('/uploads') && !/\.(css|js|jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map)$/i.test(req.path)) {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
 
   try {
     // 1. Session customer or admin user

@@ -481,6 +481,14 @@ exports.postHomepageEditor = async (req, res, next) => {
 
     await Setting.updateAll(updates);
 
+    const refreshedSettings = await Setting.getAll();
+    if (req.app) {
+      req.app.locals.siteSettings = {
+        ...(req.app.locals.siteSettings || {}),
+        ...refreshedSettings
+      };
+    }
+
     req.flash('success', 'Homepage content updated successfully! All changes are live on the customer website.');
     res.redirect('/admin/homepage');
   } catch (err) {
@@ -523,16 +531,6 @@ exports.postFeatureCardsApi = async (req, res, next) => {
         return res.status(400).json({
           success: false,
           message: `Subtitle for "${card.title}" exceeds the 80 characters limit.`
-        });
-      }
-    }
-
-    if (config.master) {
-      const enabledCount = (config.cards || []).filter(c => c.enabled).length;
-      if (enabledCount === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'At least one card must be enabled when feature cards are visible on the website.'
         });
       }
     }

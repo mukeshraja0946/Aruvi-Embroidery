@@ -279,6 +279,7 @@ router.post('/admin/tools/backup/restore', adminToolsController.postRestoreBacku
 // Database & System Health Dashboard
 router.get('/admin/tools/system-health', adminToolsController.getSystemHealth);
 router.post('/admin/tools/system-health/migrate', adminToolsController.postRunMigrations);
+router.post('/admin/tools/system-health/run-migrations', adminToolsController.postRunMigrations);
 router.post('/admin/tools/system-health/test-storage', adminToolsController.postTestStorageHealth);
 router.get('/admin/tools/system-health/download-sync-sql', adminToolsController.downloadProductionSyncSql);
 

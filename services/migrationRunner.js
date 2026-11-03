@@ -193,6 +193,40 @@ async function executeMigrationSql(conn, sql, file) {
       continue;
     }
 
+    // Handle MariaDB/MySQL "CREATE [UNIQUE] INDEX IF NOT EXISTS ..."
+    const createIndexMatch = stmt.match(/^CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+[`"]?([a-zA-Z0-9_]+)[`"]?\s+ON\s+[`"]?([a-zA-Z0-9_]+)[`"]?\s*\(([\s\S]+)\)$/i);
+    if (createIndexMatch) {
+      const isUnique = Boolean(createIndexMatch[1]);
+      const indexName = createIndexMatch[2];
+      const tableName = createIndexMatch[3];
+      const colList = createIndexMatch[4];
+
+      try {
+        await conn.query(stmt);
+      } catch (err) {
+        if (err.errno === 1061 || (err.message && err.message.includes('Duplicate key name'))) {
+          // Index already exists, safe to continue
+        } else if (err.errno === 1064 || (err.message && err.message.includes('IF NOT EXISTS'))) {
+          // Fallback for older MySQL lacking IF NOT EXISTS in CREATE INDEX
+          const [chk] = await conn.query(
+            'SELECT COUNT(*) as count FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?',
+            [tableName, indexName]
+          );
+          if (chk && chk[0] && chk[0].count === 0) {
+            const createSql = `CREATE ${isUnique ? 'UNIQUE ' : ''}INDEX \`${indexName}\` ON \`${tableName}\` (${colList})`;
+            try {
+              await conn.query(createSql);
+            } catch (createErr) {
+              if (createErr.errno !== 1061) throw createErr;
+            }
+          }
+        } else {
+          throw err;
+        }
+      }
+      continue;
+    }
+
     // Default statement execution with defensive error code handling
     try {
       await conn.query(stmt);
@@ -216,6 +250,20 @@ async function executeMigrationSql(conn, sql, file) {
   }
 }
 
+/**
+ * Touches tmp/restart.txt to gracefully notify Phusion Passenger on Hostinger
+ */
+function touchPassengerRestart() {
+  try {
+    const restartFile = path.resolve(__dirname, '..', 'tmp', 'restart.txt');
+    const tmpDir = path.dirname(restartFile);
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    fs.writeFileSync(restartFile, String(Date.now()));
+  } catch (_) {}
+}
+
 const MIGRATION_REQUIRED_TABLES = {
   '001': 'designs',
   '004': 'activity_logs',
@@ -230,14 +278,16 @@ const MIGRATION_REQUIRED_TABLES = {
   '024': 'design_images',
   '025': 'upload_sessions',
   '028': 'custom_requests',
-  '031': 'bulk_replace_jobs'
+  '031': 'bulk_replace_jobs',
+  '032': 'bulk_replace_jobs'
 };
 
 const MIGRATION_REQUIRED_COLUMNS = {
   '028': { table: 'custom_requests', column: 'request_number' },
   '029': { table: 'design_files', column: 'retired_at' },
   '030': { table: 'settings', column: 'setting_key' },
-  '031': { table: 'design_files', column: 'retired_at' }
+  '031': { table: 'design_files', column: 'retired_at' },
+  '032': { table: 'image_replace_log_items', column: 'old_files_json' }
 };
 
 const CANONICAL_REQUIRED_TABLES = [
@@ -359,10 +409,10 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
 
         appliedThisRun.push(file);
         if (expectedTable) existingTableNames.add(expectedTable.toLowerCase());
-        if (!silent) console.log(`  Applied migration ${file}`);
+        console.log(`Applied migration ${version}`);
       } catch (fileErr) {
         const cleanMsg = formatErrorMessage(fileErr);
-        console.error(`  FAILED: ${file}: ${cleanMsg}`);
+        console.error(`FAILED ${version}: ${cleanMsg}`);
         failedThisRun.push({
           file,
           version,
@@ -370,6 +420,10 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
           sqlState: fileErr.sqlState || 'N/A'
         });
       }
+    }
+
+    if (appliedThisRun.length > 0) {
+      touchPassengerRestart();
     }
 
     // Post-migration table presence audit
@@ -413,6 +467,19 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       dbServerVersion
     };
 
+  } catch (outerErr) {
+    const cleanOuterMsg = formatErrorMessage(outerErr);
+    console.error('❌ [Migration Runner Safe Catch]:', cleanOuterMsg);
+    return {
+      success: false,
+      appliedCount: 0,
+      appliedFiles: [],
+      failedCount: 1,
+      failedFiles: [{ file: 'connection', version: 'all', error: cleanOuterMsg }],
+      missingTables: [],
+      error: cleanOuterMsg,
+      dbServerVersion: 'Unknown'
+    };
   } finally {
     if (shouldClose && conn) {
       try {
@@ -435,8 +502,9 @@ async function getMigrationStatus() {
     const { rows, namesSet, versionsSet } = await getAppliedMigrations(conn);
     const allFiles = getAvailableMigrationFiles();
 
-    // Fetch all currently existing tables to catch false-positive migration status
+    // Fetch all currently existing tables and columns to catch false-positive migration status
     let existingTableNames = new Set();
+    let existingColumnKeys = new Set();
     try {
       const [existingTableRows] = await conn.query(
         'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()'
@@ -444,19 +512,37 @@ async function getMigrationStatus() {
       existingTableNames = new Set(
         (existingTableRows || []).map(r => (r.TABLE_NAME || r.table_name || Object.values(r)[0]).toLowerCase())
       );
+      const [existingColRows] = await conn.query(
+        'SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = DATABASE()'
+      );
+      existingColumnKeys = new Set(
+        (existingColRows || []).map(r => `${(r.TABLE_NAME || r.table_name || '').toLowerCase()}.${(r.COLUMN_NAME || r.column_name || '').toLowerCase()}`)
+      );
     } catch (_) {}
 
     const migrationsList = allFiles.map(file => {
       const version = file.split('_')[0];
       const appliedRow = rows.find(r => r.name === file || r.version === version);
       const expectedTable = MIGRATION_REQUIRED_TABLES[version];
+      const expectedCol = MIGRATION_REQUIRED_COLUMNS[version];
+
       let tableExists = true;
       if (expectedTable && !existingTableNames.has(expectedTable.toLowerCase())) {
         tableExists = false;
       }
-      const isApplied = Boolean(appliedRow || namesSet.has(file) || versionsSet.has(version)) && tableExists;
+
+      let colExists = true;
+      if (expectedCol) {
+        const key = `${expectedCol.table.toLowerCase()}.${expectedCol.column.toLowerCase()}`;
+        if (!existingColumnKeys.has(key)) {
+          colExists = false;
+        }
+      }
+
+      const isApplied = Boolean(appliedRow || namesSet.has(file) || versionsSet.has(version)) && tableExists && colExists;
       return {
         filename: file,
+        file,
         version,
         isApplied,
         appliedAt: appliedRow ? appliedRow.applied_at : null

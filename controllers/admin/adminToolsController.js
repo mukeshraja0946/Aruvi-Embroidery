@@ -1209,7 +1209,10 @@ exports.postRunMigrations = async (req, res, next) => {
       });
     }
 
-    if (result.appliedCount === 0) {
+    if (result.failedCount > 0) {
+      const failSummary = result.failedFiles.map(f => `${f.file}: ${f.error}`).join('; ');
+      req.flash('error', `Migration warning: ${failSummary}`);
+    } else if (result.appliedCount === 0) {
       req.flash('info', 'Database schema is already up to date. All migrations have been applied.');
     } else {
       req.flash('success', `Successfully applied ${result.appliedCount} new database migration(s)!`);
