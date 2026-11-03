@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= title %></title>
+  <meta name="csrf-token" content="<%= (typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : '' %>">
   <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,173 +12,1022 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/public/css/main.css">
   <link rel="stylesheet" href="/public/css/admin.css">
+
   <style>
-    .health-stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 1.25rem;
-      margin-bottom: 2rem;
+    /* ============================================================
+       SYSTEM HEALTH - MASTER RESETS & NO-OVERFLOW CONSTRAINTS
+       ============================================================ */
+    *, *::before, *::after {
+      box-sizing: border-box;
     }
-    .health-stat-card {
+
+    html, body {
+      max-width: 100vw;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+      background-color: var(--admin-bg, #F7F3EC);
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--admin-text-dark, #231815);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Outer wrapper & layout */
+    .admin-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 100vw;
+      overflow: hidden;
+    }
+
+    .admin-top-header {
+      height: 70px;
       background: #FFFFFF;
-      border: 1px solid var(--admin-border);
-      border-radius: 14px;
-      padding: 1.35rem;
+      border-bottom: 1px solid var(--admin-border, #E8E0D5);
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      padding: 0 1.75rem;
+      flex-shrink: 0;
+      z-index: 100;
       gap: 1rem;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .health-stat-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(0,0,0,0.05);
-    }
-    .health-stat-icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 12px;
+
+    .admin-main-container {
       display: flex;
+      flex: 1 1 0%;
+      min-width: 0;
+      max-width: 100%;
+      height: calc(100vh - 70px);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Fixed: Use robust flex item constraints so main never expands outside container */
+    .admin-content-body,
+    .admin-main-content {
+      flex: 1 1 0%;
+      min-width: 0;
+      max-width: 100%;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 1.75rem 2rem;
+      box-sizing: border-box;
+      -webkit-overflow-scrolling: touch;
+      background-color: var(--admin-bg, #F7F3EC);
+    }
+
+    /* All flex/grid children inside main content must have min-width: 0 to prevent text-driven overflow */
+    .admin-content-body *,
+    .admin-main-content * {
+      min-width: 0;
+    }
+
+    /* Monospace wrap utility */
+    .wrap-anywhere {
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      white-space: normal;
+    }
+
+    /* ============================================================
+       TOP HEADER & MOBILE TOGGLE
+       ============================================================ */
+    .sidebar-mobile-toggle-btn {
+      display: none;
       align-items: center;
       justify-content: center;
-      font-size: 1.4rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid var(--admin-border, #E8E0D5);
+      background: #FAF7F2;
+      color: #231815;
+      cursor: pointer;
+      font-size: 1.1rem;
+      margin-right: 8px;
       flex-shrink: 0;
+      transition: background 0.15s ease;
     }
-    .health-stat-icon.green { background: #E8F5E9; color: #2E7D32; }
-    .health-stat-icon.red { background: #FFEBEE; color: #C62828; }
-    .health-stat-icon.blue { background: #E3F2FD; color: #1565C0; }
-    .health-stat-icon.purple { background: #F3E5F5; color: #7B1FA2; }
-    .health-stat-data strong {
+    .sidebar-mobile-toggle-btn:hover {
+      background: #EDE4D8;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 98;
+      backdrop-filter: blur(2px);
+    }
+    .sidebar-backdrop.active {
       display: block;
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: var(--admin-text);
-      line-height: 1.2;
     }
-    .health-stat-data span {
-      font-size: 0.82rem;
-      color: #666;
+
+    /* ============================================================
+       BRAND DESIGN SYSTEM & CARDS (Beige/White, 16px, Soft Shadows)
+       ============================================================ */
+    .health-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border, #E8E0D5);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 14px rgba(44, 24, 16, 0.04);
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .health-card:hover {
+      box-shadow: 0 6px 22px rgba(44, 24, 16, 0.07);
+    }
+
+    /* Page Header */
+    .health-page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+      width: 100%;
+    }
+    .health-header-left {
+      max-width: 680px;
+      flex: 1 1 auto;
+    }
+    .health-breadcrumb {
+      font-size: 0.8rem;
+      color: #8C7F79;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .health-breadcrumb a {
+      color: inherit;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .health-breadcrumb a:hover {
+      color: #B8402A;
+    }
+    .health-page-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--admin-text-dark, #231815);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      line-height: 1.25;
+    }
+    .health-page-subtitle {
+      font-size: 0.86rem;
+      color: #7A6F69;
+      margin: 0.35rem 0 0.65rem 0;
+      line-height: 1.5;
+    }
+
+    /* Meta & Re-check strip */
+    .health-meta-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .health-last-checked-pill {
+      font-size: 0.76rem;
+      color: #5C524C;
+      background: #F4EFEA;
+      border: 1px solid #E2D7CB;
+      border-radius: 999px;
+      padding: 3px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       font-weight: 500;
     }
-    .health-banner {
+    .btn-recheck {
+      background: none;
+      border: 1px solid #D8CEC2;
+      border-radius: 999px;
+      color: #6B5E57;
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 3px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      min-height: 28px;
+    }
+    .btn-recheck:hover {
+      background: #FFFFFF;
+      color: #B8402A;
+      border-color: #B8402A;
+    }
+
+    /* Header Action Buttons */
+    .health-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .btn-health-outline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0.6rem 1.15rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: #231815;
+      background: #FFFFFF;
+      border: 1.5px solid var(--admin-border, #E8E0D5);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      min-height: 44px;
+      white-space: nowrap;
+    }
+    .btn-health-outline:hover {
+      background: #FAF7F2;
+      border-color: #C8BCAC;
+      color: #B8402A;
+      transform: translateY(-1px);
+    }
+    .btn-health-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0.6rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: #FFFFFF;
+      background: #0284C7;
+      border: 1.5px solid #0284C7;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      min-height: 44px;
+      white-space: nowrap;
+    }
+    .btn-health-primary:hover {
+      background: #0369A1;
+      border-color: #0369A1;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    }
+    .btn-health-primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* ============================================================
+       FLASH NOTIFICATIONS WITH AUTO-HIDE & CLOSE BUTTON
+       ============================================================ */
+    .health-flash-box {
       border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      margin-bottom: 2rem;
+      padding: 0.9rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: slideDownFade 0.3s ease;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .health-flash-box.fade-out {
+      opacity: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+    }
+    @keyframes slideDownFade {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .health-flash-box.success {
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      color: #065F46;
+    }
+    .health-flash-box.info {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+    }
+    .health-flash-box.error {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      color: #991B1B;
+    }
+    .health-flash-close-btn {
+      background: none;
+      border: none;
+      font-size: 1.15rem;
+      line-height: 1;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.7;
+      padding: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: opacity 0.15s;
+    }
+    .health-flash-close-btn:hover {
+      opacity: 1;
+    }
+
+    /* ============================================================
+       STATUS HERO CARD
+       ============================================================ */
+    .status-hero-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border, #E8E0D5);
+      border-radius: 16px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.75rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 1.5rem;
+      box-shadow: 0 4px 16px rgba(44, 24, 16, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+    .status-hero-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 6px;
+      height: 100%;
+    }
+    .status-hero-card.is-healthy::before {
+      background: #10B981;
+    }
+    .status-hero-card.is-warning::before {
+      background: #F59E0B;
+    }
+    .status-hero-card.is-danger::before {
+      background: #EF4444;
+    }
+
+    .hero-info-group {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      flex: 1 1 auto;
+    }
+    .hero-shield-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      flex-shrink: 0;
+    }
+    .status-hero-card.is-healthy .hero-shield-icon {
+      background: #ECFDF5;
+      color: #059669;
+    }
+    .status-hero-card.is-warning .hero-shield-icon {
+      background: #FFFBEB;
+      color: #D97706;
+    }
+    .status-hero-card.is-danger .hero-shield-icon {
+      background: #FEF2F2;
+      color: #DC2626;
+    }
+
+    .hero-title-text {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #231815;
+      margin: 0;
+      line-height: 1.3;
+    }
+    .hero-desc-text {
+      font-size: 0.84rem;
+      color: #6B5E57;
+      margin: 4px 0 0 0;
+      line-height: 1.5;
+    }
+    .hero-desc-text strong {
+      color: #231815;
+    }
+
+    .hero-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.55rem 1.25rem;
+      border-radius: 999px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .hero-status-pill.pill-success {
+      background: #D1FAE5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+    }
+    .hero-status-pill.pill-warning {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FDE68A;
+    }
+    .hero-status-pill.pill-danger {
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
+    }
+
+    /* ============================================================
+       STAT CARDS GRID (Uniform auto-fit, minmax 220px, 1fr)
+       ============================================================ */
+    .health-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      width: 100%;
+    }
+
+    .health-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border, #E8E0D5);
+      border-radius: 16px;
+      padding: 1.35rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.15rem;
+      box-shadow: 0 2px 10px rgba(44, 24, 16, 0.03);
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+      position: relative;
+    }
+    .health-stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(44, 24, 16, 0.08);
+      border-color: #D5C7B7;
+    }
+    .health-stat-card:focus-visible {
+      outline: 2px solid #0284C7;
+      outline-offset: 2px;
+    }
+
+    .health-stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.45rem;
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .health-stat-card:hover .health-stat-icon {
+      transform: scale(1.05);
+    }
+
+    .health-stat-icon.green { background: #ECFDF5; color: #059669; }
+    .health-stat-icon.red { background: #FEF2F2; color: #DC2626; }
+    .health-stat-icon.blue { background: #EFF6FF; color: #0284C7; }
+    .health-stat-icon.amber { background: #FFFBEB; color: #D97706; }
+    .health-stat-icon.purple { background: #FAF5FF; color: #7E22CE; }
+
+    .health-stat-data {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .health-stat-data strong {
+      display: block;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: #231815;
+      line-height: 1.15;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .health-stat-data .stat-label {
+      font-size: 0.82rem;
+      color: #7A6F69;
+      font-weight: 600;
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .health-stat-data .stat-hint {
+      font-size: 0.74rem;
+      color: #9C8F87;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Warning / Danger Alert state on stat cards */
+    .health-stat-card.is-alert-danger {
+      border-color: #FECACA;
+      background: #FFFDFD;
+    }
+    .health-stat-card.is-alert-danger strong {
+      color: #DC2626;
+    }
+    .health-stat-card.is-alert-warning {
+      border-color: #FDE68A;
+      background: #FFFEF9;
+    }
+    .health-stat-card.is-alert-warning strong {
+      color: #D97706;
+    }
+
+    /* ============================================================
+       UPLOAD ROUTE & STORAGE SECTION
+       ============================================================ */
+    .storage-header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .storage-title-box h3 {
+      margin: 0;
+      font-size: 1.18rem;
+      font-weight: 700;
+      color: #231815;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .storage-title-box p {
+      margin: 4px 0 0 0;
+      font-size: 0.84rem;
+      color: #6B5E57;
+      line-height: 1.45;
+    }
+
+    /* Active storage configuration box */
+    .storage-config-card {
+      border-radius: 12px;
+      padding: 1.15rem 1.35rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid #E2E8F0;
+      background: #F8FAFC;
+    }
+    .storage-config-card.is-blocked {
+      background: #FFF5F5;
+      border-color: #FEB2B2;
+    }
+
+    .storage-badges-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .badge-pill {
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      letter-spacing: 0.3px;
+    }
+    .badge-pill.writable { background: #DCFCE7; color: #166534; }
+    .badge-pill.blocked { background: #EF4444; color: #FFFFFF; }
+    .badge-pill.safe { background: #EDE9FE; color: #5B21B6; }
+
+    /* Monospace copy-box for UPLOAD_DIR */
+    .storage-path-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      color: #1E293B;
+      background: #FFFFFF;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
       flex-wrap: wrap;
     }
-    .health-banner.healthy {
-      background: #E8F5E9;
-      border: 1px solid #A5D6A7;
-      color: #1B5E20;
+    .storage-path-text {
+      flex: 1 1 auto;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      white-space: normal;
     }
-    .health-banner.unhealthy {
-      background: #FFEBEE;
-      border: 1px solid #FFCDD2;
-      color: #B71C1C;
+    .btn-copy-path {
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      color: #334155;
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      min-height: 28px;
     }
-    .schema-card {
+    .btn-copy-path:hover {
+      background: #E2E8F0;
+      color: #0F172A;
+    }
+
+    /* ============================================================
+       RATE LIMITER CONFIG (4 Small Wrapping Cards)
+       ============================================================ */
+    .rate-limiter-section-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #475569;
+      margin: 1.25rem 0 0.6rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .rate-limiter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 0.75rem;
+    }
+    .rate-limiter-chip {
       background: #FFFFFF;
-      border: 1px solid var(--admin-border);
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+      border: 1px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      transition: border-color 0.15s;
     }
-    .schema-card-header {
+    .rate-limiter-chip:hover {
+      border-color: #CBD5E1;
+    }
+    .rate-limiter-chip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #64748B;
+      font-weight: 600;
+    }
+    .rate-limiter-chip-val {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #0F172A;
+      line-height: 1.3;
+    }
+    .rate-limiter-chip-sub {
+      font-size: 0.72rem;
+      color: #64748B;
+      overflow-wrap: anywhere;
+    }
+
+    /* ============================================================
+       COLLAPSIBLE ACCORDIONS & SEARCH TOOLS
+       ============================================================ */
+    .accordion-header-btn {
+      width: 100%;
+      background: none;
+      border: none;
       padding: 1rem 1.25rem;
-      background: #FAFAFA;
-      border-bottom: 1px solid var(--admin-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
+      cursor: pointer;
+      text-align: left;
+      color: inherit;
+      border-bottom: 1px solid var(--admin-border, #E8E0D5);
+      border-radius: 16px 16px 0 0;
+      transition: background 0.15s ease;
     }
-    .schema-card-body {
-      padding: 1.25rem;
+    .accordion-header-btn:hover {
+      background: #FAF7F2;
     }
+    .accordion-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .accordion-title-group h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #231815;
+    }
+    .accordion-chevron {
+      font-size: 0.9rem;
+      color: #8C7F79;
+      transition: transform 0.25s ease;
+      flex-shrink: 0;
+    }
+    .accordion-item.is-collapsed .accordion-chevron {
+      transform: rotate(-90deg);
+    }
+    .accordion-item.is-collapsed .accordion-content-body {
+      display: none;
+    }
+
+    /* Table Container - Overflow-X inside container ONLY */
+    .table-responsive-box {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 0 0 16px 16px;
+    }
+    .table-responsive-box table {
+      width: 100%;
+      min-width: 600px;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .table-responsive-box th {
+      background: #F9FAFB;
+      border-bottom: 1px solid var(--admin-border, #E8E0D5);
+      padding: 0.8rem 1.25rem;
+      font-weight: 600;
+      color: #4B5563;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .table-responsive-box td {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--admin-border, #E8E0D5);
+      color: #1F2937;
+    }
+
+    /* Filter Toolbar */
+    .schema-filter-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 1rem;
+      background: #FFFFFF;
+      padding: 10px 14px;
+      border: 1px solid var(--admin-border, #E8E0D5);
+      border-radius: 12px;
+    }
+    .schema-search-input-wrap {
+      position: relative;
+      flex: 1 1 240px;
+      max-width: 400px;
+    }
+    .schema-search-input-wrap i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8C7F79;
+      font-size: 0.85rem;
+    }
+    .schema-search-input {
+      width: 100%;
+      height: 38px;
+      background: #FAF7F2;
+      border: 1px solid #D8CEC2;
+      border-radius: 8px;
+      padding: 0 12px 0 34px;
+      font-size: 0.85rem;
+      color: #231815;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    .schema-search-input:focus {
+      background: #FFFFFF;
+      border-color: #B8402A;
+      box-shadow: 0 0 0 3px rgba(184, 64, 42, 0.1);
+    }
+    .schema-checkbox-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #4B5563;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Table & Column Pills */
     .col-pill-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 6px;
+      padding: 1rem 1.25rem;
     }
     .col-pill {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       padding: 0.3rem 0.65rem;
       border-radius: 6px;
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-weight: 500;
+      white-space: nowrap;
     }
     .col-pill.ok {
-      background: #E8F5E9;
-      color: #2E7D32;
-      border: 1px solid #C8E6C9;
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
     }
     .col-pill.missing {
-      background: #FFEBEE;
-      color: #C62828;
-      border: 1px solid #FFCDD2;
+      background: #FEF2F2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
       font-weight: 700;
       animation: pulseAlert 1.5s infinite alternate;
     }
     @keyframes pulseAlert {
-      from { box-shadow: 0 0 0 rgba(220, 53, 69, 0.2); }
-      to { box-shadow: 0 0 8px rgba(220, 53, 69, 0.6); }
+      from { box-shadow: 0 0 0 rgba(220, 38, 38, 0.2); }
+      to { box-shadow: 0 0 6px rgba(220, 38, 38, 0.5); }
     }
-    .badge-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 0.25rem 0.65rem;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+
+    /* Highlight scroll target */
+    .highlight-pulse {
+      animation: targetHighlight 2s ease forwards;
     }
-    .badge-status.ok {
-      background: #2E7D32;
-      color: #FFF;
+    @keyframes targetHighlight {
+      0% { box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.5); }
+      100% { box-shadow: 0 2px 14px rgba(44, 24, 16, 0.04); }
     }
-    .badge-status.error {
-      background: #C62828;
-      color: #FFF;
+
+    /* ============================================================
+       RESPONSIVE BREAKPOINTS (360px, 390px, 768px, 1280px, 1920px)
+       ============================================================ */
+    @media (max-width: 992px) {
+      .admin-top-header {
+        padding: 0 1rem;
+        height: 60px;
+      }
+      .sidebar-mobile-toggle-btn {
+        display: inline-flex;
+      }
+      .admin-main-container {
+        height: calc(100vh - 60px);
+      }
+      .admin-sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 99;
+        transform: translateX(-100%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+      }
+      .admin-sidebar.sidebar-open {
+        transform: translateX(0);
+      }
+      .admin-content-body,
+      .admin-main-content {
+        padding: 1.25rem 1rem;
+      }
+      .admin-search-bar {
+        display: none;
+      }
     }
-    .badge-status.warning {
-      background: #F57F17;
-      color: #FFF;
+
+    @media (max-width: 768px) {
+      .health-page-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .health-header-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .btn-health-outline,
+      .btn-health-primary {
+        width: 100%;
+      }
+      .status-hero-card {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.25rem;
+      }
+      .hero-info-group {
+        width: 100%;
+      }
+      .hero-status-pill {
+        align-self: flex-start;
+      }
+      .health-stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      .health-stat-card {
+        padding: 1rem;
+        gap: 0.75rem;
+      }
+      .health-stat-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 1.25rem;
+      }
+      .health-stat-data strong {
+        font-size: 1.35rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .health-stat-grid {
+        grid-template-columns: 1fr;
+      }
+      .health-page-title {
+        font-size: 1.4rem;
+      }
+      .rate-limiter-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body class="admin-body">
 
-<div class="admin-wrapper">
+<div class="admin-wrapper" id="adminWrapper">
   <!-- Top Header -->
   <header class="admin-top-header">
-    <a href="/admin" class="admin-header-brand">
-      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
-      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
-    </a>
+    <div style="display: flex; align-items: center;">
+      <button type="button" class="sidebar-mobile-toggle-btn" id="btnToggleSidebarMobile" aria-label="Toggle Navigation Menu">
+        <i class="fa-solid fa-bars"></i>
+      </button>
 
-    <div class="admin-search-bar">
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="tableSearchInput" placeholder="Filter tables or columns..." onkeyup="filterTables()">
+      <a href="/admin" class="admin-header-brand" aria-label="Aruvi Embroidery Admin Home">
+        <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/assets/brand/logo.png'; %>
+        <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 40px; width: auto; object-fit: contain;">
+      </a>
     </div>
 
     <div class="admin-header-right">
-      <a href="/admin/tools/system-health" class="admin-icon-btn active" title="System Health">
+      <a href="/admin/tools/system-health" class="admin-icon-btn active" title="System Health" aria-label="System Health">
         <i class="fa-solid fa-heart-pulse"></i>
       </a>
-      <a href="/admin/tools/missing-files" class="admin-icon-btn" title="Missing Files">
+      <a href="/admin/tools/missing-files" class="admin-icon-btn" title="Missing Files" aria-label="Missing Files">
         <i class="fa-solid fa-triangle-exclamation"></i>
       </a>
-      <div class="admin-user-menu">
+      <div class="admin-user-menu" title="Admin User">
         <div class="admin-user-avatar">A</div>
         <div class="admin-user-info">
           <strong>Admin</strong>
@@ -188,8 +1038,11 @@
   </header>
 
   <div class="admin-main-container">
-    <!-- Sidebar -->
-    <aside class="admin-sidebar">
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- Admin Sidebar -->
+    <aside class="admin-sidebar" id="adminSidebar">
       <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
         <li class="sidebar-nav-item">
           <a href="/admin">
@@ -234,387 +1087,718 @@
       </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="admin-main-content">
-      <!-- Page Header -->
-      <div class="admin-page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
-        <div>
-          <div class="admin-breadcrumb" style="font-size: 0.82rem; color: #888; margin-bottom: 0.35rem;">
-            <a href="/admin" style="color: inherit; text-decoration: none;">Admin</a> &rsaquo; 
-            <a href="/admin/tools/system-health" style="color: inherit; text-decoration: none;">Tools</a> &rsaquo; 
-            <span>System Health</span>
+    <!-- Main Content Body (Enforced max-width 100%, no horizontal page scroll) -->
+    <main class="admin-content-body" id="adminMainContent">
+
+      <!-- Page Header Row -->
+      <div class="health-page-header">
+        <div class="health-header-left">
+          <div class="health-breadcrumb">
+            <a href="/admin">Admin</a> &rsaquo;
+            <a href="/admin/tools/system-health">Tools</a> &rsaquo;
+            <span>Database & System Health</span>
           </div>
-          <h1 style="font-size: 1.6rem; font-weight: 700; color: var(--admin-text); margin: 0;">
-            <i class="fa-solid fa-heart-pulse" style="color: <%= health.isHealthy ? '#2E7D32' : '#C62828' %>; margin-right: 8px;"></i>
+
+          <h1 class="health-page-title">
+            <i class="fa-solid fa-heart-pulse" style="color: <%= health.isHealthy ? '#059669' : '#DC2626' %>;"></i>
             Database & System Health
           </h1>
-          <p style="font-size: 0.88rem; color: #666; margin-top: 4px;">
+
+          <p class="health-page-subtitle">
             Live schema verification across all <%= health.stats.totalExpectedTables %> database tables and <%= health.stats.totalExpectedColumns %> columns.
           </p>
-        </div>
 
-        <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
-          <a href="/admin/tools/system-health/download-sync-sql" class="btn btn-outline" style="font-size: 0.85rem; padding: 0.55rem 1rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-file-arrow-down"></i> Download production_sync.sql
-          </a>
-          <form action="/admin/tools/system-health/run-migrations" method="POST" style="margin: 0;" onsubmit="return confirm('Run all pending database migrations now? Existing catalog data will never be touched.');">
-            <button type="submit" id="btnRunMigrations" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1.15rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #0284C7; border-color: #0284C7; color: #FFF; font-weight: 700;">
-              <i class="fa-solid fa-bolt"></i> Run migrations now
+          <div class="health-meta-strip">
+            <span class="health-last-checked-pill">
+              <i class="fa-regular fa-clock"></i>
+              Last checked: <strong id="healthLastCheckedText">Just now</strong>
+            </span>
+            <button type="button" class="btn-recheck" onclick="reloadHealthCheck()" title="Re-check database and system status">
+              <i class="fa-solid fa-rotate" id="recheckIcon"></i> Re-check
             </button>
-          </form>
-        </div>
-      </div>
-
-      <!-- Flash Messages -->
-      <% if (locals.flash && locals.flash.success && locals.flash.success.length > 0) { %>
-        <div style="background: #E8F5E9; border-left: 4px solid #2E7D32; padding: 0.85rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #1B5E20; display: flex; align-items: center; gap: 8px;">
-          <i class="fa-solid fa-circle-check"></i> <%= locals.flash.success[0] %>
-        </div>
-      <% } %>
-      <% if (locals.flash && locals.flash.info && locals.flash.info.length > 0) { %>
-        <div style="background: #E3F2FD; border-left: 4px solid #1565C0; padding: 0.85rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #0D47A1; display: flex; align-items: center; gap: 8px;">
-          <i class="fa-solid fa-circle-info"></i> <%= locals.flash.info[0] %>
-        </div>
-      <% } %>
-      <% if (locals.flash && locals.flash.error && locals.flash.error.length > 0) { %>
-        <div style="background: #FFEBEE; border-left: 4px solid #C62828; padding: 0.85rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #B71C1C; display: flex; align-items: center; gap: 8px;">
-          <i class="fa-solid fa-triangle-exclamation"></i> <%= locals.flash.error[0] %>
-        </div>
-      <% } %>
-
-      <!-- Health Status Banner -->
-      <div class="health-banner <%= health.isHealthy ? 'healthy' : 'unhealthy' %>">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div style="font-size: 2rem;">
-            <i class="fa-solid <%= health.isHealthy ? 'fa-shield-halved' : 'fa-triangle-exclamation' %>"></i>
-          </div>
-          <div>
-            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700;">
-              <%= health.isHealthy ? 'All Systems Operational — Database Fully Synchronized' : 'Database Schema Incomplete — Missing Tables or Columns Detected' %>
-            </h3>
-            <p style="margin: 4px 0 0 0; font-size: 0.85rem; opacity: 0.9;">
-              Connected to <strong><%= health.databaseName %></strong> on <strong><%= health.host %></strong>.
-              <%= health.isHealthy ? 'All required catalog, bulk import, and admin features are 100% ready.' : 'Some features (like Bulk Import) may fail until missing tables/columns are created.' %>
-            </p>
           </div>
         </div>
 
-        <div>
-          <span style="font-size: 1.3rem; font-weight: 800; padding: 0.4rem 1rem; border-radius: 30px; background: <%= health.isHealthy ? '#C8E6C9' : '#FFCDD2' %>; color: <%= health.isHealthy ? '#1B5E20' : '#B71C1C' %>;">
-            <%= health.stats.healthPercentage %>% Complete
-          </span>
-        </div>
-      </div>
+        <div class="health-header-actions">
+          <a href="/admin/tools/system-health/download-sync-sql" class="btn-health-outline" title="Download standalone SQL sync script">
+            <i class="fa-solid fa-file-arrow-down"></i>
+            <span>Download production_sync.sql</span>
+          </a>
 
-      <!-- KPI Stat Cards -->
-      <div class="health-stat-grid">
-        <div class="health-stat-card">
-          <div class="health-stat-icon <%= health.stats.missingTablesCount === 0 ? 'green' : 'red' %>">
-            <i class="fa-solid fa-table"></i>
-          </div>
-          <div class="health-stat-data">
-            <strong><%= health.stats.existingTablesCount %> / <%= health.stats.totalExpectedTables %></strong>
-            <span>Tables Existing</span>
-          </div>
-        </div>
-
-        <div class="health-stat-card">
-          <div class="health-stat-icon <%= health.stats.missingColumnsCount === 0 ? 'green' : 'red' %>">
-            <i class="fa-solid fa-table-columns"></i>
-          </div>
-          <div class="health-stat-data">
-            <strong><%= health.stats.existingColumnsCount %> / <%= health.stats.totalExpectedColumns %></strong>
-            <span>Columns Verified</span>
-          </div>
-        </div>
-
-        <div class="health-stat-card">
-          <div class="health-stat-icon <%= health.migrations.pendingCount === 0 ? 'green' : 'blue' %>">
-            <i class="fa-solid fa-code-merge"></i>
-          </div>
-          <div class="health-stat-data">
-            <strong><%= health.migrations.appliedCount %> / <%= health.migrations.total %></strong>
-            <span>Migrations Applied</span>
-          </div>
-        </div>
-
-        <div class="health-stat-card">
-          <div class="health-stat-icon <%= health.isHealthy ? 'green' : 'red' %>">
-            <i class="fa-solid fa-heart-pulse"></i>
-          </div>
-          <div class="health-stat-data">
-            <strong><%= health.isHealthy ? 'PERFECT' : health.stats.missingTablesCount + ' MISSING' %></strong>
-            <span>Overall Status</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Upload Route & Persistent Storage Health Check Card -->
-      <div style="background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
-          <div>
-            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--admin-text); display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-cloud-arrow-up" style="color: #0284C7;"></i> Upload Route & Persistent Storage Health Check
-            </h3>
-            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #666;">
-              Test end-to-end chunked upload routes, CSRF token acceptance, admin session persistence, UPLOAD_DIR write permissions, and Sharp processor mode.
-            </p>
-          </div>
-          <button type="button" id="btnTestUpload" onclick="runUploadRouteTest()" class="btn btn-primary" style="font-size: 0.85rem; padding: 0.55rem 1.25rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: #0284C7; border-color: #0284C7; color: #FFF; font-weight: 700;">
-            <i class="fa-solid fa-vial"></i> Test Upload Route
+          <button type="button" id="btnRunMigrations" onclick="triggerRunMigrations()" class="btn-health-primary" title="Execute all pending migrations now">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Run migrations now</span>
           </button>
         </div>
-
-        <!-- Persistent Storage Overview (Hostinger Environment) -->
-        <% if (locals.storageStatus) { %>
-          <div style="background: <%= storageStatus.isBlocked ? '#FFF5F5' : '#F8FAFC' %>; border: 1px solid <%= storageStatus.isBlocked ? '#FEB2B2' : '#E2E8F0' %>; border-radius: 10px; padding: 14px 18px; margin-bottom: 1.25rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-hard-drive" style="color: <%= storageStatus.isBlocked ? '#E53E3E' : '#4B0F1C' %>; font-size: 1.1rem;"></i>
-                <strong style="font-size: 0.9rem; color: #1E293B;">Active Storage Configuration:</strong>
-                <span class="badge" style="background: <%= storageStatus.isWritable ? '#DCFCE7' : '#FEE2E2' %>; color: <%= storageStatus.isWritable ? '#166534' : '#991B1B' %>; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
-                  <%= storageStatus.isWritable ? 'WRITABLE' : 'READ-ONLY / BLOCKED' %>
-                </span>
-                <% if (storageStatus.isBlocked) { %>
-                  <span class="badge" style="background: #E53E3E; color: #FFF; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
-                    INSIDE DEPLOY DIRECTORY
-                  </span>
-                <% } else { %>
-                  <span class="badge" style="background: #EDE9FE; color: #5B21B6; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">
-                    PERSISTENT (SAFE)
-                  </span>
-                <% } %>
-              </div>
-              <div style="font-size: 0.78rem; color: #64748B;">
-                Driver: <strong><%= storageStatus.driver || 'LOCAL' %></strong> | Session Store: <strong><%= locals.sessionStoreType || 'express-mysql-session' %></strong>
-              </div>
-            </div>
-
-            <div style="font-size: 0.82rem; color: #334155; margin-bottom: 8px; word-break: break-all; font-family: monospace; background: #FFF; padding: 6px 10px; border-radius: 6px; border: 1px solid #E2E8F0;">
-              <strong>UPLOAD_DIR:</strong> <%= storageStatus.uploadsDir %>
-            </div>
-
-            <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: #475569;">
-              <div>Public Files: <strong style="color: #0F172A;"><%= storageStatus.publicFilesCount || 0 %></strong></div>
-              <div>Private Files: <strong style="color: #0F172A;"><%= storageStatus.privateFilesCount || 0 %></strong></div>
-              <% if (storageStatus.isAutoDetected) { %>
-                <div style="color: #059669;"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-detected Hostinger Persistent Directory</div>
-              <% } %>
-            </div>
-          </div>
-        <% } %>
-
-        <!-- Live Rate Limit & Proxy Status Overview -->
-        <% if (locals.rateLimitStatus) { %>
-          <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.8rem;">
-            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-              <span style="color: #166534; font-weight: 700;">
-                <i class="fa-solid fa-shield-halved" style="margin-right: 4px;"></i> Rate Limiter Config:
-              </span>
-              <span style="color: #15803D;">
-                Admin Uploads: <strong style="background: #DCFCE7; padding: 2px 6px; border-radius: 4px; color: #166534;">100% EXEMPT</strong>
-              </span>
-              <span style="color: #374151;">
-                Trust Proxy: <strong><%= rateLimitStatus.trustProxy.enabled ? 'Active (app.set trust proxy, 1)' : 'Disabled' %></strong>
-              </span>
-              <span style="color: #374151;">
-                Strict Auth: <strong>10 req / 15m</strong>
-              </span>
-              <span style="color: #374151;">
-                Public Store: <strong>300 req / 5m</strong>
-              </span>
-            </div>
-            <div style="color: #6B7280; font-family: monospace; font-size: 0.75rem;">
-              Client IP: <%= rateLimitStatus.clientIp %>
-            </div>
-          </div>
-        <% } %>
-
-        <div id="uploadTestResultsContainer" style="display: none; margin-top: 1rem; border-top: 1px solid #ECEFF1; padding-top: 1rem;">
-          <!-- Dynamically populated by runUploadRouteTest -->
-        </div>
       </div>
 
-      <!-- Missing Items Alert (if any) -->
-      <% if (!health.isHealthy) { %>
-        <div style="background: #FFFFFF; border: 2px solid #FFCDD2; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
-          <h3 style="color: #C62828; margin: 0 0 0.8rem 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-circle-exclamation"></i> Action Required to Prevent Production Errors:
-          </h3>
-          <p style="font-size: 0.88rem; color: #555; margin-bottom: 1rem;">
-            Click <strong>"Apply Pending Migrations"</strong> above, or download <strong>production_sync.sql</strong> and run it inside your live phpMyAdmin panel.
-          </p>
+      <!-- Hidden Form for Running Migrations -->
+      <form id="formRunMigrations" action="/admin/tools/system-health/run-migrations" method="POST" style="display: none;">
+        <input type="hidden" name="_csrf" value="<%= (typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : '' %>">
+      </form>
 
-          <% if (health.missingTables.length > 0) { %>
-            <div style="margin-bottom: 0.8rem;">
-              <strong style="color: #C62828; font-size: 0.85rem;">Missing Tables (<%= health.missingTables.length %>):</strong>
-              <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
-                <% health.missingTables.forEach(t => { %>
-                  <span class="col-pill missing"><i class="fa-solid fa-xmark"></i> <%= t %></span>
-                <% }) %>
-              </div>
-            </div>
-          <% } %>
-
-          <% if (health.missingColumns.length > 0) { %>
-            <div>
-              <strong style="color: #C62828; font-size: 0.85rem;">Missing Columns (<%= health.missingColumns.length %>):</strong>
-              <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
-                <% health.missingColumns.forEach(c => { %>
-                  <span class="col-pill missing"><i class="fa-solid fa-xmark"></i> <%= c.table %>.<%= c.column %></span>
-                <% }) %>
-              </div>
-            </div>
-          <% } %>
+      <!-- Dismissible Auto-Hiding Flash Notifications -->
+      <% if (locals.flash && locals.flash.success && locals.flash.success.length > 0) { %>
+        <div class="health-flash-box success" id="healthFlashBanner">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-circle-check" style="font-size: 1.1rem;"></i>
+            <span><strong>Success:</strong> <%= locals.flash.success[0] %></span>
+          </div>
+          <button type="button" class="health-flash-close-btn" onclick="closeFlashBanner()" aria-label="Close notification">&times;</button>
         </div>
       <% } %>
 
-      <!-- Migrations History Accordion -->
-      <div class="schema-card">
-        <div class="schema-card-header">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-clock-rotate-left" style="color: var(--admin-primary);"></i>
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--admin-text);">
-              Migration Version History (<%= health.migrations.appliedCount %> applied, <%= health.migrations.pendingCount %> pending)
-            </h3>
+      <% if (locals.flash && locals.flash.info && locals.flash.info.length > 0) { %>
+        <div class="health-flash-box info" id="healthFlashBanner">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-circle-info" style="font-size: 1.1rem;"></i>
+            <span><strong>Notice:</strong> <%= locals.flash.info[0] %></span>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="badge-status <%= health.migrations.isUpToDate ? 'ok' : 'warning' %>">
-              <%= health.migrations.isUpToDate ? 'Up To Date' : health.migrations.pendingCount + ' Pending' %>
-            </span>
-            <% if (!health.migrations.isUpToDate) { %>
-              <form action="/admin/tools/system-health/run-migrations" method="POST" style="margin: 0;">
-                <button type="submit" class="btn btn-sm" style="background: #0284C7; color: #FFF; font-weight: 700; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; border: none; cursor: pointer;">
-                  <i class="fa-solid fa-bolt"></i> Run migrations now
-                </button>
-              </form>
-            <% } %>
-          </div>
+          <button type="button" class="health-flash-close-btn" onclick="closeFlashBanner()" aria-label="Close notification">&times;</button>
         </div>
-        <div class="schema-card-body" style="padding: 0;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-            <thead>
-              <tr style="background: #F9FAFB; border-bottom: 1px solid var(--admin-border); text-align: left;">
-                <th style="padding: 0.75rem 1.25rem;">Version</th>
-                <th style="padding: 0.75rem 1.25rem;">Migration File</th>
-                <th style="padding: 0.75rem 1.25rem;">Status</th>
-                <th style="padding: 0.75rem 1.25rem;">Applied At</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (health.migrations.migrations && health.migrations.migrations.length > 0) { %>
-                <% health.migrations.migrations.forEach(m => { %>
-                  <tr style="border-bottom: 1px solid var(--admin-border); <%= !m.isApplied ? 'background: #FFFBEB;' : '' %>">
-                    <td style="padding: 0.65rem 1.25rem; font-family: monospace; font-weight: 600;">
-                      <%= m.version %>
-                    </td>
-                    <td style="padding: 0.65rem 1.25rem; font-family: monospace;">
-                      <%= m.file || m.filename %>
-                    </td>
-                    <td style="padding: 0.65rem 1.25rem;">
-                      <span class="badge-status <%= m.isApplied ? 'ok' : 'warning' %>" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">
-                        <%= m.isApplied ? 'Applied' : 'Pending' %>
-                      </span>
-                    </td>
-                    <td style="padding: 0.65rem 1.25rem; color: #666;">
-                      <%= m.appliedAt ? new Date(m.appliedAt).toLocaleString('en-IN') : '—' %>
-                    </td>
-                  </tr>
-                <% }) %>
-              <% } else { %>
-                <tr>
-                  <td colspan="4" style="padding: 1.5rem; text-align: center; color: #888;">No migration files recorded.</td>
-                </tr>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <% } %>
 
-      <!-- Database Tables & Columns Health Breakdown -->
-      <div style="margin-top: 2rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-          <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--admin-text); margin: 0;">
-            <i class="fa-solid fa-list-check" style="color: var(--admin-primary); margin-right: 6px;"></i>
-            Schema Integrity by Table
+      <% if (locals.flash && locals.flash.error && locals.flash.error.length > 0) { %>
+        <div class="health-flash-box error" id="healthFlashBanner">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem;"></i>
+            <span><strong>Action Needed:</strong> <%= locals.flash.error[0] %></span>
+          </div>
+          <button type="button" class="health-flash-close-btn" onclick="closeFlashBanner()" aria-label="Close notification">&times;</button>
+        </div>
+      <% } %>
+
+      <!-- Database Disconnection Error State (Friendly Fallback) -->
+      <% if (!health.connected) { %>
+        <div class="health-card" style="border: 2px solid #FECACA; background: #FFF5F5; text-align: center; padding: 2.5rem 1.5rem;">
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem auto;">
+            <i class="fa-solid fa-database"></i>
+          </div>
+          <h2 style="font-family: 'Playfair Display', serif; font-size: 1.5rem; color: #991B1B; margin: 0 0 0.5rem 0;">
+            Database Connection Offline
           </h2>
-          <div style="font-size: 0.82rem; color: #777;">
-            Showing all <%= health.tables.length %> required application tables
+          <p style="color: #7F1D1D; font-size: 0.9rem; max-width: 580px; margin: 0 auto 1.5rem auto; line-height: 1.5;">
+            Unable to establish a live connection to MySQL/MariaDB (<%= health.databaseName %> on <%= health.host %>). Verify DB credentials in your environment configuration.
+          </p>
+          <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+            <button type="button" class="btn-health-primary" onclick="reloadHealthCheck()">
+              <i class="fa-solid fa-rotate"></i> Retry Connection
+            </button>
+            <a href="/admin" class="btn-health-outline">
+              <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+            </a>
+          </div>
+        </div>
+      <% } else { %>
+
+        <!-- Status Hero Card -->
+        <%
+          let heroClass = 'is-healthy';
+          let statusPillClass = 'pill-success';
+          let statusPillText = '100% Complete';
+          let statusPillIcon = 'fa-circle-check';
+
+          if (!health.isHealthy) {
+            if (health.stats.missingTablesCount > 0 || health.stats.missingColumnsCount > 0) {
+              heroClass = 'is-danger';
+              statusPillClass = 'pill-danger';
+              statusPillText = 'Action Required';
+              statusPillIcon = 'fa-triangle-exclamation';
+            } else if (health.migrations.pendingCount > 0) {
+              heroClass = 'is-warning';
+              statusPillClass = 'pill-warning';
+              statusPillText = 'Needs Attention';
+              statusPillIcon = 'fa-clock';
+            }
+          }
+        %>
+        <div class="status-hero-card <%= heroClass %>">
+          <div class="hero-info-group">
+            <div class="hero-shield-icon">
+              <i class="fa-solid <%= health.isHealthy ? 'fa-shield-halved' : (heroClass === 'is-warning' ? 'fa-clock' : 'fa-triangle-exclamation') %>"></i>
+            </div>
+            <div>
+              <h2 class="hero-title-text">
+                <%= health.isHealthy ? 'All Systems Operational — Database Fully Synchronized' : (heroClass === 'is-warning' ? 'Pending Migrations Detected — Schema Update Ready' : 'Database Schema Incomplete — Missing Tables or Columns Detected') %>
+              </h2>
+              <p class="hero-desc-text">
+                Connected to <strong><%= health.databaseName %></strong> on <strong><%= health.host %></strong>.
+                <%= health.isHealthy ? 'All required catalog, bulk replace, and admin features are 100% ready.' : 'Some features (like Bulk Replace) may fail until missing tables/columns are created.' %>
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <span class="hero-status-pill <%= statusPillClass %>">
+              <i class="fa-solid <%= statusPillIcon %>"></i>
+              <span><%= statusPillText %></span>
+            </span>
           </div>
         </div>
 
-        <div id="tableListContainer">
-          <% health.tables.forEach(tbl => { %>
-            <div class="schema-card table-row-item" data-tablename="<%= tbl.name.toLowerCase() %>" data-status="<%= tbl.isFullyHealthy ? 'healthy' : 'issue' %>">
-              <div class="schema-card-header">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span class="badge-status <%= tbl.exists ? 'ok' : 'error' %>">
-                    <%= tbl.exists ? 'TABLE OK' : 'TABLE MISSING' %>
-                  </span>
-                  <span style="font-family: monospace; font-size: 1rem; font-weight: 700; color: #222;">
-                    `<%= tbl.name %>`
-                  </span>
-                  <span style="font-size: 0.8rem; color: #777;">
-                    (<%= tbl.columns.filter(c => c.exists).length %> of <%= tbl.columns.length %> columns verified)
-                  </span>
-                </div>
+        <!-- 4 KPI Stat Cards (Responsive Grid) -->
+        <div class="health-stat-grid">
+          <!-- Card 1: Tables -->
+          <div class="health-stat-card <%= health.stats.missingTablesCount > 0 ? 'is-alert-danger' : '' %>" onclick="scrollToSection('sectionTables')" role="button" tabindex="0" title="Click to view table list">
+            <div class="health-stat-icon <%= health.stats.missingTablesCount === 0 ? 'green' : 'red' %>">
+              <i class="fa-solid fa-table"></i>
+            </div>
+            <div class="health-stat-data">
+              <strong><%= health.stats.existingTablesCount %> / <%= health.stats.totalExpectedTables %></strong>
+              <span class="stat-label">Tables Existing</span>
+              <span class="stat-hint">
+                <i class="fa-solid fa-arrow-down" style="font-size: 0.68rem;"></i> <%= health.stats.missingTablesCount === 0 ? 'All tables present' : health.stats.missingTablesCount + ' missing' %>
+              </span>
+            </div>
+          </div>
 
-                <div>
-                  <% if (tbl.missingColumnCount > 0) { %>
-                    <span style="font-size: 0.78rem; font-weight: 700; color: #C62828;">
-                      <i class="fa-solid fa-triangle-exclamation"></i> <%= tbl.missingColumnCount %> Column(s) Missing!
+          <!-- Card 2: Columns -->
+          <div class="health-stat-card <%= health.stats.missingColumnsCount > 0 ? 'is-alert-danger' : '' %>" onclick="scrollToSection('sectionTables')" role="button" tabindex="0" title="Click to inspect columns">
+            <div class="health-stat-icon <%= health.stats.missingColumnsCount === 0 ? 'green' : 'red' %>">
+              <i class="fa-solid fa-table-columns"></i>
+            </div>
+            <div class="health-stat-data">
+              <strong><%= health.stats.existingColumnsCount %> / <%= health.stats.totalExpectedColumns %></strong>
+              <span class="stat-label">Columns Verified</span>
+              <span class="stat-hint">
+                <i class="fa-solid fa-arrow-down" style="font-size: 0.68rem;"></i> <%= health.stats.missingColumnsCount === 0 ? 'All columns active' : health.stats.missingColumnsCount + ' missing' %>
+              </span>
+            </div>
+          </div>
+
+          <!-- Card 3: Migrations -->
+          <div class="health-stat-card <%= health.migrations.pendingCount > 0 ? 'is-alert-warning' : '' %>" onclick="scrollToSection('sectionMigrations')" role="button" tabindex="0" title="Click to view migrations">
+            <div class="health-stat-icon <%= health.migrations.pendingCount === 0 ? 'green' : 'amber' %>">
+              <i class="fa-solid fa-code-merge"></i>
+            </div>
+            <div class="health-stat-data">
+              <strong><%= health.migrations.appliedCount %> / <%= health.migrations.total %></strong>
+              <span class="stat-label">Migrations Applied</span>
+              <span class="stat-hint">
+                <i class="fa-solid fa-arrow-down" style="font-size: 0.68rem;"></i> <%= health.migrations.pendingCount === 0 ? 'Up to date' : health.migrations.pendingCount + ' pending' %>
+              </span>
+            </div>
+          </div>
+
+          <!-- Card 4: Overall Status -->
+          <div class="health-stat-card <%= !health.isHealthy ? 'is-alert-danger' : '' %>" onclick="scrollToSection('<%= health.isHealthy ? 'sectionStorage' : (health.missingTables.length > 0 || health.missingColumns.length > 0 ? 'sectionMissingAlert' : 'sectionMigrations') %>')" role="button" tabindex="0" title="Click to view status details">
+            <div class="health-stat-icon <%= health.isHealthy ? 'green' : 'red' %>">
+              <i class="fa-solid <%= health.isHealthy ? 'fa-shield-heart' : 'fa-triangle-exclamation' %>"></i>
+            </div>
+            <div class="health-stat-data">
+              <strong><%= health.isHealthy ? 'PERFECT' : (health.stats.missingTablesCount > 0 || health.stats.missingColumnsCount > 0 ? health.stats.missingTablesCount + ' MISSING' : 'PENDING') %></strong>
+              <span class="stat-label">Overall Status</span>
+              <span class="stat-hint">
+                <i class="fa-solid fa-circle-notch" style="font-size: 0.68rem;"></i> <%= health.stats.healthPercentage %>% Complete
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload Route & Persistent Storage Health Check Card -->
+        <div class="health-card" id="sectionStorage">
+          <div class="storage-header-flex">
+            <div class="storage-title-box">
+              <h3>
+                <i class="fa-solid fa-cloud-arrow-up" style="color: #0284C7;"></i>
+                Upload Route & Persistent Storage Health Check
+              </h3>
+              <p>
+                Probe end-to-end chunked upload routes, CSRF token verification, admin session persistence, UPLOAD_DIR write permissions, and Sharp mode.
+              </p>
+            </div>
+
+            <button type="button" id="btnTestUpload" onclick="runUploadRouteTest()" class="btn-health-primary" title="Probe upload route now">
+              <i class="fa-solid fa-vial"></i>
+              <span>Test Upload Route</span>
+            </button>
+          </div>
+
+          <!-- Active Storage Configuration -->
+          <% if (locals.storageStatus) { %>
+            <div class="storage-config-card <%= storageStatus.isBlocked ? 'is-blocked' : '' %>">
+              <div class="storage-badges-strip">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <i class="fa-solid fa-hard-drive" style="color: <%= storageStatus.isBlocked ? '#DC2626' : '#8B261E' %>; font-size: 1.05rem;"></i>
+                  <strong style="font-size: 0.88rem; color: #1E293B;">Active Storage Configuration:</strong>
+
+                  <span class="badge-pill <%= storageStatus.isWritable ? 'writable' : 'blocked' %>">
+                    <i class="fa-solid <%= storageStatus.isWritable ? 'fa-check' : 'fa-xmark' %>"></i>
+                    <%= storageStatus.isWritable ? 'WRITABLE' : 'READ-ONLY / BLOCKED' %>
+                  </span>
+
+                  <% if (storageStatus.isBlocked) { %>
+                    <span class="badge-pill blocked">
+                      <i class="fa-solid fa-triangle-exclamation"></i> INSIDE DEPLOY DIRECTORY
                     </span>
                   <% } else { %>
-                    <span style="font-size: 0.78rem; font-weight: 600; color: #2E7D32;">
-                      <i class="fa-solid fa-circle-check"></i> Complete
+                    <span class="badge-pill safe">
+                      <i class="fa-solid fa-shield-halved"></i> PERSISTENT (SAFE)
                     </span>
                   <% } %>
                 </div>
+
+                <div style="font-size: 0.78rem; color: #64748B;">
+                  Driver: <strong style="color: #1E293B;"><%= (storageStatus.driver || 'LOCAL').toUpperCase() %></strong> &bull; Session Store: <strong style="color: #1E293B;"><%= locals.sessionStoreType || 'express-mysql-session' %></strong>
+                </div>
               </div>
 
-              <div class="schema-card-body">
-                <div class="col-pill-grid">
-                  <% tbl.columns.forEach(col => { %>
-                    <span class="col-pill <%= col.exists ? 'ok' : 'missing' %>" title="<%= col.exists ? 'Column is active in MySQL' : 'CRITICAL: Column is missing in MySQL!' %>">
-                      <i class="fa-solid <%= col.exists ? 'fa-check' : 'fa-xmark' %>"></i> <%= col.name %>
-                    </span>
-                  <% }) %>
+              <!-- UPLOAD_DIR Path Box with Copy Button (Wraps properly) -->
+              <div class="storage-path-box">
+                <div class="storage-path-text">
+                  <span style="color: #64748B; font-weight: 600;">UPLOAD_DIR:</span>
+                  <span id="textUploadDirPath" class="wrap-anywhere"><%= storageStatus.uploadsDir %></span>
+                </div>
+                <button type="button" id="btnCopyUploadDir" class="btn-copy-path" onclick="copyUploadDirPath()" title="Copy UPLOAD_DIR path">
+                  <i class="fa-regular fa-copy"></i> Copy
+                </button>
+              </div>
+
+              <!-- File Count & Auto-detection row -->
+              <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.78rem; color: #475569; align-items: center;">
+                <div>Public Files: <strong style="color: #0F172A;"><%= storageStatus.publicFilesCount || 0 %></strong></div>
+                <div>Private Files: <strong style="color: #0F172A;"><%= storageStatus.privateFilesCount || 0 %></strong></div>
+                <% if (storageStatus.isAutoDetected) { %>
+                  <div style="color: #059669; font-weight: 600;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-detected Hostinger Persistent Directory
+                  </div>
+                <% } %>
+              </div>
+            </div>
+          <% } %>
+
+          <!-- Rate Limiter Config (4 Small Wrapping Cards) -->
+          <% if (locals.rateLimitStatus) { %>
+            <div class="rate-limiter-section-title">
+              <span><i class="fa-solid fa-shield-halved" style="color: #059669; margin-right: 6px;"></i> Rate Limiter Config:</span>
+              <span style="font-size: 0.75rem; color: #64748B; font-family: monospace;">Client IP: <%= rateLimitStatus.clientIp %></span>
+            </div>
+
+            <div class="rate-limiter-grid">
+              <!-- Chip 1: Admin Uploads -->
+              <div class="rate-limiter-chip">
+                <div class="rate-limiter-chip-header">
+                  <span>Admin Uploads</span>
+                  <i class="fa-solid fa-upload"></i>
+                </div>
+                <div class="rate-limiter-chip-val" style="color: #059669;">
+                  100% EXEMPT
+                </div>
+                <div class="rate-limiter-chip-sub">
+                  Admin session bypasses 429
+                </div>
+              </div>
+
+              <!-- Chip 2: Trust Proxy -->
+              <div class="rate-limiter-chip">
+                <div class="rate-limiter-chip-header">
+                  <span>Trust Proxy</span>
+                  <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div class="rate-limiter-chip-val">
+                  <%= rateLimitStatus.trustProxy.enabled ? 'Active (1)' : 'Direct' %>
+                </div>
+                <div class="rate-limiter-chip-sub">
+                  Hostinger / LiteSpeed proxy
+                </div>
+              </div>
+
+              <!-- Chip 3: Strict Auth -->
+              <div class="rate-limiter-chip">
+                <div class="rate-limiter-chip-header">
+                  <span>Strict Auth</span>
+                  <i class="fa-solid fa-lock"></i>
+                </div>
+                <div class="rate-limiter-chip-val">
+                  10 req / 15m
+                </div>
+                <div class="rate-limiter-chip-sub">
+                  Login, Register, Checkout
+                </div>
+              </div>
+
+              <!-- Chip 4: Public Store -->
+              <div class="rate-limiter-chip">
+                <div class="rate-limiter-chip-header">
+                  <span>Public Store</span>
+                  <i class="fa-solid fa-store"></i>
+                </div>
+                <div class="rate-limiter-chip-val">
+                  300 req / 5m
+                </div>
+                <div class="rate-limiter-chip-sub">
+                  Storefront (Static assets exempt)
                 </div>
               </div>
             </div>
-          <% }) %>
+          <% } %>
+
+          <!-- Upload Route Probing Dynamic Result Area -->
+          <div id="uploadTestResultsContainer" style="display: none; margin-top: 1.25rem; border-top: 1px solid #ECEFF1; padding-top: 1.25rem;">
+            <!-- Dynamically populated by runUploadRouteTest() -->
+          </div>
         </div>
-      </div>
+
+        <!-- Missing Items Alert Card (Rendered if any table or column is missing) -->
+        <% if (health.missingTables.length > 0 || health.missingColumns.length > 0) { %>
+          <div class="health-card" id="sectionMissingAlert" style="border: 2px solid #FECACA; background: #FFFBFB;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 0.8rem; flex-wrap: wrap;">
+              <h3 style="color: #DC2626; margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-circle-exclamation"></i> Action Required to Prevent Production Errors
+              </h3>
+              <button type="button" onclick="triggerRunMigrations()" class="btn-health-primary" style="padding: 0.45rem 1rem; font-size: 0.8rem; min-height: 36px;">
+                <i class="fa-solid fa-bolt"></i> Run migrations now
+              </button>
+            </div>
+
+            <p style="font-size: 0.86rem; color: #4B5563; margin-bottom: 1rem; line-height: 1.5;">
+              The database schema is missing required tables or columns. Click <strong>"Run migrations now"</strong> above or execute <strong>production_sync.sql</strong> in phpMyAdmin.
+            </p>
+
+            <% if (health.missingTables.length > 0) { %>
+              <div style="margin-bottom: 0.8rem;">
+                <strong style="color: #DC2626; font-size: 0.84rem;">Missing Tables (<%= health.missingTables.length %>):</strong>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
+                  <% health.missingTables.forEach(t => { %>
+                    <span class="col-pill missing"><i class="fa-solid fa-xmark"></i> <%= t %></span>
+                  <% }) %>
+                </div>
+              </div>
+            <% } %>
+
+            <% if (health.missingColumns.length > 0) { %>
+              <div>
+                <strong style="color: #DC2626; font-size: 0.84rem;">Missing Columns (<%= health.missingColumns.length %>):</strong>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem;">
+                  <% health.missingColumns.forEach(c => { %>
+                    <span class="col-pill missing"><i class="fa-solid fa-xmark"></i> <%= c.table %>.<%= c.column %></span>
+                  <% }) %>
+                </div>
+              </div>
+            <% } %>
+          </div>
+        <% } %>
+
+        <!-- Migrations Version History (Accordion) -->
+        <div class="health-card" id="sectionMigrations" style="padding: 0; overflow: hidden;">
+          <div class="accordion-item" id="accordionMigrations">
+            <button type="button" class="accordion-header-btn" onclick="toggleAccordion('accordionMigrations')" aria-expanded="true">
+              <div class="accordion-title-group">
+                <i class="fa-solid fa-clock-rotate-left" style="color: #B8402A; font-size: 1.15rem;"></i>
+                <div>
+                  <h3>Migration Version History</h3>
+                  <span style="font-size: 0.78rem; color: #6B5E57; font-weight: 500;">
+                    <%= health.migrations.appliedCount %> applied, <%= health.migrations.pendingCount %> pending (<%= health.migrations.total %> total)
+                  </span>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="badge-pill <%= health.migrations.isUpToDate ? 'writable' : 'blocked' %>" style="font-size: 0.72rem;">
+                  <%= health.migrations.isUpToDate ? 'Up To Date' : health.migrations.pendingCount + ' Pending' %>
+                </span>
+                <i class="fa-solid fa-chevron-down accordion-chevron"></i>
+              </div>
+            </button>
+
+            <div class="accordion-content-body">
+              <div class="table-responsive-box">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 100px;">Version</th>
+                      <th>Migration File</th>
+                      <th style="width: 120px;">Status</th>
+                      <th style="width: 220px;">Applied At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (health.migrations.migrations && health.migrations.migrations.length > 0) { %>
+                      <% health.migrations.migrations.forEach(m => { %>
+                        <tr style="<%= !m.isApplied ? 'background: #FFFBEB;' : '' %>">
+                          <td style="font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 700; color: #0F172A;">
+                            <%= m.version %>
+                          </td>
+                          <td style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.82rem;" class="wrap-anywhere">
+                            <%= m.file || m.filename %>
+                          </td>
+                          <td>
+                            <span class="badge-pill <%= m.isApplied ? 'writable' : 'blocked' %>" style="font-size: 0.7rem;">
+                              <%= m.isApplied ? 'Applied' : 'Pending' %>
+                            </span>
+                          </td>
+                          <td style="font-size: 0.8rem; color: #64748B;">
+                            <%= m.appliedAt ? new Date(m.appliedAt).toLocaleString('en-IN') : 'Pending execution' %>
+                          </td>
+                        </tr>
+                      <% }) %>
+                    <% } else { %>
+                      <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem; color: #8C7F79;">
+                          No migration records registered.
+                        </td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Database Tables & Columns Breakdown (Accordion with Search) -->
+        <div class="health-card" id="sectionTables" style="padding: 0; overflow: hidden;">
+          <div class="accordion-item" id="accordionTables">
+            <button type="button" class="accordion-header-btn" onclick="toggleAccordion('accordionTables')" aria-expanded="true">
+              <div class="accordion-title-group">
+                <i class="fa-solid fa-list-check" style="color: #B8402A; font-size: 1.15rem;"></i>
+                <div>
+                  <h3>Schema Integrity by Table</h3>
+                  <span style="font-size: 0.78rem; color: #6B5E57; font-weight: 500;">
+                    <%= health.tables.length %> required tables &bull; <%= health.stats.existingColumnsCount %> / <%= health.stats.totalExpectedColumns %> columns verified
+                  </span>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="badge-pill <%= health.stats.missingColumnsCount === 0 ? 'writable' : 'blocked' %>" style="font-size: 0.72rem;">
+                  <%= health.stats.missingColumnsCount === 0 ? 'All Columns Present' : health.stats.missingColumnsCount + ' Missing' %>
+                </span>
+                <i class="fa-solid fa-chevron-down accordion-chevron"></i>
+              </div>
+            </button>
+
+            <div class="accordion-content-body" style="padding: 1.25rem;">
+              <!-- Search & Filter Toolbar -->
+              <div class="schema-filter-toolbar">
+                <div class="schema-search-input-wrap">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="tableSearchInput" class="schema-search-input" placeholder="Filter tables or columns..." oninput="filterTables()" aria-label="Filter tables or columns">
+                </div>
+
+                <label class="schema-checkbox-label">
+                  <input type="checkbox" id="filterOnlyProblems" onchange="filterTables()">
+                  <span>Show only tables with issues (<%= health.tables.filter(t => !t.isFullyHealthy).length %>)</span>
+                </label>
+              </div>
+
+              <!-- Tables List -->
+              <div id="tableListContainer">
+                <% health.tables.forEach(tbl => { %>
+                  <div class="health-card table-row-item" data-tablename="<%= tbl.name.toLowerCase() %>" data-status="<%= tbl.isFullyHealthy ? 'healthy' : 'issue' %>" style="padding: 0; margin-bottom: 1rem; border-radius: 12px; overflow: hidden; border-color: <%= tbl.isFullyHealthy ? '#E2E8F0' : '#FECACA' %>;">
+                    <div style="background: <%= tbl.isFullyHealthy ? '#F8FAFC' : '#FFF5F5' %>; padding: 0.8rem 1.25rem; border-bottom: 1px solid <%= tbl.isFullyHealthy ? '#E2E8F0' : '#FECACA' %>; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span class="badge-pill <%= tbl.exists ? 'writable' : 'blocked' %>" style="font-size: 0.7rem;">
+                          <%= tbl.exists ? 'TABLE OK' : 'TABLE MISSING' %>
+                        </span>
+                        <strong style="font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.95rem; color: #0F172A;">
+                          `<%= tbl.name %>`
+                        </strong>
+                        <span style="font-size: 0.76rem; color: #64748B;">
+                          (<%= tbl.columns.filter(c => c.exists).length %> of <%= tbl.columns.length %> columns verified)
+                        </span>
+                      </div>
+
+                      <div>
+                        <% if (tbl.missingColumnCount > 0) { %>
+                          <span style="font-size: 0.76rem; font-weight: 700; color: #DC2626;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> <%= tbl.missingColumnCount %> Column(s) Missing!
+                          </span>
+                        <% } else { %>
+                          <span style="font-size: 0.76rem; font-weight: 600; color: #059669;">
+                            <i class="fa-solid fa-circle-check"></i> Complete
+                          </span>
+                        <% } %>
+                      </div>
+                    </div>
+
+                    <div class="col-pill-grid">
+                      <% tbl.columns.forEach(col => { %>
+                        <span class="col-pill <%= col.exists ? 'ok' : 'missing' %>" title="<%= col.exists ? 'Column active in MySQL' : 'CRITICAL: Column missing in MySQL!' %>">
+                          <i class="fa-solid <%= col.exists ? 'fa-check' : 'fa-xmark' %>"></i>
+                          <span><%= col.name %></span>
+                        </span>
+                      <% }) %>
+                    </div>
+                  </div>
+                <% }) %>
+
+                <!-- No Results Empty State -->
+                <div id="noTablesFoundMessage" style="display: none; text-align: center; padding: 2.5rem 1rem; color: #8C7F79;">
+                  <i class="fa-solid fa-filter-circle-xmark" style="font-size: 2rem; color: #D5C8B8; margin-bottom: 0.5rem; display: block;"></i>
+                  <strong style="display: block; font-size: 0.95rem; color: #4B5563;">No tables match your filter</strong>
+                  <span style="font-size: 0.8rem;">Try clearing the search query or unchecking "Show only tables with issues".</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      <% } %>
+
     </main>
   </div>
 </div>
 
 <script>
+/* ============================================================
+   INTERACTIVE CLIENT SCRIPTS (Accordion, Test Upload, Filter, Copy)
+   ============================================================ */
+
+// 1. Mobile Sidebar Toggle & Backdrop
+(function() {
+  const toggleBtn = document.getElementById('btnToggleSidebarMobile');
+  const sidebar = document.getElementById('adminSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (toggleBtn && sidebar && backdrop) {
+    toggleBtn.addEventListener('click', function() {
+      sidebar.classList.toggle('sidebar-open');
+      backdrop.classList.toggle('active');
+    });
+
+    backdrop.addEventListener('click', function() {
+      sidebar.classList.remove('sidebar-open');
+      backdrop.classList.remove('active');
+    });
+  }
+})();
+
+// 2. Auto-hide Flash Banner after 8 seconds
+(function() {
+  const banner = document.getElementById('healthFlashBanner');
+  if (banner) {
+    setTimeout(function() {
+      closeFlashBanner();
+    }, 8000);
+  }
+})();
+
+function closeFlashBanner() {
+  const banner = document.getElementById('healthFlashBanner');
+  if (banner) {
+    banner.classList.add('fade-out');
+    setTimeout(function() {
+      if (banner.parentNode) banner.parentNode.removeChild(banner);
+    }, 400);
+  }
+}
+
+// 3. Smooth Scroll to Section when Stat Card is Clicked
+function scrollToSection(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+
+  // If section is an accordion that is collapsed, expand it
+  const accordion = el.querySelector('.accordion-item') || el.closest('.accordion-item') || el;
+  if (accordion && accordion.classList.contains('is-collapsed')) {
+    accordion.classList.remove('is-collapsed');
+    const btn = accordion.querySelector('.accordion-header-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.classList.add('highlight-pulse');
+  setTimeout(() => el.classList.remove('highlight-pulse'), 2200);
+}
+
+// 4. Accordion Toggle
+function toggleAccordion(accordionId) {
+  const el = document.getElementById(accordionId);
+  if (!el) return;
+  const isCollapsed = el.classList.toggle('is-collapsed');
+  const btn = el.querySelector('.accordion-header-btn');
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(!isCollapsed));
+  }
+}
+
+// 5. Copy UPLOAD_DIR Path to Clipboard
+function copyUploadDirPath() {
+  const textEl = document.getElementById('textUploadDirPath');
+  const btn = document.getElementById('btnCopyUploadDir');
+  if (!textEl || !btn) return;
+
+  const path = textEl.textContent.trim();
+  navigator.clipboard.writeText(path).then(function() {
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-check" style="color: #059669;"></i> Copied!';
+    setTimeout(function() {
+      btn.innerHTML = origHtml;
+    }, 2000);
+  }).catch(function() {
+    prompt('Copy storage directory path:', path);
+  });
+}
+
+// 6. Reload Health Check Button
+function reloadHealthCheck() {
+  const icon = document.getElementById('recheckIcon');
+  if (icon) icon.classList.add('fa-spin');
+  window.location.reload();
+}
+
+// 7. Trigger Run Migrations with Confirmation & Disabled State
+function triggerRunMigrations() {
+  const confirmed = confirm('Run all pending database migrations now?\n\nExisting catalog data and products will never be touched.');
+  if (!confirmed) return;
+
+  const btn = document.getElementById('btnRunMigrations');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running migrations...';
+  }
+
+  const form = document.getElementById('formRunMigrations');
+  if (form) {
+    form.submit();
+  }
+}
+
+// 8. Filter Tables and Columns Search Tool
 function filterTables() {
-  const query = (document.getElementById('tableSearchInput').value || '').toLowerCase().trim();
+  const query = (document.getElementById('tableSearchInput')?.value || '').toLowerCase().trim();
+  const onlyProblems = Boolean(document.getElementById('filterOnlyProblems')?.checked);
   const rows = document.querySelectorAll('.table-row-item');
-  rows.forEach(row => {
-    const tableName = row.getAttribute('data-tablename');
+  let visibleCount = 0;
+
+  rows.forEach(function(row) {
+    const tableName = (row.getAttribute('data-tablename') || '').toLowerCase();
+    const isIssue = row.getAttribute('data-status') === 'issue';
     const textContent = row.textContent.toLowerCase();
-    if (!query || tableName.includes(query) || textContent.includes(query)) {
+
+    const matchesQuery = !query || tableName.includes(query) || textContent.includes(query);
+    const matchesProblem = !onlyProblems || isIssue;
+
+    if (matchesQuery && matchesProblem) {
       row.style.display = '';
+      visibleCount++;
     } else {
       row.style.display = 'none';
     }
   });
+
+  const emptyMsg = document.getElementById('noTablesFoundMessage');
+  if (emptyMsg) {
+    emptyMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+  }
 }
 
+// 9. Run End-to-End Upload Route & Storage Health Check Probe
 async function runUploadRouteTest() {
   const btn = document.getElementById('btnTestUpload');
   const container = document.getElementById('uploadTestResultsContainer');
+  if (!btn || !container) return;
+
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Probing Upload Route...';
   container.style.display = 'block';
-  container.innerHTML = '<div style="color: #666; font-size: 0.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> Testing route, CSRF, admin session, and persistent storage write permissions...</div>';
+  container.innerHTML = '<div style="color: #6B7280; font-size: 0.85rem; padding: 10px 0;"><i class="fa-solid fa-spinner fa-spin"></i> Testing route accessibility, CSRF headers, session persistence, and persistent storage write permissions...</div>';
 
   try {
     const meta = document.querySelector('meta[name="csrf-token"]');
-    const token = meta ? meta.getAttribute('content') : (window.CSRF_TOKEN || '');
+    const token = meta ? meta.getAttribute('content') : '';
+
     const res = await fetch('/admin/api/upload/test-health', {
       method: 'POST',
       headers: {
@@ -628,87 +1812,84 @@ async function runUploadRouteTest() {
     const data = await res.json();
     const checks = data.checks || {};
 
-    const passBadge = '<span style="color: #2E7D32; font-weight: 700; background: #E8F5E9; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-circle-check"></i> PASS</span>';
-    const failBadge = '<span style="color: #C62828; font-weight: 700; background: #FFEBEE; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-circle-xmark"></i> FAIL</span>';
-    const warnBadge = '<span style="color: #E65100; font-weight: 700; background: #FFF3E0; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-triangle-exclamation"></i> FALLBACK</span>';
+    const passBadge = '<span class="badge-pill writable"><i class="fa-solid fa-circle-check"></i> PASS</span>';
+    const failBadge = '<span class="badge-pill blocked"><i class="fa-solid fa-circle-xmark"></i> FAIL</span>';
+    const warnBadge = '<span class="badge-pill safe" style="background: #FEF3C7; color: #92400E;"><i class="fa-solid fa-triangle-exclamation"></i> FALLBACK</span>';
 
     container.innerHTML = `
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 12px;">
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Route Accessibility:</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">Route Accessibility:</strong>
             ${checks.route?.status === 'pass' ? passBadge : failBadge}
           </div>
-          <div style="font-size: 0.76rem; color: #666;">HTTP ${checks.route?.code || 200} OK (/admin/api/upload/test-health)</div>
+          <div style="font-size: 0.74rem; color: #64748B;">HTTP ${checks.route?.code || 200} OK (/test-health)</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">CSRF Header Acceptance:</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">CSRF Acceptance:</strong>
             ${checks.csrf?.status === 'pass' ? passBadge : failBadge}
           </div>
-          <div style="font-size: 0.76rem; color: #666;">X-CSRF-Token verified successfully</div>
+          <div style="font-size: 0.74rem; color: #64748B;">X-CSRF-Token verified</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Session Persistence:</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">Session Persistence:</strong>
             ${checks.session?.status === 'pass' ? passBadge : failBadge}
           </div>
-          <div style="font-size: 0.76rem; color: #666;">Active Admin: ${escapeHtml(checks.session?.user || 'Active')}</div>
+          <div style="font-size: 0.74rem; color: #64748B;">Admin: ${escapeHtml(checks.session?.user || 'Active')}</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Rate Limiter & Proxy:</strong>
-            ${checks.rateLimiter?.adminExempt ? '<span style="color: #2E7D32; font-weight: 700; background: #E8F5E9; padding: 2px 8px; border-radius: 4px; font-size: 0.78rem;"><i class="fa-solid fa-shield-check"></i> EXEMPT (PASS)</span>' : passBadge}
+            <strong style="font-size: 0.82rem; color: #1E293B;">Rate Limiter Exemption:</strong>
+            <span class="badge-pill writable"><i class="fa-solid fa-shield-check"></i> 100% EXEMPT</span>
           </div>
-          <div style="font-size: 0.76rem; color: #666;">
-            Admin Upload: <strong>Exempt from 429</strong> | Trust Proxy: <strong>${checks.rateLimiter?.trustProxy ? 'Active (1)' : 'Direct'}</strong> (Client IP: ${escapeHtml(checks.rateLimiter?.clientIp || '127.0.0.1')})
-          </div>
-          <div style="font-size: 0.72rem; color: #888; margin-top: 2px;">
-            Strict Auth: 10 req/15m | Public Pages: 300 req/5m | Static Assets: Exempt
-          </div>
+          <div style="font-size: 0.74rem; color: #64748B;">Admin uploads exempt from 429</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Storage Directory (UPLOAD_DIR):</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">UPLOAD_DIR Writable:</strong>
             ${checks.storageWritable?.status === 'pass' ? passBadge : failBadge}
           </div>
-          <div style="font-size: 0.74rem; color: #666; font-family: monospace; word-break: break-all;">${escapeHtml(checks.storageWritable?.path || 'N/A')}</div>
+          <div style="font-size: 0.72rem; color: #64748B; font-family: monospace; overflow-wrap: anywhere;">${escapeHtml(checks.storageWritable?.path || 'N/A')}</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Previews Directory:</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">Previews Writable:</strong>
             ${checks.previewsWritable?.status === 'pass' ? passBadge : failBadge}
           </div>
-          <div style="font-size: 0.74rem; color: #666; font-family: monospace; word-break: break-all;">${escapeHtml(checks.previewsWritable?.path || 'N/A')}</div>
+          <div style="font-size: 0.72rem; color: #64748B; font-family: monospace; overflow-wrap: anywhere;">${escapeHtml(checks.previewsWritable?.path || 'N/A')}</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Image Processor (Sharp):</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">Sharp Image Processor:</strong>
             ${checks.sharpAvailable?.status === 'pass' ? passBadge : warnBadge}
           </div>
-          <div style="font-size: 0.76rem; color: #666;">Mode: ${escapeHtml(checks.sharpAvailable?.mode || 'Native')}</div>
+          <div style="font-size: 0.74rem; color: #64748B;">Mode: ${escapeHtml(checks.sharpAvailable?.mode || 'Native')}</div>
         </div>
 
-        <div style="padding: 10px 12px; background: #FAFAFA; border: 1px solid #ECEFF1; border-radius: 8px;">
+        <div style="padding: 10px 12px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 0.82rem; color: #333;">Max Payload Limit:</strong>
+            <strong style="font-size: 0.82rem; color: #1E293B;">Max Body Limit:</strong>
             ${passBadge}
           </div>
-          <div style="font-size: 0.76rem; color: #666;">${escapeHtml(checks.maxBodySize || '10MB raw / 50MB batch')}</div>
+          <div style="font-size: 0.74rem; color: #64748B;">${escapeHtml(checks.maxBodySize || '10MB chunk / 50MB batch')}</div>
         </div>
       </div>
-      <div style="font-size: 0.82rem; padding: 8px 12px; border-radius: 6px; background: ${data.success ? '#E8F5E9' : '#FFEBEE'}; color: ${data.success ? '#1B5E20' : '#B71C1C'}; font-weight: 600;">
-        <i class="fa-solid ${data.success ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i> ${escapeHtml(data.summary || 'Test complete')} [Ref: ${escapeHtml(data.referenceId || '')}]
+
+      <div style="font-size: 0.82rem; padding: 10px 14px; border-radius: 8px; background: ${data.success ? '#ECFDF5' : '#FEF2F2'}; color: ${data.success ? '#065F46' : '#991B1B'}; font-weight: 600; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span><i class="fa-solid ${data.success ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i> ${escapeHtml(data.summary || 'Test complete')}</span>
+        <span style="font-size: 0.74rem; opacity: 0.85; font-family: monospace;">Ref: ${escapeHtml(data.referenceId || '')}</span>
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="color: #C62828; font-size: 0.84rem; padding: 10px; background: #FFEBEE; border-radius: 6px;"><strong>Test probe failed:</strong> ${escapeHtml(err.message)}</div>`;
+    container.innerHTML = `<div style="color: #991B1B; font-size: 0.84rem; padding: 10px 14px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px;"><strong>Test probe failed:</strong> ${escapeHtml(err.message)}</div>`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-vial"></i> Test Upload Route';
