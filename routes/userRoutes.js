@@ -24,6 +24,14 @@ router.get('/user/download-format/:designId/:format', ensureAuthOrToken, userCon
 router.get('/account/downloads', (req, res) => res.redirect('/user/dashboard#purchased-downloads'));
 router.get('/account', (req, res) => res.redirect('/user/dashboard'));
 
+// Wishlist routes (accessible to guests and authenticated users)
+router.get('/wishlist', userController.getWishlist);
+router.get('/user/wishlist', (req, res) => res.redirect('/wishlist'));
+router.post('/user/wishlist/toggle', userController.toggleWishlist);
+router.post('/api/wishlist/toggle', userController.toggleWishlist);
+router.post('/user/wishlist/merge', userController.mergeWishlist);
+router.post('/api/wishlist/merge', userController.mergeWishlist);
+
 // Standard authenticated user routes
 router.use('/user', isAuthenticated);
 
@@ -35,9 +43,7 @@ router.get('/user/complete-profile', userController.getCompleteProfile);
 router.post('/user/complete-profile', userController.postCompleteProfile);
 router.post('/user/profile/update', userController.updateProfile);
 router.get('/user/orders/:id', userController.getOrderDetail);
-router.get('/user/wishlist', userController.getWishlist);
 router.post('/user/change-password', userController.changePassword);
-router.post('/user/wishlist/toggle', userController.toggleWishlist);
 
 module.exports = router;
 

@@ -10,6 +10,7 @@ router.get('/search', shopController.getShopPage);
 // API search suggestions & live designs count
 router.get('/api/search/suggestions', shopController.getSearchSuggestions);
 router.get('/api/designs/count', shopController.getDesignsCount);
+router.get('/api/designs/by-ids', shopController.getDesignsByIds);
 
 // Categories listing page & individual category page
 router.get('/categories', shopController.getCategoriesPage);

@@ -619,11 +619,20 @@ exports.downloadDesignApi = exports.downloadDesignAllZip;
 exports.getWishlist = async (req, res, next) => {
   try {
     const sort = req.query.sort || 'latest';
-    const items = await Wishlist.getByUser(req.user.id, sort);
+    let items = [];
+    let inactiveCount = 0;
+
+    if (req.user) {
+      items = await Wishlist.getByUser(req.user.id, sort);
+      inactiveCount = await Wishlist.countInactive(req.user.id);
+    }
+
     res.render('user/wishlist', {
-      title: 'My Wishlist - Aruvi Embroidery',
+      title: 'My Saved Wishlist - Aruvi Embroidery',
       items,
-      sort
+      sort,
+      inactiveCount,
+      isGuest: !req.user
     });
   } catch (err) {
     next(err);
@@ -634,19 +643,61 @@ exports.toggleWishlist = async (req, res, next) => {
   try {
     const { design_id } = req.body;
     if (!req.user) {
-      return res.json({ success: false, message: 'Please login to save to wishlist.' });
+      return res.status(200).json({
+        success: false,
+        requireLogin: true,
+        message: 'Please log in to save designs to your wishlist.'
+      });
+    }
+
+    if (!design_id) {
+      return res.status(400).json({ success: false, message: 'Design ID missing.' });
     }
 
     const isIn = await Wishlist.isInWishlist(req.user.id, design_id);
     if (isIn) {
       await Wishlist.remove(req.user.id, design_id);
-      return res.json({ success: true, status: 'removed', message: 'Removed from wishlist.' });
+      const count = await Wishlist.getCount(req.user.id);
+      return res.json({
+        success: true,
+        status: 'removed',
+        count,
+        message: 'Removed from wishlist.'
+      });
     } else {
       await Wishlist.add(req.user.id, design_id);
-      return res.json({ success: true, status: 'added', message: 'Saved to your wishlist!' });
+      const count = await Wishlist.getCount(req.user.id);
+      return res.json({
+        success: true,
+        status: 'added',
+        count,
+        message: 'Saved to your wishlist!'
+      });
     }
   } catch (err) {
-    next(err);
+    console.error('toggleWishlist error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update wishlist.' });
+  }
+};
+
+exports.mergeWishlist = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(200).json({ success: false, message: 'User not logged in' });
+    }
+    const { design_ids } = req.body;
+    if (Array.isArray(design_ids) && design_ids.length > 0) {
+      await Wishlist.mergeWishlist(req.user.id, design_ids);
+    }
+    const count = await Wishlist.getCount(req.user.id);
+    return res.json({
+      success: true,
+      count,
+      message: 'Wishlist synchronized successfully.'
+    });
+  } catch (err) {
+    console.error('mergeWishlist error:', err);
+    res.status(500).json({ success: false, message: 'Failed to merge wishlist.' });
   }
 };
 

@@ -134,6 +134,14 @@ body.aruvi-preloader-locked {
 }
 
 /* Exit effect variations */
+#aruvi-preloader[aria-hidden="true"],
+#aruvi-preloader.dismissed {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 #aruvi-preloader.aruvi-pl-exit-fade {
   opacity: 0;
   pointer-events: none;

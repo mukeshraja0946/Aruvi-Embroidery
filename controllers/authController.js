@@ -1,10 +1,25 @@
 const User = require('../models/User');
+const Cart = require('../models/Cart');
 const { validationResult } = require('express-validator');
+
+function getSafeReturnUrl(target) {
+  if (!target || typeof target !== 'string') return null;
+  const trimmed = target.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
+    return trimmed;
+  }
+  return null;
+}
 
 exports.getLogin = (req, res) => {
   if (req.user) return res.redirect('/user/dashboard');
+  if (req.query.returnTo) {
+    const safe = getSafeReturnUrl(req.query.returnTo);
+    if (safe && req.session) req.session.returnTo = safe;
+  }
   res.render('auth/login', {
-    title: 'Customer Login - Aruvi Embroidery'
+    title: 'Customer Login - Aruvi Embroidery',
+    returnTo: getSafeReturnUrl(req.query.returnTo || (req.session ? req.session.returnTo : null))
   });
 };
 
@@ -68,7 +83,18 @@ exports.postLogin = async (req, res, next) => {
 
     req.session.userId = user.id;
 
-    const returnTo = user.role === 'admin' ? '/admin' : (req.session.returnTo || '/user/dashboard');
+    // Merge guest session cart into user account
+    if (req.session && req.session.cartSessionId) {
+      await Cart.mergeCart(user.id, req.session.cartSessionId);
+    }
+    if (req.session && req.session.pendingBuyNow) {
+      await Cart.addItem(user.id, null, req.session.pendingBuyNow);
+      delete req.session.pendingBuyNow;
+    }
+
+    const returnTo = user.role === 'admin' 
+      ? '/admin' 
+      : (getSafeReturnUrl(req.body.returnTo || req.query.returnTo || req.session.returnTo) || '/user/dashboard');
     delete req.session.returnTo;
 
     if (isAjax) {
@@ -100,8 +126,13 @@ exports.postLogin = async (req, res, next) => {
 
 exports.getRegister = (req, res) => {
   if (req.user) return res.redirect('/user/dashboard');
+  if (req.query.returnTo) {
+    const safe = getSafeReturnUrl(req.query.returnTo);
+    if (safe && req.session) req.session.returnTo = safe;
+  }
   res.render('auth/register', {
-    title: 'Create Account - Aruvi Embroidery'
+    title: 'Create Account - Aruvi Embroidery',
+    returnTo: getSafeReturnUrl(req.query.returnTo || (req.session ? req.session.returnTo : null))
   });
 };
 
@@ -128,8 +159,21 @@ exports.postRegister = async (req, res, next) => {
     });
 
     req.session.userId = userId;
+
+    // Merge guest session cart into user account
+    if (req.session && req.session.cartSessionId) {
+      await Cart.mergeCart(userId, req.session.cartSessionId);
+    }
+    if (req.session && req.session.pendingBuyNow) {
+      await Cart.addItem(userId, null, req.session.pendingBuyNow);
+      delete req.session.pendingBuyNow;
+    }
+
+    const returnTo = getSafeReturnUrl(req.body.returnTo || req.query.returnTo || req.session.returnTo) || '/user/dashboard';
+    delete req.session.returnTo;
+
     req.flash('success', 'Registration successful! Welcome to Aruvi Embroidery.');
-    res.redirect('/user/dashboard');
+    res.redirect(returnTo);
   } catch (err) {
     next(err);
   }
@@ -228,10 +272,22 @@ exports.postGoogleVerify = async (req, res) => {
         await User.updateProfile(user.id, { profile_picture: tokenInfo.picture });
       }
 
+      // Merge guest cart into user account
+      if (req.session && req.session.cartSessionId) {
+        await Cart.mergeCart(user.id, req.session.cartSessionId);
+      }
+      if (req.session && req.session.pendingBuyNow) {
+        await Cart.addItem(user.id, null, req.session.pendingBuyNow);
+        delete req.session.pendingBuyNow;
+      }
+
+      const returnTo = getSafeReturnUrl(req.body.returnTo || (req.session ? req.session.returnTo : null));
+      if (req.session) delete req.session.returnTo;
+
       return res.json({
         success: true,
-        message: `Welcome back, ${user.full_name}! Please confirm your profile details.`,
-        redirect: '/user/complete-profile'
+        message: `Welcome back, ${user.full_name}!`,
+        redirect: returnTo || '/user/dashboard'
       });
     }
 
@@ -249,10 +305,22 @@ exports.postGoogleVerify = async (req, res) => {
 
     req.session.userId = newUserId;
 
+    // Merge guest cart into newly created user account
+    if (req.session && req.session.cartSessionId) {
+      await Cart.mergeCart(newUserId, req.session.cartSessionId);
+    }
+    if (req.session && req.session.pendingBuyNow) {
+      await Cart.addItem(newUserId, null, req.session.pendingBuyNow);
+      delete req.session.pendingBuyNow;
+    }
+
+    const returnTo = getSafeReturnUrl(req.body.returnTo || (req.session ? req.session.returnTo : null));
+    if (req.session) delete req.session.returnTo;
+
     return res.json({
       success: true,
       message: 'Welcome to Aruvi Embroidery! Account created successfully via Google.',
-      redirect: '/user/complete-profile'
+      redirect: returnTo || '/user/complete-profile'
     });
 
   } catch (err) {
@@ -270,7 +338,7 @@ function getCanonicalRedirectUri(req) {
 }
 
 /**
- * OAuth Redirect Fallback Handler
+ * OAuth Redirect Handler
  */
 exports.getGoogleAuth = (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -282,8 +350,19 @@ exports.getGoogleAuth = (req, res) => {
     return res.redirect('/auth/login');
   }
 
+  // Preserve returnTo if provided in query
+  const returnTarget = getSafeReturnUrl(req.query.returnTo || (req.session ? req.session.returnTo : null));
+  if (returnTarget && req.session) {
+    req.session.returnTo = returnTarget;
+  }
+
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20email&access_type=online&prompt=select_account`;
-  res.redirect(googleAuthUrl);
+  
+  if (req.session) {
+    req.session.save(() => res.redirect(googleAuthUrl));
+  } else {
+    res.redirect(googleAuthUrl);
+  }
 };
 
 exports.getGoogleCallback = async (req, res, next) => {
@@ -390,8 +469,23 @@ exports.getGoogleCallback = async (req, res, next) => {
         await User.updateProfile(user.id, { profile_picture: tokenInfo.picture });
       }
 
-      req.flash('success', `Welcome back, ${user.full_name}! Please confirm your details.`);
-      return res.redirect('/user/complete-profile');
+      // Merge guest cart into user account
+      if (req.session && req.session.cartSessionId) {
+        await Cart.mergeCart(user.id, req.session.cartSessionId);
+      }
+      if (req.session && req.session.pendingBuyNow) {
+        await Cart.addItem(user.id, null, req.session.pendingBuyNow);
+        delete req.session.pendingBuyNow;
+      }
+
+      const returnTo = getSafeReturnUrl(req.session ? req.session.returnTo : null);
+      if (req.session) delete req.session.returnTo;
+
+      req.flash('success', `Welcome back, ${user.full_name}!`);
+      if (returnTo) {
+        return res.redirect(returnTo);
+      }
+      return res.redirect('/user/dashboard');
     }
 
     // Create New Customer
@@ -407,7 +501,23 @@ exports.getGoogleCallback = async (req, res, next) => {
     });
 
     req.session.userId = newUserId;
+
+    // Merge guest cart into newly created user account
+    if (req.session && req.session.cartSessionId) {
+      await Cart.mergeCart(newUserId, req.session.cartSessionId);
+    }
+    if (req.session && req.session.pendingBuyNow) {
+      await Cart.addItem(newUserId, null, req.session.pendingBuyNow);
+      delete req.session.pendingBuyNow;
+    }
+
+    const returnTo = getSafeReturnUrl(req.session ? req.session.returnTo : null);
+    if (req.session) delete req.session.returnTo;
+
     req.flash('success', 'Welcome to Aruvi Embroidery! Account created successfully via Google.');
+    if (returnTo) {
+      return res.redirect(returnTo);
+    }
     res.redirect('/user/complete-profile');
 
   } catch (err) {

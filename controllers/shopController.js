@@ -251,6 +251,8 @@ exports.getDesignDetail = async (req, res, next) => {
     const inWishlist = req.user ? await Wishlist.isInWishlist(req.user.id, design.id) : false;
     const hasPurchased = req.user ? await Order.hasUserPurchasedDesign(req.user.id, design.id) : false;
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
+    const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
+    const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.design_id || w.wishlist_id);
 
     res.render('shop/detail', {
       title: `${design.title} - Digital Embroidery Design | ARUVI EMBROIDERY STUDIO`,
@@ -259,10 +261,32 @@ exports.getDesignDetail = async (req, res, next) => {
       reviews,
       inWishlist,
       hasPurchased,
-      userPurchasedDesignIds
+      userPurchasedDesignIds,
+      userWishlistDesignIds
     });
   } catch (err) {
     next(err);
+  }
+};
+
+exports.getDesignsByIds = async (req, res, next) => {
+  try {
+    const rawIds = (req.query.ids || '').split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+    if (rawIds.length === 0) {
+      return res.json({ success: true, designs: [] });
+    }
+    const cleanIds = rawIds.slice(0, 50);
+    const designs = [];
+    for (const id of cleanIds) {
+      const d = await Design.getById(id);
+      if (d && (d.is_active === 1 || d.is_active === undefined)) {
+        designs.push(d);
+      }
+    }
+    return res.json({ success: true, designs });
+  } catch (err) {
+    console.error('getDesignsByIds error:', err);
+    return res.status(500).json({ success: false, designs: [] });
   }
 };
 

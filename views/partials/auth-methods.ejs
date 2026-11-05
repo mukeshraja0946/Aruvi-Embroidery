@@ -1,0 +1,135 @@
+<%
+  const _mode = (typeof mode !== 'undefined' && mode) ? mode : 'login';
+  const _isModal = (typeof isModal !== 'undefined') ? isModal : (_mode === 'modal');
+  const _targetReturn = (typeof returnTo !== 'undefined' && returnTo) 
+    ? returnTo 
+    : ((typeof currentPath !== 'undefined' && currentPath && currentPath !== '/auth/login' && currentPath !== '/auth/register') ? currentPath : '');
+  const _csrf = (typeof csrfToken !== 'undefined') ? csrfToken : '';
+  const _submitText = (typeof submitText !== 'undefined' && submitText) 
+    ? submitText 
+    : (_isModal ? 'Sign In & Continue' : (_mode === 'register' ? 'Register Account' : 'Sign In'));
+  const _formId = (typeof formId !== 'undefined' && formId) 
+    ? formId 
+    : (_isModal ? 'loginModalForm' : (_mode === 'register' ? 'registerForm' : 'loginForm'));
+%>
+
+<div class="auth-methods-container">
+  <% if (typeof googleAuthEnabled !== 'undefined' && googleAuthEnabled) { %>
+    <!-- Continue with Google Button -->
+    <div class="auth-google-wrapper" style="margin-bottom: 0.9rem;">
+      <a href="/auth/google<%= _targetReturn ? '?returnTo=' + encodeURIComponent(_targetReturn) : '' %>" 
+         class="btn btn-block btn-google-sso" 
+         id="<%= _isModal ? 'modalGoogleBtn' : 'pageGoogleBtn' %>"
+         style="background: #FFFFFF; color: #3c4043; border: 1px solid #dadce0; border-radius: 10px; height: 46px; min-height: 44px; font-size: 0.94rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; width: 100%; text-decoration: none; box-sizing: border-box; transition: background-color 0.2s, box-shadow 0.2s;"
+         aria-label="Continue with Google">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink: 0;">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </a>
+    </div>
+
+    <!-- Divider -->
+    <div class="auth-divider" style="display: flex; align-items: center; margin: 1.1rem 0; text-align: center;">
+      <div style="flex: 1; border-bottom: 1px solid var(--border-light, #E8E0D5);"></div>
+      <span style="padding: 0 12px; font-size: 0.76rem; color: var(--text-muted, #8C7F79); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">OR</span>
+      <div style="flex: 1; border-bottom: 1px solid var(--border-light, #E8E0D5);"></div>
+    </div>
+  <% } %>
+
+  <!-- Standard Form -->
+  <% if (_mode === 'register') { %>
+    <form id="<%= _formId %>" action="/auth/register" method="POST">
+      <input type="hidden" name="_csrf" value="<%= _csrf %>">
+      <input type="hidden" name="returnTo" id="<%= _isModal ? 'modalReturnTo' : 'pageReturnTo' %>" value="<%= _targetReturn %>">
+
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Full Name <span style="color: var(--primary, #900C3F);">*</span></label>
+        <div style="position: relative;">
+          <i class="fa-regular fa-user" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #8C7F79); font-size: 0.95rem;"></i>
+          <input type="text" name="full_name" class="form-control" placeholder="e.g. Priya Lakshmi" required style="padding-left: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Email Address <span style="color: var(--primary, #900C3F);">*</span></label>
+        <div style="position: relative;">
+          <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #8C7F79); font-size: 0.95rem;"></i>
+          <input type="email" name="email" class="form-control" placeholder="name@example.com" required style="padding-left: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Phone Number (Optional)</label>
+        <div style="position: relative;">
+          <i class="fa-solid fa-phone" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #8C7F79); font-size: 0.95rem;"></i>
+          <input type="tel" name="phone" class="form-control" placeholder="+91 98765 43210" style="padding-left: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Password <span style="color: var(--primary, #900C3F);">*</span></label>
+        <div style="position: relative;">
+          <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #8C7F79); font-size: 0.95rem;"></i>
+          <input type="password" name="password" class="form-control" placeholder="At least 6 characters" required style="padding-left: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.1rem;">
+        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">Confirm Password <span style="color: var(--primary, #900C3F);">*</span></label>
+        <div style="position: relative;">
+          <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #8C7F79); font-size: 0.95rem;"></i>
+          <input type="password" name="confirm_password" class="form-control" placeholder="Re-enter password" required style="padding-left: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="height: 46px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background-color: var(--primary, #900C3F);">
+        <i class="fa-solid fa-user-plus"></i> <%= _submitText %>
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.2rem; padding-top: 0.9rem; border-top: 1px solid var(--border-light, #E8E0D5); font-size: 0.88rem; color: var(--text-muted, #8C7F79);">
+      Already registered? <a href="/auth/login<%= _targetReturn ? '?returnTo=' + encodeURIComponent(_targetReturn) : '' %>" style="font-weight: 600; color: var(--primary, #900C3F);">Sign in here</a>
+    </div>
+
+  <% } else { %>
+    <!-- Login Form (Modal or Page) -->
+    <form id="<%= _formId %>" action="/auth/login" method="POST">
+      <input type="hidden" name="_csrf" value="<%= _csrf %>">
+      <input type="hidden" name="returnTo" id="<%= _isModal ? 'modalReturnTo' : 'pageReturnTo' %>" value="<%= _targetReturn %>">
+
+      <div class="form-group" style="margin-bottom: 0.9rem;">
+        <label class="form-label" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 0.3rem; color: #231815;">Email Address <span style="color: #B8402A;">*</span></label>
+        <div style="position: relative;">
+          <i class="fa-regular fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #8C7F79; font-size: 0.95rem;"></i>
+          <input type="email" id="<%= _isModal ? 'loginModalEmail' : 'loginPageEmail' %>" name="email" class="form-control" placeholder="you@example.com" required style="padding-left: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; font-size: 0.9rem; box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+          <label class="form-label" style="margin: 0; font-size: 0.84rem; font-weight: 600; color: #231815;">Password <span style="color: #B8402A;">*</span></label>
+          <% if (!_isModal) { %>
+            <a href="/auth/forgot-password" style="font-size: 0.82rem; color: var(--primary, #900C3F); font-weight: 500;">Forgot Password?</a>
+          <% } %>
+        </div>
+        <div style="position: relative;">
+          <i class="fa-solid fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #8C7F79; font-size: 0.95rem;"></i>
+          <input type="password" id="<%= _isModal ? 'loginModalPassword' : 'customerPassword' %>" name="password" class="form-control" placeholder="Enter your password" required style="padding-left: 2.6rem; padding-right: 2.6rem; height: 44px; width: 100%; border-radius: 10px; border: 1px solid #E8E0D5; font-size: 0.9rem; box-sizing: border-box;">
+          <i class="fa-regular fa-eye toggle-pwd-btn" id="<%= _isModal ? 'toggleModalPasswordBtn' : 'togglePasswordBtn' %>" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #8C7F79; font-size: 0.95rem; cursor: pointer;"></i>
+        </div>
+      </div>
+
+      <button type="submit" id="<%= _isModal ? 'loginModalBtn' : 'loginPageBtn' %>" class="btn btn-primary btn-block btn-lg" style="height: 46px; border-radius: 10px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background-color: var(--primary, #900C3F);">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i> <%= _submitText %>
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.2rem; padding-top: 0.9rem; border-top: 1px solid var(--border-light, #E8E0D5); font-size: 0.88rem; color: var(--text-muted, #8C7F79);">
+      Don't have an account? <a href="/auth/register<%= _targetReturn ? '?returnTo=' + encodeURIComponent(_targetReturn) : '' %>" style="font-weight: 600; color: var(--primary, #900C3F);">Create Account</a>
+    </div>
+  <% } %>
+</div>

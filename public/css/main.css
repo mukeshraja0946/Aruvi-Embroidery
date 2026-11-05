@@ -345,22 +345,30 @@ textarea.form-control {
 .header-icon-btn {
   position: relative;
   color: var(--text-dark);
-  font-size: 14px;
-  width: 32px;
-  height: 32px;
+  font-size: 16px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   background-color: #F7F3EE;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition);
+  text-decoration: none;
+}
+
+.header-icon-btn:focus-visible {
+  outline: 2px solid var(--primary, #900C3F) !important;
+  outline-offset: 2px !important;
 }
 
 .header-icon-btn i,
 .header-icon-btn svg {
-  font-size: 14px;
-  width: 14px;
-  height: 14px;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -372,18 +380,20 @@ textarea.form-control {
   color: #FFFFFF;
 }
 
-.cart-badge {
+.header-badge,
+.cart-badge,
+.wishlist-badge {
   position: absolute;
-  top: -3px;
-  right: -3px;
+  top: 1px;
+  right: 1px;
   background-color: var(--primary);
   color: white;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  width: 15px;
-  height: 15px;
-  min-width: 15px;
-  min-height: 15px;
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  min-height: 17px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -4927,11 +4937,11 @@ textarea.form-control {
   }
 
   .header-icon-btn {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px !important;
-    min-height: 32px !important;
-    font-size: 14px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    font-size: 16px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -4940,29 +4950,37 @@ textarea.form-control {
     background: #FAF6F0 !important;
     color: #2D231E !important;
     box-sizing: border-box !important;
+    text-decoration: none !important;
+  }
+
+  .header-icon-btn:focus-visible {
+    outline: 2px solid var(--primary, #900C3F) !important;
+    outline-offset: 2px !important;
   }
 
   .header-icon-btn i,
   .header-icon-btn svg {
-    font-size: 14px !important;
-    width: 14px !important;
-    height: 14px !important;
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     line-height: 1 !important;
   }
 
-  .header-icon-btn .cart-badge {
+  .header-icon-btn .cart-badge,
+  .header-icon-btn .wishlist-badge,
+  .header-icon-btn .header-badge {
     position: absolute !important;
-    top: -3px !important;
-    right: -3px !important;
-    font-size: 9px !important;
+    top: 1px !important;
+    right: 1px !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
-    min-width: 15px !important;
-    width: 15px !important;
-    height: 15px !important;
-    min-height: 15px !important;
+    min-width: 17px !important;
+    width: 17px !important;
+    height: 17px !important;
+    min-height: 17px !important;
     border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
@@ -7061,11 +7079,11 @@ textarea.form-control {
 
   /* Header icons touch targets */
   .header-icon-btn {
-    min-width: 32px !important;
-    min-height: 32px !important;
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 14px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 16px !important;
   }
 
   .mobile-menu-toggle {

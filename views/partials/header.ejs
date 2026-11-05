@@ -100,28 +100,28 @@
 
         <!-- Right Action Icons -->
         <div class="header-actions">
-          <a href="/user/wishlist" class="header-icon-btn" title="Wishlist">
+          <a href="/wishlist" class="header-icon-btn" aria-label="Wishlist (<%= _wishlistCount %> items)" title="Wishlist">
             <i class="fa-regular fa-heart"></i>
-            <span class="cart-badge wishlist-badge"><%= _wishlistCount %></span>
+            <span class="header-badge wishlist-badge"><%= _wishlistCount %></span>
           </a>
           
           <% if (_currentUser && _currentUser.role === 'admin') { %>
-            <a href="/admin" class="header-icon-btn" title="Admin Panel" style="background: #231815; color: #FFFFFF;">
+            <a href="/admin" class="header-icon-btn" aria-label="Admin Panel" title="Admin Panel" style="background: #231815; color: #FFFFFF;">
               <i class="fa-solid fa-user-gear"></i>
             </a>
           <% } else if (_currentUser) { %>
-            <a href="/user/dashboard" class="header-icon-btn" title="Account">
+            <a href="/user/dashboard" class="header-icon-btn" aria-label="My Account" title="My Account">
               <i class="fa-regular fa-user"></i>
             </a>
           <% } else { %>
-            <a href="/auth/login" class="header-icon-btn" title="Sign In">
+            <a href="/auth/login" class="header-icon-btn" aria-label="Sign In" title="Sign In">
               <i class="fa-regular fa-user"></i>
             </a>
           <% } %>
 
-          <a href="/cart" class="header-icon-btn" title="Cart">
+          <a href="/cart" class="header-icon-btn" aria-label="Shopping Cart (<%= _cartCount %> items)" title="Cart">
             <i class="fa-solid fa-bag-shopping"></i>
-            <span class="cart-badge"><%= _cartCount %></span>
+            <span class="header-badge cart-badge"><%= _cartCount %></span>
           </a>
         </div>
       </nav>
@@ -162,14 +162,14 @@
           <a href="/auth/login"><i class="fa-regular fa-user"></i> My Account</a>
           <a href="/auth/login"><i class="fa-solid fa-box-archive"></i> My Orders</a>
         <% } %>
-        <a href="/user/wishlist"><i class="fa-regular fa-heart"></i> Wishlist</a>
-        <a href="/cart"><i class="fa-solid fa-bag-shopping"></i> Cart (<%= _cartCount %>)</a>
+        <a href="/wishlist"><i class="fa-regular fa-heart"></i> Wishlist (<span class="wishlist-badge"><%= _wishlistCount %></span>)</a>
+        <a href="/cart"><i class="fa-solid fa-bag-shopping"></i> Cart (<span class="cart-badge"><%= _cartCount %></span>)</a>
       </li>
     </ul>
 
     <div class="mobile-drawer-footer">
       <div class="drawer-action-btns">
-        <a href="/cart" class="btn btn-primary btn-block"><i class="fa-solid fa-bag-shopping"></i> View Cart (<%= _cartCount %>)</a>
+        <a href="/cart" class="btn btn-primary btn-block"><i class="fa-solid fa-bag-shopping"></i> View Cart (<span class="cart-badge"><%= _cartCount %></span>)</a>
       </div>
     </div>
   </div>
@@ -179,7 +179,7 @@
     <div class="modal-card" style="background: #FFF; width: 100%; max-width: 440px; border-radius: 20px; padding: 2.2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.25); position: relative; border: 1px solid #E8E0D5;">
       <button type="button" onclick="closeLoginModal()" style="position: absolute; top: 18px; right: 18px; background: none; border: none; font-size: 1.4rem; color: #8C7F79; cursor: pointer;">&times;</button>
       
-      <div style="text-align: center; margin-bottom: 1.5rem;">
+      <div style="text-align: center; margin-bottom: 1.2rem;">
         <img src="<%= (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg' %>" alt="Aruvi Embroidery" style="max-height: 48px; width: auto; margin-bottom: 0.8rem; object-fit: contain;">
         <h3 style="font-family: var(--font-heading); font-size: 1.6rem; font-weight: 700; color: #231815; margin-bottom: 4px;">Sign In Required</h3>
         <p style="font-size: 0.85rem; color: #8C7F79; margin: 0;">Please log in to your account to continue your purchase and instant file download.</p>
@@ -187,26 +187,7 @@
 
       <div id="loginModalError" style="display: none; background: #FCE8E6; color: #B8402A; padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 500; margin-bottom: 1.2rem; text-align: center;"></div>
 
-      <form id="loginModalForm">
-        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-        <div style="margin-bottom: 1.1rem;">
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #231815; margin-bottom: 6px;">Email Address <span style="color: #B8402A;">*</span></label>
-          <input type="email" id="loginModalEmail" name="email" class="form-control" placeholder="your.email@example.com" required style="width: 100%; height: 44px; border-radius: 10px; border: 1px solid #E8E0D5; padding: 0 1rem; font-size: 0.9rem;">
-        </div>
-
-        <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: #231815; margin-bottom: 6px;">Password <span style="color: #B8402A;">*</span></label>
-          <input type="password" id="loginModalPassword" name="password" class="form-control" placeholder="••••••••" required style="width: 100%; height: 44px; border-radius: 10px; border: 1px solid #E8E0D5; padding: 0 1rem; font-size: 0.9rem;">
-        </div>
-
-        <button type="submit" id="loginModalBtn" class="btn btn-primary btn-block" style="height: 46px; border-radius: 10px; font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 8px; background-color: var(--primary);">
-          <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In & Continue
-        </button>
-      </form>
-
-      <div style="text-align: center; margin-top: 1.2rem; font-size: 0.85rem; color: #8C7F79;">
-        Don't have an account? <a href="/auth/register" style="color: #B8402A; font-weight: 600; text-decoration: none;">Create Account</a>
-      </div>
+      <%- include('auth-methods', { mode: 'modal', isModal: true, submitText: 'Sign In & Continue', formId: 'loginModalForm' }) %>
     </div>
   </div>
 
@@ -214,17 +195,26 @@
     window.isUserLoggedIn = <%= _currentUser ? 'true' : 'false' %>;
     window.pendingAuthAction = null;
 
-    function openLoginModal(onSuccessCallback) {
+    function openLoginModal(onSuccessCallback, customReturnUrl) {
       if (window.isUserLoggedIn) {
         if (typeof onSuccessCallback === 'function') onSuccessCallback();
         return;
       }
       window.pendingAuthAction = onSuccessCallback || null;
+      const targetUrl = customReturnUrl || (window.location.pathname + window.location.search);
       const modal = document.getElementById('authLoginModal');
       if (modal) {
+        const modalGoogle = document.getElementById('modalGoogleBtn');
+        if (modalGoogle) {
+          modalGoogle.href = '/auth/google?returnTo=' + encodeURIComponent(targetUrl);
+        }
+        const returnInput = document.getElementById('modalReturnTo');
+        if (returnInput) {
+          returnInput.value = targetUrl;
+        }
         modal.style.display = 'flex';
       } else {
-        window.location.href = '/auth/login';
+        window.location.href = '/auth/login?returnTo=' + encodeURIComponent(targetUrl);
       }
     }
 
@@ -249,8 +239,12 @@
           const email = document.getElementById('loginModalEmail').value;
           const password = document.getElementById('loginModalPassword').value;
           const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+          const returnTo = document.getElementById('modalReturnTo')?.value || '';
 
           try {
+            const payload = { email, password, _csrf: csrfToken, _ajax: '1' };
+            if (returnTo) payload.returnTo = returnTo;
+
             const res = await fetch('/auth/login', {
               method: 'POST',
               headers: {
@@ -259,7 +253,7 @@
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-Token': csrfToken
               },
-              body: new URLSearchParams({ email, password, _csrf: csrfToken, _ajax: '1' })
+              body: new URLSearchParams(payload)
             });
 
             const data = await res.json();
@@ -295,6 +289,24 @@
             }
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In & Continue';
+          }
+        });
+      }
+
+      const toggleModalPwd = document.getElementById('toggleModalPasswordBtn');
+      if (toggleModalPwd) {
+        toggleModalPwd.addEventListener('click', function() {
+          const pwdInput = document.getElementById('loginModalPassword');
+          if (pwdInput) {
+            if (pwdInput.type === 'password') {
+              pwdInput.type = 'text';
+              this.classList.remove('fa-eye');
+              this.classList.add('fa-eye-slash');
+            } else {
+              pwdInput.type = 'password';
+              this.classList.remove('fa-eye-slash');
+              this.classList.add('fa-eye');
+            }
           }
         });
       }

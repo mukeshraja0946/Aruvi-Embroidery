@@ -29,16 +29,16 @@
           initialMainImage = '/public/images/placeholder-preview.svg';
         }
       %>
-      <div class="main-image-display" id="mainImageDisplayWrapper" style="cursor: zoom-in;" onclick="openLightbox(document.getElementById('mainDisplayImg').src)">
+      <div class="main-image-display" id="mainImageDisplayWrapper" style="cursor: zoom-in;" onclick="if (event.target.closest('.wishlist-btn, .wishlist-round-btn, .download-preview-btn')) return; openLightbox(document.getElementById('mainDisplayImg').src)">
         <% const isWish = (typeof inWishlist !== 'undefined' && inWishlist) || (typeof userWishlistDesignIds !== 'undefined' && userWishlistDesignIds && userWishlistDesignIds.includes(design.id)); %>
-        <button type="button" class="wishlist-round-btn wishlist-btn <%= isWish ? 'active' : '' %>" data-id="<%= design.id %>" title="Wishlist" onclick="event.stopPropagation()">
+        <button type="button" class="wishlist-round-btn wishlist-btn <%= isWish ? 'active' : '' %>" data-id="<%= design.id %>" aria-label="Save to Wishlist" title="Wishlist">
           <i class="fa-<%= isWish ? 'solid' : 'regular' %> fa-heart"></i>
         </button>
         <img id="mainDisplayImg" src="<%= initialMainImage %>" alt="<%= design.title %>" class="zoomable-detail-img" onerror="if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
         
         <% if (typeof siteSettings === 'undefined' || siteSettings.show_preview_download_button !== '0') { %>
           <!-- Preview PNG Download Pill (available on preview image for all visitors) -->
-          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="event.stopPropagation(); downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
+          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
             <i class="fa-solid fa-download"></i>
             <span>Download</span>
           </button>
@@ -652,10 +652,11 @@
       addToCartForm.addEventListener('submit', function(e) {
         if (typeof window.isUserLoggedIn !== 'undefined' && !window.isUserLoggedIn) {
           e.preventDefault();
+          const returnUrl = window.location.pathname + window.location.search;
           if (typeof openLoginModal === 'function') {
-            openLoginModal(() => addToCartForm.submit());
+            openLoginModal(() => addToCartForm.submit(), returnUrl);
           } else {
-            window.location.href = '/auth/login';
+            window.location.href = '/auth/login?returnTo=' + encodeURIComponent(returnUrl);
           }
         }
       });
@@ -666,10 +667,11 @@
       buyNowForm.addEventListener('submit', function(e) {
         if (typeof window.isUserLoggedIn !== 'undefined' && !window.isUserLoggedIn) {
           e.preventDefault();
+          const returnUrl = '/cart/buy-now?design_id=<%= design.id %>';
           if (typeof openLoginModal === 'function') {
-            openLoginModal(() => buyNowForm.submit());
+            openLoginModal(() => buyNowForm.submit(), returnUrl);
           } else {
-            window.location.href = '/auth/login';
+            window.location.href = '/auth/login?returnTo=' + encodeURIComponent(returnUrl);
           }
         }
       });

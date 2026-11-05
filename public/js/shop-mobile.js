@@ -337,7 +337,7 @@
     e.preventDefault();
     e.stopPropagation();
 
-    if (cartBtn.disabled || cartBtn.classList.contains('adding')) return;
+    if (cartBtn.disabled || cartBtn.classList.contains('adding') || cartBtn.dataset.processing === '1') return;
 
     const designId = cartBtn.dataset.id;
     if (!designId) return;
@@ -401,60 +401,8 @@
   });
 
   // -------------------------------------------------------------------------
-  // 7. WISHLIST TOGGLE AJAX WITH HEADER BADGE SYNC
+  // 7. WISHLIST TOGGLE AJAX (Handled globally by main.js)
   // -------------------------------------------------------------------------
-  document.addEventListener('click', async function (e) {
-    const wishBtn = e.target.closest('.wishlist-round-btn');
-    if (!wishBtn) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const designId = wishBtn.dataset.id;
-    if (!designId) return;
-
-    const icon = wishBtn.querySelector('i');
-
-    try {
-      const res = await fetch('/user/wishlist/toggle', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
-        },
-        body: JSON.stringify({ design_id: designId })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        if (data.status === 'added') {
-          wishBtn.classList.add('active');
-          if (icon) icon.className = 'fa-solid fa-heart';
-        } else {
-          wishBtn.classList.remove('active');
-          if (icon) icon.className = 'fa-regular fa-heart';
-        }
-
-        // Update wishlist badges in header
-        if (typeof data.count !== 'undefined') {
-          document.querySelectorAll('.wishlist-badge').forEach(badge => {
-            badge.textContent = data.count;
-          });
-        }
-
-        if (typeof showToast === 'function') {
-          showToast(data.message, 'success');
-        }
-      } else {
-        if (typeof showToast === 'function') {
-          showToast(data.message || 'Please log in to save to wishlist.', 'error');
-        }
-      }
-    } catch (err) {
-      console.error('Wishlist error:', err);
-    }
-  });
 
   // -------------------------------------------------------------------------
   // 8. INFINITE SCROLL / LOAD MORE (24/page) WITH SKELETON CARDS

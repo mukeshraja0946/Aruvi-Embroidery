@@ -16,6 +16,12 @@ async function attachUserAndCart(req, res, next) {
   res.locals.flash = { success: [], error: [], info: [] };
   res.locals.messages = { success: '', error: '', info: '' };
   res.locals.csrfToken = '';
+  res.locals.googleAuthEnabled = Boolean(
+    process.env.GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_ID !== 'sample-google-client-id' &&
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+  res.locals.googleClientId = process.env.GOOGLE_CLIENT_ID || '';
   res.locals.schemaAlert = (req.app && req.app.locals && req.app.locals.schemaAlert) ? req.app.locals.schemaAlert : { isHealthy: true, missingCount: 0, missingSummary: '' };
   res.locals.Setting = Setting;
   res.locals.parseFeatureCards = (raw) => Setting.parseFeatureCards(raw);
@@ -68,8 +74,8 @@ async function attachUserAndCart(req, res, next) {
     try {
       if (req.user && req.user.id) {
         const userWishlist = await Wishlist.getByUser(req.user.id);
-        res.locals.userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
-        res.locals.wishlistCount = res.locals.userWishlistDesignIds.length;
+        res.locals.userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.design_id || w.wishlist_id);
+        res.locals.wishlistCount = await Wishlist.getCount(req.user.id);
       }
     } catch (wishErr) {
       console.error('Wishlist fetch error:', wishErr.message);

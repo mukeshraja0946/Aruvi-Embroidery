@@ -53,7 +53,12 @@
         var freq = "<%= frequency %>";
         if (!isPrev && freq === 'session' && window.sessionStorage && sessionStorage.getItem('aruvi_preloaded') === 'true') {
           var p = document.getElementById('aruvi-preloader');
-          if (p) p.style.display = 'none';
+          if (p) {
+            p.style.display = 'none';
+            p.style.pointerEvents = 'none';
+            p.setAttribute('aria-hidden', 'true');
+            if (p.parentNode) p.parentNode.removeChild(p);
+          }
         } else if (!isPrev) {
           document.body && document.body.classList.add('aruvi-preloader-locked');
           document.documentElement && document.documentElement.classList.add('aruvi-preloader-locked');
@@ -283,22 +288,33 @@
   function dismiss(immediate) {
     if (isDismissed) return;
     isDismissed = true;
-    if (progressInterval) clearInterval(progressInterval);
-    if (barEl) updateProgress(100);
+    try {
+      if (progressInterval) clearInterval(progressInterval);
+      if (barEl) updateProgress(100);
 
-    var exitDuration = Math.round(650 * speedVal);
+      // Immediately disable pointer events so clicks are NEVER blocked
+      if (preloader) {
+        preloader.style.pointerEvents = 'none';
+      }
 
-    if (immediate) {
+      var exitDuration = Math.round(650 * speedVal);
+
+      if (immediate) {
+        cleanup();
+        return;
+      }
+
+      // Apply designated exit effect class
+      if (preloader) {
+        preloader.classList.add('aruvi-pl-exit-' + exitEffect);
+      }
+
+      setTimeout(function() {
+        cleanup();
+      }, exitDuration + 50);
+    } catch(e) {
       cleanup();
-      return;
     }
-
-    // Apply designated exit effect class
-    preloader.classList.add('aruvi-pl-exit-' + exitEffect);
-
-    setTimeout(function() {
-      cleanup();
-    }, exitDuration + 50);
   }
 
   function cleanup() {
@@ -311,8 +327,13 @@
       if (document.body && document.body.style.overflow === 'hidden') {
         document.body.style.overflow = '';
       }
-      if (preloader && preloader.parentNode) {
-        preloader.parentNode.removeChild(preloader);
+      if (preloader) {
+        preloader.style.pointerEvents = 'none';
+        preloader.style.display = 'none';
+        preloader.setAttribute('aria-hidden', 'true');
+        if (preloader.parentNode) {
+          preloader.parentNode.removeChild(preloader);
+        }
       }
     } catch(e) {}
   }

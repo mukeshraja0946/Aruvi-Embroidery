@@ -157,6 +157,38 @@ class Cart {
     fallbackCarts.delete(key);
     return true;
   }
+
+  static async mergeCart(userId, sessionId) {
+    if (!userId || !sessionId) return;
+    if (db.isConnected()) {
+      try {
+        const guestItems = await db.query('SELECT design_id FROM cart_items WHERE session_id = ?', [sessionId]);
+        if (Array.isArray(guestItems)) {
+          for (const item of guestItems) {
+            const userItems = await db.query('SELECT id FROM cart_items WHERE user_id = ? AND design_id = ?', [userId, item.design_id]);
+            if (!userItems || userItems.length === 0) {
+              await db.query('INSERT INTO cart_items (user_id, session_id, design_id) VALUES (?, NULL, ?)', [userId, item.design_id]);
+            }
+          }
+          await db.query('DELETE FROM cart_items WHERE session_id = ?', [sessionId]);
+        }
+      } catch (err) {
+        console.warn('[Cart mergeCart DB Warning]:', err.message);
+      }
+    }
+
+    const sessKey = `sess_${sessionId}`;
+    const userKey = `user_${userId}`;
+    const sessList = fallbackCarts.get(sessKey) || [];
+    if (sessList.length > 0) {
+      let userList = fallbackCarts.get(userKey) || [];
+      for (const id of sessList) {
+        if (!userList.includes(id)) userList.push(id);
+      }
+      fallbackCarts.set(userKey, userList);
+      fallbackCarts.delete(sessKey);
+    }
+  }
 }
 
 module.exports = Cart;
