@@ -161,9 +161,14 @@ exports.getCategoryDetailPage = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { sort, sub, page, search } = req.query;
-    const category = await Category.getBySlug(id) || await Category.getById(id);
+    let category = await Category.getBySlug(id) || await Category.getById(id);
 
     if (!category) {
+      const redirectSlug = await Category.getRedirectSlug(id);
+      if (redirectSlug) {
+        const queryStr = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        return res.redirect(301, `/category/${encodeURIComponent(redirectSlug)}${queryStr}`);
+      }
       req.flash('error', 'Category not found.');
       return res.redirect('/categories');
     }

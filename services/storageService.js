@@ -251,6 +251,14 @@ class StorageService {
     return dir;
   }
 
+  getCategoriesDir() {
+    const dir = path.join(this.getPublicDir(), 'categories');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    }
+    return dir;
+  }
+
   getDesignsDir() {
     const dir = path.join(this.getPrivateDir(), 'designs');
     if (!fs.existsSync(dir)) {
@@ -303,6 +311,7 @@ class StorageService {
       this.getThumbsDir();
       this.getBrandingDir();
       this.getBannersDir();
+      this.getCategoriesDir();
       this.getDesignsDir();
       this.getOriginalsDir();
       this.getCustomRequestsDir();
@@ -512,7 +521,7 @@ class StorageService {
 
     const driver = this.getDriver();
     const ext = path.extname(originalName || '').toLowerCase();
-    const prefix = subFolder === 'branding' ? 'brand' : (subFolder === 'banners' ? 'banner' : 'preview');
+    const prefix = subFolder === 'branding' ? 'brand' : (subFolder === 'banners' ? 'banner' : (subFolder === 'categories' ? 'cat' : 'preview'));
     const uniqueFilename = this.generateUniqueFilename(originalName, prefix);
 
     // 1. Cloudinary driver
@@ -558,6 +567,8 @@ class StorageService {
       targetDir = this.getBrandingDir();
     } else if (subFolder === 'banners') {
       targetDir = this.getBannersDir();
+    } else if (subFolder === 'categories') {
+      targetDir = this.getCategoriesDir();
     } else {
       targetDir = this.getPreviewsDir();
     }
@@ -586,7 +597,40 @@ class StorageService {
       await this.generateThumbnail(destPath, uniqueFilename);
     }
 
+    // Generate 400x500 card & 150x150 thumbnail WebP for category images
+    if (subFolder === 'categories' && ['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      try {
+        const { getSharp } = require('../utils/sharpHelper');
+        const sharp = getSharp();
+        if (sharp) {
+          const baseName = path.basename(uniqueFilename, ext);
+          const cardPath = path.join(targetDir, `${baseName}_card.webp`);
+          const thumbPath = path.join(targetDir, `${baseName}_thumb.webp`);
+          await sharp(destPath).rotate().resize(400, 500, { fit: 'cover' }).webp({ quality: 85 }).toFile(cardPath);
+          await sharp(destPath).rotate().resize(150, 150, { fit: 'cover' }).webp({ quality: 85 }).toFile(thumbPath);
+        }
+      } catch (catThumbErr) {
+        console.warn('[Category thumbnail notice]:', catThumbErr.message);
+      }
+    }
+
     return `/public/uploads/${subFolder}/${uniqueFilename}`;
+  }
+
+  /**
+   * Safely retires an old uploaded file after database transaction commit
+   */
+  retireFile(fileUrl) {
+    if (!fileUrl || typeof fileUrl !== 'string') return;
+    try {
+      if (fileUrl.startsWith('/public/uploads/')) {
+        const rel = fileUrl.replace(/^\/public\/uploads\//, '');
+        const resolved = path.join(this.getPublicDir(), rel);
+        if (fs.existsSync(resolved)) {
+          fs.unlinkSync(resolved);
+        }
+      }
+    } catch (_) {}
   }
 
   /**

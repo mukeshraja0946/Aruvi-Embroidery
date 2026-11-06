@@ -375,24 +375,25 @@ textarea.form-control {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 8px;
 }
 
 .header-icon-btn {
   position: relative;
   color: var(--text-dark);
-  font-size: 16px;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   border-radius: 50%;
   background-color: #F7F3EE;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition);
   text-decoration: none;
+  box-sizing: border-box;
 }
 
 .header-icon-btn:focus-visible {
@@ -402,9 +403,9 @@ textarea.form-control {
 
 .header-icon-btn i,
 .header-icon-btn svg {
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,8 +421,8 @@ textarea.form-control {
 .cart-badge,
 .wishlist-badge {
   position: absolute;
-  top: 1px;
-  right: 1px;
+  top: -3px;
+  right: -3px;
   background-color: var(--primary);
   color: white;
   font-size: 10px;
@@ -437,6 +438,7 @@ textarea.form-control {
   border: 1.5px solid white;
   line-height: 1;
   padding: 0;
+  z-index: 2;
 }
 
 /* ============================================================
@@ -5066,16 +5068,19 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     padding-right: 12px !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
   }
 
   .site-header .navbar {
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-start !important;
+    justify-content: space-between !important;
     width: 100% !important;
     max-width: 100% !important;
-    gap: 0 !important;
+    min-width: 0 !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
     box-sizing: border-box !important;
     padding: 0 !important;
   }
@@ -5084,10 +5089,12 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 30px !important;
+    width: 36px !important;
     height: 36px !important;
-    min-width: 30px !important;
+    min-width: 36px !important;
     min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
     padding: 0 !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
@@ -5095,24 +5102,29 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     color: #2D231E !important;
     background: transparent !important;
     border: none !important;
+    position: relative !important;
   }
 
   .brand-logo {
     display: flex !important;
     align-items: center !important;
-    margin-left: 2px !important;
+    margin: 0 !important;
     padding: 0 !important;
-    flex-shrink: 0 !important;
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
   }
 
   .brand-logo img,
   .brand-logo .header-logo-img {
-    height: 38px !important;
-    max-height: 40px !important;
+    height: 36px !important;
+    max-height: 36px !important;
     width: auto !important;
-    margin-left: 0 !important;
-    padding-left: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     object-fit: contain !important;
+    flex-shrink: 1 !important;
   }
 
   .nav-links,
@@ -5125,14 +5137,26 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
+    flex-shrink: 0 !important;
+    min-width: 0 !important;
   }
 
-  .header-icon-btn {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-    font-size: 16px !important;
+  .desktop-theme-switcher-wrap {
+    display: inline-flex !important;
+    align-items: center !important;
+    position: relative !important;
+    flex-shrink: 0 !important;
+  }
+
+  .header-icon-btn,
+  .theme-switcher-toggle {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    font-size: 18px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -5142,36 +5166,60 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     color: #2D231E !important;
     box-sizing: border-box !important;
     text-decoration: none !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
   }
 
-  .header-icon-btn:focus-visible {
+  .header-icon-btn:focus-visible,
+  .theme-switcher-toggle:focus-visible {
     outline: 2px solid var(--primary, #900C3F) !important;
     outline-offset: 2px !important;
   }
 
   .header-icon-btn i,
-  .header-icon-btn svg {
-    font-size: 16px !important;
-    width: 16px !important;
-    height: 16px !important;
+  .header-icon-btn svg,
+  .theme-switcher-toggle i,
+  .theme-switcher-toggle svg {
+    font-size: 18px !important;
+    width: 18px !important;
+    height: 18px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     line-height: 1 !important;
   }
 
+  /* 44px invisible touch target area via ::after */
+  .header-icon-btn::after,
+  .theme-switcher-toggle::after,
+  .mobile-menu-toggle::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    pointer-events: auto !important;
+    z-index: 1 !important;
+  }
+
   .header-icon-btn .cart-badge,
   .header-icon-btn .wishlist-badge,
   .header-icon-btn .header-badge {
     position: absolute !important;
-    top: 1px !important;
-    right: 1px !important;
-    font-size: 10px !important;
+    top: -4px !important;
+    right: -4px !important;
+    font-size: 9.5px !important;
     font-weight: 700 !important;
-    min-width: 17px !important;
-    width: 17px !important;
-    height: 17px !important;
-    min-height: 17px !important;
+    min-width: 15px !important;
+    width: 15px !important;
+    height: 15px !important;
+    min-height: 15px !important;
+    max-width: 15px !important;
+    max-height: 15px !important;
     border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
@@ -5179,8 +5227,10 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     padding: 0 !important;
     border: 1.5px solid #FFFFFF !important;
     line-height: 1 !important;
-    background-color: #BB4558 !important;
+    background-color: var(--primary, #900C3F) !important;
     color: #FFFFFF !important;
+    box-sizing: border-box !important;
+    z-index: 2 !important;
   }
 
   /* 3. Hero Section Mobile Layout */
@@ -7363,19 +7413,20 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
   }
 
-  /* Header icons touch targets */
-  .header-icon-btn {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    width: 44px !important;
-    height: 44px !important;
-    font-size: 16px !important;
+  /* Header icons touch targets (visual 36px, 44px touch via ::after) */
+  .header-icon-btn,
+  .theme-switcher-toggle {
+    min-width: 36px !important;
+    min-height: 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 18px !important;
   }
 
   .mobile-menu-toggle {
-    min-width: 30px !important;
+    min-width: 36px !important;
     min-height: 36px !important;
-    width: 30px !important;
+    width: 36px !important;
     height: 36px !important;
     font-size: 18px !important;
   }
@@ -10496,8 +10547,10 @@ body,
 }
 
 .theme-switcher-toggle {
-  width: 44px; /* 44px touch target requirement */
-  height: 44px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   border-radius: 50%;
   border: 1px solid var(--border-light);
   background: var(--bg-card);
@@ -10505,9 +10558,10 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
+  font-size: 20px;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  box-sizing: border-box;
 }
 
 .theme-switcher-toggle:hover {
@@ -10638,10 +10692,30 @@ body,
   border-color: var(--border-light);
 }
 
-[data-theme="dark"] .header-icon-btn {
-  background: var(--bg-elevated);
-  color: var(--text-dark);
-  border: 1px solid var(--border-light);
+[data-theme="dark"] .mobile-menu-toggle {
+  color: var(--text-dark, #F5EDE4) !important;
+}
+
+[data-theme="dark"] .header-icon-btn,
+[data-theme="dark"] .theme-switcher-toggle {
+  background: var(--bg-elevated) !important;
+  color: var(--text-dark, #F5EDE4) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+[data-theme="dark"] .header-icon-btn .cart-badge,
+[data-theme="dark"] .header-icon-btn .wishlist-badge,
+[data-theme="dark"] .header-icon-btn .header-badge {
+  border-color: var(--bg-card, #1C0E14) !important;
+}
+
+@media (max-width: 768px) {
+  [data-theme="dark"] .brand-logo .logo-dark {
+    height: 36px !important;
+    max-height: 36px !important;
+    width: auto !important;
+    object-fit: contain !important;
+  }
 }
 
 [data-theme="dark"] .nav-links a {

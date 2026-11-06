@@ -184,6 +184,7 @@ router.post('/admin/categories/toggle-status/:id', adminCategoryController.toggl
 router.post('/admin/categories/toggle-home/:id', adminCategoryController.toggleHome);
 router.post('/admin/categories/reorder/:id/:direction', adminCategoryController.postReorder);
 router.post('/admin/categories/delete/:id', adminCategoryController.deleteCategory);
+router.post('/admin/categories/bulk-action', adminCategoryController.postBulkAction);
 
 // Orders Management
 router.get('/admin/orders', adminOrderController.getOrders);
@@ -319,6 +320,12 @@ router.get('/admin/tools/stitch-history/download/:id', adminToolsController.down
 router.get('/admin/tools/duplicate-files', adminToolsController.getDuplicateFiles);
 router.post('/admin/tools/duplicate-files/clean', adminToolsController.cleanDuplicateFiles);
 router.post('/admin/tools/duplicate-files/undo/:backupFileName', adminToolsController.undoDuplicateFiles);
+
+// Category Repair Tool
+router.get('/admin/tools/category-repair', adminToolsController.getCategoryRepair);
+router.post('/admin/tools/category-repair/apply', adminToolsController.postCategoryRepairApply);
+router.post('/admin/tools/category-repair/undo/:backupFile', adminToolsController.postCategoryRepairUndo);
+router.post('/admin/tools/category-repair/create-missing', adminToolsController.postCreateMissingCategory);
 
 module.exports = router;
 

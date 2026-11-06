@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <% const currentLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+      <img src="<%= currentLogo %>" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+    </a>
+    <div class="admin-header-right">
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item"><a href="/admin"><span><i class="fa-solid fa-house"></i> Dashboard</span></a></li>
+      </ul>
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">TOOLS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/category-repair" class="active"><span><i class="fa-solid fa-screwdriver-wrench"></i> Category Repair</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Database Backup</span></a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="admin-content-body">
+      <!-- Breadcrumbs -->
+      <div style="margin-bottom: 1.5rem;">
+        <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 0.4rem;">
+          <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp;
+          <a href="/admin/categories" style="color: var(--admin-text-muted); text-decoration: none;">Categories</a> &nbsp;>&nbsp;
+          <span style="color: var(--admin-primary); font-weight: 600;">Category Repair Tool</span>
+        </div>
+        <h1 style="font-family: var(--font-heading); font-size: 2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.3rem;">
+          Category Repair & Orphan Designs Tool
+        </h1>
+        <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin: 0;">
+          Audit design-to-category associations, preview dry-run reassignments, create automatic 7-day backups, and restore missing historical categories safely without touching data unconfirmed.
+        </p>
+      </div>
+
+      <% if (flash && flash.success && flash.success.length > 0) { %>
+        <div class="alert alert-success" style="margin-bottom: 1.5rem; border-radius: 10px; background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7; padding: 0.9rem 1.2rem; display: flex; align-items: center; gap: 10px;">
+          <i class="fa-solid fa-circle-check"></i> <%= flash.success[0] %>
+        </div>
+      <% } %>
+
+      <% if (flash && flash.error && flash.error.length > 0) { %>
+        <div class="alert alert-danger" style="margin-bottom: 1.5rem; border-radius: 10px; background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; padding: 0.9rem 1.2rem; display: flex; align-items: center; gap: 10px;">
+          <i class="fa-solid fa-circle-exclamation"></i> <%= flash.error[0] %>
+        </div>
+      <% } %>
+
+      <!-- Audit Status Overview -->
+      <div class="admin-stats-row" style="margin-bottom: 1.8rem;">
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-border-all"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Categories in Database</div>
+            <div class="stat-num"><%= categories.length %></div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">healthy category records</span>
+          </div>
+        </div>
+
+        <div class="admin-summary-card">
+          <div class="card-icon-badge" style="background: <%= orphanGroups.length > 0 ? '#FFEBEE' : '#E8F5E9' %>; color: <%= orphanGroups.length > 0 ? '#C62828' : '#2E7D32' %>;">
+            <i class="fa-solid fa-link-slash"></i>
+          </div>
+          <div class="card-info-content">
+            <div class="stat-title">Orphan Design Groups</div>
+            <div class="stat-num" style="color: <%= orphanGroups.length > 0 ? '#C62828' : '#2E7D32' %>;"><%= orphanGroups.length %></div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);"><%= orphanGroups.reduce((acc, g) => acc + g.count, 0) %> total orphan designs</span>
+          </div>
+        </div>
+
+        <div class="admin-summary-card">
+          <div class="card-icon-badge"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <div class="card-info-content">
+            <div class="stat-title">Available Undo Backups</div>
+            <div class="stat-num"><%= backups.length %></div>
+            <span style="font-size: 0.72rem; color: var(--admin-text-muted);">retained for 7 days</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 1: Orphan Designs Reassignment (DRY-RUN with Confirmation) -->
+      <div class="admin-card-box" style="padding: 1.5rem; margin-bottom: 1.8rem; background: #FFF; border-radius: 12px; border: 1px solid var(--admin-border);">
+        <h3 style="margin: 0 0 6px; font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-screwdriver-wrench" style="color: var(--admin-primary);"></i>
+          Orphan Designs Dry-Run & Reassignment
+        </h3>
+        <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin: 0 0 1.2rem;">
+          Designs referencing category IDs that do not exist or are NULL. Any change requires explicit confirmation and creates a downloadable SQL snapshot with instant 7-day undo capability.
+        </p>
+
+        <% if (orphanGroups.length === 0) { %>
+          <div style="background: #E8F5E9; border: 1px solid #C8E6C9; border-radius: 10px; padding: 1.2rem; display: flex; align-items: center; gap: 12px; color: #2E7D32;">
+            <i class="fa-solid fa-circle-check" style="font-size: 1.6rem;"></i>
+            <div>
+              <strong>All designs are correctly linked!</strong>
+              <div style="font-size: 0.82rem; color: #1B5E20; margin-top: 2px;">
+                0 orphan design groups detected. All designs in the database point to valid, active categories.
+              </div>
+            </div>
+          </div>
+        <% } else { %>
+          <div style="overflow-x: auto;">
+            <table class="compact-cat-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Orphan Source</th>
+                  <th>Designs Count</th>
+                  <th>Sample Design</th>
+                  <th>Suggested Target Category</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% orphanGroups.forEach(g => { %>
+                  <tr>
+                    <td><strong><%= g.category_id_display %></strong></td>
+                    <td><span class="badge" style="background: #FFEBEE; color: #C62828; font-weight: 700; padding: 4px 8px; border-radius: 6px;"><%= g.count %> Designs</span></td>
+                    <td style="font-size: 0.82rem; color: var(--admin-text-dark);"><%= g.sample_title || ('Design #' + g.sample_design_id) %></td>
+                    <td>
+                      <form id="reassignForm-<%= g.category_id || 'null' %>" action="/admin/tools/category-repair/apply" method="POST" style="display: flex; gap: 8px; align-items: center;">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input type="hidden" name="from_category_id" value="<%= g.category_id === null ? 'null' : g.category_id %>">
+                        <select name="to_category_id" class="form-control" style="height: 36px; font-size: 0.82rem; min-width: 200px;" required>
+                          <option value="">-- Select Target Category --</option>
+                          <% categories.forEach(cat => { %>
+                            <option value="<%= cat.id %>" <%= (g.suggested_category_id === cat.id) ? 'selected' : '' %>>
+                              #<%= cat.id %> - <%= cat.name %>
+                            </option>
+                          <% }) %>
+                        </select>
+                        <button type="button" onclick="confirmReassign('<%= g.category_id || 'null' %>', '<%= g.count %>')" class="btn btn-primary" style="height: 36px; padding: 0 1rem; font-size: 0.82rem; white-space: nowrap;">
+                          <i class="fa-solid fa-arrow-right-arrow-left"></i> Confirm Reassign
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- Section 2: Missing Categories Quick-Restore -->
+      <div class="admin-card-box" style="padding: 1.5rem; margin-bottom: 1.8rem; background: #FFF; border-radius: 12px; border: 1px solid var(--admin-border);">
+        <h3 style="margin: 0 0 6px; font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-shapes" style="color: var(--admin-primary);"></i>
+          Historical & Missing Categories Restore
+        </h3>
+        <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin: 0 0 1.2rem;">
+          Quickly restore historical categories (Bulk Designs, Kids Embroidery, Customized Designs) if missing from the catalog without creating duplicate slugs.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+          <% missingCategories.forEach(item => { %>
+            <div style="border: 1px solid var(--admin-border); border-radius: 10px; padding: 1.1rem; background: #FAF8F5; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <strong style="font-size: 0.95rem; color: var(--admin-text-dark);"><%= item.name %></strong>
+                  <% if (item.exists) { %>
+                    <span style="font-size: 0.7rem; font-weight: 700; background: #E8F5E9; color: #2E7D32; padding: 2px 7px; border-radius: 4px;">
+                      <i class="fa-solid fa-circle-check"></i> Exists in DB
+                    </span>
+                  <% } else { %>
+                    <span style="font-size: 0.7rem; font-weight: 700; background: #FFF3E0; color: #E65100; padding: 2px 7px; border-radius: 4px;">
+                      <i class="fa-solid fa-circle-plus"></i> Missing
+                    </span>
+                  <% } %>
+                </div>
+                <div style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 4px;">Slug: <code><%= item.slug %></code></div>
+                <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 0 0 12px;"><%= item.description %></p>
+              </div>
+
+              <% if (item.exists) { %>
+                <button type="button" class="btn btn-outline" disabled style="height: 36px; font-size: 0.8rem; opacity: 0.6; cursor: not-allowed;">
+                  <i class="fa-solid fa-check"></i> Already in Database
+                </button>
+              <% } else { %>
+                <form action="/admin/tools/category-repair/create-missing" method="POST">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="name" value="<%= item.name %>">
+                  <input type="hidden" name="slug" value="<%= item.slug %>">
+                  <input type="hidden" name="description" value="<%= item.description %>">
+                  <input type="hidden" name="icon" value="<%= item.icon %>">
+                  <button type="submit" class="btn btn-primary" style="height: 36px; width: 100%; font-size: 0.82rem; font-weight: 600;">
+                    <i class="fa-solid fa-plus"></i> Restore "<%= item.name %>"
+                  </button>
+                </form>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- Section 3: 7-Day Backups & Undo History -->
+      <div class="admin-card-box" style="padding: 1.5rem; margin-bottom: 1.8rem; background: #FFF; border-radius: 12px; border: 1px solid var(--admin-border);">
+        <h3 style="margin: 0 0 6px; font-size: 1.15rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-clock-rotate-left" style="color: var(--admin-primary);"></i>
+          Reassignment Backups & 7-Day Undo History
+        </h3>
+        <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin: 0 0 1.2rem;">
+          Every reassignment creates an automatic SQL restore snapshot before updating the designs table. You can undo any reassignment within 7 days.
+        </p>
+
+        <% if (backups.length === 0) { %>
+          <div style="font-size: 0.82rem; color: var(--admin-text-muted); text-align: center; padding: 1.5rem; background: #FAF8F5; border-radius: 8px;">
+            No recent category reassignment backups found.
+          </div>
+        <% } else { %>
+          <div style="overflow-x: auto;">
+            <table class="compact-cat-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Backup File</th>
+                  <th>Created At</th>
+                  <th>Affected Designs</th>
+                  <th>Description</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% backups.forEach(b => { %>
+                  <tr>
+                    <td><code><%= b.file %></code></td>
+                    <td style="font-size: 0.82rem; color: var(--admin-text-muted);"><%= new Date(b.created_at).toLocaleString() %></td>
+                    <td><strong><%= b.count %> Designs</strong></td>
+                    <td style="font-size: 0.82rem;"><%= b.description %></td>
+                    <td style="text-align: right;">
+                      <form action="/admin/tools/category-repair/undo/<%= encodeURIComponent(b.file) %>" method="POST" onsubmit="return confirm('Undo this reassignment? All designs will be restored to their previous category mapping.');" style="display: inline-block;">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-outline" style="height: 32px; padding: 0 0.8rem; font-size: 0.78rem; border-color: #C62828; color: #C62828;">
+                          <i class="fa-solid fa-rotate-left"></i> Undo Reassign
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  function confirmReassign(fromId, count) {
+    const form = document.getElementById('reassignForm-' + fromId);
+    if (!form) return;
+    const select = form.querySelector('select[name="to_category_id"]');
+    if (!select || !select.value) {
+      alert('Please select a target category first.');
+      return;
+    }
+    const targetText = select.options[select.selectedIndex].text;
+    const ok = confirm(`CONFIRMATION REQUIRED:\n\nAre you sure you want to reassign ${count} designs to "${targetText}"?\n\nAn automated SQL backup snapshot will be saved with 7-day undo.`);
+    if (ok) form.submit();
+  }
+</script>
+</body>
+</html>

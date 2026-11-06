@@ -2490,6 +2490,261 @@ exports.downloadOriginalFilesCsv = async (req, res, next) => {
   }
 };
 
+// ============================================================================
+// Category Repair Tool (Dry-Run, Backup, Reassign, Undo, and Missing Categories)
+// ============================================================================
+
+exports.getCategoryRepair = async (req, res, next) => {
+  try {
+    const Category = require('../../models/Category');
+    const catsInDb = await db.query('SELECT id, name, slug, is_active FROM categories ORDER BY id ASC');
+    const validCatIds = Array.isArray(catsInDb) ? catsInDb.map(c => Number(c.id)) : [];
+
+    // 1. Group designs by category_id
+    const designGroups = await db.query(`
+      SELECT 
+        d.category_id,
+        COUNT(*) as count,
+        SUM(CASE WHEN d.is_active = 1 THEN 1 ELSE 0 END) as active_count,
+        MIN(d.id) as sample_design_id,
+        MIN(d.title) as sample_title
+      FROM designs d
+      GROUP BY d.category_id
+    `);
+
+    // Separate into valid vs orphan
+    const orphanGroups = [];
+    const validGroups = [];
+
+    if (Array.isArray(designGroups)) {
+      designGroups.forEach(g => {
+        const cid = g.category_id;
+        if (!cid || !validCatIds.includes(Number(cid))) {
+          let suggestedCat = null;
+          if (g.sample_title) {
+            const lower = g.sample_title.toLowerCase();
+            suggestedCat = catsInDb.find(c => lower.includes(c.name.toLowerCase().split(' ')[0]));
+          }
+          orphanGroups.push({
+            ...g,
+            category_id_display: cid === null ? 'NULL (Uncategorized)' : `#${cid}`,
+            suggested_category_id: suggestedCat ? suggestedCat.id : (catsInDb[0] ? catsInDb[0].id : null),
+            suggested_category_name: suggestedCat ? suggestedCat.name : ''
+          });
+        } else {
+          const cat = catsInDb.find(c => Number(c.id) === Number(cid));
+          validGroups.push({
+            ...g,
+            category_name: cat ? cat.name : `Category #${cid}`
+          });
+        }
+      });
+    }
+
+    // 2. Missing categories status
+    const historicalNeeded = [
+      { name: 'Bulk Designs', slug: 'bulk-designs', description: 'Wholesale & bulk embroidery bundles', icon: 'fa-solid fa-shapes' },
+      { name: 'Kids Embroidery', slug: 'kids-embroidery', description: 'Playful & colorful kids embroidery patterns', icon: 'fa-solid fa-shapes' },
+      { name: 'Customized Designs', slug: 'customized-designs', description: 'Custom & bespoke embroidery commissions', icon: 'fa-solid fa-wand-magic-sparkles' }
+    ];
+
+    const missingCategories = historicalNeeded.map(item => {
+      const exists = catsInDb.some(c => c.slug.toLowerCase() === item.slug.toLowerCase() || c.name.toLowerCase() === item.name.toLowerCase());
+      return {
+        ...item,
+        exists
+      };
+    });
+
+    // 3. Check existing backups in backupsDir within last 7 days
+    const backupDir = backupsDir || path.join(projectRoot, 'storage_private', 'backups');
+    const backups = [];
+    if (fs.existsSync(backupDir)) {
+      const files = fs.readdirSync(backupDir).filter(f => f.startsWith('category_repair_backup_') && f.endsWith('.json'));
+      const now = Date.now();
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+      files.forEach(f => {
+        try {
+          const filePath = path.join(backupDir, f);
+          const stat = fs.statSync(filePath);
+          if (now - stat.mtimeMs < SEVEN_DAYS_MS) {
+            const raw = fs.readFileSync(filePath, 'utf8');
+            const data = JSON.parse(raw);
+            backups.push({
+              file: f,
+              created_at: stat.mtime,
+              count: data.affected_count || 0,
+              description: data.description || 'Category reassignment backup'
+            });
+          }
+        } catch (_) {}
+      });
+    }
+
+    res.render('admin/tools/category-repair', {
+      title: 'Category Repair - Admin Tools',
+      categories: catsInDb || [],
+      orphanGroups,
+      validGroups,
+      missingCategories,
+      backups,
+      csrfToken: typeof req.csrfToken === 'function' ? req.csrfToken() : (res.locals.csrfToken || '')
+    });
+  } catch (err) {
+    console.error('getCategoryRepair error:', err);
+    next(err);
+  }
+};
+
+exports.postCategoryRepairApply = async (req, res, next) => {
+  try {
+    const { from_category_id, to_category_id } = req.body;
+    if (!to_category_id) {
+      req.flash('error', 'Target category is required.');
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    const targetCat = await db.query('SELECT id, name FROM categories WHERE id = ?', [to_category_id]);
+    if (!targetCat || !targetCat[0]) {
+      req.flash('error', 'Target category does not exist.');
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    // 1. Fetch designs that will be affected
+    let affectedDesigns = [];
+    if (from_category_id === 'null' || from_category_id === '' || from_category_id === undefined) {
+      affectedDesigns = await db.query('SELECT id, sku, title, category_id FROM designs WHERE category_id IS NULL');
+    } else {
+      affectedDesigns = await db.query('SELECT id, sku, title, category_id FROM designs WHERE category_id = ?', [from_category_id]);
+    }
+
+    if (!affectedDesigns || affectedDesigns.length === 0) {
+      req.flash('info', 'No designs matched the selected source category.');
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    // 2. Create backup before touching data (SQL & JSON snapshot)
+    const backupDir = backupsDir || path.join(projectRoot, 'storage_private', 'backups');
+    ensureDir(backupDir);
+    const timestamp = Date.now();
+    const backupBaseName = `category_repair_backup_${timestamp}`;
+    const jsonPath = path.join(backupDir, `${backupBaseName}.json`);
+    const sqlPath = path.join(backupDir, `${backupBaseName}.sql`);
+
+    const backupData = {
+      timestamp,
+      created_at: new Date().toISOString(),
+      description: `Reassigned ${affectedDesigns.length} designs to category "${targetCat[0].name}" (#${to_category_id})`,
+      from_category_id,
+      to_category_id,
+      affected_count: affectedDesigns.length,
+      designs: affectedDesigns
+    };
+    fs.writeFileSync(jsonPath, JSON.stringify(backupData, null, 2), 'utf8');
+
+    // Generate restore SQL
+    const sqlStatements = affectedDesigns.map(d => {
+      const origCid = d.category_id === null ? 'NULL' : d.category_id;
+      return `UPDATE designs SET category_id = ${origCid} WHERE id = ${d.id};`;
+    });
+    fs.writeFileSync(sqlPath, sqlStatements.join('\n'), 'utf8');
+
+    // 3. Execute reassignment
+    if (from_category_id === 'null' || from_category_id === '' || from_category_id === undefined) {
+      await db.query('UPDATE designs SET category_id = ? WHERE category_id IS NULL', [to_category_id]);
+    } else {
+      await db.query('UPDATE designs SET category_id = ? WHERE category_id = ?', [to_category_id, from_category_id]);
+    }
+
+    const Category = require('../../models/Category');
+    Category.invalidateCache();
+    await ActivityLog.logFromReq(req, 'repair', 'categories', to_category_id, `Category Repair: Reassigned ${affectedDesigns.length} designs to "${targetCat[0].name}". Backup: ${backupBaseName}.sql`);
+
+    req.flash('success', `Successfully reassigned ${affectedDesigns.length} designs to "${targetCat[0].name}". A 7-day undo snapshot (${backupBaseName}) was created.`);
+    res.redirect('/admin/tools/category-repair');
+  } catch (err) {
+    console.error('postCategoryRepairApply error:', err);
+    req.flash('error', `Category repair error: ${err.message}`);
+    res.redirect('/admin/tools/category-repair');
+  }
+};
+
+exports.postCategoryRepairUndo = async (req, res, next) => {
+  try {
+    const { backupFile } = req.params;
+    if (!backupFile || !backupFile.startsWith('category_repair_backup_')) {
+      req.flash('error', 'Invalid backup file specified.');
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    const backupDir = backupsDir || path.join(projectRoot, 'storage_private', 'backups');
+    const jsonPath = path.join(backupDir, backupFile.replace(/\.sql$/, '.json'));
+    if (!fs.existsSync(jsonPath)) {
+      req.flash('error', 'Backup file not found or expired.');
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    const raw = fs.readFileSync(jsonPath, 'utf8');
+    const data = JSON.parse(raw);
+
+    if (data.designs && Array.isArray(data.designs)) {
+      for (const d of data.designs) {
+        await db.query('UPDATE designs SET category_id = ? WHERE id = ?', [d.category_id, d.id]);
+      }
+    }
+
+    const Category = require('../../models/Category');
+    Category.invalidateCache();
+    await ActivityLog.logFromReq(req, 'repair_undo', 'categories', null, `Category Repair: Undid ${data.affected_count} designs reassignment from backup ${backupFile}`);
+
+    req.flash('success', `Undo complete! Restored original categories for ${data.affected_count} designs.`);
+    res.redirect('/admin/tools/category-repair');
+  } catch (err) {
+    console.error('postCategoryRepairUndo error:', err);
+    req.flash('error', `Undo error: ${err.message}`);
+    res.redirect('/admin/tools/category-repair');
+  }
+};
+
+exports.postCreateMissingCategory = async (req, res, next) => {
+  try {
+    const { name, slug, description, icon } = req.body;
+    if (!name || !name.trim()) {
+      req.flash('error', 'Category name is required.');
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    const Category = require('../../models/Category');
+    const cleanSlug = (slug || name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const isTaken = await Category.isSlugTaken(cleanSlug);
+    if (isTaken) {
+      req.flash('error', `A category with slug "${cleanSlug}" already exists.`);
+      return res.redirect('/admin/tools/category-repair');
+    }
+
+    const newId = await Category.create({
+      name: name.trim(),
+      slug: cleanSlug,
+      description: description ? description.trim() : null,
+      icon: icon || 'fa-solid fa-shapes',
+      sort_order: 20,
+      display_order: 20,
+      show_on_home: 1,
+      is_active: 1
+    });
+
+    Category.invalidateCache();
+    await ActivityLog.logFromReq(req, 'create', 'category', newId, `Category Repair: Restored missing category "${name.trim()}"`);
+
+    req.flash('success', `Category "${name.trim()}" restored successfully with ID #${newId}.`);
+    res.redirect('/admin/tools/category-repair');
+  } catch (err) {
+    console.error('postCreateMissingCategory error:', err);
+    req.flash('error', `Error creating category: ${err.message}`);
+    res.redirect('/admin/tools/category-repair');
+  }
+};
+
 
 
 

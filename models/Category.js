@@ -20,6 +20,9 @@ class Category {
     categoryMemoryCache.clear();
   }
 
+  /**
+   * Retrieves all categories with active design counts and hierarchical subcategory aggregation.
+   */
   static async getAll({ sort = null, search = null, status = null, showOnHomeOnly = false, hideEmpty = false, parent = null } = {}) {
     const cacheKey = JSON.stringify({ sort, search, status, showOnHomeOnly, hideEmpty, parent });
     const cachedEntry = categoryMemoryCache.get(cacheKey);
@@ -29,121 +32,127 @@ class Category {
       return [...cachedEntry.data];
     }
 
-    if (db.isConnected()) {
+    try {
+      let whereClauses = [];
+      let params = [];
+      if (status === 'active') {
+        whereClauses.push('(c.is_active = 1 OR c.is_active IS NULL)');
+      } else if (status === 'inactive') {
+        whereClauses.push('c.is_active = 0');
+      }
+      if (showOnHomeOnly) {
+        whereClauses.push('(c.show_on_home = 1 OR c.show_on_home IS NULL)');
+      }
+      if (parent === 'top') {
+        whereClauses.push('(c.parent_id IS NULL OR c.parent_id = 0)');
+      } else if (parent && !isNaN(parseInt(parent, 10))) {
+        whereClauses.push('c.parent_id = ?');
+        params.push(parseInt(parent, 10));
+      } else if (parent && typeof parent === 'string') {
+        whereClauses.push('c.parent_id = (SELECT p.id FROM categories p WHERE p.slug = ? LIMIT 1)');
+        params.push(parent.trim());
+      }
+      if (search && search.trim()) {
+        const q = `%${search.trim()}%`;
+        whereClauses.push('(c.name LIKE ? OR c.description LIKE ?)');
+        params.push(q, q);
+      }
+      const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+      let orderSql = 'ORDER BY COALESCE(c.sort_order, c.display_order, c.id, 0) ASC, c.name ASC';
+      if (sort === 'name') orderSql = 'ORDER BY c.name ASC';
+      else if (sort === 'count') orderSql = 'ORDER BY c.name ASC'; // Sorted in JS after count aggregation
+      else if (sort === 'newest') orderSql = 'ORDER BY c.id DESC';
+
+      // 1. Fetch categories table
+      const sql = `
+        SELECT 
+          c.*,
+          COALESCE(c.sort_order, c.display_order, c.id, 0) AS final_order,
+          (SELECT COUNT(*) FROM categories child WHERE child.parent_id = c.id) AS children_count
+        FROM categories c
+        ${whereClause}
+        ${orderSql}
+      `;
+      const catRows = await db.query(sql, params, { timeout: 6000 });
+
+      // 2. Fetch active design counts in ONE single indexed group query
+      let countMap = new Map();
       try {
-        let whereClauses = [];
-        let params = [];
-        if (status === 'active') {
-          whereClauses.push('(c.is_active = 1 OR c.is_active IS NULL)');
-        } else if (status === 'inactive') {
-          whereClauses.push('c.is_active = 0');
+        const countRows = await db.query(
+          `SELECT category_id, COUNT(*) AS cnt 
+           FROM designs 
+           WHERE (is_active = 1 OR is_active IS NULL) 
+             AND deleted_at IS NULL 
+             AND category_id IS NOT NULL 
+           GROUP BY category_id`,
+          [],
+          { timeout: 4000 }
+        );
+        if (Array.isArray(countRows)) {
+          countRows.forEach(r => countMap.set(Number(r.category_id), Number(r.cnt)));
         }
-        if (showOnHomeOnly) {
-          whereClauses.push('(c.show_on_home = 1 OR c.show_on_home IS NULL)');
-        }
-        if (parent === 'top') {
-          whereClauses.push('(c.parent_id IS NULL OR c.parent_id = 0)');
-        } else if (parent && !isNaN(parseInt(parent, 10))) {
-          whereClauses.push('c.parent_id = ?');
-          params.push(parseInt(parent, 10));
-        } else if (parent && typeof parent === 'string') {
-          whereClauses.push('c.parent_id = (SELECT p.id FROM categories p WHERE p.slug = ? LIMIT 1)');
-          params.push(parent.trim());
-        }
-        if (search && search.trim()) {
-          const q = `%${search.trim()}%`;
-          whereClauses.push('(c.name LIKE ? OR c.description LIKE ?)');
-          params.push(q, q);
-        }
-        const whereClause = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+      } catch (countErr) {
+        console.warn('[Category.getAll] Design count notice:', countErr.message);
+      }
 
-        let orderSql = 'ORDER BY COALESCE(c.sort_order, c.display_order, c.id, 0) ASC, c.name ASC';
-        if (sort === 'name') orderSql = 'ORDER BY c.name ASC';
-        else if (sort === 'count') orderSql = 'ORDER BY c.name ASC'; // Sorted in JS after count aggregation
-        else if (sort === 'newest') orderSql = 'ORDER BY c.id DESC';
-
-        // 1. Fetch categories table ONLY (ultra-fast, zero join on designs table)
-        const sql = `
-          SELECT 
-            c.*,
-            COALESCE(c.sort_order, c.display_order, c.id, 0) AS final_order,
-            (SELECT COUNT(*) FROM categories child WHERE child.parent_id = c.id) AS children_count
-          FROM categories c
-          ${whereClause}
-          ${orderSql}
-        `;
-        const catRows = await db.query(sql, params, { timeout: 4000 });
-
-        // 2. Fetch active design counts in ONE single indexed group query
-        let countMap = new Map();
-        try {
-          const countRows = await db.query(
-            'SELECT category_id, COUNT(*) AS cnt FROM designs WHERE is_active = 1 AND category_id IS NOT NULL GROUP BY category_id',
-            [],
-            { timeout: 3000 }
-          );
-          if (Array.isArray(countRows)) {
-            countRows.forEach(r => countMap.set(Number(r.category_id), Number(r.cnt)));
+      if (catRows && Array.isArray(catRows) && catRows.length > 0) {
+        // Pre-map child categories for fast hierarchical count rollup
+        const childrenMap = new Map();
+        catRows.forEach(c => {
+          if (c.parent_id) {
+            const pid = Number(c.parent_id);
+            if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+            childrenMap.get(pid).push(Number(c.id));
           }
-        } catch (_) {}
+        });
 
-        if (catRows && Array.isArray(catRows)) {
-          // Pre-map child categories for fast hierarchical count rollup
-          const childrenMap = new Map();
-          catRows.forEach(c => {
-            if (c.parent_id) {
-              const pid = Number(c.parent_id);
-              if (!childrenMap.has(pid)) childrenMap.set(pid, []);
-              childrenMap.get(pid).push(Number(c.id));
-            }
-          });
+        let mapped = catRows.map(r => {
+          const catId = Number(r.id);
+          let totalDesigns = countMap.get(catId) || 0;
 
-          let mapped = catRows.map(r => {
-            const catId = Number(r.id);
-            let totalDesigns = countMap.get(catId) || 0;
-
-            // Include subcategory designs if present
-            const childIds = childrenMap.get(catId);
-            if (childIds && Array.isArray(childIds)) {
-              childIds.forEach(cid => {
-                totalDesigns += (countMap.get(cid) || 0);
-              });
-            }
-
-            return {
-              ...r,
-              icon: r.icon || 'fa-solid fa-shapes',
-              card_image_key: r.card_image_key || null,
-              image_url: r.card_image_key || r.image_url || null,
-              sort_order: r.sort_order !== undefined ? r.sort_order : (r.display_order || r.id || 0),
-              show_on_home: r.show_on_home !== undefined ? (r.show_on_home === 1 || r.show_on_home === true || r.show_on_home === '1') : true,
-              is_active: r.is_active !== undefined ? (r.is_active === 1 || r.is_active === true || r.is_active === '1') : true,
-              children_count: parseInt(r.children_count || 0, 10),
-              has_children: parseInt(r.children_count || 0, 10) > 0,
-              design_count: totalDesigns
-            };
-          });
-
-          if (sort === 'count') {
-            mapped.sort((a, b) => b.design_count - a.design_count);
+          // Include subcategory designs if present
+          const childIds = childrenMap.get(catId);
+          if (childIds && Array.isArray(childIds)) {
+            childIds.forEach(cid => {
+              totalDesigns += (countMap.get(cid) || 0);
+            });
           }
 
-          if (hideEmpty) {
-            mapped = mapped.filter(r => r.design_count > 0);
-          }
+          return {
+            ...r,
+            icon: r.icon || 'fa-solid fa-shapes',
+            card_image_key: r.card_image_key || null,
+            image_url: r.card_image_key || r.image_url || null,
+            sort_order: r.sort_order !== undefined ? r.sort_order : (r.display_order || r.id || 0),
+            show_on_home: r.show_on_home !== undefined ? (r.show_on_home === 1 || r.show_on_home === true || r.show_on_home === '1') : true,
+            is_active: r.is_active !== undefined ? (r.is_active === 1 || r.is_active === true || r.is_active === '1') : true,
+            children_count: parseInt(r.children_count || 0, 10),
+            has_children: parseInt(r.children_count || 0, 10) > 0,
+            design_count: totalDesigns
+          };
+        });
 
-          // Cache in memory
-          categoryMemoryCache.set(cacheKey, { timestamp: now, data: mapped });
-          return mapped;
+        if (sort === 'count') {
+          mapped.sort((a, b) => b.design_count - a.design_count);
         }
-      } catch (err) {
-        console.warn('[Category.getAll] Query notice, checking stale cache / fallback:', err.message);
-        if (cachedEntry) {
-          return [...cachedEntry.data];
+
+        if (hideEmpty) {
+          mapped = mapped.filter(r => r.design_count > 0);
         }
+
+        // Cache database results in memory
+        categoryMemoryCache.set(cacheKey, { timestamp: now, data: mapped });
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('[Category.getAll] Database query notice, checking stale cache / fallback:', err.message);
+      if (cachedEntry) {
+        return [...cachedEntry.data];
       }
     }
 
+    // Fallback mode ONLY when DB is completely unreachable
     let fallbackCounts = {};
     try {
       const fbPath = path.join(__dirname, '..', 'public', 'uploads', 'fallback_designs.json');
@@ -185,13 +194,12 @@ class Category {
   }
 
   static async getById(id) {
-    if (db.isConnected()) {
-      try {
-        const rows = await db.query('SELECT * FROM categories WHERE id = ? LIMIT 1', [id]);
-        if (rows && rows[0]) return rows[0];
-      } catch (err) {
-        console.error('Category.getById DB error:', err.message);
-      }
+    if (!id) return null;
+    try {
+      const rows = await db.query('SELECT * FROM categories WHERE id = ? LIMIT 1', [id]);
+      if (rows && rows[0]) return rows[0];
+    } catch (err) {
+      console.warn('Category.getById DB notice:', err.message);
     }
     return fallbackCategories.find(c => c.id == id) || null;
   }
@@ -199,42 +207,11 @@ class Category {
   static async getBySlug(slug) {
     if (!slug) return null;
     const cleanSlug = String(slug).trim().toLowerCase();
-    if (db.isConnected()) {
-      try {
-        // 1. Direct exact slug match
-        const exact = await db.query('SELECT * FROM categories WHERE slug = ? LIMIT 1', [cleanSlug]);
-        if (exact && exact[0]) return exact[0];
-
-        // 2. Flexible match for slug variants or category name
-        const variations = await db.query(`
-          SELECT * FROM categories 
-          WHERE slug = ? 
-             OR slug = ? 
-             OR slug = ?
-             OR slug LIKE ?
-             OR LOWER(name) = ?
-             OR LOWER(name) LIKE ?
-          ORDER BY 
-            (slug = ?) DESC,
-            (slug = ?) DESC,
-            (slug = ?) DESC,
-            COALESCE(sort_order, display_order, id, 0) ASC
-          LIMIT 1
-        `, [
-          cleanSlug,
-          `${cleanSlug}-embroidery`,
-          `${cleanSlug}-designs`,
-          `${cleanSlug}%`,
-          cleanSlug,
-          `%${cleanSlug}%`,
-          cleanSlug,
-          `${cleanSlug}-embroidery`,
-          `${cleanSlug}-designs`
-        ]);
-        if (variations && variations[0]) return variations[0];
-      } catch (err) {
-        console.error('Category.getBySlug DB error:', err.message);
-      }
+    try {
+      const rows = await db.query('SELECT * FROM categories WHERE slug = ? LIMIT 1', [cleanSlug]);
+      if (rows && rows[0]) return rows[0];
+    } catch (err) {
+      console.warn('Category.getBySlug DB notice:', err.message);
     }
     return fallbackCategories.find(c => 
       c.slug === cleanSlug || 
@@ -244,46 +221,120 @@ class Category {
     ) || null;
   }
 
+  /**
+   * Retrieves 301 SEO redirect destination if slug has changed.
+   */
+  static async getRedirectSlug(oldSlug) {
+    if (!oldSlug) return null;
+    try {
+      const rows = await db.query(
+        'SELECT new_slug FROM category_slug_redirects WHERE old_slug = ? LIMIT 1',
+        [oldSlug.trim().toLowerCase()]
+      );
+      if (rows && rows[0] && rows[0].new_slug) {
+        return rows[0].new_slug;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /**
+   * Checks whether a slug is already in use by another category.
+   */
+  static async isSlugTaken(slug, excludeId = null) {
+    if (!slug) return false;
+    try {
+      let sql = 'SELECT id FROM categories WHERE slug = ?';
+      let params = [slug.trim().toLowerCase()];
+      if (excludeId) {
+        sql += ' AND id != ?';
+        params.push(parseInt(excludeId, 10));
+      }
+      const rows = await db.query(sql, params);
+      return Array.isArray(rows) && rows.length > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Counts active designs linked to a specific category.
+   */
+  static async getDesignCount(categoryId) {
+    if (!categoryId) return 0;
+    try {
+      const rows = await db.query(
+        'SELECT COUNT(*) as cnt FROM designs WHERE category_id = ? AND deleted_at IS NULL',
+        [categoryId]
+      );
+      return (rows && rows[0] && rows[0].cnt) ? parseInt(rows[0].cnt, 10) : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /**
+   * Reassigns all designs from one category to another.
+   */
+  static async reassignDesigns(fromCategoryId, toCategoryId) {
+    const fromId = parseInt(fromCategoryId, 10);
+    const toId = parseInt(toCategoryId, 10);
+    if (!fromId || !toId || fromId === toId) return 0;
+    try {
+      const res = await db.query(
+        'UPDATE designs SET category_id = ? WHERE category_id = ?',
+        [toId, fromId]
+      );
+      Category.invalidateCache();
+      return res.affectedRows || 0;
+    } catch (err) {
+      console.error('Error reassigning designs:', err);
+      throw err;
+    }
+  }
+
   static async create({ name, slug, description, image_url, card_image_key, icon = 'fa-solid fa-shapes', sort_order = 0, display_order = 0, show_on_home = 1, is_active = 1, parent_id = null }) {
     const finalOrder = parseInt(sort_order || display_order, 10) || 0;
     const isHome = (show_on_home === 0 || show_on_home === false || show_on_home === '0') ? 0 : 1;
     const activeVal = (is_active === 0 || is_active === false || is_active === '0') ? 0 : 1;
     const parentVal = (parent_id && !isNaN(parseInt(parent_id, 10)) && parseInt(parent_id, 10) > 0) ? parseInt(parent_id, 10) : null;
 
-    if (db.isConnected()) {
+    try {
+      const res = await db.query(
+        'INSERT INTO categories (name, slug, description, image_url, card_image_key, icon, sort_order, display_order, show_on_home, is_active, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [name, slug, description, image_url, card_image_key || image_url, icon || 'fa-solid fa-shapes', finalOrder, finalOrder, isHome, activeVal, parentVal]
+      );
+      Category.invalidateCache();
+      return res.insertId;
+    } catch (err) {
       try {
         const res = await db.query(
-          'INSERT INTO categories (name, slug, description, image_url, card_image_key, icon, sort_order, display_order, show_on_home, is_active, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [name, slug, description, image_url, card_image_key || image_url, icon || 'fa-solid fa-shapes', finalOrder, finalOrder, isHome, activeVal, parentVal]
+          'INSERT INTO categories (name, slug, description, image_url, icon, display_order, show_on_home) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [name, slug, description, image_url, icon || 'fa-solid fa-shapes', finalOrder, isHome]
         );
+        Category.invalidateCache();
         return res.insertId;
-      } catch (err) {
-        try {
-          const res = await db.query(
-            'INSERT INTO categories (name, slug, description, image_url, icon, display_order, show_on_home) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [name, slug, description, image_url, icon || 'fa-solid fa-shapes', finalOrder, isHome]
-          );
-          return res.insertId;
-        } catch (innerErr) {
-          const res = await db.query(
-            'INSERT INTO categories (name, slug, description, image_url, display_order) VALUES (?, ?, ?, ?, ?)',
-            [name, slug, description, image_url, finalOrder]
-          );
-          return res.insertId;
-        }
+      } catch (innerErr) {
+        const res = await db.query(
+          'INSERT INTO categories (name, slug, description, image_url, display_order) VALUES (?, ?, ?, ?, ?)',
+          [name, slug, description, image_url, finalOrder]
+        );
+        Category.invalidateCache();
+        return res.insertId;
       }
     }
-    const newId = fallbackCategories.length + 1;
-    const item = { id: newId, name, slug, description, image_url, card_image_key, icon, sort_order: finalOrder, display_order: finalOrder, show_on_home: isHome, is_active: activeVal, parent_id: parentVal };
-    fallbackCategories.push(item);
-    return newId;
   }
 
   static async update(id, { name, slug, description, image_url, card_image_key, icon, sort_order, display_order, show_on_home, is_active, parent_id }) {
     const isHome = (show_on_home === 0 || show_on_home === false || show_on_home === '0') ? 0 : 1;
     const finalOrder = (sort_order !== undefined || display_order !== undefined) ? (parseInt(sort_order !== undefined ? sort_order : display_order, 10) || 0) : null;
     const activeVal = is_active !== undefined ? ((is_active === 0 || is_active === false || is_active === '0') ? 0 : 1) : null;
-    const parentVal = parent_id !== undefined ? ((parent_id && !isNaN(parseInt(parent_id, 10)) && parseInt(parent_id, 10) > 0) ? parseInt(parent_id, 10) : null) : undefined;
+
+    // Track old values for 301 SEO redirects and image cleanup
+    let oldCategory = null;
+    try {
+      oldCategory = await this.getById(id);
+    } catch (_) {}
 
     let imageClause = '';
     let imageParams = [];
@@ -294,137 +345,144 @@ class Category {
       imageParams.push(image_url, card_image_key || image_url);
     }
 
-    if (db.isConnected()) {
-      try {
-        await db.query(
-          `UPDATE categories SET 
-            name = ?, 
-            slug = ?, 
-            description = ?, 
-            ${imageClause}
-            icon = COALESCE(?, icon), 
-            sort_order = COALESCE(?, sort_order), 
-            display_order = COALESCE(?, display_order), 
-            show_on_home = ?, 
-            is_active = COALESCE(?, is_active)
-           WHERE id = ?`,
-          [name, slug, description, ...imageParams, icon || 'fa-solid fa-shapes', finalOrder, finalOrder, isHome, activeVal, id]
-        );
-        return true;
-      } catch (err) {
+    try {
+      await db.query(
+        `UPDATE categories SET 
+          name = ?, 
+          slug = ?, 
+          description = ?, 
+          ${imageClause}
+          icon = COALESCE(?, icon), 
+          sort_order = COALESCE(?, sort_order), 
+          display_order = COALESCE(?, display_order), 
+          show_on_home = ?, 
+          is_active = COALESCE(?, is_active)
+         WHERE id = ?`,
+        [name, slug, description, ...imageParams, icon || 'fa-solid fa-shapes', finalOrder, finalOrder, isHome, activeVal, id]
+      );
+
+      // Handle 301 slug redirect when slug changes
+      if (oldCategory && oldCategory.slug && slug && oldCategory.slug.toLowerCase() !== slug.toLowerCase()) {
         try {
-          let fallbackImageClause = '';
-          let fallbackImageParams = [];
-          if (image_url === '__REMOVE__' || image_url === '') {
-            fallbackImageClause = 'image_url = NULL,';
-          } else if (image_url !== undefined && image_url !== null) {
-            fallbackImageClause = 'image_url = ?,';
-            fallbackImageParams.push(image_url);
-          }
           await db.query(
-            `UPDATE categories SET name = ?, slug = ?, description = ?, ${fallbackImageClause} icon = ?, display_order = COALESCE(?, display_order), show_on_home = ? WHERE id = ?`,
-            [name, slug, description, ...fallbackImageParams, icon || 'fa-solid fa-shapes', finalOrder, isHome, id]
+            `INSERT INTO category_slug_redirects (category_id, old_slug, new_slug) 
+             VALUES (?, ?, ?) 
+             ON DUPLICATE KEY UPDATE new_slug = VALUES(new_slug)`,
+            [id, oldCategory.slug.toLowerCase(), slug.toLowerCase()]
           );
-          return true;
-        } catch (innerErr) {
+          // Chain existing redirects to new slug
           await db.query(
-            'UPDATE categories SET name = ?, slug = ?, description = ?, display_order = COALESCE(?, display_order) WHERE id = ?',
-            [name, slug, description, finalOrder, id]
+            'UPDATE category_slug_redirects SET new_slug = ? WHERE new_slug = ?',
+            [slug.toLowerCase(), oldCategory.slug.toLowerCase()]
           );
-          return true;
+        } catch (redirErr) {
+          console.warn('[Category.update] Redirect tracking notice:', redirErr.message);
         }
       }
-    }
-    const cat = fallbackCategories.find(c => c.id == id);
-    if (cat) {
-      cat.name = name;
-      cat.slug = slug;
-      cat.description = description;
-      if (image_url === '__REMOVE__' || image_url === '') {
-        cat.image_url = null;
-        cat.card_image_key = null;
-      } else if (image_url !== undefined && image_url !== null) {
-        cat.image_url = image_url;
-        cat.card_image_key = card_image_key || image_url;
+
+      Category.invalidateCache();
+      return {
+        success: true,
+        oldImageToRetire: (oldCategory && oldCategory.image_url && image_url !== undefined && oldCategory.image_url !== image_url) ? oldCategory.image_url : null
+      };
+    } catch (err) {
+      try {
+        let fallbackImageClause = '';
+        let fallbackImageParams = [];
+        if (image_url === '__REMOVE__' || image_url === '') {
+          fallbackImageClause = 'image_url = NULL,';
+        } else if (image_url !== undefined && image_url !== null) {
+          fallbackImageClause = 'image_url = ?,';
+          fallbackImageParams.push(image_url);
+        }
+        await db.query(
+          `UPDATE categories SET name = ?, slug = ?, description = ?, ${fallbackImageClause} icon = ?, display_order = COALESCE(?, display_order), show_on_home = ? WHERE id = ?`,
+          [name, slug, description, ...fallbackImageParams, icon || 'fa-solid fa-shapes', finalOrder, isHome, id]
+        );
+        Category.invalidateCache();
+        return { success: true, oldImageToRetire: null };
+      } catch (innerErr) {
+        await db.query(
+          'UPDATE categories SET name = ?, slug = ?, description = ?, display_order = COALESCE(?, display_order) WHERE id = ?',
+          [name, slug, description, finalOrder, id]
+        );
+        Category.invalidateCache();
+        return { success: true, oldImageToRetire: null };
       }
-      if (icon) cat.icon = icon;
-      if (finalOrder !== null) {
-        cat.sort_order = finalOrder;
-        cat.display_order = finalOrder;
-      }
-      if (show_on_home !== undefined) cat.show_on_home = isHome;
-      if (activeVal !== null) cat.is_active = activeVal;
     }
-    return true;
   }
 
   static async reorder(id, direction) {
     if (!['up', 'down'].includes(direction)) return false;
-    if (db.isConnected()) {
-      try {
-        const rows = await db.query(
-          'SELECT id, COALESCE(sort_order, display_order, id, 0) AS ord FROM categories ORDER BY ord ASC, id ASC'
-        );
-        if (!rows || rows.length === 0) return false;
-        const targetId = parseInt(id, 10);
-        const currentIndex = rows.findIndex(r => r.id === targetId);
-        if (currentIndex === -1) return false;
+    try {
+      const rows = await db.query(
+        'SELECT id, COALESCE(sort_order, display_order, id, 0) AS ord FROM categories ORDER BY ord ASC, id ASC'
+      );
+      if (!rows || rows.length === 0) return false;
+      const targetId = parseInt(id, 10);
+      const currentIndex = rows.findIndex(r => r.id === targetId);
+      if (currentIndex === -1) return false;
 
-        const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (swapIndex < 0 || swapIndex >= rows.length) return false;
+      const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (swapIndex < 0 || swapIndex >= rows.length) return false;
 
-        const currentCat = rows[currentIndex];
-        const swapCat = rows[swapIndex];
+      const currentCat = rows[currentIndex];
+      const swapCat = rows[swapIndex];
 
-        let ordCurrent = currentCat.ord;
-        let ordSwap = swapCat.ord;
+      let ordCurrent = currentCat.ord;
+      let ordSwap = swapCat.ord;
 
-        if (ordCurrent === ordSwap) {
-          ordCurrent = currentIndex * 10;
-          ordSwap = swapIndex * 10;
-        }
-
-        await db.query('UPDATE categories SET sort_order = ?, display_order = ? WHERE id = ?', [ordSwap, ordSwap, currentCat.id]);
-        await db.query('UPDATE categories SET sort_order = ?, display_order = ? WHERE id = ?', [ordCurrent, ordCurrent, swapCat.id]);
-        return true;
-      } catch (err) {
-        console.error('Category.reorder DB error:', err.message);
+      if (ordCurrent === ordSwap) {
+        ordCurrent = currentIndex * 10;
+        ordSwap = swapIndex * 10;
       }
+
+      await db.query('UPDATE categories SET sort_order = ?, display_order = ? WHERE id = ?', [ordSwap, ordSwap, currentCat.id]);
+      await db.query('UPDATE categories SET sort_order = ?, display_order = ? WHERE id = ?', [ordCurrent, ordCurrent, swapCat.id]);
+      Category.invalidateCache();
+      return true;
+    } catch (err) {
+      console.error('Category.reorder DB error:', err.message);
+      return false;
     }
-    const idx = fallbackCategories.findIndex(c => c.id == id);
-    if (idx !== -1) {
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (swapIdx >= 0 && swapIdx < fallbackCategories.length) {
-        const tmp = fallbackCategories[idx];
-        fallbackCategories[idx] = fallbackCategories[swapIdx];
-        fallbackCategories[swapIdx] = tmp;
-      }
-    }
-    return true;
   }
 
   static async delete(id) {
-    if (db.isConnected()) {
+    try {
       await db.query('DELETE FROM categories WHERE id = ?', [id]);
+      try {
+        await db.query('DELETE FROM category_slug_redirects WHERE category_id = ?', [id]);
+      } catch (_) {}
+      Category.invalidateCache();
       return true;
+    } catch (err) {
+      console.error('Category.delete error:', err);
+      throw err;
     }
-    const index = fallbackCategories.findIndex(c => c.id == id);
-    if (index !== -1) fallbackCategories.splice(index, 1);
-    return true;
   }
 
   static async toggleStatus(id) {
-    if (db.isConnected()) {
-      await db.query('UPDATE categories SET is_active = NOT is_active WHERE id = ?', [id]);
-      const [row] = await db.query('SELECT is_active, name FROM categories WHERE id = ?', [id]);
-      return row ? row.is_active : false;
+    try {
+      await db.query('UPDATE categories SET is_active = NOT COALESCE(is_active, 1) WHERE id = ?', [id]);
+      const rows = await db.query('SELECT is_active FROM categories WHERE id = ?', [id]);
+      Category.invalidateCache();
+      return rows && rows[0] ? (rows[0].is_active === 1 || rows[0].is_active === true) : false;
+    } catch (err) {
+      console.error('Category.toggleStatus error:', err);
+      return false;
     }
-    const cat = fallbackCategories.find(c => c.id == id);
-    if (cat) {
-      cat.is_active = cat.is_active ? 0 : 1;
-      return cat.is_active;
+  }
+
+  static async toggleHome(id) {
+    try {
+      await db.query('UPDATE categories SET show_on_home = NOT COALESCE(show_on_home, 1) WHERE id = ?', [id]);
+      const rows = await db.query('SELECT show_on_home FROM categories WHERE id = ?', [id]);
+      Category.invalidateCache();
+      return rows && rows[0] ? (rows[0].show_on_home === 1 || rows[0].show_on_home === true) : false;
+    } catch (err) {
+      console.error('Category.toggleHome error:', err);
+      return false;
     }
-    return false;
   }
 }
 

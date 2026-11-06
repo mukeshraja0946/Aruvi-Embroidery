@@ -252,6 +252,8 @@ app.use('/public/uploads/branding', express.static(storage.getBrandingDir(), sta
 app.use('/uploads/branding', express.static(storage.getBrandingDir(), staticCacheOptions));
 app.use('/public/uploads/banners', express.static(storage.getBannersDir(), staticCacheOptions));
 app.use('/uploads/banners', express.static(storage.getBannersDir(), staticCacheOptions));
+app.use('/public/uploads/categories', express.static(storage.getCategoriesDir(), staticCacheOptions));
+app.use('/uploads/categories', express.static(storage.getCategoriesDir(), staticCacheOptions));
 app.use('/public/uploads', express.static(storage.getPublicDir(), staticCacheOptions));
 app.use('/uploads', express.static(storage.getPublicDir(), staticCacheOptions));
 app.use('/public/uploads', express.static(storage.getUploadsDir(), staticCacheOptions));
