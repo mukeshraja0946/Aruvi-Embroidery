@@ -482,8 +482,24 @@ exports.postCreate = async (req, res, next) => {
       for (const file of imgFiles) {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
+        let origMeta = null;
+        try {
+          origMeta = await storage.saveOriginalFile(file.path, file.originalname, file.mimetype);
+        } catch (_) {}
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
         await Design.addFile(designId, file.originalname, savedUrl, ext, file.size, 1);
+        if (origMeta && db.isConnected()) {
+          try {
+            await db.query(
+              'UPDATE designs SET preview_original_key = ?, checksum = COALESCE(checksum, ?), original_size = COALESCE(original_size, ?), needs_reupload = 0 WHERE id = ?',
+              [origMeta.storage_key, origMeta.checksum, origMeta.original_size, designId]
+            );
+            await db.query(
+              'UPDATE design_images SET original_name = ?, original_mime_type = ?, original_size = ?, checksum = ?, original_key = ? WHERE design_id = ? AND image_url = ?',
+              [origMeta.original_name, origMeta.mime_type, origMeta.original_size, origMeta.checksum, origMeta.storage_key, designId, savedUrl]
+            );
+          } catch (_) {}
+        }
       }
     }
 
@@ -847,11 +863,27 @@ exports.postEdit = async (req, res, next) => {
       for (const file of imgFiles) {
         const extName = path.extname(file.originalname).toLowerCase();
         const ext = extName.replace('.', '').toUpperCase();
+        let origMeta = null;
+        try {
+          origMeta = await storage.saveOriginalFile(file.path, file.originalname, file.mimetype);
+        } catch (_) {}
         const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
         const existingImg = await db.query('SELECT id FROM design_images WHERE design_id = ? AND image_url = ?', [id, savedUrl]);
         if (!existingImg || existingImg.length === 0) {
           logDesignFileInsert('POST /admin/designs/edit/:id (imgFiles direct)', id, { original_name: file.originalname, file_size: file.size });
           await Design.addFile(id, file.originalname, savedUrl, ext, file.size, 1);
+        }
+        if (origMeta && db.isConnected()) {
+          try {
+            await db.query(
+              'UPDATE designs SET preview_original_key = ?, checksum = COALESCE(checksum, ?), original_size = COALESCE(original_size, ?), needs_reupload = 0 WHERE id = ?',
+              [origMeta.storage_key, origMeta.checksum, origMeta.original_size, id]
+            );
+            await db.query(
+              'UPDATE design_images SET original_name = ?, original_mime_type = ?, original_size = ?, checksum = ?, original_key = ? WHERE design_id = ? AND image_url = ?',
+              [origMeta.original_name, origMeta.mime_type, origMeta.original_size, origMeta.checksum, origMeta.storage_key, id, savedUrl]
+            );
+          } catch (_) {}
         }
       }
     }
@@ -1757,8 +1789,25 @@ exports.replaceImage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid image format. Supported formats: JPG, PNG, WEBP, SVG, AVIF' });
     }
 
+    let origMeta = null;
+    try {
+      origMeta = await storage.saveOriginalFile(file.path, file.originalname, file.mimetype);
+    } catch (_) {}
+
     const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
     await Design.replacePrimaryImage(id, savedUrl, file.originalname, file.size);
+    if (origMeta && db.isConnected()) {
+      try {
+        await db.query(
+          'UPDATE designs SET preview_original_key = ?, checksum = COALESCE(checksum, ?), original_size = COALESCE(original_size, ?), needs_reupload = 0 WHERE id = ?',
+          [origMeta.storage_key, origMeta.checksum, origMeta.original_size, id]
+        );
+        await db.query(
+          'UPDATE design_images SET original_name = ?, original_mime_type = ?, original_size = ?, checksum = ?, original_key = ? WHERE design_id = ? AND is_primary = 1',
+          [origMeta.original_name, origMeta.mime_type, origMeta.original_size, origMeta.checksum, origMeta.storage_key, id]
+        );
+      } catch (_) {}
+    }
     await ActivityLog.logFromReq(req, 'update_image', 'design', id, `Replaced primary image for design #${id} "${design.title}"`);
 
     const isAjax = checkIsAjax(req);

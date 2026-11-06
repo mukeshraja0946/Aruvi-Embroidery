@@ -373,6 +373,8 @@ exports.downloadSingleFile = async (req, res, next) => {
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
         'Content-Type': mimeType,
+        'Cache-Control': 'no-transform, private, no-cache',
+        'Content-Encoding': 'identity',
         'Content-Disposition': `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`
       });
       return fileStream.pipe(res);
@@ -382,6 +384,8 @@ exports.downloadSingleFile = async (req, res, next) => {
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Length', stat.size);
     res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'no-transform, private, no-cache');
+    res.setHeader('Content-Encoding', 'identity');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFileName}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`);
 
     const stream = fs.createReadStream(fullPath);
@@ -471,12 +475,14 @@ exports.downloadDesignAllZip = async (req, res, next) => {
       return res.redirect('/user/dashboard');
     }
 
-    // Stream on-the-fly dynamically using archiver (zero disk leak)
+    // Stream on-the-fly dynamically using archiver in store-only mode (preserves original bytes, zero compression loss)
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"; filename*=UTF-8''${encodeURIComponent(zipFileName)}`);
     res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-transform, private, no-cache');
+    res.setHeader('Content-Encoding', 'identity');
 
-    const archive = createZipArchive({ zlib: { level: 6 } });
+    const archive = createZipArchive({ zlib: { level: 0 }, store: true });
 
     archive.on('error', (err) => {
       console.error('[Archiver Stream Error]:', err);
@@ -558,8 +564,10 @@ exports.downloadOrderAllZip = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${zipFileName}"; filename*=UTF-8''${encodeURIComponent(zipFileName)}`);
     res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-transform, private, no-cache');
+    res.setHeader('Content-Encoding', 'identity');
 
-    const archive = createZipArchive({ zlib: { level: 6 } });
+    const archive = createZipArchive({ zlib: { level: 0 }, store: true });
 
     archive.on('error', (err) => {
       console.error('[Order Archiver Stream Error]:', err);

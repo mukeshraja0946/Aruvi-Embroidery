@@ -287,6 +287,10 @@ exports.replaceDesignFileQuick = async (req, res, next) => {
     const ext = path.extname(file.originalname).toLowerCase();
 
     if (replaceType === 'image') {
+      let origMeta = null;
+      try {
+        origMeta = await storage.saveOriginalFile(file.path, file.originalname, file.mimetype);
+      } catch (_) {}
       const savedUrl = await storage.savePublicFile(file.path, file.originalname, file.mimetype);
       
       // Update primary image in design_images
@@ -296,11 +300,27 @@ exports.replaceDesignFileQuick = async (req, res, next) => {
           'INSERT INTO design_images (design_id, image_url, is_primary, display_order) VALUES (?, ?, 1, 0)',
           [designId, savedUrl]
         );
+        if (origMeta) {
+          try {
+            await db.query(
+              'UPDATE designs SET preview_original_key = ?, checksum = COALESCE(checksum, ?), original_size = COALESCE(original_size, ?), needs_reupload = 0 WHERE id = ?',
+              [origMeta.storage_key, origMeta.checksum, origMeta.original_size, designId]
+            );
+            await db.query(
+              'UPDATE design_images SET original_name = ?, original_mime_type = ?, original_size = ?, checksum = ?, original_key = ? WHERE design_id = ? AND image_url = ?',
+              [origMeta.original_name, origMeta.mime_type, origMeta.original_size, origMeta.checksum, origMeta.storage_key, designId, savedUrl]
+            );
+          } catch (_) {}
+        }
       }
       await ActivityLog.logFromReq(req, 'update', 'design', designId, `Replaced missing image for design #${designId}`);
       return res.json({ success: true, message: 'Product image successfully replaced!', newUrl: savedUrl });
     } else {
       // Machine File Replacement
+      let origMeta = null;
+      try {
+        origMeta = await storage.saveOriginalFile(file.path, file.originalname, file.mimetype);
+      } catch (_) {}
       const savedPath = await storage.savePrivateFile(file.path, file.originalname, file.mimetype);
       const fmt = ext.replace('.', '').toUpperCase() || 'ZIP';
 
@@ -312,6 +332,14 @@ exports.replaceDesignFileQuick = async (req, res, next) => {
           [designId, file.originalname, savedPath, fmt, file.size]
         );
         await db.query('UPDATE designs SET formats = ? WHERE id = ?', [fmt, designId]);
+        if (origMeta) {
+          try {
+            await db.query(
+              'UPDATE designs SET original_file_key = ?, original_name = ?, original_size = ?, checksum = ?, needs_reupload = 0 WHERE id = ?',
+              [origMeta.storage_key, origMeta.original_name, origMeta.original_size, origMeta.checksum, designId]
+            );
+          } catch (_) {}
+        }
       }
       await ActivityLog.logFromReq(req, 'update', 'design', designId, `Replaced missing design file for design #${designId}`);
       return res.json({ success: true, message: 'Machine design file successfully replaced!', newPath: savedPath });
@@ -2192,6 +2220,263 @@ exports.postTestStorageHealth = async (req, res, next) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+/**
+ * =========================================================================
+ * ORIGINAL FILES CHECK & INTEGRITY AUDIT
+ * =========================================================================
+ */
+
+exports.getOriginalFilesCheck = async (req, res, next) => {
+  try {
+    const Category = require('../../models/Category');
+    const previewService = require('../../services/previewService');
+    const categories = await Category.getAll();
+    const allDesignsResult = await Design.getAll({ limit: 10000 });
+    const designsList = allDesignsResult.designs || [];
+
+    const totalDesigns = designsList.length;
+    let designsWithOriginal = 0;
+    let designsNeedingReupload = 0;
+    let designsWithPreview = 0;
+
+    const initialResults = [];
+
+    for (let i = 0; i < designsList.length; i++) {
+      const d = designsList[i];
+      const prev = previewService.getPrimaryPreview(d);
+      if (prev.hasPreview) designsWithPreview++;
+
+      const cleanOrig = await findCleanOriginalForDesign(d);
+      const isVerified = Boolean(cleanOrig) && !d.needs_reupload;
+
+      if (isVerified) {
+        designsWithOriginal++;
+      } else {
+        designsNeedingReupload++;
+      }
+
+      if (i < 50) {
+        let origName = d.original_name || null;
+        let origSize = d.original_size || 0;
+        let checksum = d.checksum || null;
+
+        if (cleanOrig && (!origSize || !checksum)) {
+          try {
+            const stat = fs.statSync(cleanOrig);
+            origSize = origSize || stat.size;
+            origName = origName || path.basename(cleanOrig);
+            if (!checksum) {
+              const buf = fs.readFileSync(cleanOrig);
+              checksum = crypto.createHash('sha256').update(buf).digest('hex');
+            }
+          } catch (_) {}
+        }
+
+        initialResults.push({
+          id: d.id,
+          sku: d.sku,
+          title: d.title,
+          category_name: d.category_name,
+          preview_url: prev.thumbUrl || prev.cardUrl || prev.largeUrl || '/public/images/placeholder.svg',
+          has_original: Boolean(cleanOrig),
+          original_name: origName,
+          original_size: origSize,
+          checksum: checksum,
+          status: isVerified ? 'verified' : 'needs_reupload'
+        });
+      }
+    }
+
+    res.render('admin/tools/original-files-check', {
+      title: 'Original Files Check & Integrity Audit - ARUVI Admin',
+      categories,
+      totalDesigns,
+      designsWithOriginal,
+      designsNeedingReupload,
+      designsWithPreview,
+      initialResults
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.postOriginalFilesScan = async (req, res, next) => {
+  try {
+    const previewService = require('../../services/previewService');
+    const { 
+      batch_size = 50, 
+      offset = 0, 
+      category_id = 'all', 
+      dry_run = false 
+    } = req.body || {};
+
+    const limit = parseInt(batch_size, 10) || 50;
+    const startOffset = parseInt(offset, 10) || 0;
+    const isDryRun = dry_run === true || dry_run === 'true' || dry_run === '1';
+
+    const allDesignsResult = await Design.getAll({
+      category: category_id && category_id !== 'all' ? category_id : null,
+      category_slug: category_id && isNaN(category_id) && category_id !== 'all' ? category_id : null,
+      limit: 10000
+    });
+    const allDesigns = allDesignsResult.designs || [];
+    const totalDesigns = allDesigns.length;
+    const batch = allDesigns.slice(startOffset, startOffset + limit);
+
+    const results = [];
+    let batchVerified = 0;
+    let batchNeedingReupload = 0;
+
+    for (const d of batch) {
+      const prev = previewService.getPrimaryPreview(d);
+      const cleanOrig = await findCleanOriginalForDesign(d);
+
+      let origName = d.original_name || null;
+      let origSize = d.original_size || 0;
+      let checksum = d.checksum || null;
+
+      if (cleanOrig) {
+        try {
+          const stat = fs.statSync(cleanOrig);
+          origSize = stat.size;
+          origName = origName || path.basename(cleanOrig);
+          if (!checksum) {
+            const buf = fs.readFileSync(cleanOrig);
+            checksum = crypto.createHash('sha256').update(buf).digest('hex');
+          }
+
+          if (!isDryRun && db.isConnected()) {
+            await db.query(
+              'UPDATE designs SET needs_reupload = 0, checksum = COALESCE(checksum, ?), original_size = COALESCE(original_size, ?) WHERE id = ?',
+              [checksum, origSize, d.id]
+            );
+          }
+        } catch (_) {}
+
+        batchVerified++;
+        results.push({
+          id: d.id,
+          sku: d.sku,
+          title: d.title,
+          category_name: d.category_name,
+          preview_url: prev.thumbUrl || prev.cardUrl || prev.largeUrl || '/public/images/placeholder.svg',
+          has_original: true,
+          original_name: origName,
+          original_size: origSize,
+          checksum: checksum,
+          status: 'verified'
+        });
+      } else {
+        // No original found - never fabricate originals from previews!
+        if (!isDryRun && db.isConnected()) {
+          try {
+            await db.query('UPDATE designs SET needs_reupload = 1 WHERE id = ?', [d.id]);
+          } catch (_) {}
+        }
+
+        batchNeedingReupload++;
+        results.push({
+          id: d.id,
+          sku: d.sku,
+          title: d.title,
+          category_name: d.category_name,
+          preview_url: prev.thumbUrl || prev.cardUrl || prev.largeUrl || '/public/images/placeholder.svg',
+          has_original: false,
+          original_name: null,
+          original_size: 0,
+          checksum: null,
+          status: 'needs_reupload'
+        });
+      }
+    }
+
+    const nextOffset = startOffset + batch.length;
+    const isCompleted = nextOffset >= totalDesigns;
+
+    return res.json({
+      success: true,
+      processed: batch.length,
+      offset: nextOffset,
+      totalDesigns,
+      isCompleted,
+      progressPercent: totalDesigns > 0 ? Math.min(100, Math.round((nextOffset / totalDesigns) * 100)) : 100,
+      batchVerified,
+      batchNeedingReupload,
+      results
+    });
+  } catch (err) {
+    console.error('postOriginalFilesScan error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.downloadOriginalFilesCsv = async (req, res, next) => {
+  try {
+    const { category_id, filter = 'all' } = req.query || {};
+
+    const allDesignsResult = await Design.getAll({
+      category: category_id && category_id !== 'all' ? category_id : null,
+      category_slug: category_id && isNaN(category_id) && category_id !== 'all' ? category_id : null,
+      limit: 10000
+    });
+    const designs = allDesignsResult.designs || [];
+
+    const rows = [
+      ['Design ID', 'SKU', 'Title', 'Category', 'Has Original File', 'Original Filename', 'Original Size Bytes', 'Checksum SHA-256', 'Status']
+    ];
+
+    for (const d of designs) {
+      const cleanOrig = await findCleanOriginalForDesign(d);
+      const isVerified = Boolean(cleanOrig) && !d.needs_reupload;
+
+      if (filter === 'verified' && !isVerified) continue;
+      if (filter === 'needs_reupload' && isVerified) continue;
+
+      let origName = d.original_name || '';
+      let origSize = d.original_size || 0;
+      let checksum = d.checksum || '';
+
+      if (cleanOrig && (!origSize || !checksum)) {
+        try {
+          const stat = fs.statSync(cleanOrig);
+          origSize = origSize || stat.size;
+          origName = origName || path.basename(cleanOrig);
+          if (!checksum) {
+            const buf = fs.readFileSync(cleanOrig);
+            checksum = crypto.createHash('sha256').update(buf).digest('hex');
+          }
+        } catch (_) {}
+      }
+
+      const statusText = isVerified ? 'Verified Original' : 'Needs Re-upload';
+      const hasOrigText = isVerified ? 'Yes' : 'No';
+
+      rows.push([
+        d.id,
+        `"${(d.sku || '').replace(/"/g, '""')}"`,
+        `"${(d.title || '').replace(/"/g, '""')}"`,
+        `"${(d.category_name || '').replace(/"/g, '""')}"`,
+        `"${hasOrigText}"`,
+        `"${origName.replace(/"/g, '""')}"`,
+        origSize,
+        `"${checksum}"`,
+        `"${statusText}"`
+      ]);
+    }
+
+    const csvContent = rows.map(r => r.join(',')).join('\n');
+    const today = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="aruvi_original_files_check_${today}.csv"`);
+    return res.send(csvContent);
+  } catch (err) {
+    console.error('downloadOriginalFilesCsv error:', err);
+    next(err);
+  }
+};
+
 
 
 

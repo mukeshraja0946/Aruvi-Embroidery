@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+  <title><%= title %></title>
+  <link rel="icon" type="image/x-icon" href="/public/assets/brand/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/public/css/main.css">
+  <link rel="stylesheet" href="/public/css/admin.css">
+  <style>
+    .orig-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .orig-stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border, #E5E7EB);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+    .orig-stat-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .orig-stat-icon.blue { background: #E3F2FD; color: #1565C0; }
+    .orig-stat-icon.green { background: #E8F5E9; color: #2E7D32; }
+    .orig-stat-icon.red { background: #FFEBEE; color: #C62828; }
+    .orig-stat-icon.purple { background: #F3E5F5; color: #7B1FA2; }
+    .orig-stat-data strong {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--admin-text-dark, #1F2937);
+      line-height: 1.2;
+    }
+    .orig-stat-data span {
+      font-size: 0.8rem;
+      color: var(--admin-text-muted, #6B7280);
+      font-weight: 500;
+    }
+
+    .card-panel {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border, #E5E7EB);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+
+    .progress-bar-container {
+      background: #EFEBE4;
+      border-radius: 10px;
+      height: 14px;
+      overflow: hidden;
+      margin: 1rem 0 0.5rem;
+      display: none;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #A87C4F, #2E7D32);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+    }
+    .status-badge.verified {
+      background: #E8F5E9;
+      color: #2E7D32;
+    }
+    .status-badge.needs_reupload {
+      background: #FFEBEE;
+      color: #C62828;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--admin-border, #E5E7EB);
+    }
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+    .results-table th {
+      background: #F9FAFB;
+      color: var(--admin-text-muted, #6B7280);
+      font-weight: 600;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--admin-border, #E5E7EB);
+    }
+    .results-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--admin-border, #E5E7EB);
+      color: var(--admin-text-dark, #1F2937);
+      vertical-align: middle;
+    }
+    .results-table tr:last-child td {
+      border-bottom: none;
+    }
+    .results-table tr:hover {
+      background: #FAFAFA;
+    }
+
+    .btn-brand-primary {
+      background: var(--admin-primary, #6B1D2F);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+      min-height: 44px;
+    }
+    .btn-brand-primary:hover {
+      background: #8B263E;
+    }
+
+    .btn-secondary {
+      background: #F3F4F6;
+      color: var(--admin-text-dark, #1F2937);
+      border: 1px solid var(--admin-border, #E5E7EB);
+      border-radius: 8px;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      min-height: 44px;
+      transition: background 0.2s;
+    }
+    .btn-secondary:hover {
+      background: #E5E7EB;
+    }
+
+    .filter-tab-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .filter-tab {
+      background: #FFFFFF;
+      border: 1px solid var(--admin-border, #E5E7EB);
+      color: var(--admin-text-muted, #6B7280);
+      padding: 0.45rem 1rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-tab.active {
+      background: var(--admin-primary, #6B1D2F);
+      color: #FFFFFF;
+      border-color: var(--admin-primary, #6B1D2F);
+    }
+  </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-wrapper">
+  <!-- Top Header -->
+  <header class="admin-top-header">
+    <a href="/admin" class="admin-header-brand">
+      <img src="/public/assets/brand/logo.png" alt="ARUVI Admin Logo" style="max-height: 42px; width: auto; object-fit: contain;" onerror="this.src='/public/images/logo.jpg'">
+    </a>
+    <div class="admin-header-right">
+      <a href="/admin/tools/system-health" class="admin-icon-btn" title="System Health"><i class="fa-solid fa-heart-pulse"></i></a>
+      <div class="admin-user-menu">
+        <div class="admin-user-avatar">A</div>
+        <div class="admin-user-info">
+          <strong>Admin</strong>
+          <span>Administrator</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="admin-main-container">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <ul class="sidebar-nav-list" style="margin-bottom: 1.2rem;">
+        <li class="sidebar-nav-item"><a href="/admin"><span><i class="fa-solid fa-house"></i> Dashboard</span></a></li>
+      </ul>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">DESIGNS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/designs"><span><i class="fa-solid fa-box-archive"></i> Manage Designs</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/designs/create"><span><i class="fa-solid fa-circle-plus"></i> Add New Design</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/categories"><span><i class="fa-solid fa-border-all"></i> Categories</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">STORAGE & RECOVERY</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/tools/original-files-check" class="active"><span><i class="fa-solid fa-file-circle-check"></i> Original Files Check</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/regenerate-previews"><span><i class="fa-solid fa-wand-magic-sparkles"></i> Regenerate Previews</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/system-health"><span><i class="fa-solid fa-heart-pulse"></i> System Health</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/duplicate-files"><span><i class="fa-solid fa-clone"></i> Remove Duplicates</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/missing-files"><span><i class="fa-solid fa-triangle-exclamation"></i> Missing Files Report</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-image-relink"><span><i class="fa-solid fa-images"></i> Bulk Image Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/bulk-file-relink"><span><i class="fa-solid fa-file-zipper"></i> Bulk File Relink</span></a></li>
+          <li class="sidebar-nav-item"><a href="/admin/tools/backup"><span><i class="fa-solid fa-database"></i> Backup & Storage</span></a></li>
+        </ul>
+      </div>
+
+      <div class="admin-sidebar-section">
+        <div class="sidebar-heading">SYSTEM SETTINGS</div>
+        <ul class="sidebar-nav-list">
+          <li class="sidebar-nav-item"><a href="/admin/settings"><span><i class="fa-solid fa-gear"></i> Website Settings</span></a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main-content">
+      <div class="admin-page-header" style="margin-bottom: 1.5rem;">
+        <div style="font-size: 0.82rem; color: var(--admin-text-muted); margin-bottom: 0.3rem;">
+          <a href="/admin" style="color: var(--admin-text-muted); text-decoration: none;">Dashboard</a> &nbsp;>&nbsp;
+          <span>Tools</span> &nbsp;>&nbsp;
+          <strong style="color: var(--admin-primary);">Original Files Check</strong>
+        </div>
+        <h1 style="font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 0 0.4rem; color: var(--admin-text-dark);">
+          <i class="fa-solid fa-file-circle-check" style="color: var(--admin-primary);"></i> Original Files Check & Integrity Audit
+        </h1>
+        <p style="color: var(--admin-text-muted); font-size: 0.9rem; margin: 0;">
+          Verify byte-for-byte existence of original design files and images in private persistent storage (SHA-256 checksum & byte size). Never fabricates originals from previews.
+        </p>
+      </div>
+
+      <!-- Stat Grid -->
+      <div class="orig-stat-grid">
+        <div class="orig-stat-card">
+          <div class="orig-stat-icon blue"><i class="fa-solid fa-layer-group"></i></div>
+          <div class="orig-stat-data">
+            <strong id="statTotal"><%= totalDesigns %></strong>
+            <span>Total Catalog Designs</span>
+          </div>
+        </div>
+
+        <div class="orig-stat-card">
+          <div class="orig-stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+          <div class="orig-stat-data">
+            <strong id="statVerified"><%= designsWithOriginal %></strong>
+            <span>Verified Original Files</span>
+          </div>
+        </div>
+
+        <div class="orig-stat-card">
+          <div class="orig-stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="orig-stat-data">
+            <strong id="statReupload"><%= designsNeedingReupload %></strong>
+            <span>Needs Re-upload</span>
+          </div>
+        </div>
+
+        <div class="orig-stat-card">
+          <div class="orig-stat-icon purple"><i class="fa-solid fa-images"></i></div>
+          <div class="orig-stat-data">
+            <strong id="statPreview"><%= designsWithPreview %></strong>
+            <span>Preview Images Available</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Control Panel -->
+      <div class="card-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="margin: 0 0 0.3rem; font-size: 1.1rem; color: var(--admin-text-dark);">Run Integrity Verification</h3>
+            <p style="margin: 0; font-size: 0.85rem; color: var(--admin-text-muted);">
+              Scans all catalog designs, validates physical existence in <code style="background: #F3F4F6; padding: 2px 6px; border-radius: 4px;">UPLOAD_DIR/private/originals/</code>, and audits checksums.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <select id="categorySelect" style="padding: 0.55rem 0.85rem; border: 1px solid var(--admin-border); border-radius: 8px; font-size: 0.85rem; min-height: 44px;">
+              <option value="all">All Categories</option>
+              <% if (categories && categories.length > 0) { %>
+                <% categories.forEach(function(c) { %>
+                  <option value="<%= c.id %>"><%= c.name %></option>
+                <% }); %>
+              <% } %>
+            </select>
+
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--admin-text-dark); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="dryRunCheck" style="width: 18px; height: 18px;">
+              Dry Run (audit only, do not save status)
+            </label>
+
+            <button id="btnStartScan" class="btn-brand-primary" type="button">
+              <i class="fa-solid fa-play"></i> Start Scan
+            </button>
+
+            <a id="btnDownloadCsv" href="/admin/tools/original-files-check/csv" class="btn-secondary" title="Export audit results to CSV">
+              <i class="fa-solid fa-file-csv"></i> Download CSV
+            </a>
+          </div>
+        </div>
+
+        <!-- Progress Box -->
+        <div id="progressBox" style="margin-top: 1.25rem; display: none;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--admin-text-dark); font-weight: 600;">
+            <span id="progressStatus">Scanning designs...</span>
+            <span id="progressPercentText">0%</span>
+          </div>
+          <div class="progress-bar-container" style="display: block;">
+            <div id="progressBarFill" class="progress-bar-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Tabs & Results Table -->
+      <div class="card-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div class="filter-tab-bar" style="margin-bottom: 0;">
+            <button class="filter-tab active" data-filter="all">All Designs</button>
+            <button class="filter-tab" data-filter="verified">Verified Originals (<span id="tabCountVerified"><%= designsWithOriginal %></span>)</button>
+            <button class="filter-tab" data-filter="needs_reupload">Needs Re-upload (<span id="tabCountReupload"><%= designsNeedingReupload %></span>)</button>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--admin-text-muted);">
+            Showing latest scan results
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">ID</th>
+                <th style="width: 70px;">Preview</th>
+                <th>SKU & Title</th>
+                <th>Category</th>
+                <th>Original File</th>
+                <th>Size</th>
+                <th>SHA-256 Checksum</th>
+                <th style="width: 140px;">Status</th>
+                <th style="width: 90px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody">
+              <% if (initialResults && initialResults.length > 0) { %>
+                <% initialResults.forEach(function(r) { %>
+                  <tr class="result-row" data-status="<%= r.status %>">
+                    <td><strong>#<%= r.id %></strong></td>
+                    <td>
+                      <img src="<%= r.preview_url %>" alt="" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #E5E7EB;">
+                    </td>
+                    <td>
+                      <strong style="color: var(--admin-text-dark);"><%= r.sku || 'No SKU' %></strong>
+                      <div style="font-size: 0.78rem; color: var(--admin-text-muted);"><%= r.title %></div>
+                    </td>
+                    <td><%= r.category_name || 'Uncategorized' %></td>
+                    <td>
+                      <% if (r.original_name) { %>
+                        <code style="font-size: 0.75rem; background: #F3F4F6; padding: 2px 4px; border-radius: 4px;"><%= r.original_name %></code>
+                      <% } else { %>
+                        <span style="color: var(--admin-text-muted); font-size: 0.78rem;">None recorded</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <%= r.original_size ? (Math.round(r.original_size / 1024) + ' KB') : '-' %>
+                    </td>
+                    <td>
+                      <% if (r.checksum) { %>
+                        <span title="<%= r.checksum %>" style="font-family: monospace; font-size: 0.72rem; color: #4B5563;">
+                          <%= r.checksum.slice(0, 12) %>...
+                        </span>
+                      <% } else { %>
+                        <span style="color: var(--admin-text-muted); font-size: 0.78rem;">-</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (r.status === 'verified') { %>
+                        <span class="status-badge verified"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                      <% } else { %>
+                        <span class="status-badge needs_reupload"><i class="fa-solid fa-triangle-exclamation"></i> Re-upload</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <a href="/admin/designs/edit/<%= r.id %>" class="btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; min-height: 32px;" title="Edit Design">
+                        <i class="fa-solid fa-pen"></i> Edit
+                      </a>
+                    </td>
+                  </tr>
+                <% }); %>
+              <% } else { %>
+                <tr>
+                  <td colspan="9" style="text-align: center; padding: 2.5rem; color: var(--admin-text-muted);">
+                    <i class="fa-solid fa-folder-open" style="font-size: 2rem; margin-bottom: 0.5rem; display: block; opacity: 0.5;"></i>
+                    No designs found. Click "Start Scan" to check original files.
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+(function() {
+  const btnStartScan = document.getElementById('btnStartScan');
+  const btnDownloadCsv = document.getElementById('btnDownloadCsv');
+  const categorySelect = document.getElementById('categorySelect');
+  const dryRunCheck = document.getElementById('dryRunCheck');
+  const progressBox = document.getElementById('progressBox');
+  const progressBarFill = document.getElementById('progressBarFill');
+  const progressStatus = document.getElementById('progressStatus');
+  const progressPercentText = document.getElementById('progressPercentText');
+  const resultsTableBody = document.getElementById('resultsTableBody');
+
+  const statTotal = document.getElementById('statTotal');
+  const statVerified = document.getElementById('statVerified');
+  const statReupload = document.getElementById('statReupload');
+  const tabCountVerified = document.getElementById('tabCountVerified');
+  const tabCountReupload = document.getElementById('tabCountReupload');
+
+  let isScanning = false;
+  let totalVerified = 0;
+  let totalReupload = 0;
+
+  // Filter Tabs
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      const filter = this.dataset.filter;
+
+      document.querySelectorAll('.result-row').forEach(row => {
+        if (filter === 'all' || row.dataset.status === filter) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Dynamic CSV Download link with category
+  categorySelect.addEventListener('change', function() {
+    const cat = categorySelect.value;
+    btnDownloadCsv.href = '/admin/tools/original-files-check/csv' + (cat !== 'all' ? '?category_id=' + cat : '');
+  });
+
+  // Start AJAX Scan
+  btnStartScan.addEventListener('click', async function() {
+    if (isScanning) return;
+    isScanning = true;
+    btnStartScan.disabled = true;
+    btnStartScan.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';
+    progressBox.style.display = 'block';
+
+    const categoryId = categorySelect.value;
+    const isDryRun = dryRunCheck.checked;
+    const batchSize = 50;
+    let offset = 0;
+    let isCompleted = false;
+
+    totalVerified = 0;
+    totalReupload = 0;
+    resultsTableBody.innerHTML = '';
+
+    try {
+      while (!isCompleted) {
+        const res = await fetch('/admin/tools/original-files-check/scan', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+          },
+          body: JSON.stringify({
+            batch_size: batchSize,
+            offset: offset,
+            category_id: categoryId,
+            dry_run: isDryRun
+          })
+        });
+
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.message || 'Scan failed');
+        }
+
+        offset = data.offset;
+        isCompleted = data.isCompleted;
+
+        totalVerified += data.batchVerified || 0;
+        totalReupload += data.batchNeedingReupload || 0;
+
+        statTotal.textContent = data.totalDesigns;
+        statVerified.textContent = totalVerified;
+        statReupload.textContent = totalReupload;
+        if (tabCountVerified) tabCountVerified.textContent = totalVerified;
+        if (tabCountReupload) tabCountReupload.textContent = totalReupload;
+
+        const percent = data.progressPercent || 0;
+        progressBarFill.style.width = percent + '%';
+        progressPercentText.textContent = percent + '%';
+        progressStatus.textContent = 'Scanned ' + offset + ' of ' + data.totalDesigns + ' designs...';
+
+        // Render rows
+        if (data.results && data.results.length > 0) {
+          data.results.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'result-row';
+            tr.dataset.status = r.status;
+            tr.innerHTML = `
+              <td><strong>#${r.id}</strong></td>
+              <td>
+                <img src="${r.preview_url}" alt="" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #E5E7EB;">
+              </td>
+              <td>
+                <strong style="color: var(--admin-text-dark);">${r.sku || 'No SKU'}</strong>
+                <div style="font-size: 0.78rem; color: var(--admin-text-muted);">${escapeHtml(r.title)}</div>
+              </td>
+              <td>${escapeHtml(r.category_name || 'Uncategorized')}</td>
+              <td>
+                ${r.original_name ? '<code style="font-size: 0.75rem; background: #F3F4F6; padding: 2px 4px; border-radius: 4px;">' + escapeHtml(r.original_name) + '</code>' : '<span style="color: var(--admin-text-muted); font-size: 0.78rem;">None recorded</span>'}
+              </td>
+              <td>${r.original_size ? Math.round(r.original_size / 1024) + ' KB' : '-'}</td>
+              <td>
+                ${r.checksum ? '<span title="' + r.checksum + '" style="font-family: monospace; font-size: 0.72rem; color: #4B5563;">' + r.checksum.slice(0, 12) + '...</span>' : '<span style="color: var(--admin-text-muted); font-size: 0.78rem;">-</span>'}
+              </td>
+              <td>
+                ${r.status === 'verified' ? '<span class="status-badge verified"><i class="fa-solid fa-circle-check"></i> Verified</span>' : '<span class="status-badge needs_reupload"><i class="fa-solid fa-triangle-exclamation"></i> Re-upload</span>'}
+              </td>
+              <td>
+                <a href="/admin/designs/edit/${r.id}" class="btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; min-height: 32px;" title="Edit Design">
+                  <i class="fa-solid fa-pen"></i> Edit
+                </a>
+              </td>
+            `;
+            resultsTableBody.appendChild(tr);
+          });
+        }
+      }
+
+      progressStatus.textContent = 'Scan completed! All designs audited successfully.';
+      progressBarFill.style.width = '100%';
+      progressPercentText.textContent = '100%';
+    } catch (err) {
+      alert('Scan error: ' + err.message);
+      progressStatus.textContent = 'Scan failed: ' + err.message;
+    } finally {
+      isScanning = false;
+      btnStartScan.disabled = false;
+      btnStartScan.innerHTML = '<i class="fa-solid fa-play"></i> Start Scan';
+    }
+  });
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>
+</body>
+</html>
+

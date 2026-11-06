@@ -784,6 +784,43 @@
             text-transform: uppercase;
           }
         </style>
+        </div>
+
+        <!-- Card 1c: Customer Theme & Appearance Settings (Part 2) -->
+        <div class="admin-card-box" id="appearance-settings" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-circle-half-stroke" style="color: var(--admin-primary);"></i> Customer Theme & Appearance Settings
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Configure light / dark / system theme behavior in the mobile sidebar drawer and header.</span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-check"></i> Live Sync</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">Enable Theme Switcher</strong>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Shows the Light / Dark / System segmented switcher in the mobile drawer and header (default: ON).</span>
+                </div>
+                <input type="checkbox" name="theme_switcher_enabled" value="1" <%= (typeof settings === 'undefined' || settings.theme_switcher_enabled !== '0') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
+              </label>
+            </div>
+
+            <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
+              <label style="display: block; font-size: 0.92rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
+                Default Theme for New Visitors
+              </label>
+              <select name="default_theme" class="form-control" style="height: 42px; border-radius: 8px; font-size: 0.85rem;">
+                <option value="system" <%= (typeof settings === 'undefined' || !settings.default_theme || settings.default_theme === 'system') ? 'selected' : '' %>>System (Follows device preference — Default)</option>
+                <option value="light" <%= (typeof settings !== 'undefined' && settings.default_theme === 'light') ? 'selected' : '' %>>Light Theme</option>
+                <option value="dark" <%= (typeof settings !== 'undefined' && settings.default_theme === 'dark') ? 'selected' : '' %>>Dark Theme</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
         <!-- Card 2: Store Information -->
         <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
@@ -1229,15 +1266,23 @@
             </div>
 
             <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
-              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 0.6rem;">
                 <div>
                   <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 4px;">
                     <i class="fa-solid fa-download" style="color: var(--admin-primary); margin-right: 5px;"></i> Show Preview Download Button
                   </strong>
-                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Shows the public PNG preview download pill on the main product image and lightbox (default: ON).</span>
+                  <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted);">Shows the public image download pill on the main product image and lightbox (default: ON).</span>
                 </div>
                 <input type="checkbox" name="show_preview_download_button" value="1" <%= (typeof settings === 'undefined' || settings.show_preview_download_button !== '0') ? 'checked' : '' %> style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--admin-primary);">
               </label>
+
+              <div style="border-top: 1px dashed var(--admin-border); padding-top: 0.6rem; margin-top: 0.6rem;">
+                <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">Download Button Gives</label>
+                <select name="design_download_source" class="form-control" style="width: 100%; height: 38px; border-radius: 6px; font-size: 0.82rem;">
+                  <option value="original" <%= (typeof settings === 'undefined' || !settings.design_download_source || settings.design_download_source === 'original') ? 'selected' : '' %>>Original image byte-for-byte (Default)</option>
+                  <option value="preview" <%= (typeof settings !== 'undefined' && settings.design_download_source === 'preview') ? 'selected' : '' %>>Display preview image</option>
+                </select>
+              </div>
             </div>
 
             <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">

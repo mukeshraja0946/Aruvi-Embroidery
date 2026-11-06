@@ -390,14 +390,18 @@
                     <strong style="font-size: 0.88rem; color: var(--admin-primary);"><%= cat.design_count !== undefined ? cat.design_count : 0 %></strong>
                   </td>
                   <td>
-                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-muted);"><%= cat.display_order || 0 %></span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <button type="button" onclick="reorderCategory('<%= cat.id %>', 'up')" title="Move Up" style="border: 1px solid var(--admin-border); background: #FFF; border-radius: 4px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--admin-text-dark);"><i class="fa-solid fa-arrow-up" style="font-size: 0.7rem;"></i></button>
+                      <span id="catOrderNum-<%= cat.id %>" style="font-size: 0.85rem; font-weight: 700; min-width: 20px; text-align: center; color: var(--admin-text-dark);"><%= cat.sort_order || cat.display_order || 0 %></span>
+                      <button type="button" onclick="reorderCategory('<%= cat.id %>', 'down')" title="Move Down" style="border: 1px solid var(--admin-border); background: #FFF; border-radius: 4px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--admin-text-dark);"><i class="fa-solid fa-arrow-down" style="font-size: 0.7rem;"></i></button>
+                    </div>
                   </td>
                   <td>
-                    <% if (cat.show_on_home !== 0 && cat.show_on_home !== false) { %>
-                      <span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; background: #E8F5E9; color: #2E7D32;">Home</span>
-                    <% } else { %>
-                      <span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; background: #F5F5F5; color: #9E9E9E;">Hidden</span>
-                    <% } %>
+                    <label class="switch-toggle" title="Toggle Home Display">
+                      <input type="checkbox" <%= (cat.show_on_home !== 0 && cat.show_on_home !== false && cat.show_on_home !== '0') ? 'checked' : '' %> onchange="toggleCategoryHome('<%= cat.id %>')">
+                      <span class="slider-round"></span>
+                      <span id="catHomeLabel-<%= cat.id %>" style="font-size: 0.78rem; font-weight: 600; color: <%= (cat.show_on_home !== 0 && cat.show_on_home !== false && cat.show_on_home !== '0') ? '#2E7D32' : 'var(--admin-text-muted)' %>;"><%= (cat.show_on_home !== 0 && cat.show_on_home !== false && cat.show_on_home !== '0') ? 'Home' : 'Hidden' %></span>
+                    </label>
                   </td>
                   <td>
                     <label class="switch-toggle">
@@ -747,6 +751,46 @@
       }
     } catch (e) {
       alert('Network error updating category status.');
+    }
+  }
+
+  async function toggleCategoryHome(id) {
+    try {
+      const res = await fetch('/admin/categories/toggle-home/' + id, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const lbl = document.getElementById('catHomeLabel-' + id);
+        if (lbl) {
+          lbl.innerText = data.show_on_home ? 'Home' : 'Hidden';
+          lbl.style.color = data.show_on_home ? '#2E7D32' : 'var(--admin-text-muted)';
+        }
+        showAdminToast(data.message || 'Home visibility updated.');
+      } else {
+        alert(data.message || 'Error updating home visibility');
+      }
+    } catch (e) {
+      alert('Network error updating category home visibility.');
+    }
+  }
+
+  async function reorderCategory(id, direction) {
+    try {
+      const res = await fetch('/admin/categories/reorder/' + id + '/' + direction, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        showAdminToast(data.message || 'Category order updated.');
+        setTimeout(() => window.location.reload(), 400);
+      } else {
+        alert(data.message || 'Error updating category order');
+      }
+    } catch (e) {
+      alert('Network error reordering category.');
     }
   }
 </script>

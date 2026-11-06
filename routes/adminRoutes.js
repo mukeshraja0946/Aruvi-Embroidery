@@ -170,6 +170,8 @@ router.post('/admin/categories/settings', adminCategoryController.postSettings);
 router.post('/admin/categories/create', upload.single('image'), adminCategoryController.postCreate);
 router.post('/admin/categories/edit/:id', upload.single('image'), adminCategoryController.postUpdate);
 router.post('/admin/categories/toggle-status/:id', adminCategoryController.toggleStatus);
+router.post('/admin/categories/toggle-home/:id', adminCategoryController.toggleHome);
+router.post('/admin/categories/reorder/:id/:direction', adminCategoryController.postReorder);
 router.post('/admin/categories/delete/:id', adminCategoryController.deleteCategory);
 
 // Orders Management
@@ -261,6 +263,11 @@ router.get('/admin/tools/regenerate-previews', adminToolsController.getRegenerat
 router.post('/admin/tools/regenerate-previews', adminToolsController.postRegeneratePreviews);
 router.get('/admin/tools/regenerate-previews/export-csv', adminToolsController.exportRegeneratePreviewsCsv);
 router.get('/admin/tools/regenerate-previews/export-missing-csv', adminToolsController.exportMissingPreviewsCsv);
+
+// Original Files Check & Integrity Audit
+router.get('/admin/tools/original-files-check', adminToolsController.getOriginalFilesCheck);
+router.post('/admin/tools/original-files-check/scan', adminToolsController.postOriginalFilesScan);
+router.get('/admin/tools/original-files-check/csv', adminToolsController.downloadOriginalFilesCsv);
 
 router.get('/admin/tools/bulk-image-relink', adminToolsController.getBulkImageRelink);
 router.get('/admin/tools/bulk-image-relink/export-report', adminToolsController.getBulkImageRelinkExport);

@@ -1,6 +1,6 @@
 <%
   const _c = (typeof category !== 'undefined' && category) ? category : ((typeof cat !== 'undefined' && cat) ? cat : {});
-  const catImage = _c.image_url || null;
+  const catImage = _c.card_image_key || _c.image_url || null;
   const catIcon = _c.icon || 'fa-solid fa-shapes';
   const cnt = (_c.design_count !== undefined && _c.design_count !== null) ? parseInt(_c.design_count, 10) : 0;
   
@@ -13,9 +13,11 @@
   } else if (mode === 'hidden') {
     countText = '';
   }
+
+  const catLink = (_c.children_count > 0 || _c.has_children) ? `/categories?parent=${encodeURIComponent(_c.slug)}` : `/category/${encodeURIComponent(_c.slug)}`;
 %>
 
-<a href="/category/<%= _c.slug %>" class="category-wave-card" title="<%= _c.name %>">
+<a href="<%= catLink %>" class="category-wave-card" title="<%= _c.name %>">
   <!-- Top Photo Box (about 60% of card) or Brand Gradient Fallback -->
   <div class="cat-wave-img-box <%= !catImage ? 'no-img-gradient' : '' %>">
     <% if (catImage) { %>
@@ -30,10 +32,10 @@
       </div>
     <% } %>
 
-    <!-- Soft Wave Curve Overlapping Photo -->
+    <!-- Soft Wave Curve Overlapping Photo (matches card bg in light and dark) -->
     <div class="cat-wave-svg-divider">
       <svg viewBox="0 0 500 90" preserveAspectRatio="none" class="cat-wave-svg">
-        <path d="M0,35 C150,90 350,0 500,55 L500,90 L0,90 Z" fill="#FFFFFF"></path>
+        <path d="M0,35 C150,90 350,0 500,55 L500,90 L0,90 Z" class="cat-wave-svg-path" fill="var(--bg-card, #FFFFFF)"></path>
       </svg>
     </div>
   </div>

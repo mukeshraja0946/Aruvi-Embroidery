@@ -33,6 +33,7 @@ module.exports = {
   saveBrandingFile: (file, originalName, mimeType) => storageService.saveBrandingFile(file, originalName, mimeType),
   saveCustomRequestFile: (file, originalName, mimeType) => storageService.saveCustomRequestFile(file, originalName, mimeType),
   savePrivateFile: (file, originalName, mimeType, designId = null) => storageService.savePrivateFile(file, originalName, mimeType, designId),
+  saveOriginalFile: (file, originalName, mimeType) => storageService.saveOriginalFile(file, originalName, mimeType),
   buildPublicUrl: (keyOrPath) => storageService.buildPublicUrl(keyOrPath),
   buildThumbnailUrl: (keyOrPath) => storageService.buildThumbnailUrl(keyOrPath),
   generateThumbnail: (source, filename) => storageService.generateThumbnail(source, filename),

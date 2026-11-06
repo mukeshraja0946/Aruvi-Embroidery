@@ -30,7 +30,8 @@
     <%- include('partials/feature-cards', { page: 'home' }) %>
   </section>
 
-  <!-- Popular Categories Section (Reference Wave Cards: 6 Desktop / Horizontal Swipe Mobile) -->
+  <!-- Popular Categories Section (Reference Wave Cards: Responsive Grid Desktop / Horizontal Swipe Mobile) -->
+  <% if (categories && categories.length > 0) { %>
   <section class="home-categories-section" style="margin-bottom: 2rem;">
     <div class="section-heading-box flex-between">
       <div>
@@ -48,17 +49,16 @@
 
     <div class="categories-wave-container">
       <div class="categories-wave-grid swipe-row-mobile hide-scrollbar">
-        <% if (categories && categories.length > 0) { %>
-          <% categories.slice(0, 6).forEach(cat => { %>
-            <%- include('partials/category-card', {
-              cat,
-              countDisplayMode: typeof countDisplayMode !== 'undefined' ? countDisplayMode : 'exact'
-            }) %>
-          <% }) %>
-        <% } %>
+        <% categories.forEach(cat => { %>
+          <%- include('partials/category-card', {
+            cat,
+            countDisplayMode: typeof countDisplayMode !== 'undefined' ? countDisplayMode : 'exact'
+          }) %>
+        <% }) %>
       </div>
     </div>
   </section>
+  <% } %>
 
   <!-- Featured Designs Section (6 in a single row matching Screenshot 2) -->
   <section style="margin-bottom: 1.5rem;">

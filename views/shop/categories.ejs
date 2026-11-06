@@ -15,14 +15,43 @@
   </div>
 
   <!-- Category Wave Cards Grid (Responsive Grid 6/3/2 matching Reference) -->
-  <div class="categories-wave-grid categories-page-grid" style="margin-bottom: 2.5rem;">
-    <% categories.forEach(cat => { %>
-      <%- include('../partials/category-card', {
-        cat,
-        countDisplayMode: typeof countDisplayMode !== 'undefined' ? countDisplayMode : 'exact'
-      }) %>
-    <% }) %>
-  </div>
+  <% if (categories && categories.length > 0) { %>
+    <div class="categories-wave-grid categories-page-grid" style="margin-bottom: 2.5rem;">
+      <% categories.forEach(cat => { %>
+        <%- include('../partials/category-card', {
+          cat,
+          countDisplayMode: typeof countDisplayMode !== 'undefined' ? countDisplayMode : 'exact'
+        }) %>
+      <% }) %>
+    </div>
+
+    <!-- Pagination if > 24 categories -->
+    <% if (typeof pagination !== 'undefined' && pagination && pagination.totalPages > 1) { %>
+      <div class="pagination-wrapper" style="display: flex; justify-content: center; gap: 8px; margin: 2rem 0 3rem;">
+        <% if (pagination.hasPrev) { %>
+          <a href="?page=<%= pagination.prevPage %>" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px;">&laquo; Previous</a>
+        <% } %>
+        <% for (let i = 1; i <= pagination.totalPages; i++) { %>
+          <a href="?page=<%= i %>" class="btn <%= pagination.page === i ? 'btn-primary' : 'btn-outline' %>" style="padding: 8px 16px; border-radius: 8px;"><%= i %></a>
+        <% } %>
+        <% if (pagination.hasNext) { %>
+          <a href="?page=<%= pagination.nextPage %>" class="btn btn-outline" style="padding: 8px 16px; border-radius: 8px;">Next &raquo;</a>
+        <% } %>
+      </div>
+    <% } %>
+  <% } else { %>
+    <div class="empty-state-card" style="text-align: center; padding: 3.5rem 1.5rem; background: var(--bg-card, #fff); border-radius: 20px; border: 1px solid var(--border-light, #f0e6e6); margin: 2rem 0 3rem; box-shadow: var(--shadow-sm);">
+      <div style="width: 72px; height: 72px; border-radius: 50%; background: var(--accent-soft, #FAF3F0); color: var(--primary, #B8402A); display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 1.2rem;">
+        <i class="fa-solid fa-layer-group"></i>
+      </div>
+      <h3 style="font-family: var(--font-heading, 'Playfair Display'); font-size: 1.45rem; font-weight: 700; color: var(--text-dark, #2C1E1A); margin-bottom: 0.5rem;">No categories yet</h3>
+      <p style="color: var(--text-muted, #7D6B63); font-size: 0.95rem; max-width: 440px; margin: 0 auto 1.5rem;">We are regularly adding new curated embroidery categories. Check back soon or browse all available designs.</p>
+      <a href="/designs" class="btn btn-primary" style="padding: 11px 28px; border-radius: 30px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+        <span>Browse All Designs</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </a>
+    </div>
+  <% } %>
 
   <!-- Reusable Trust/Feature Cards Bar (Controls via Admin Homepage/Settings) -->
   <%- include('../partials/feature-cards', { page: 'categories' }) %>

@@ -125,9 +125,11 @@ const fallbackSettings = {
   razorpay_key_secret: process.env.RAZORPAY_KEY_SECRET || '',
   razorpay_mode: process.env.RAZORPAY_MODE || (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_ID.startsWith('rzp_live') ? 'live' : 'test'),
   razorpay_webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
-  hide_empty_categories_in_pills: 'true',
+  hide_empty_categories_in_pills: 'false',
   category_count_display: 'exact', // 'exact', 'rounded', 'hidden'
-  category_hide_empty: '1', // '1' = hide 0-design categories, '0' = show
+  category_hide_empty: '0', // '0' = show all categories (default OFF), '1' = hide 0-design categories
+  max_categories_on_home: '', // empty = show all categories without artificial limit
+  category_count_includes_subcategories: '1', // '1' = count includes child category designs
   show_category_banner_mobile: '0',
   show_sku_on_cards: '0',
   about_hero_title: 'About ARUVI',

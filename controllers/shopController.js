@@ -49,7 +49,7 @@ exports.getShopPage = async (req, res, next) => {
       limit
     });
 
-    const hideEmptySetting = await Setting.get('category_hide_empty', '1');
+    const hideEmptySetting = await Setting.get('category_hide_empty', '0');
     const hideEmptyCategories = (hideEmptySetting === '1' || hideEmptySetting === 'true' || hideEmptySetting === true);
     const categories = await Category.getAll({ status: 'active', hideEmpty: hideEmptyCategories });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
@@ -111,8 +111,32 @@ exports.getShopPage = async (req, res, next) => {
 exports.getCategoriesPage = async (req, res, next) => {
   try {
     const countDisplay = await Setting.get('category_count_display', 'exact');
-    const hideEmpty = await Setting.get('category_hide_empty', '1');
-    const categories = await Category.getAll({ status: 'active', hideEmpty: hideEmpty === '1' });
+    const hideEmpty = await Setting.get('category_hide_empty', '0');
+    const parentSlug = req.query.parent || null;
+    const allCategories = await Category.getAll({ status: 'active', hideEmpty: hideEmpty === '1', parent: parentSlug });
+    
+    // Pagination only if more than 24 categories
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 24;
+    const totalCategories = allCategories.length;
+    let categories = allCategories;
+    let pagination = null;
+
+    if (totalCategories > limit) {
+      const totalPages = Math.ceil(totalCategories / limit);
+      const startIndex = (page - 1) * limit;
+      categories = allCategories.slice(startIndex, startIndex + limit);
+      pagination = {
+        page,
+        totalPages,
+        totalItems: totalCategories,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+        nextPage: page + 1,
+        prevPage: page - 1
+      };
+    }
+
     const featuredDesigns = await Design.getFeatured(6);
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
     const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
@@ -120,6 +144,7 @@ exports.getCategoriesPage = async (req, res, next) => {
     res.render('shop/categories', {
       title: 'Categories - ARUVI EMBROIDERY STUDIO',
       categories,
+      pagination,
       countDisplayMode: countDisplay,
       featuredDesigns,
       userPurchasedDesignIds,
@@ -164,7 +189,7 @@ exports.getCategoryDetailPage = async (req, res, next) => {
       limit
     });
 
-    const hideEmptySetting = await Setting.get('category_hide_empty', '1');
+    const hideEmptySetting = await Setting.get('category_hide_empty', '0');
     const hideEmptyCategories = (hideEmptySetting === '1' || hideEmptySetting === 'true' || hideEmptySetting === true);
     const categories = await Category.getAll({ status: 'active', hideEmpty: hideEmptyCategories });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
@@ -450,19 +475,9 @@ exports.downloadPreviewPng = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Design not found' });
     }
 
-    const reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/placeholder-preview.png';
-    if (!reqImgUrl) {
-      return res.status(404).json({ success: false, message: 'No preview image available for this design' });
-    }
-
-    // Security check: strictly forbid machine embroidery files, archives, and system files
-    const forbiddenExts = ['.zip', '.dst', '.pes', '.jef', '.exp', '.xxx', '.vp3', '.hus', '.env', '.json', '.sql', '.js', '.rar', '.7z'];
-    const lowerUrl = reqImgUrl.toLowerCase().split('?')[0];
-    if (forbiddenExts.some(ext => lowerUrl.endsWith(ext))) {
-      return res.status(403).json({ success: false, message: 'Machine files cannot be downloaded via preview download' });
-    }
-    if (reqImgUrl.includes('..') || reqImgUrl.includes('etc/passwd') || reqImgUrl.includes('.env')) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+    const settings = await Setting.getAll();
+    if (settings.show_preview_download_button === '0') {
+      return res.status(403).json({ success: false, message: 'Preview downloads are disabled by administrator.' });
     }
 
     // Increment preview_download_count safely
@@ -474,27 +489,45 @@ exports.downloadPreviewPng = async (req, res, next) => {
       }
     }
 
-    let inputBuffer = null;
+    const storage = require('../config/storage');
+    const downloadSource = settings.design_download_source || 'original';
 
-    // First attempt local file lookup (handles both relative paths and full URLs pointing to this host)
-    let localRel = reqImgUrl;
-    if (reqImgUrl.startsWith('http://') || reqImgUrl.startsWith('https://')) {
-      try {
-        const parsedUrl = new URL(reqImgUrl);
-        localRel = parsedUrl.pathname;
-      } catch (e) {
-        localRel = reqImgUrl;
+    // 1. Try serving byte-for-byte original file if configured and available
+    if (downloadSource === 'original') {
+      const origKey = design.preview_original_key || design.original_file_key || design.original_key;
+      let origPath = origKey ? storage.resolveFilePath(origKey) : null;
+      if (!origPath || !fs.existsSync(origPath)) {
+        // Also check by original filename in originals directory
+        if (design.original_name) {
+          const directOrig = path.join(storage.getOriginalsDir(), design.original_name);
+          if (fs.existsSync(directOrig)) origPath = directOrig;
+        }
+      }
+
+      if (origPath && fs.existsSync(origPath)) {
+        const stat = fs.statSync(origPath);
+        const ext = path.extname(origPath) || '.png';
+        const cleanName = design.original_name || `${(design.sku || design.title || 'design').replace(/[/\\?%*:|"<>]/g, '_')}${ext}`;
+        const mimeType = design.original_mime_type || storage.getMimeType(ext) || 'image/png';
+
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
+        res.setHeader('Content-Disposition', `attachment; filename="${cleanName}"; filename*=UTF-8''${encodeURIComponent(cleanName)}`);
+        return fs.createReadStream(origPath).pipe(res);
       }
     }
 
-    const cleanRel = localRel.split('?')[0].replace(/^\//, '');
+    // 2. Serve direct preview image file without sharp re-compression or loss
+    const reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/placeholder-preview.png';
+    const cleanRel = reqImgUrl.split('?')[0].replace(/^\//, '');
     const candidates = [
+      storage.resolveFilePath(cleanRel),
       path.resolve(__dirname, '..', cleanRel),
       path.resolve(__dirname, '..', 'public', cleanRel.replace(/^public\//, '')),
       path.resolve(__dirname, '..', 'public', 'uploads', cleanRel.replace(/^(public\/)?uploads\//, '')),
-      path.resolve(__dirname, '..', 'public', 'uploads', 'previews', cleanRel.replace(/^(public\/)?(uploads\/)?previews\//, '')),
-      path.resolve(__dirname, '..', 'public', 'images', cleanRel.replace(/^(public\/)?images\//, ''))
-    ];
+      path.resolve(__dirname, '..', 'public', 'uploads', 'previews', cleanRel.replace(/^(public\/)?(uploads\/)?previews\//, ''))
+    ].filter(Boolean);
 
     let foundPath = null;
     for (const cand of candidates) {
@@ -504,51 +537,23 @@ exports.downloadPreviewPng = async (req, res, next) => {
       }
     }
 
-    if (foundPath) {
-      inputBuffer = await fs.promises.readFile(foundPath);
-    } else if (reqImgUrl.startsWith('http://') || reqImgUrl.startsWith('https://')) {
-      try {
-        const fetchRes = await fetch(reqImgUrl);
-        if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
-        const arrayBuf = await fetchRes.arrayBuffer();
-        inputBuffer = Buffer.from(arrayBuf);
-      } catch (netErr) {
-        return res.status(502).json({ success: false, message: 'Failed to fetch remote preview image: ' + netErr.message });
-      }
-    } else {
+    if (!foundPath) {
       return res.status(404).json({ success: false, message: 'Preview image file not found on server' });
     }
 
-    if (!inputBuffer || inputBuffer.length === 0) {
-      return res.status(500).json({ success: false, message: 'Preview image file is empty' });
-    }
-
-    // Check if input is already a valid PNG (magic bytes: 89 50 4E 47 0D 0A 1A 0A)
-    const isPng = inputBuffer.length > 8 &&
-                  inputBuffer[0] === 0x89 &&
-                  inputBuffer[1] === 0x50 &&
-                  inputBuffer[2] === 0x4E &&
-                  inputBuffer[3] === 0x47;
-
-    let outputPngBuffer;
-    if (isPng) {
-      outputPngBuffer = inputBuffer;
-    } else {
-      outputPngBuffer = await sharp(inputBuffer)
-        .png({ compressionLevel: 9, adaptiveFiltering: true })
-        .toBuffer();
-    }
-
+    const stat = fs.statSync(foundPath);
+    const ext = path.extname(foundPath) || '.png';
     const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
-    const downloadFilename = `${baseClean}-preview.png`;
+    const downloadFilename = `${baseClean}${ext}`;
+    const mimeType = storage.getMimeType(ext) || 'image/png';
 
-    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
-    res.setHeader('Content-Length', outputPngBuffer.length);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.end(outputPngBuffer);
+    return fs.createReadStream(foundPath).pipe(res);
   } catch (err) {
     console.error('[Download Preview PNG Error]:', err);
     return res.status(500).json({ success: false, message: 'Error processing preview image: ' + err.message });
@@ -556,10 +561,9 @@ exports.downloadPreviewPng = async (req, res, next) => {
 };
 
 /**
- * Dedicated Preview Download Route matching Task 3 requirements:
+ * Dedicated Preview Download Route:
  * /designs/:slug/preview-download/:imageId?
- * Supports on-the-fly watermarking, login permissions, separate preview download tracking,
- * and strictly prevents machine file downloads.
+ * Serves exact original file byte-for-byte or pristine preview without sharp re-compression.
  */
 exports.downloadPreviewImageRoute = async (req, res, next) => {
   try {
@@ -581,8 +585,82 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
       return res.redirect(`/user/login?returnUrl=${encodeURIComponent(req.originalUrl)}`);
     }
 
-    let reqImgUrl = null;
+    // Increment preview_download_count safely
+    if (db.isConnected()) {
+      try {
+        await db.query('UPDATE designs SET preview_download_count = COALESCE(preview_download_count, 0) + 1 WHERE id = ?', [design.id]);
+      } catch (cntErr) {
+        console.warn('[Preview Download Count Error]:', cntErr.message);
+      }
+    }
+
+    const storage = require('../config/storage');
+    const downloadSource = settings.design_download_source || 'original';
     const imageId = req.params.imageId;
+
+    // Check if an original image exists for this design or imageId
+    let origPath = null;
+    let originalName = null;
+    let originalMime = null;
+
+    if (downloadSource === 'original') {
+      if (imageId && db.isConnected()) {
+        try {
+          const [imgRow] = await db.query(
+            'SELECT original_key, original_name, original_size, original_mime_type FROM design_images WHERE id = ? AND design_id = ? LIMIT 1',
+            [imageId, design.id]
+          );
+          if (imgRow && imgRow.original_key) {
+            const p = storage.resolveFilePath(imgRow.original_key);
+            if (p && fs.existsSync(p)) {
+              origPath = p;
+              originalName = imgRow.original_name;
+              originalMime = imgRow.original_mime_type;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!origPath) {
+        const origKey = design.preview_original_key || design.original_file_key || design.original_key;
+        if (origKey) {
+          const p = storage.resolveFilePath(origKey);
+          if (p && fs.existsSync(p)) {
+            origPath = p;
+            originalName = design.original_name;
+            originalMime = design.original_mime_type;
+          }
+        }
+      }
+
+      // Check directly in originals directory if design has an original_name
+      if (!origPath && design.original_name) {
+        const directOrig = path.join(storage.getOriginalsDir(), design.original_name);
+        if (fs.existsSync(directOrig)) {
+          origPath = directOrig;
+          originalName = design.original_name;
+        }
+      }
+    }
+
+    // If original found on disk, stream byte-for-byte!
+    if (origPath && fs.existsSync(origPath)) {
+      const stat = fs.statSync(origPath);
+      const ext = path.extname(origPath) || '.png';
+      const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
+      const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
+      const downloadFilename = originalName || `${rawSku || rawTitle || 'design'}${ext}`;
+      const mimeType = originalMime || storage.getMimeType(ext) || 'image/png';
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', stat.size);
+      res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
+      return fs.createReadStream(origPath).pipe(res);
+    }
+
+    // Otherwise find the preview image file and stream it directly without sharp re-compression
+    let reqImgUrl = null;
     if (imageId) {
       if (db.isConnected()) {
         const [imgRow] = await db.query('SELECT image_url FROM design_images WHERE id = ? AND design_id = ?', [imageId, design.id]);
@@ -607,16 +685,6 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // Increment preview_download_count safely (separated from real purchase downloads)
-    if (db.isConnected()) {
-      try {
-        await db.query('UPDATE designs SET preview_download_count = COALESCE(preview_download_count, 0) + 1 WHERE id = ?', [design.id]);
-      } catch (cntErr) {
-        console.warn('[Preview Download Count Error]:', cntErr.message);
-      }
-    }
-
-    let inputBuffer = null;
     let localRel = reqImgUrl;
     if (reqImgUrl.startsWith('http://') || reqImgUrl.startsWith('https://')) {
       try {
@@ -629,56 +697,43 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
 
     const cleanRel = localRel.split('?')[0].replace(/^\//, '');
     const candidates = [
+      storage.resolveFilePath(cleanRel),
       path.resolve(__dirname, '..', cleanRel),
       path.resolve(__dirname, '..', 'public', cleanRel.replace(/^public\//, '')),
       path.resolve(__dirname, '..', 'public', 'uploads', cleanRel.replace(/^(public\/)?uploads\//, '')),
-      path.resolve(__dirname, '..', 'public', 'uploads', 'previews', cleanRel.replace(/^(public\/)?(uploads\/)?previews\//, '')),
-      path.resolve(__dirname, '..', 'public', 'images', cleanRel.replace(/^(public\/)?images\//, ''))
-    ];
+      path.resolve(__dirname, '..', 'public', 'uploads', 'previews', cleanRel.replace(/^(public\/)?(uploads\/)?previews\//, ''))
+    ].filter(Boolean);
 
+    let foundPath = null;
     for (const cand of candidates) {
       if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
-        inputBuffer = await fs.promises.readFile(cand);
+        foundPath = cand;
         break;
       }
     }
 
-    if (!inputBuffer && (reqImgUrl.startsWith('http://') || reqImgUrl.startsWith('https://'))) {
-      try {
-        const fetchRes = await fetch(reqImgUrl);
-        if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
-        inputBuffer = Buffer.from(await fetchRes.arrayBuffer());
-      } catch (netErr) {
-        return res.status(502).json({ success: false, message: 'Failed to fetch remote preview image: ' + netErr.message });
-      }
-    }
-
-    if (!inputBuffer || inputBuffer.length === 0) {
+    if (!foundPath) {
       return res.status(404).json({ success: false, message: 'Preview image file not found on server' });
     }
 
-    // Clean preview download - NO watermarking step
-    let outputBuffer = inputBuffer;
-    const isPng = inputBuffer.length > 8 &&
-                  inputBuffer[0] === 0x89 && inputBuffer[1] === 0x50 &&
-                  inputBuffer[2] === 0x4E && inputBuffer[3] === 0x47;
-    if (!isPng) {
-      const sharp = getSharp();
-      if (sharp) {
-        outputBuffer = await sharp(inputBuffer).rotate().png({ compressionLevel: 8 }).toBuffer();
-      }
-    }
-
+    const stat = fs.statSync(foundPath);
+    const ext = path.extname(foundPath) || '.png';
     const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
-    const downloadFilename = `${baseClean}-preview.png`;
+    const downloadFilename = `${baseClean}${ext}`;
+    const mimeType = storage.getMimeType(ext) || 'image/png';
 
-    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
-    res.setHeader('Content-Length', outputBuffer.length);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.end(outputBuffer);
+    return fs.createReadStream(foundPath).pipe(res);
+  } catch (err) {
+    console.error('[Preview Download Route Error]:', err);
+    return res.status(500).json({ success: false, message: 'Error processing preview download: ' + err.message });
+  }
+};
   } catch (err) {
     console.error('[Preview Download Route Error]:', err);
     return res.status(500).json({ success: false, message: 'Error processing preview download: ' + err.message });

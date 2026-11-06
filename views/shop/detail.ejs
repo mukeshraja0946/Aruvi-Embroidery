@@ -441,14 +441,13 @@
     element.classList.add('active');
   }
 
-  // Download currently displayed preview as authentic watermarked preview PNG
-  async function downloadPreviewImage(e, explicitSrc) {
+  // Download currently displayed preview / original image (Plain direct route - byte for byte fidelity)
+  function downloadPreviewImage(e, explicitSrc) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
-    const clickedBtn = (e && e.currentTarget) ? e.currentTarget : document.getElementById('downloadPreviewBtn');
     const targetImgSrc = explicitSrc || document.getElementById('mainDisplayImg')?.src;
     if (!targetImgSrc) {
       alert('Preview image not available for download.');
@@ -456,66 +455,22 @@
     }
 
     const designSlug = '<%= design.slug || design.id %>';
-    const rawSku = '<%= (design.sku || "").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
-    const rawTitle = '<%= (design.title || "").replace(/[/\\?%*:|"<>]/g, "-").trim() %>';
-    const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
-    const targetFilename = `${baseClean}-preview.png`;
+    const downloadUrl = `/designs/${encodeURIComponent(designSlug)}/preview-download?imgUrl=${encodeURIComponent(targetImgSrc)}`;
 
-    const originalContent = clickedBtn ? clickedBtn.innerHTML : '';
-    if (clickedBtn) {
-      clickedBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Downloading...</span>';
-      clickedBtn.disabled = true;
-      clickedBtn.style.opacity = '0.85';
-    }
-
-    function triggerDownload(blob, name) {
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-    }
-
-    try {
-      // Hit dedicated server preview-download route: /designs/:slug/preview-download?imgUrl=...
-      const downloadUrl = `/designs/${encodeURIComponent(designSlug)}/preview-download?imgUrl=${encodeURIComponent(targetImgSrc)}`;
-      const res = await fetch(downloadUrl);
-
-      if (res.status === 401) {
+    <% if (typeof siteSettings !== 'undefined' && siteSettings.require_login_preview_download === '1') { %>
+      if (typeof window.isUserLoggedIn !== 'undefined' && !window.isUserLoggedIn) {
         if (typeof openLoginModal === 'function') {
-          openLoginModal(() => downloadPreviewImage(null, targetImgSrc));
+          openLoginModal(() => { window.location.href = downloadUrl; });
           return;
         } else {
           window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
           return;
         }
       }
+    <% } %>
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Server returned status ${res.status}`);
-      }
-
-      const blob = await res.blob();
-      if (!blob || blob.size === 0) {
-        throw new Error('Downloaded preview image was empty');
-      }
-
-      triggerDownload(blob, targetFilename);
-    } catch (err) {
-      console.warn('Preview download route error, trying direct fallback:', err);
-      // Fallback direct link
-      window.open(targetImgSrc, '_blank');
-    } finally {
-      if (clickedBtn) {
-        clickedBtn.innerHTML = originalContent;
-        clickedBtn.disabled = false;
-        clickedBtn.style.opacity = '1';
-      }
-    }
+    // Plain direct browser download link: streams exact server bytes directly to disk
+    window.location.href = downloadUrl;
   }
 
   // Tap-to-Zoom Pinch Lightbox Controller

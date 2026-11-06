@@ -743,6 +743,51 @@ class StorageService {
   }
 
   /**
+   * Saves an ORIGINAL file byte-for-byte in private storage (UPLOAD_DIR/private/originals/).
+   * Never resized, recompressed, converted, metadata-stripped or re-zipped.
+   * Calculates SHA-256 checksum and exact size.
+   */
+  async saveOriginalFile(filePathOrBuffer, originalName, mimeType = null) {
+    if (this.isUploadBlocked()) {
+      throw new Error('Uploads are currently disabled: UPLOAD_DIR is located inside the deploy folder.');
+    }
+
+    const cleanOrig = path.basename(originalName || 'original_file').replace(/[/\\?%*:|"<>]/g, '_').trim();
+    const ext = path.extname(cleanOrig).toLowerCase();
+    const baseName = (cleanOrig.slice(0, -ext.length) || 'file').trim();
+    const uniqueFilename = `${baseName}_orig_${Date.now()}_${crypto.randomBytes(4).toString('hex')}${ext}`;
+
+    const targetDir = this.getOriginalsDir();
+    const destPath = path.join(targetDir, uniqueFilename);
+    const tempDest = `${destPath}.tmp_${Date.now()}`;
+
+    let size = 0;
+    let sha256 = null;
+
+    if (Buffer.isBuffer(filePathOrBuffer)) {
+      size = filePathOrBuffer.length;
+      sha256 = crypto.createHash('sha256').update(filePathOrBuffer).digest('hex');
+      fs.writeFileSync(tempDest, filePathOrBuffer);
+    } else {
+      const stat = fs.statSync(filePathOrBuffer);
+      size = stat.size;
+      const fileBuf = fs.readFileSync(filePathOrBuffer);
+      sha256 = crypto.createHash('sha256').update(fileBuf).digest('hex');
+      fs.copyFileSync(filePathOrBuffer, tempDest);
+    }
+    fs.renameSync(tempDest, destPath);
+
+    return {
+      storage_key: `originals/${uniqueFilename}`,
+      full_path: destPath,
+      original_name: cleanOrig,
+      original_size: size,
+      mime_type: mimeType || this.getMimeType(ext),
+      checksum: sha256
+    };
+  }
+
+  /**
    * Generates a signed temporary download URL for paid design files.
    */
   async getSignedDownloadUrl(storageKeyOrPath, expiresInSeconds = 3600) {
