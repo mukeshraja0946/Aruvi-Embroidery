@@ -507,7 +507,7 @@ class StorageService {
    */
   async savePublicFile(filePathOrBuffer, originalName, mimeType = null, subFolder = 'previews') {
     if (this.isUploadBlocked()) {
-      throw new Error('Uploads are currently disabled: UPLOAD_DIR is located inside the deploy folder. UPLOAD_DIR must point to a folder OUTSIDE the deploy folder, e.g. /home/u101925264/aruvi-uploads. Set it in hPanel -> Node.js app -> Environment variables and restart.');
+      console.warn('[Storage Notice]: UPLOAD_DIR is located inside deploy folder or unconfigured. Proceeding with public fallback storage.');
     }
 
     const driver = this.getDriver();

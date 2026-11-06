@@ -165,10 +165,21 @@ router.post('/admin/api/bulk-stitch/apply', adminDesignController.applyBulkStitc
 router.get('/admin/designs/export', adminDesignController.exportDesigns);
 
 // Categories Management
+const handleCategoryUpload = (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.error('[Category Upload Multer Error]:', err.message);
+      req.flash('error', `Image upload error: ${err.message}`);
+      return res.redirect('/admin/categories');
+    }
+    next();
+  });
+};
+
 router.get('/admin/categories', adminCategoryController.getCategories);
 router.post('/admin/categories/settings', adminCategoryController.postSettings);
-router.post('/admin/categories/create', upload.single('image'), adminCategoryController.postCreate);
-router.post('/admin/categories/edit/:id', upload.single('image'), adminCategoryController.postUpdate);
+router.post('/admin/categories/create', handleCategoryUpload, adminCategoryController.postCreate);
+router.post('/admin/categories/edit/:id', handleCategoryUpload, adminCategoryController.postUpdate);
 router.post('/admin/categories/toggle-status/:id', adminCategoryController.toggleStatus);
 router.post('/admin/categories/toggle-home/:id', adminCategoryController.toggleHome);
 router.post('/admin/categories/reorder/:id/:direction', adminCategoryController.postReorder);

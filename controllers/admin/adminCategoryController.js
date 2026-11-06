@@ -18,6 +18,7 @@ exports.getCategories = async (req, res, next) => {
     const categories = await Category.getAll({ sort: sort || 'newest', search, status });
     const countDisplay = await Setting.get('category_count_display', 'exact');
     const hideEmpty = await Setting.get('category_hide_empty', '0');
+    const csrfToken = typeof req.csrfToken === 'function' ? req.csrfToken() : (res.locals.csrfToken || '');
 
     res.render('admin/categories/index', {
       title: 'Manage Categories - Admin',
@@ -26,7 +27,8 @@ exports.getCategories = async (req, res, next) => {
       currentSearch: search || '',
       currentStatus: status || '',
       countDisplay,
-      hideEmpty
+      hideEmpty,
+      csrfToken
     });
   } catch (err) {
     next(err);
@@ -59,12 +61,37 @@ exports.postSettings = async (req, res, next) => {
 exports.postCreate = async (req, res, next) => {
   try {
     const { name, slug, description, icon, display_order, sort_order, show_on_home, is_active } = req.body;
-    const generatedSlug = slug ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') : name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    if (!name || !name.trim()) {
+      req.flash('error', 'Category name is required.');
+      return res.redirect('/admin/categories');
+    }
 
+    const cleanName = name.trim();
+    const generatedSlug = slug && slug.trim() 
+      ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') 
+      : cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+    const path = require('path');
+    const fs = require('fs');
     const storage = require('../../config/storage');
     let imageUrl = null;
+
     if (req.file) {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const allowedExts = ['.png', '.jpg', '.jpeg', '.webp'];
+      if (!allowedExts.includes(ext)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        req.flash('error', 'Invalid image format. Allowed formats: PNG, JPG, JPEG, WEBP.');
+        return res.redirect('/admin/categories');
+      }
+
       imageUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
+      // Clean up multer temporary disk file
+      try {
+        if (req.file.path && fs.existsSync(req.file.path) && req.file.path !== imageUrl) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (_) {}
     }
 
     const isHome = (show_on_home === undefined || show_on_home === '1' || show_on_home === 'on' || show_on_home === true || show_on_home === 1) ? 1 : 0;
@@ -72,9 +99,9 @@ exports.postCreate = async (req, res, next) => {
     const ordVal = parseInt(sort_order !== undefined ? sort_order : display_order, 10) || 0;
 
     const newId = await Category.create({
-      name,
+      name: cleanName,
       slug: generatedSlug,
-      description,
+      description: description ? description.trim() : null,
       image_url: imageUrl,
       card_image_key: imageUrl,
       icon: icon || 'fa-solid fa-shapes',
@@ -85,11 +112,13 @@ exports.postCreate = async (req, res, next) => {
     });
 
     invalidateCategoryCaches(req);
-    await ActivityLog.logFromReq(req, 'create', 'category', newId, `Created category: "${name}"`);
-    req.flash('success', `Category "${name}" added successfully.`);
+    await ActivityLog.logFromReq(req, 'create', 'category', newId, `Created category: "${cleanName}"`);
+    req.flash('success', `Category "${cleanName}" added successfully.`);
     res.redirect('/admin/categories');
   } catch (err) {
-    next(err);
+    console.error('[Category Create Error]:', err);
+    req.flash('error', `Failed to create category: ${err.message}`);
+    res.redirect('/admin/categories');
   }
 };
 
@@ -97,14 +126,39 @@ exports.postUpdate = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, slug, description, icon, display_order, sort_order, show_on_home, is_active, remove_image } = req.body;
-    const generatedSlug = slug ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') : name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    if (!name || !name.trim()) {
+      req.flash('error', 'Category name is required.');
+      return res.redirect('/admin/categories');
+    }
 
-    let imageUrl = null;
-    if (remove_image === '1') {
-      imageUrl = '';
+    const cleanName = name.trim();
+    const generatedSlug = slug && slug.trim() 
+      ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') 
+      : cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+    const path = require('path');
+    const fs = require('fs');
+    let imageUrl = undefined; // undefined preserves existing image unless changed or removed
+
+    if (remove_image === '1' || remove_image === 'on') {
+      imageUrl = '__REMOVE__';
     } else if (req.file) {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const allowedExts = ['.png', '.jpg', '.jpeg', '.webp'];
+      if (!allowedExts.includes(ext)) {
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        req.flash('error', 'Invalid image format. Allowed formats: PNG, JPG, JPEG, WEBP.');
+        return res.redirect('/admin/categories');
+      }
+
       const storage = require('../../config/storage');
       imageUrl = await storage.savePublicFile(req.file.path, req.file.originalname, req.file.mimetype);
+      // Clean up multer temporary disk file
+      try {
+        if (req.file.path && fs.existsSync(req.file.path) && req.file.path !== imageUrl) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (_) {}
     }
 
     const isHome = (show_on_home === '1' || show_on_home === 'on' || show_on_home === true || show_on_home === 1) ? 1 : 0;
@@ -112,9 +166,9 @@ exports.postUpdate = async (req, res, next) => {
     const ordVal = parseInt(sort_order !== undefined ? sort_order : display_order, 10) || 0;
 
     await Category.update(id, {
-      name,
+      name: cleanName,
       slug: generatedSlug,
-      description,
+      description: description ? description.trim() : null,
       image_url: imageUrl,
       card_image_key: imageUrl,
       icon: icon || 'fa-solid fa-shapes',
@@ -125,11 +179,13 @@ exports.postUpdate = async (req, res, next) => {
     });
 
     invalidateCategoryCaches(req);
-    await ActivityLog.logFromReq(req, 'update', 'category', id, `Updated category: "${name}"`);
-    req.flash('success', `Category updated.`);
+    await ActivityLog.logFromReq(req, 'update', 'category', id, `Updated category: "${cleanName}"`);
+    req.flash('success', `Category "${cleanName}" updated successfully.`);
     res.redirect('/admin/categories');
   } catch (err) {
-    next(err);
+    console.error('[Category Update Error]:', err);
+    req.flash('error', `Failed to update category: ${err.message}`);
+    res.redirect('/admin/categories');
   }
 };
 

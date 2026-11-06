@@ -285,6 +285,15 @@ class Category {
     const activeVal = is_active !== undefined ? ((is_active === 0 || is_active === false || is_active === '0') ? 0 : 1) : null;
     const parentVal = parent_id !== undefined ? ((parent_id && !isNaN(parseInt(parent_id, 10)) && parseInt(parent_id, 10) > 0) ? parseInt(parent_id, 10) : null) : undefined;
 
+    let imageClause = '';
+    let imageParams = [];
+    if (image_url === '__REMOVE__' || image_url === '') {
+      imageClause = 'image_url = NULL, card_image_key = NULL,';
+    } else if (image_url !== undefined && image_url !== null) {
+      imageClause = 'image_url = ?, card_image_key = ?,';
+      imageParams.push(image_url, card_image_key || image_url);
+    }
+
     if (db.isConnected()) {
       try {
         await db.query(
@@ -292,28 +301,35 @@ class Category {
             name = ?, 
             slug = ?, 
             description = ?, 
-            image_url = COALESCE(?, image_url), 
-            card_image_key = COALESCE(?, card_image_key), 
+            ${imageClause}
             icon = COALESCE(?, icon), 
             sort_order = COALESCE(?, sort_order), 
             display_order = COALESCE(?, display_order), 
             show_on_home = ?, 
             is_active = COALESCE(?, is_active)
            WHERE id = ?`,
-          [name, slug, description, image_url, card_image_key || image_url, icon || 'fa-solid fa-shapes', finalOrder, finalOrder, isHome, activeVal, id]
+          [name, slug, description, ...imageParams, icon || 'fa-solid fa-shapes', finalOrder, finalOrder, isHome, activeVal, id]
         );
         return true;
       } catch (err) {
         try {
+          let fallbackImageClause = '';
+          let fallbackImageParams = [];
+          if (image_url === '__REMOVE__' || image_url === '') {
+            fallbackImageClause = 'image_url = NULL,';
+          } else if (image_url !== undefined && image_url !== null) {
+            fallbackImageClause = 'image_url = ?,';
+            fallbackImageParams.push(image_url);
+          }
           await db.query(
-            'UPDATE categories SET name = ?, slug = ?, description = ?, image_url = COALESCE(?, image_url), icon = ?, display_order = COALESCE(?, display_order), show_on_home = ? WHERE id = ?',
-            [name, slug, description, image_url, icon || 'fa-solid fa-shapes', finalOrder, isHome, id]
+            `UPDATE categories SET name = ?, slug = ?, description = ?, ${fallbackImageClause} icon = ?, display_order = COALESCE(?, display_order), show_on_home = ? WHERE id = ?`,
+            [name, slug, description, ...fallbackImageParams, icon || 'fa-solid fa-shapes', finalOrder, isHome, id]
           );
           return true;
         } catch (innerErr) {
           await db.query(
-            'UPDATE categories SET name = ?, slug = ?, description = ?, image_url = COALESCE(?, image_url), display_order = COALESCE(?, display_order) WHERE id = ?',
-            [name, slug, description, image_url, finalOrder, id]
+            'UPDATE categories SET name = ?, slug = ?, description = ?, display_order = COALESCE(?, display_order) WHERE id = ?',
+            [name, slug, description, finalOrder, id]
           );
           return true;
         }
@@ -324,8 +340,13 @@ class Category {
       cat.name = name;
       cat.slug = slug;
       cat.description = description;
-      if (image_url) cat.image_url = image_url;
-      if (card_image_key) cat.card_image_key = card_image_key;
+      if (image_url === '__REMOVE__' || image_url === '') {
+        cat.image_url = null;
+        cat.card_image_key = null;
+      } else if (image_url !== undefined && image_url !== null) {
+        cat.image_url = image_url;
+        cat.card_image_key = card_image_key || image_url;
+      }
       if (icon) cat.icon = icon;
       if (finalOrder !== null) {
         cat.sort_order = finalOrder;
