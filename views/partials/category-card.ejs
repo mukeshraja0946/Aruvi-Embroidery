@@ -1,6 +1,13 @@
 <%
   const _c = (typeof category !== 'undefined' && category) ? category : ((typeof cat !== 'undefined' && cat) ? cat : {});
-  const catImage = _c.card_image_key || _c.image_url || null;
+  const rawImage = _c.card_image_key || _c.image_url || null;
+  // Eliminate stock / sample / monogram images; categories without an uploaded image show the brand gradient
+  const isStockPhoto = rawImage && (
+    rawImage.includes('cat_monogram') ||
+    rawImage.includes('/public/images/cat_') ||
+    rawImage.includes('placeholder')
+  );
+  const catImage = isStockPhoto ? null : rawImage;
   const catIcon = _c.icon || 'fa-solid fa-shapes';
   const cnt = (_c.design_count !== undefined && _c.design_count !== null) ? parseInt(_c.design_count, 10) : 0;
   
@@ -18,19 +25,18 @@
 %>
 
 <a href="<%= catLink %>" class="category-wave-card" title="<%= _c.name %>">
-  <!-- Top Photo Box (about 60% of card) or Brand Gradient Fallback -->
+  <!-- Top Photo Box (aspect-ratio 4/5) or Brand Gradient Fallback with Line Icon -->
   <div class="cat-wave-img-box <%= !catImage ? 'no-img-gradient' : '' %>">
     <% if (catImage) { %>
       <img src="<%= catImage %>" 
            alt="<%= _c.name %>" 
            loading="lazy" 
            class="cat-wave-img" 
-           onerror="this.onerror=null;this.parentElement.classList.add('no-img-gradient');this.remove();">
-    <% } else { %>
-      <div class="cat-wave-placeholder-bg">
-        <i class="<%= catIcon %> cat-wave-bg-watermark"></i>
-      </div>
+           onerror="this.onerror=null;this.parentElement.classList.add('no-img-gradient');const ph=this.parentElement.querySelector('.cat-wave-placeholder-bg');if(ph)ph.style.display='flex';this.remove();">
     <% } %>
+    <div class="cat-wave-placeholder-bg" style="<%= catImage ? 'display: none;' : '' %>">
+      <i class="<%= catIcon %> cat-wave-bg-watermark"></i>
+    </div>
 
     <!-- Soft Wave Curve Overlapping Photo (matches card bg in light and dark) -->
     <div class="cat-wave-svg-divider">
@@ -40,22 +46,22 @@
     </div>
   </div>
 
-  <!-- White Bottom Panel -->
+  <!-- Wave Body Panel (about 96px height) -->
   <div class="cat-wave-body">
-    <!-- Centered Circular Icon Badge (Maroon) -->
+    <!-- Centered 36px Circular Icon Badge -->
     <div class="cat-wave-icon-wrap">
       <i class="<%= catIcon %>"></i>
     </div>
 
-    <!-- Category Name (Playfair Display, Bold, Centered) -->
-    <h3 class="cat-wave-title"><%= _c.name %></h3>
+    <!-- Centered Text Block: padded so name & count never run under the 30px arrow -->
+    <div class="cat-wave-text-block">
+      <h3 class="cat-wave-title"><%= _c.name %></h3>
+      <% if (countText) { %>
+        <span class="cat-wave-count"><%= countText %></span>
+      <% } %>
+    </div>
 
-    <!-- Design Count (Small Grey) -->
-    <% if (countText) { %>
-      <span class="cat-wave-count"><%= countText %></span>
-    <% } %>
-
-    <!-- Round Blush Arrow Button at Bottom Right -->
+    <!-- 30px Round Arrow Button at Bottom Right Corner (10px from edges) -->
     <div class="cat-wave-arrow-btn" aria-hidden="true">
       <i class="fa-solid fa-arrow-right"></i>
     </div>

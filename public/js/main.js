@@ -386,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mobileNavDrawer && mobileDrawerOverlay) {
         mobileNavDrawer.classList.add('open');
         mobileDrawerOverlay.classList.add('active');
+        document.body.classList.add('drawer-open');
         document.body.style.overflow = 'hidden';
       }
     }
@@ -394,6 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mobileNavDrawer && mobileDrawerOverlay) {
         mobileNavDrawer.classList.remove('open');
         mobileDrawerOverlay.classList.remove('active');
+        document.body.classList.remove('drawer-open');
         document.body.style.overflow = '';
       }
     }

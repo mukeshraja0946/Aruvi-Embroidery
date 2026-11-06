@@ -173,51 +173,99 @@
   <!-- Mobile Navigation Drawer -->
   <div class="mobile-drawer-overlay" id="mobileDrawerOverlay"></div>
   <div class="mobile-nav-drawer" id="mobileNavDrawer">
-    <div class="mobile-drawer-header">
-      <div class="drawer-logo">
-        <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" class="logo-light" onerror="this.onerror=null;this.src='/public/images/logo.jpg';">
-        <img src="<%= darkLogo %>" alt="ARUVI EMBROIDERY" class="logo-dark" style="display: none;" onerror="this.onerror=null;this.src='<%= headerLogo %>';">
+    <!-- Fixed Drawer Top: Header with Logo, Close & Search -->
+    <div class="mobile-drawer-top-fixed">
+      <div class="mobile-drawer-header">
+        <div class="drawer-logo">
+          <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" class="logo-light" onerror="this.onerror=null;this.src='/public/images/logo.jpg';">
+          <img src="<%= darkLogo %>" alt="ARUVI EMBROIDERY" class="logo-dark" style="display: none;" onerror="this.onerror=null;this.src='<%= headerLogo %>';">
+        </div>
+        <button class="mobile-drawer-close" id="closeMobileMenu" aria-label="Close Menu">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
-      <button class="mobile-drawer-close" id="closeMobileMenu" aria-label="Close Menu">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
+
+      <div class="mobile-drawer-search">
+        <form action="/designs" method="GET">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" name="search" placeholder="Search designs..." value="<%= typeof search !== 'undefined' ? search : '' %>">
+        </form>
+      </div>
     </div>
 
-    <div class="mobile-drawer-search">
-      <form action="/designs" method="GET">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" name="search" placeholder="Search designs..." value="<%= typeof search !== 'undefined' ? search : '' %>">
-      </form>
+    <!-- Scrollable Drawer Menu List (padding-top 8px) -->
+    <div class="mobile-drawer-scrollable">
+      <nav class="mobile-drawer-nav" aria-label="Mobile Navigation">
+        <!-- Group 1: Store Navigation Links -->
+        <div class="drawer-nav-group">
+          <a href="/" class="drawer-nav-row <%= _currentPath === '/' ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-house"></i></span>
+            <span class="drawer-nav-label">Home</span>
+          </a>
+          <a href="/designs" class="drawer-nav-row <%= _currentPath.startsWith('/designs') || _currentPath.startsWith('/shop') ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-shapes"></i></span>
+            <span class="drawer-nav-label">Designs</span>
+            <i class="fa-solid fa-chevron-right drawer-chevron"></i>
+          </a>
+          <a href="/categories" class="drawer-nav-row <%= _currentPath.startsWith('/categor') ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-layer-group"></i></span>
+            <span class="drawer-nav-label">Categories</span>
+            <i class="fa-solid fa-chevron-right drawer-chevron"></i>
+          </a>
+          <a href="/custom-order" class="drawer-nav-row <%= _currentPath === '/custom-order' ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+            <span class="drawer-nav-label">Custom Order</span>
+          </a>
+          <a href="/about" class="drawer-nav-row <%= _currentPath === '/about' ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-circle-info"></i></span>
+            <span class="drawer-nav-label">About</span>
+          </a>
+          <a href="/contact" class="drawer-nav-row <%= _currentPath === '/contact' ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-headset"></i></span>
+            <span class="drawer-nav-label">Contact</span>
+          </a>
+        </div>
+
+        <!-- Consistent Divider -->
+        <div class="drawer-divider"></div>
+
+        <!-- Group 2: User Account & Cart/Wishlist Links -->
+        <div class="drawer-nav-group">
+          <% if (_currentUser) { %>
+            <a href="/user/dashboard" class="drawer-nav-row <%= _currentPath.startsWith('/user/dashboard') ? 'active' : '' %>">
+              <span class="drawer-nav-icon"><i class="fa-regular fa-user"></i></span>
+              <span class="drawer-nav-label">My Account</span>
+            </a>
+            <a href="/user/orders" class="drawer-nav-row <%= _currentPath.startsWith('/user/orders') ? 'active' : '' %>">
+              <span class="drawer-nav-icon"><i class="fa-solid fa-box-archive"></i></span>
+              <span class="drawer-nav-label">My Orders</span>
+            </a>
+          <% } else { %>
+            <a href="/auth/login" class="drawer-nav-row">
+              <span class="drawer-nav-icon"><i class="fa-regular fa-user"></i></span>
+              <span class="drawer-nav-label">My Account</span>
+            </a>
+            <a href="/auth/login" class="drawer-nav-row">
+              <span class="drawer-nav-icon"><i class="fa-solid fa-box-archive"></i></span>
+              <span class="drawer-nav-label">My Orders</span>
+            </a>
+          <% } %>
+          <a href="/wishlist" class="drawer-nav-row <%= _currentPath.startsWith('/wishlist') ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-regular fa-heart"></i></span>
+            <span class="drawer-nav-label">Wishlist</span>
+            <span class="drawer-nav-pill wishlist-badge <%= _wishlistCount > 0 ? '' : 'is-zero' %>" id="drawerWishlistBadge"><%= _wishlistCount %></span>
+          </a>
+          <a href="/cart" class="drawer-nav-row <%= _currentPath === '/cart' ? 'active' : '' %>">
+            <span class="drawer-nav-icon"><i class="fa-solid fa-bag-shopping"></i></span>
+            <span class="drawer-nav-label">Cart</span>
+            <span class="drawer-nav-pill cart-badge <%= _cartCount > 0 ? '' : 'is-zero' %>" id="drawerCartBadge"><%= _cartCount %></span>
+          </a>
+        </div>
+      </nav>
     </div>
 
-    <ul class="mobile-drawer-links">
-      <li><a href="/" class="<%= _currentPath === '/' ? 'active' : '' %>"><i class="fa-solid fa-house"></i> Home</a></li>
-      <li><a href="/designs" class="<%= _currentPath.startsWith('/designs') || _currentPath.startsWith('/shop') ? 'active' : '' %>"><i class="fa-solid fa-shapes"></i> Designs <i class="fa-solid fa-chevron-down" style="margin-left: auto; font-size: 0.75rem;"></i></a></li>
-      <li><a href="/categories" class="<%= _currentPath.startsWith('/categor') ? 'active' : '' %>"><i class="fa-solid fa-layer-group"></i> Categories <i class="fa-solid fa-chevron-down" style="margin-left: auto; font-size: 0.75rem;"></i></a></li>
-      <li><a href="/custom-order" class="<%= _currentPath === '/custom-order' ? 'active' : '' %>"><i class="fa-solid fa-wand-magic-sparkles"></i> Custom Order</a></li>
-      <li><a href="/about" class="<%= _currentPath === '/about' ? 'active' : '' %>"><i class="fa-solid fa-circle-info"></i> About</a></li>
-      <li><a href="/contact" class="<%= _currentPath === '/contact' ? 'active' : '' %>"><i class="fa-solid fa-headset"></i> Contact</a></li>
-      <li style="border-top: 1px solid var(--border-light); margin-top: 6px; padding-top: 6px;">
-        <% if (_currentUser) { %>
-          <a href="/user/dashboard"><i class="fa-regular fa-user"></i> My Account</a>
-          <a href="/user/orders"><i class="fa-solid fa-box-archive"></i> My Orders</a>
-        <% } else { %>
-          <a href="/auth/login"><i class="fa-regular fa-user"></i> My Account</a>
-          <a href="/auth/login"><i class="fa-solid fa-box-archive"></i> My Orders</a>
-        <% } %>
-        <a href="/wishlist" class="drawer-nav-item-badge">
-          <span><i class="fa-regular fa-heart"></i> Wishlist</span>
-          <span class="drawer-count-badge wishlist-badge" id="drawerWishlistBadge"><%= _wishlistCount %></span>
-        </a>
-        <a href="/cart" class="drawer-nav-item-badge">
-          <span><i class="fa-solid fa-bag-shopping"></i> Cart</span>
-          <span class="drawer-count-badge cart-badge" id="drawerCartBadge"><%= _cartCount %></span>
-        </a>
-      </li>
-    </ul>
-
+    <!-- Drawer Footer: Appearance Block & View Cart Button -->
     <div class="mobile-drawer-footer">
-      <!-- Part 2: Appearance Segmented Control (Above View Cart button) -->
       <% if (showThemeSwitcher) { %>
         <div class="drawer-appearance-block" id="drawerAppearanceBlock">
           <div class="appearance-block-title">
@@ -226,11 +274,11 @@
           </div>
           <div class="theme-segmented-ctrl" role="group" aria-label="Theme Selection">
             <button type="button" class="theme-seg-btn" data-theme-val="light" aria-pressed="false" title="Light Theme">
-              <i class="fa-regular fa-sun"></i>
+              <i class="fa-solid fa-sun"></i>
               <span>Light</span>
             </button>
             <button type="button" class="theme-seg-btn" data-theme-val="dark" aria-pressed="false" title="Dark Theme">
-              <i class="fa-regular fa-moon"></i>
+              <i class="fa-solid fa-moon"></i>
               <span>Dark</span>
             </button>
             <button type="button" class="theme-seg-btn" data-theme-val="system" aria-pressed="true" title="System Theme">
@@ -309,14 +357,58 @@
       if (counts.cart !== undefined) {
         document.querySelectorAll('.cart-badge').forEach(function(el) {
           el.textContent = counts.cart;
+          if (el.classList.contains('drawer-nav-pill')) {
+            if (parseInt(counts.cart, 10) > 0) {
+              el.classList.remove('is-zero');
+            } else {
+              el.classList.add('is-zero');
+            }
+          }
         });
       }
       if (counts.wishlist !== undefined) {
         document.querySelectorAll('.wishlist-badge').forEach(function(el) {
           el.textContent = counts.wishlist;
+          if (el.classList.contains('drawer-nav-pill')) {
+            if (parseInt(counts.wishlist, 10) > 0) {
+              el.classList.remove('is-zero');
+            } else {
+              el.classList.add('is-zero');
+            }
+          }
         });
       }
     };
+
+    // Synchronize Mobile Navigation Drawer open/close state with body.drawer-open
+    document.addEventListener('DOMContentLoaded', function() {
+      var mobileMenuBtn = document.getElementById('mobileMenuBtn');
+      var closeMobileMenu = document.getElementById('closeMobileMenu');
+      var mobileNavDrawer = document.getElementById('mobileNavDrawer');
+      var mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
+
+      function openDrawer() {
+        if (mobileNavDrawer && mobileDrawerOverlay) {
+          mobileNavDrawer.classList.add('open');
+          mobileDrawerOverlay.classList.add('active');
+          document.body.classList.add('drawer-open');
+          document.body.style.overflow = 'hidden';
+        }
+      }
+
+      function closeDrawer() {
+        if (mobileNavDrawer && mobileDrawerOverlay) {
+          mobileNavDrawer.classList.remove('open');
+          mobileDrawerOverlay.classList.remove('active');
+          document.body.classList.remove('drawer-open');
+          document.body.style.overflow = '';
+        }
+      }
+
+      if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openDrawer);
+      if (closeMobileMenu) closeMobileMenu.addEventListener('click', closeDrawer);
+      if (mobileDrawerOverlay) mobileDrawerOverlay.addEventListener('click', closeDrawer);
+    });
 
     // Theme Switcher Controller (Part 2: Light / Dark / System)
     (function initThemeSwitcher() {

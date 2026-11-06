@@ -3,12 +3,12 @@ const fs = require('fs');
 const db = require('../config/db');
 
 const fallbackCategories = [
-  { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs', description: '400+ Designs', image_url: '/public/images/cat_traditional.jpg', icon: 'fa-solid fa-dove', sort_order: 1, display_order: 1, show_on_home: 1, is_active: 1 },
-  { id: 2, name: 'Blouse Designs', slug: 'blouse-designs', description: '300+ Designs', image_url: '/public/images/cat_blouse.jpg', icon: 'fa-solid fa-vest', sort_order: 2, display_order: 2, show_on_home: 1, is_active: 1 },
-  { id: 3, name: 'Saree Designs', slug: 'saree-designs', description: '350+ Designs', image_url: '/public/images/cat_border.jpg', icon: 'fa-solid fa-wand-magic-sparkles', sort_order: 3, display_order: 3, show_on_home: 1, is_active: 1 },
-  { id: 4, name: 'Shirt Designs', slug: 'shirt-designs', description: '250+ Designs', image_url: '/public/images/placeholder-preview.svg', icon: 'fa-solid fa-shirt', sort_order: 4, display_order: 4, show_on_home: 1, is_active: 1 },
-  { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs', description: '300+ Designs', image_url: '/public/images/cat_monogram.jpg', icon: 'fa-solid fa-crown', sort_order: 5, display_order: 5, show_on_home: 1, is_active: 1 },
-  { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs', description: '500+ Designs', image_url: '/public/images/cat_kids.jpg', icon: 'fa-solid fa-shapes', sort_order: 6, display_order: 6, show_on_home: 1, is_active: 1 }
+  { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs', description: '400+ Designs', image_url: null, icon: 'fa-solid fa-dove', sort_order: 1, display_order: 1, show_on_home: 1, is_active: 1 },
+  { id: 2, name: 'Blouse Designs', slug: 'blouse-designs', description: '300+ Designs', image_url: null, icon: 'fa-solid fa-vest', sort_order: 2, display_order: 2, show_on_home: 1, is_active: 1 },
+  { id: 3, name: 'Saree Designs', slug: 'saree-designs', description: '350+ Designs', image_url: null, icon: 'fa-solid fa-wand-magic-sparkles', sort_order: 3, display_order: 3, show_on_home: 1, is_active: 1 },
+  { id: 4, name: 'Shirt Designs', slug: 'shirt-designs', description: '250+ Designs', image_url: null, icon: 'fa-solid fa-shirt', sort_order: 4, display_order: 4, show_on_home: 1, is_active: 1 },
+  { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs', description: '300+ Designs', image_url: null, icon: 'fa-solid fa-crown', sort_order: 5, display_order: 5, show_on_home: 1, is_active: 1 },
+  { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs', description: '500+ Designs', image_url: null, icon: 'fa-solid fa-shapes', sort_order: 6, display_order: 6, show_on_home: 1, is_active: 1 }
 ];
 
 // In-Memory 60-Second Cache for Categories & Aggregated Counts
