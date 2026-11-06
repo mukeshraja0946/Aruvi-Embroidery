@@ -30,8 +30,8 @@
     <%- include('partials/feature-cards', { page: 'home' }) %>
   </section>
 
-  <!-- Popular Categories Section (6 in a single row) -->
-  <section style="margin-bottom: 1.5rem;">
+  <!-- Popular Categories Section (Reference Wave Cards: 6 Desktop / Horizontal Swipe Mobile) -->
+  <section class="home-categories-section" style="margin-bottom: 2rem;">
     <div class="section-heading-box flex-between">
       <div>
         <div class="eyebrow-tag">
@@ -40,27 +40,20 @@
         </div>
         <h2 class="section-title">Popular Categories</h2>
       </div>
-      <a href="/categories" class="view-all-link">
-        View All Categories <i class="fa-solid fa-arrow-right"></i>
+      <a href="/categories" class="categories-header-viewall-link" title="View All Categories">
+        <span>View All Categories</span>
+        <i class="fa-solid fa-arrow-right"></i>
       </a>
     </div>
 
-    <div class="scroller-wrapper-relative">
-      <div class="grid-6 hide-scrollbar row-with-arrows">
+    <div class="categories-wave-container">
+      <div class="categories-wave-grid swipe-row-mobile hide-scrollbar">
         <% if (categories && categories.length > 0) { %>
           <% categories.slice(0, 6).forEach(cat => { %>
-            <a href="/category/<%= cat.slug %>" class="category-card">
-              <div class="category-card-img-box">
-                <img src="<%= cat.image_url || '/public/images/placeholder-preview.svg' %>" alt="<%= cat.name %>" onerror="if(this.src.indexOf('placeholder-preview.svg')===-1)this.src='/public/images/placeholder-preview.svg';">
-              </div>
-              <div class="category-card-info">
-                <div class="category-card-meta">
-                  <h3><%= cat.name %></h3>
-                  <span class="design-count"><%= cat.description || (cat.design_count || 300) + '+ Designs' %></span>
-                </div>
-                <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
-              </div>
-            </a>
+            <%- include('partials/category-card', {
+              cat,
+              countDisplayMode: typeof countDisplayMode !== 'undefined' ? countDisplayMode : 'exact'
+            }) %>
           <% }) %>
         <% } %>
       </div>

@@ -166,6 +166,7 @@ router.get('/admin/designs/export', adminDesignController.exportDesigns);
 
 // Categories Management
 router.get('/admin/categories', adminCategoryController.getCategories);
+router.post('/admin/categories/settings', adminCategoryController.postSettings);
 router.post('/admin/categories/create', upload.single('image'), adminCategoryController.postCreate);
 router.post('/admin/categories/edit/:id', upload.single('image'), adminCategoryController.postUpdate);
 router.post('/admin/categories/toggle-status/:id', adminCategoryController.toggleStatus);

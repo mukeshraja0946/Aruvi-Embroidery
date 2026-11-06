@@ -404,6 +404,90 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch (drawerErr) {
     console.warn('Mobile drawer init notice:', drawerErr);
   }
+
+  // 5. Grid / List View Toggle Controller (Task 2)
+  try {
+    const gridEl = document.getElementById('designsGrid') || document.querySelector('.grid-4-strict');
+    const toggleBtns = document.querySelectorAll('.view-btn');
+
+    // Determine initial view: URL param ?view=list > localStorage > default 'grid'
+    const urlParams = new URLSearchParams(window.location.search);
+    let viewMode = urlParams.get('view');
+    if (!viewMode || (viewMode !== 'list' && viewMode !== 'grid')) {
+      try {
+        viewMode = localStorage.getItem('aruvi_view_mode');
+      } catch (_) {}
+    }
+    if (viewMode !== 'list' && viewMode !== 'grid') {
+      viewMode = 'grid';
+    }
+
+    function applyViewMode(mode, updateUrl = false) {
+      const activeGrid = document.getElementById('designsGrid') || document.querySelector('.grid-4-strict');
+      if (activeGrid) {
+        if (mode === 'list') {
+          activeGrid.classList.add('list-view-active');
+        } else {
+          activeGrid.classList.remove('list-view-active');
+        }
+      }
+
+      // Update all toggle buttons (mobile and desktop)
+      document.querySelectorAll('.view-btn').forEach(btn => {
+        const btnView = btn.getAttribute('data-view') || (btn.title && btn.title.toLowerCase().includes('list') ? 'list' : 'grid');
+        const isActive = (btnView === mode);
+        if (isActive) {
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+        } else {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-pressed', 'false');
+        }
+      });
+
+      // Save to localStorage
+      try {
+        localStorage.setItem('aruvi_view_mode', mode);
+      } catch (_) {}
+
+      // Update URL query param ?view= without reload or scroll loss
+      if (updateUrl && window.history && window.history.replaceState) {
+        try {
+          const currentUrl = new URL(window.location.href);
+          if (mode === 'list') {
+            currentUrl.searchParams.set('view', 'list');
+          } else {
+            currentUrl.searchParams.delete('view');
+          }
+          window.history.replaceState(null, '', currentUrl.toString());
+        } catch (_) {}
+      }
+    }
+
+    // Apply initial view mode
+    applyViewMode(viewMode, false);
+
+    // Attach click listeners to all view buttons
+    toggleBtns.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const targetView = this.getAttribute('data-view') || (this.title && this.title.toLowerCase().includes('list') ? 'list' : 'grid');
+        applyViewMode(targetView, true);
+      });
+    });
+
+    // Expose helpers globally
+    window.aruviApplyViewMode = applyViewMode;
+    window.aruviGetCurrentViewMode = () => {
+      try {
+        return localStorage.getItem('aruvi_view_mode') || 'grid';
+      } catch (_) {
+        return 'grid';
+      }
+    };
+  } catch (viewToggleErr) {
+    console.warn('View toggle init notice:', viewToggleErr);
+  }
 });
 
 // ---------------------------------------------------------------------------

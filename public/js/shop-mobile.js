@@ -178,20 +178,26 @@
   }
 
   // -------------------------------------------------------------------------
-  // 3. HORIZONTALLY SCROLLABLE CATEGORY PILLS (Auto-center active pill)
+  // 3. HORIZONTALLY SCROLLABLE CATEGORY PILLS (Task 1: Space before "All" & offset scroll)
   // -------------------------------------------------------------------------
   if (categoryPillsRow) {
     const activePill = categoryPillsRow.querySelector('.cat-pill-btn.active');
     if (activePill) {
       setTimeout(() => {
         try {
-          activePill.scrollIntoView({
-            behavior: 'smooth',
-            inline: 'center',
-            block: 'nearest'
-          });
+          // If the first pill ("All"), keep scrollLeft at 0 so it aligns with the 16px page gutter
+          if (!activePill.previousElementSibling || categoryPillsRow.firstElementChild === activePill) {
+            categoryPillsRow.scrollLeft = 0;
+          } else {
+            const pillLeft = activePill.offsetLeft;
+            const targetLeft = pillLeft - 16; // 16px gutter offset
+            categoryPillsRow.scrollTo({
+              left: Math.max(0, targetLeft),
+              behavior: 'smooth'
+            });
+          }
         } catch (e) {
-          categoryPillsRow.scrollLeft = activePill.offsetLeft - (categoryPillsRow.clientWidth / 2) + (activePill.clientWidth / 2);
+          categoryPillsRow.scrollLeft = Math.max(0, activePill.offsetLeft - 16);
         }
       }, 100);
     }
@@ -286,14 +292,76 @@
   if (closeFilterBtn) closeFilterBtn.addEventListener('click', closeFilterDrawer);
   if (filterOverlay) filterOverlay.addEventListener('click', closeFilterDrawer);
 
-  // Live filter count calculation
+  // Live filter count calculation & Sort synchronization
   const filterForm = document.getElementById('filterForm');
   if (filterForm) {
-    filterForm.addEventListener('change', function () {
+    filterForm.addEventListener('change', function (e) {
+      if (e.target && e.target.name === 'sort') {
+        const selectedSort = e.target.value;
+        const sortLabels = {
+          latest: 'Latest',
+          oldest: 'Oldest',
+          price_asc: 'Price: Low to High',
+          price_desc: 'Price: High to Low',
+          popular: 'Popular',
+          top_rated: 'Top Rated'
+        };
+        const optLabel = sortLabels[selectedSort] || 'Latest';
+
+        // Sync all sort dropdown buttons & hidden inputs
+        document.querySelectorAll('.aruvi-sort-wrapper').forEach(wrapper => {
+          const input = wrapper.querySelector('input[type="hidden"]');
+          if (input) input.value = selectedSort;
+          const trigger = wrapper.querySelector('.aruvi-sort-btn');
+          if (trigger) {
+            const valText = trigger.querySelector('.aruvi-sort-val-text');
+            if (valText) valText.textContent = optLabel;
+            trigger.setAttribute('aria-label', `Sort options, current: ${optLabel}`);
+          }
+        });
+
+        // Sync sort panels
+        document.querySelectorAll('.aruvi-sort-panel .aruvi-sort-item').forEach(item => {
+          const itemVal = item.getAttribute('data-value');
+          if (itemVal === selectedSort) {
+            item.classList.add('selected');
+            item.setAttribute('aria-selected', 'true');
+          } else {
+            item.classList.remove('selected');
+            item.setAttribute('aria-selected', 'false');
+          }
+        });
+      }
+
       clearTimeout(countDebounceTimer);
       countDebounceTimer = setTimeout(updateFilterLiveCount, 200);
     });
   }
+
+  // "Clear all" button in drawer: reset sort to "latest" and filters
+  const drawerClearBtn = document.getElementById('drawerClearBtn');
+  const clearAllLink = document.querySelector('.clear-all-link');
+  function handleDrawerClearAll(e) {
+    if (filterForm) {
+      const latestSort = filterForm.querySelector('input[name="sort"][value="latest"]');
+      if (latestSort) {
+        latestSort.checked = true;
+        document.querySelectorAll('.aruvi-sort-wrapper').forEach(wrapper => {
+          const input = wrapper.querySelector('input[type="hidden"]');
+          if (input) input.value = 'latest';
+          const trigger = wrapper.querySelector('.aruvi-sort-btn');
+          if (trigger) {
+            const valText = trigger.querySelector('.aruvi-sort-val-text');
+            if (valText) valText.textContent = 'Latest';
+          }
+        });
+      }
+      clearTimeout(countDebounceTimer);
+      countDebounceTimer = setTimeout(updateFilterLiveCount, 150);
+    }
+  }
+  if (drawerClearBtn) drawerClearBtn.addEventListener('click', handleDrawerClearAll);
+  if (clearAllLink) clearAllLink.addEventListener('click', handleDrawerClearAll);
 
   async function updateFilterLiveCount() {
     if (!drawerApplyBtn || !filterForm) return;
@@ -629,21 +697,27 @@
   // 10. MOBILE & DESKTOP GRID / LIST VIEW TOGGLE
   // -------------------------------------------------------------------------
   document.querySelectorAll('.view-btn').forEach(btn => {
-    btn.addEventListener('click', function () {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
       const view = this.getAttribute('data-view') || (this.title && this.title.toLowerCase().includes('list') ? 'list' : 'grid');
-      document.querySelectorAll('.view-btn').forEach(b => {
-        const bView = b.getAttribute('data-view') || (b.title && b.title.toLowerCase().includes('list') ? 'list' : 'grid');
-        if (bView === view) b.classList.add('active');
-        else b.classList.remove('active');
-      });
-
-      const gridEl = document.getElementById('designsGrid') || document.querySelector('.grid-4-strict');
-      if (gridEl) {
-        if (view === 'list') {
-          gridEl.classList.add('list-view-active');
-        } else {
-          gridEl.classList.remove('list-view-active');
+      if (typeof window.aruviApplyViewMode === 'function') {
+        window.aruviApplyViewMode(view, true);
+      } else {
+        const gridEl = document.getElementById('designsGrid') || document.querySelector('.grid-4-strict');
+        if (gridEl) {
+          if (view === 'list') gridEl.classList.add('list-view-active');
+          else gridEl.classList.remove('list-view-active');
         }
+        document.querySelectorAll('.view-btn').forEach(b => {
+          const bView = b.getAttribute('data-view') || (b.title && b.title.toLowerCase().includes('list') ? 'list' : 'grid');
+          if (bView === view) {
+            b.classList.add('active');
+            b.setAttribute('aria-pressed', 'true');
+          } else {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+          }
+        });
       }
     });
   });

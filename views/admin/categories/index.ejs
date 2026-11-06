@@ -197,6 +197,50 @@
         const inactiveCats = categories ? categories.filter(c => c.is_active === 0 || c.is_active === false).length : 0;
         const totalDesignsCount = categories ? categories.reduce((sum, c) => sum + (parseInt(c.design_count) || 0), 0) : 0;
       %>
+
+      <!-- Category Display Settings Card (Task 3 Admin Settings) -->
+      <div class="admin-card-box" style="padding: 1.2rem 1.6rem; margin-bottom: 1.8rem; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin: 0 0 4px; font-size: 1.05rem; font-weight: 700; color: var(--admin-text-dark); display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-sliders" style="color: var(--admin-primary);"></i> Category Display & Counter Settings
+            </h3>
+            <p style="margin: 0; font-size: 0.82rem; color: var(--admin-text-muted);">
+              Controls how design count badges appear on category cards across the homepage and store.
+            </p>
+          </div>
+        </div>
+
+        <form action="/admin/categories/settings" method="POST" style="display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+          <div style="flex: 1; min-width: 220px;">
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">
+              Count Display Mode
+            </label>
+            <select name="category_count_display" class="form-control" style="height: 40px; border-radius: 8px; font-size: 0.85rem;">
+              <option value="exact" <%= (typeof countDisplay !== 'undefined' && countDisplay === 'exact') ? 'selected' : '' %>>Exact Count (e.g. "100 Designs")</option>
+              <option value="rounded" <%= (typeof countDisplay !== 'undefined' && countDisplay === 'rounded') ? 'selected' : '' %>>Rounded with Plus (e.g. "100+ Designs")</option>
+              <option value="hidden" <%= (typeof countDisplay !== 'undefined' && countDisplay === 'hidden') ? 'selected' : '' %>>Hidden (Hide Count Label)</option>
+            </select>
+          </div>
+
+          <div style="min-width: 220px; padding-bottom: 8px;">
+            <label class="switch-toggle">
+              <input type="checkbox" name="category_hide_empty" value="1" <%= (typeof hideEmpty !== 'undefined' && (hideEmpty === '1' || hideEmpty === 'true' || hideEmpty === true)) ? 'checked' : '' %>>
+              <span class="slider-round"></span>
+              <span style="font-size: 0.85rem; font-weight: 600; color: var(--admin-text-dark);">Hide Empty Categories (0 Designs)</span>
+            </label>
+          </div>
+
+          <div>
+            <button type="submit" class="btn btn-primary" style="height: 40px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; padding: 0 1.2rem;">
+              <i class="fa-solid fa-floppy-disk"></i> Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+
       <!-- 4 Stat Summary Cards Row matching Manage Designs Master UI -->
       <div class="admin-stats-row" style="margin-bottom: 1.8rem;">
         <!-- Total Categories Card -->
@@ -292,13 +336,14 @@
           <thead>
             <tr>
               <th style="width: 38px; text-align: center;"><input type="checkbox"></th>
-              <th style="width: 60px;">#</th>
-              <th>Category Image</th>
-              <th>Category Name</th>
+              <th style="width: 50px;">#</th>
+              <th>Category</th>
+              <th>Icon</th>
               <th>Slug</th>
-              <th>Design Count</th>
+              <th>Designs</th>
+              <th>Order</th>
+              <th>Home</th>
               <th>Status</th>
-              <th>Date Added</th>
               <th style="text-align: right;">Actions</th>
             </tr>
           </thead>
@@ -319,17 +364,40 @@
                   <td style="text-align: center;"><input type="checkbox"></td>
                   <td><strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= codeNum %></strong></td>
                   <td>
-                    <img src="<%= cat.image_url || '/public/images/cat_floral.jpg' %>" alt="<%= cat.name %>" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid var(--admin-border);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <% if (cat.image_url) { %>
+                        <img src="<%= cat.image_url %>" alt="<%= cat.name %>" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover; border: 1px solid var(--admin-border);">
+                      <% } else { %>
+                        <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #FAF3F0 0%, #F5EBE6 100%); display: flex; align-items: center; justify-content: center; border: 1px solid #ECE5DC; color: #900C3F; font-size: 1.1rem;">
+                          <i class="<%= cat.icon || 'fa-solid fa-shapes' %>"></i>
+                        </div>
+                      <% } %>
+                      <div>
+                        <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 2px;"><%= cat.name %></strong>
+                        <span class="cat-tag <%= catClass %>"><%= cat.name %></span>
+                      </div>
+                    </div>
                   </td>
                   <td>
-                    <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 2px;"><%= cat.name %></strong>
-                    <span class="cat-tag <%= catClass %>"><%= cat.name %></span>
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #FAF3F0; color: #900C3F; display: flex; align-items: center; justify-content: center; font-size: 0.88rem; border: 1px solid #ECE3DA;" title="<%= cat.icon || 'fa-solid fa-shapes' %>">
+                      <i class="<%= cat.icon || 'fa-solid fa-shapes' %>"></i>
+                    </div>
                   </td>
                   <td>
                     <code style="font-size: 0.78rem; background: #FAF6F0; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--admin-border);"><%= cat.slug %></code>
                   </td>
                   <td>
-                    <strong style="font-size: 0.88rem; color: var(--admin-primary);"><%= cat.design_count !== undefined ? cat.design_count : 0 %> Designs</strong>
+                    <strong style="font-size: 0.88rem; color: var(--admin-primary);"><%= cat.design_count !== undefined ? cat.design_count : 0 %></strong>
+                  </td>
+                  <td>
+                    <span style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-muted);"><%= cat.display_order || 0 %></span>
+                  </td>
+                  <td>
+                    <% if (cat.show_on_home !== 0 && cat.show_on_home !== false) { %>
+                      <span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; background: #E8F5E9; color: #2E7D32;">Home</span>
+                    <% } else { %>
+                      <span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; background: #F5F5F5; color: #9E9E9E;">Hidden</span>
+                    <% } %>
                   </td>
                   <td>
                     <label class="switch-toggle">
@@ -337,9 +405,6 @@
                       <span class="slider-round"></span>
                       <span id="catStatusLabel-<%= cat.id %>" style="font-size: 0.78rem; font-weight: 600; color: <%= (cat.is_active !== 0 && cat.is_active !== false) ? '#2E7D32' : 'var(--admin-text-muted)' %>;"><%= (cat.is_active !== 0 && cat.is_active !== false) ? 'Active' : 'Inactive' %></span>
                     </label>
-                  </td>
-                  <td style="color: var(--admin-text-muted); font-size: 0.78rem;">
-                    <%= formatDateTime(cat.created_at) %>
                   </td>
                   <td style="text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
@@ -352,7 +417,7 @@
               <% }) %>
             <% } else { %>
               <tr>
-                <td colspan="9" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                <td colspan="10" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
                   No categories found. Click "+ Add Category" to create one.
                 </td>
               </tr>
@@ -380,44 +445,102 @@
 
 <!-- Add/Edit Category Modal matching Master Manage Designs UI -->
 <div id="categoryModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
-  <div style="background: #FFFFFF; border-radius: 18px; max-width: 520px; width: 90%; padding: 2.2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.15); border: 1px solid var(--admin-border);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; padding-bottom: 0.8rem; border-bottom: 1px solid var(--admin-border);">
-      <h3 id="modalTitle" style="font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Add New Category</h3>
-      <i class="fa-solid fa-xmark" onclick="closeCategoryModal()" style="cursor: pointer; font-size: 1.1rem; color: var(--admin-text-muted);"></i>
+  <div style="background: #FFFFFF; border-radius: 18px; max-width: 540px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.15); border: 1px solid var(--admin-border);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 1px solid var(--admin-border);">
+      <h3 id="modalTitle" style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; color: var(--admin-text-dark); margin: 0;">Add New Category</h3>
+      <i class="fa-solid fa-xmark" onclick="closeCategoryModal()" style="cursor: pointer; font-size: 1.2rem; color: var(--admin-text-muted);"></i>
     </div>
 
     <form id="categoryForm" action="/admin/categories/create?_csrf=<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" method="POST" enctype="multipart/form-data">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
-      <div style="margin-bottom: 1.1rem;">
-        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Category Name <span style="color: var(--admin-primary);">*</span></label>
-        <input type="text" id="catName" name="name" class="form-control" placeholder="e.g. Floral Designs" required style="height: 42px; border-radius: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Category Name <span style="color: var(--admin-primary);">*</span></label>
+          <input type="text" id="catName" name="name" class="form-control" placeholder="e.g. Floral Designs" required style="height: 42px; border-radius: 8px;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Slug</label>
+          <input type="text" id="catSlug" name="slug" class="form-control" placeholder="e.g. floral-designs" style="height: 42px; border-radius: 8px;">
+        </div>
       </div>
 
-      <div style="margin-bottom: 1.1rem;">
-        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Slug</label>
-        <input type="text" id="catSlug" name="slug" class="form-control" placeholder="e.g. floral-designs" style="height: 42px; border-radius: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <!-- Icon Picker -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Category Icon</label>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div id="catIconPreview" style="width: 42px; height: 42px; border-radius: 8px; background: #FAF3F0; color: #900C3F; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; border: 1px solid #ECE3DA; flex-shrink: 0;">
+              <i class="fa-solid fa-shapes"></i>
+            </div>
+            <select id="catIconSelect" name="icon" class="form-control" style="height: 42px; border-radius: 8px; font-size: 0.82rem;" onchange="updateIconPreview(this.value)">
+              <option value="fa-solid fa-shapes">Shapes (General)</option>
+              <option value="fa-solid fa-shirt">Blouse & Attire</option>
+              <option value="fa-solid fa-gem">Jewelry & Luxury</option>
+              <option value="fa-solid fa-leaf">Floral & Leaves</option>
+              <option value="fa-solid fa-crown">Bridal & Regal</option>
+              <option value="fa-solid fa-spa">Mandala & Traditional</option>
+              <option value="fa-solid fa-feather">Peacock & Feathers</option>
+              <option value="fa-solid fa-heart">Wedding & Love</option>
+              <option value="fa-solid fa-star">Festive & Stars</option>
+              <option value="fa-solid fa-wand-magic-sparkles">Specialty Embroidery</option>
+              <option value="fa-solid fa-scissors">Cutwork & Borders</option>
+              <option value="fa-solid fa-palette">Artistic Patterns</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Sort Order -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Sort Order</label>
+          <input type="number" id="catDisplayOrder" name="display_order" class="form-control" min="0" step="1" value="0" placeholder="0" style="height: 42px; border-radius: 8px;">
+        </div>
       </div>
 
-      <div style="margin-bottom: 1.1rem;">
-        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Design Count Label</label>
-        <input type="text" id="catDesc" name="description" class="form-control" placeholder="e.g. 500+ Designs" style="height: 42px; border-radius: 8px;">
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Design Count Label / Description</label>
+        <input type="text" id="catDesc" name="description" class="form-control" placeholder="e.g. 500+ Designs (optional)" style="height: 42px; border-radius: 8px;">
       </div>
 
-      <div style="margin-bottom: 1.2rem;">
-        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 6px;">Category Image</label>
-        <input type="file" name="image" class="form-control" accept="image/*" style="height: 42px; border-radius: 8px;">
+      <!-- Category Image Upload with 4:5 Guidance & Live Preview -->
+      <div style="margin-bottom: 1.2rem; background: #FAF6F0; padding: 1rem; border-radius: 10px; border: 1px dashed var(--admin-border);">
+        <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark); margin-bottom: 4px;">Category Card Image</label>
+        <p style="font-size: 0.74rem; color: var(--admin-text-muted); margin: 0 0 8px;">
+          <i class="fa-solid fa-circle-info" style="color: var(--admin-primary);"></i> Recommended <strong>4:5 ratio</strong> (e.g. 400x500px, JPG/WebP). Used for wave cards. If omitted, a neutral brand gradient is used.
+        </p>
+
+        <input type="file" id="catImageInput" name="image" class="form-control" accept="image/*" style="height: 40px; border-radius: 8px; background: #FFF;" onchange="previewCatImage(this)">
+
+        <div id="catImgPreviewBox" style="display: none; margin-top: 10px; align-items: center; gap: 12px;">
+          <img id="catImgPreviewEl" src="" alt="Preview" style="width: 72px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid var(--admin-border); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+          <div style="font-size: 0.78rem; color: var(--admin-text-muted);">
+            <span id="catImgPreviewStatus">New image selected</span>
+            <div id="catRemoveImgWrap" style="display: none; margin-top: 6px;">
+              <label style="color: #C62828; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: 500;">
+                <input type="checkbox" name="remove_image" id="catRemoveImage" value="1" onchange="toggleRemoveImg(this)"> Remove current image
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div style="margin-bottom: 1.5rem;">
+      <!-- Toggles: Show on Home + Active -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.4rem;">
         <label class="switch-toggle">
-          <input type="checkbox" name="is_active" checked>
+          <input type="checkbox" id="catShowOnHome" name="show_on_home" value="1" checked>
           <span class="slider-round"></span>
-          <span style="font-size: 0.85rem; font-weight: 500; color: var(--admin-text-dark);">Active Category</span>
+          <span style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark);">Show on Home Wave Row</span>
+        </label>
+
+        <label class="switch-toggle">
+          <input type="checkbox" id="catIsActive" name="is_active" value="1" checked>
+          <span class="slider-round"></span>
+          <span style="font-size: 0.82rem; font-weight: 600; color: var(--admin-text-dark);">Active Category</span>
         </label>
       </div>
 
-      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; padding-top: 0.8rem; border-top: 1px solid var(--admin-border);">
         <button type="button" onclick="closeCategoryModal()" class="btn btn-outline" style="height: 44px; border-radius: 10px; font-weight: 600; background: #FFF; padding: 0 1.2rem;">Cancel</button>
         <button type="submit" class="btn btn-primary" style="height: 44px; border-radius: 10px; font-weight: 600; padding: 0 1.5rem;">Save Category</button>
       </div>
@@ -443,12 +566,53 @@
 <script>
   let pendingDeleteCategoryId = null;
 
+  function updateIconPreview(iconClass) {
+    const previewEl = document.getElementById('catIconPreview');
+    if (previewEl) {
+      previewEl.innerHTML = `<i class="${iconClass || 'fa-solid fa-shapes'}"></i>`;
+    }
+  }
+
+  function previewCatImage(input) {
+    const box = document.getElementById('catImgPreviewBox');
+    const img = document.getElementById('catImgPreviewEl');
+    const status = document.getElementById('catImgPreviewStatus');
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        if (img) img.src = e.target.result;
+        if (box) box.style.display = 'flex';
+        if (status) status.textContent = 'Selected: ' + input.files[0].name;
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function toggleRemoveImg(chk) {
+    const img = document.getElementById('catImgPreviewEl');
+    if (img) {
+      img.style.opacity = chk.checked ? '0.3' : '1';
+    }
+  }
+
   function openAddCategoryModal() {
     document.getElementById('modalTitle').innerText = 'Add New Category';
     document.getElementById('categoryForm').action = '/admin/categories/create?_csrf=' + encodeURIComponent('<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>');
     document.getElementById('catName').value = '';
     document.getElementById('catSlug').value = '';
     document.getElementById('catDesc').value = '';
+    document.getElementById('catDisplayOrder').value = '0';
+    document.getElementById('catIconSelect').value = 'fa-solid fa-shapes';
+    updateIconPreview('fa-solid fa-shapes');
+    document.getElementById('catShowOnHome').checked = true;
+    document.getElementById('catIsActive').checked = true;
+    
+    // Reset image preview
+    document.getElementById('catImageInput').value = '';
+    document.getElementById('catImgPreviewBox').style.display = 'none';
+    document.getElementById('catRemoveImgWrap').style.display = 'none';
+    document.getElementById('catRemoveImage').checked = false;
+
     document.getElementById('categoryModal').style.display = 'flex';
   }
 
@@ -458,6 +622,36 @@
     document.getElementById('catName').value = cat.name || '';
     document.getElementById('catSlug').value = cat.slug || '';
     document.getElementById('catDesc').value = cat.description || '';
+    document.getElementById('catDisplayOrder').value = cat.display_order !== undefined ? cat.display_order : 0;
+    
+    const iconVal = cat.icon || 'fa-solid fa-shapes';
+    document.getElementById('catIconSelect').value = iconVal;
+    updateIconPreview(iconVal);
+
+    document.getElementById('catShowOnHome').checked = (cat.show_on_home !== 0 && cat.show_on_home !== false);
+    document.getElementById('catIsActive').checked = (cat.is_active !== 0 && cat.is_active !== false);
+
+    // Image preview & remove option
+    document.getElementById('catImageInput').value = '';
+    document.getElementById('catRemoveImage').checked = false;
+    const box = document.getElementById('catImgPreviewBox');
+    const img = document.getElementById('catImgPreviewEl');
+    const status = document.getElementById('catImgPreviewStatus');
+    const removeWrap = document.getElementById('catRemoveImgWrap');
+
+    if (cat.image_url) {
+      if (img) {
+        img.src = cat.image_url;
+        img.style.opacity = '1';
+      }
+      if (status) status.textContent = 'Current Category Image';
+      if (box) box.style.display = 'flex';
+      if (removeWrap) removeWrap.style.display = 'block';
+    } else {
+      if (box) box.style.display = 'none';
+      if (removeWrap) removeWrap.style.display = 'none';
+    }
+
     document.getElementById('categoryModal').style.display = 'flex';
   }
 

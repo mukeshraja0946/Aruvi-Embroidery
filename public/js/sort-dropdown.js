@@ -112,6 +112,7 @@
         const itemVal = item.getAttribute('data-value');
         const isMatch = (itemVal === val) ||
           (val === 'latest' && itemVal === 'newest') ||
+          (val === 'oldest' && itemVal === 'oldest') ||
           (val === 'price_asc' && itemVal === 'price_low') ||
           (val === 'price_desc' && itemVal === 'price_high') ||
           (val === 'top_rated' && itemVal === 'rating') ||
@@ -125,6 +126,30 @@
           item.setAttribute('aria-selected', 'false');
         }
       });
+    });
+
+    // Also sync Filter Drawer / Sidebar Sort Radio Buttons
+    document.querySelectorAll('input[type="radio"][name="sort"]').forEach(radio => {
+      const rVal = radio.value;
+      const isMatch = (rVal === val) ||
+        (val === 'latest' && (rVal === 'latest' || rVal === 'newest')) ||
+        (val === 'oldest' && rVal === 'oldest') ||
+        (val === 'price_asc' && (rVal === 'price_asc' || rVal === 'price_low')) ||
+        (val === 'price_desc' && (rVal === 'price_desc' || rVal === 'price_high')) ||
+        (val === 'top_rated' && (rVal === 'top_rated' || rVal === 'rating')) ||
+        (val === 'popular' && (rVal === 'popular' || rVal === 'most_popular'));
+
+      radio.checked = isMatch;
+      const parentLabel = radio.closest('.sort-radio-item');
+      if (parentLabel) {
+        if (isMatch) parentLabel.classList.add('active');
+        else parentLabel.classList.remove('active');
+      }
+    });
+
+    // Also sync any hidden sort inputs
+    document.querySelectorAll('input[type="hidden"][name="sort"]').forEach(inp => {
+      inp.value = val;
     });
   }
 
@@ -187,9 +212,20 @@
                             document.querySelector('.shop-main-content .grid-3');
 
         if (newGrid && currentGrid) {
+          const isListView = (typeof window.aruviGetCurrentViewMode === 'function')
+            ? (window.aruviGetCurrentViewMode() === 'list')
+            : currentGrid.classList.contains('list-view-active');
+
           currentGrid.innerHTML = newGrid.innerHTML;
           currentGrid.className = newGrid.className;
           currentGrid.classList.remove('grid-is-loading');
+
+          if (isListView) {
+            currentGrid.classList.add('list-view-active');
+          }
+          if (typeof window.aruviApplyViewMode === 'function') {
+            window.aruviApplyViewMode(isListView ? 'list' : 'grid', false);
+          }
         }
 
         // 2. Replace Mobile Results Count Pill ("100 designs")
@@ -400,7 +436,8 @@
     
     // Determine sort label from options
     let optLabel = 'Latest';
-    if (sortVal === 'price_asc' || sortVal === 'price_low') optLabel = 'Price: Low to High';
+    if (sortVal === 'oldest') optLabel = 'Oldest';
+    else if (sortVal === 'price_asc' || sortVal === 'price_low') optLabel = 'Price: Low to High';
     else if (sortVal === 'price_desc' || sortVal === 'price_high') optLabel = 'Price: High to Low';
     else if (sortVal === 'popular' || sortVal === 'most_popular') optLabel = 'Popular';
     else if (sortVal === 'top_rated' || sortVal === 'rating') optLabel = 'Top Rated';

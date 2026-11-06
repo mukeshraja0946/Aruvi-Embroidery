@@ -24,7 +24,17 @@ exports.getShopPage = async (req, res, next) => {
       if (selectedCategory) categoryId = selectedCategory.id;
     }
 
-    const normalizedSort = (sort === 'newest') ? 'latest' : (sort || 'latest');
+    const VALID_SORTS = ['latest', 'oldest', 'price_asc', 'price_desc', 'popular', 'top_rated'];
+    let normalizedSort = 'latest';
+    if (sort) {
+      const s = String(sort).toLowerCase().trim();
+      if (s === 'newest') normalizedSort = 'latest';
+      else if (s === 'price_low') normalizedSort = 'price_asc';
+      else if (s === 'price_high') normalizedSort = 'price_desc';
+      else if (s === 'rating') normalizedSort = 'top_rated';
+      else if (s === 'most_popular') normalizedSort = 'popular';
+      else if (VALID_SORTS.includes(s)) normalizedSort = s;
+    }
 
     const { designs, total, totalPages } = await Design.getAll({
       search,
@@ -39,7 +49,9 @@ exports.getShopPage = async (req, res, next) => {
       limit
     });
 
-    const categories = await Category.getAll({ status: 'active' });
+    const hideEmptySetting = await Setting.get('category_hide_empty', '1');
+    const hideEmptyCategories = (hideEmptySetting === '1' || hideEmptySetting === 'true' || hideEmptySetting === true);
+    const categories = await Category.getAll({ status: 'active', hideEmpty: hideEmptyCategories });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
     const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
     const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
@@ -58,9 +70,6 @@ exports.getShopPage = async (req, res, next) => {
     } else {
       totalActiveDesigns = total;
     }
-
-    const hideEmptySetting = await Setting.get('hide_empty_categories_in_pills', '1');
-    const hideEmptyCategories = hideEmptySetting !== 'false' && hideEmptySetting !== '0';
 
     if (req.query.ajax === '1' || (req.headers.accept && req.headers.accept.includes('application/json'))) {
       return res.json({
@@ -101,7 +110,9 @@ exports.getShopPage = async (req, res, next) => {
 
 exports.getCategoriesPage = async (req, res, next) => {
   try {
-    const categories = await Category.getAll();
+    const countDisplay = await Setting.get('category_count_display', 'exact');
+    const hideEmpty = await Setting.get('category_hide_empty', '1');
+    const categories = await Category.getAll({ status: 'active', hideEmpty: hideEmpty === '1' });
     const featuredDesigns = await Design.getFeatured(6);
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
     const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
@@ -109,6 +120,7 @@ exports.getCategoriesPage = async (req, res, next) => {
     res.render('shop/categories', {
       title: 'Categories - ARUVI EMBROIDERY STUDIO',
       categories,
+      countDisplayMode: countDisplay,
       featuredDesigns,
       userPurchasedDesignIds,
       userWishlistDesignIds
@@ -132,15 +144,29 @@ exports.getCategoryDetailPage = async (req, res, next) => {
     const currentPage = parseInt(page) || 1;
     const limit = parseInt(req.query.limit) || 24;
 
+    const VALID_SORTS = ['latest', 'oldest', 'price_asc', 'price_desc', 'popular', 'top_rated'];
+    let normalizedSort = 'latest';
+    if (sort) {
+      const s = String(sort).toLowerCase().trim();
+      if (s === 'newest') normalizedSort = 'latest';
+      else if (s === 'price_low') normalizedSort = 'price_asc';
+      else if (s === 'price_high') normalizedSort = 'price_desc';
+      else if (s === 'rating') normalizedSort = 'top_rated';
+      else if (s === 'most_popular') normalizedSort = 'popular';
+      else if (VALID_SORTS.includes(s)) normalizedSort = s;
+    }
+
     const { designs, total, totalPages } = await Design.getAll({
       category_id: category.id,
       search: sub ? sub : (search || ''),
-      sort: sort || 'latest',
+      sort: normalizedSort,
       page: currentPage,
       limit
     });
 
-    const categories = await Category.getAll({ status: 'active' });
+    const hideEmptySetting = await Setting.get('category_hide_empty', '1');
+    const hideEmptyCategories = (hideEmptySetting === '1' || hideEmptySetting === 'true' || hideEmptySetting === true);
+    const categories = await Category.getAll({ status: 'active', hideEmpty: hideEmptyCategories });
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
     const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
     const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
@@ -158,9 +184,6 @@ exports.getCategoryDetailPage = async (req, res, next) => {
     } else {
       totalActiveDesigns = total;
     }
-
-    const hideEmptySetting = await Setting.get('hide_empty_categories_in_pills', '1');
-    const hideEmptyCategories = hideEmptySetting !== 'false' && hideEmptySetting !== '0';
 
     if (req.query.ajax === '1' || (req.headers.accept && req.headers.accept.includes('application/json'))) {
       return res.json({

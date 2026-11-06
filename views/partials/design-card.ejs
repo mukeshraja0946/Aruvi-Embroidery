@@ -87,41 +87,43 @@
       </div>
     <% } %>
 
-    <!-- Price Row with Instant Add to Cart -->
-    <%
-      const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
-      const origPrice = parseFloat(design.price || 0);
-      const hasDisc = origPrice > curPrice && origPrice > 0;
-      const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
-    %>
-    <div class="card-price-action-row">
-      <div class="card-price-group">
-        <div class="price-numbers-row">
-          <% if (hasDisc) { %>
-            <span class="old-price">₹<%= origPrice %></span>
-          <% } %>
-          <span class="current-price">₹<%= curPrice %></span>
-          <% if (hasDisc) { %>
-            <span class="discount-badge"><%= discPct %>% OFF</span>
-          <% } %>
+    <!-- Price & Actions Container -->
+    <div class="card-bottom-actions-container">
+      <%
+        const curPrice = (design.sale_price !== null && design.sale_price !== undefined && design.sale_price !== '') ? parseFloat(design.sale_price) : parseFloat(design.price);
+        const origPrice = parseFloat(design.price || 0);
+        const hasDisc = origPrice > curPrice && origPrice > 0;
+        const discPct = hasDisc ? Math.round(((origPrice - curPrice) / origPrice) * 100) : 0;
+      %>
+      <div class="card-price-action-row">
+        <div class="card-price-group">
+          <div class="price-numbers-row">
+            <% if (hasDisc) { %>
+              <span class="old-price">₹<%= origPrice %></span>
+            <% } %>
+            <span class="current-price">₹<%= curPrice %></span>
+            <% if (hasDisc) { %>
+              <span class="discount-badge"><%= discPct %>% OFF</span>
+            <% } %>
+          </div>
         </div>
+
+        <button type="button" class="card-cart-btn-instant" data-id="<%= design.id %>" aria-label="Add to Cart" title="Add to Cart">
+          <i class="fa-solid fa-cart-shopping"></i>
+        </button>
       </div>
 
-      <button type="button" class="card-cart-btn-instant" data-id="<%= design.id %>" aria-label="Add to Cart" title="Add to Cart">
-        <i class="fa-solid fa-cart-shopping"></i>
-      </button>
+      <!-- Full-Width Buy Now Button (48px) -->
+      <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
+      <% if (isOwned) { %>
+        <a href="/design/<%= design.slug %>" class="card-btn-buynow is-owned" aria-label="Owned - View and Download" title="Owned - Download">
+          <i class="fa-solid fa-circle-check"></i> Owned
+        </a>
+      <% } else { %>
+        <a href="/cart/buy-now?design_id=<%= design.id %>" class="card-btn-buynow" aria-label="Buy Now" title="Buy Now">
+          <i class="fa-solid fa-bag-shopping"></i> Buy Now
+        </a>
+      <% } %>
     </div>
-
-    <!-- Full-Width Buy Now Button (48px) -->
-    <% const isOwned = (typeof userPurchasedDesignIds !== 'undefined' && userPurchasedDesignIds && userPurchasedDesignIds.includes(design.id)); %>
-    <% if (isOwned) { %>
-      <a href="/design/<%= design.slug %>" class="card-btn-buynow is-owned" aria-label="Owned - View and Download" title="Owned - Download">
-        <i class="fa-solid fa-circle-check"></i> Owned
-      </a>
-    <% } else { %>
-      <a href="/cart/buy-now?design_id=<%= design.id %>" class="card-btn-buynow" aria-label="Buy Now" title="Buy Now">
-        <i class="fa-solid fa-bag-shopping"></i> Buy Now
-      </a>
-    <% } %>
   </div>
 </div>

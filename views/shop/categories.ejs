@@ -14,24 +14,13 @@
     </div>
   </div>
 
-  <!-- Category Cards Grid matching Reference (4 Columns Desktop x 2 Columns Mobile) -->
-  <div class="grid-4-strict categories-cards-grid">
+  <!-- Category Wave Cards Grid (Responsive Grid 6/3/2 matching Reference) -->
+  <div class="categories-wave-grid categories-page-grid" style="margin-bottom: 2.5rem;">
     <% categories.forEach(cat => { %>
-      <% 
-        let catImg = cat.image_url || '/public/images/placeholder-preview.svg';
-      %>
-      <a href="/category/<%= cat.slug %>" class="category-card">
-        <div class="category-card-img-box">
-          <img src="<%= catImg %>" alt="<%= cat.name %>" onerror="this.onerror=null;this.src='/public/images/placeholder-preview.svg';">
-        </div>
-        <div class="category-card-info">
-          <div class="category-card-meta">
-            <h3><%= cat.name %></h3>
-            <span class="design-count"><%= (cat.design_count !== undefined && cat.design_count !== null) ? (cat.design_count + ' Designs') : (cat.description || '300+ Designs') %></span>
-          </div>
-          <div class="card-arrow"><i class="fa-solid fa-arrow-right"></i></div>
-        </div>
-      </a>
+      <%- include('../partials/category-card', {
+        cat,
+        countDisplayMode: typeof countDisplayMode !== 'undefined' ? countDisplayMode : 'exact'
+      }) %>
     <% }) %>
   </div>
 

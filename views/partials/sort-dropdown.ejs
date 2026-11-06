@@ -10,6 +10,7 @@
   function normalizeSortValue(val) {
     if (!val) return 'latest';
     if (val === 'newest') return 'latest';
+    if (val === 'oldest') return 'oldest';
     if (val === 'price_low') return 'price_asc';
     if (val === 'price_high') return 'price_desc';
     if (val === 'rating') return 'top_rated';
@@ -19,12 +20,18 @@
 
   const _activeVal = normalizeSortValue(_rawSort);
 
-  // Default 5 standard options if not supplied
+  // Default standard 6 options in required order:
+  // Latest, Oldest, Price: Low to High, Price: High to Low, Popular, Top Rated
   const _defaultOptions = [
     {
       value: 'latest',
       label: 'Latest',
       iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
+    },
+    {
+      value: 'oldest',
+      label: 'Oldest',
+      iconSvg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 8 14"/></svg>`
     },
     {
       value: 'price_asc',

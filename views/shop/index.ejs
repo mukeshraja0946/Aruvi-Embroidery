@@ -59,7 +59,6 @@
 
       <form action="/designs" method="GET" id="filterForm" class="filter-form-body">
         <% if (search) { %><input type="hidden" name="search" value="<%= search %>"><% } %>
-        <% if (sort && sort !== 'latest') { %><input type="hidden" name="sort" value="<%= sort %>"><% } %>
 
         <!-- 1. Categories Accordion -->
         <div class="filter-accordion-group">
@@ -185,6 +184,9 @@
                 <input type="radio" name="sort" value="latest" <%= !sort || sort === 'latest' || sort === 'newest' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Latest
               </label>
               <label class="sort-radio-item">
+                <input type="radio" name="sort" value="oldest" <%= sort === 'oldest' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Oldest
+              </label>
+              <label class="sort-radio-item">
                 <input type="radio" name="sort" value="price_asc" <%= sort === 'price_asc' || sort === 'price_low' ? 'checked' : '' %> onchange="handleFilterChange(this)"> Price: Low to High
               </label>
               <label class="sort-radio-item">
@@ -252,8 +254,8 @@
           }) %>
 
           <div class="mobile-view-toggle">
-            <button type="button" class="view-btn active" data-view="grid" title="Grid View" aria-label="Grid View"><i class="fa-solid fa-border-all"></i></button>
-            <button type="button" class="view-btn" data-view="list" title="List View" aria-label="List View"><i class="fa-solid fa-list"></i></button>
+            <button type="button" class="view-btn active" data-view="grid" title="Grid View" aria-label="Grid View" aria-pressed="true"><i class="fa-solid fa-border-all"></i></button>
+            <button type="button" class="view-btn" data-view="list" title="List View" aria-label="List View" aria-pressed="false"><i class="fa-solid fa-list"></i></button>
           </div>
         </div>
       </div>
@@ -278,8 +280,8 @@
           }) %>
 
           <div class="view-toggle-btns">
-            <button class="view-btn active" title="Grid View" type="button"><i class="fa-solid fa-border-all"></i></button>
-            <button class="view-btn" title="List View" type="button"><i class="fa-solid fa-list"></i></button>
+            <button class="view-btn active" title="Grid View" type="button" data-view="grid" aria-label="Grid View" aria-pressed="true"><i class="fa-solid fa-border-all"></i></button>
+            <button class="view-btn" title="List View" type="button" data-view="list" aria-label="List View" aria-pressed="false"><i class="fa-solid fa-list"></i></button>
           </div>
         </div>
       </div>

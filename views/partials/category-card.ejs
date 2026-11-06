@@ -1,0 +1,61 @@
+<%
+  const _c = (typeof category !== 'undefined' && category) ? category : ((typeof cat !== 'undefined' && cat) ? cat : {});
+  const catImage = _c.image_url || null;
+  const catIcon = _c.icon || 'fa-solid fa-shapes';
+  const cnt = (_c.design_count !== undefined && _c.design_count !== null) ? parseInt(_c.design_count, 10) : 0;
+  
+  let countText = '';
+  const mode = typeof countDisplayMode !== 'undefined' ? countDisplayMode : (typeof siteSettings !== 'undefined' && siteSettings.category_count_display ? siteSettings.category_count_display : 'exact');
+  if (mode === 'exact') {
+    countText = `${cnt} ${cnt === 1 ? 'Design' : 'Designs'}`;
+  } else if (mode === 'rounded') {
+    countText = cnt >= 10 ? `${cnt}+ Designs` : `${cnt} ${cnt === 1 ? 'Design' : 'Designs'}`;
+  } else if (mode === 'hidden') {
+    countText = '';
+  }
+%>
+
+<a href="/category/<%= _c.slug %>" class="category-wave-card" title="<%= _c.name %>">
+  <!-- Top Photo Box (about 60% of card) or Brand Gradient Fallback -->
+  <div class="cat-wave-img-box <%= !catImage ? 'no-img-gradient' : '' %>">
+    <% if (catImage) { %>
+      <img src="<%= catImage %>" 
+           alt="<%= _c.name %>" 
+           loading="lazy" 
+           class="cat-wave-img" 
+           onerror="this.onerror=null;this.parentElement.classList.add('no-img-gradient');this.remove();">
+    <% } else { %>
+      <div class="cat-wave-placeholder-bg">
+        <i class="<%= catIcon %> cat-wave-bg-watermark"></i>
+      </div>
+    <% } %>
+
+    <!-- Soft Wave Curve Overlapping Photo -->
+    <div class="cat-wave-svg-divider">
+      <svg viewBox="0 0 500 90" preserveAspectRatio="none" class="cat-wave-svg">
+        <path d="M0,35 C150,90 350,0 500,55 L500,90 L0,90 Z" fill="#FFFFFF"></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- White Bottom Panel -->
+  <div class="cat-wave-body">
+    <!-- Centered Circular Icon Badge (Maroon) -->
+    <div class="cat-wave-icon-wrap">
+      <i class="<%= catIcon %>"></i>
+    </div>
+
+    <!-- Category Name (Playfair Display, Bold, Centered) -->
+    <h3 class="cat-wave-title"><%= _c.name %></h3>
+
+    <!-- Design Count (Small Grey) -->
+    <% if (countText) { %>
+      <span class="cat-wave-count"><%= countText %></span>
+    <% } %>
+
+    <!-- Round Blush Arrow Button at Bottom Right -->
+    <div class="cat-wave-arrow-btn" aria-hidden="true">
+      <i class="fa-solid fa-arrow-right"></i>
+    </div>
+  </div>
+</a>

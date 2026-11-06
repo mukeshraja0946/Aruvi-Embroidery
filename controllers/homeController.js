@@ -1,12 +1,22 @@
 const Design = require('../models/Design');
 const Category = require('../models/Category');
 const Order = require('../models/Order');
+const Setting = require('../models/Setting');
 
 exports.getHomePage = async (req, res, next) => {
   try {
     const featuredDesigns = await Design.getFeatured(6);
     const newArrivals = await Design.getNewArrivals(6);
-    const categories = await Category.getAll();
+
+    const countDisplay = await Setting.get('category_count_display', 'exact');
+    const hideEmpty = await Setting.get('category_hide_empty', '1');
+
+    const categories = await Category.getAll({
+      status: 'active',
+      showOnHomeOnly: true,
+      hideEmpty: hideEmpty === '1'
+    });
+
     const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
 
     res.render('home', {
@@ -14,6 +24,7 @@ exports.getHomePage = async (req, res, next) => {
       featuredDesigns,
       newArrivals,
       categories,
+      countDisplayMode: countDisplay,
       userPurchasedDesignIds
     });
   } catch (err) {

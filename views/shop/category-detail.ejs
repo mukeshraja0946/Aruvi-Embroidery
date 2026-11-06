@@ -60,8 +60,8 @@
       }) %>
 
       <div class="mobile-view-toggle">
-        <button type="button" class="view-btn active" data-view="grid" title="Grid View" aria-label="Grid View"><i class="fa-solid fa-border-all"></i></button>
-        <button type="button" class="view-btn" data-view="list" title="List View" aria-label="List View"><i class="fa-solid fa-list"></i></button>
+        <button type="button" class="view-btn active" data-view="grid" title="Grid View" aria-label="Grid View" aria-pressed="true"><i class="fa-solid fa-border-all"></i></button>
+        <button type="button" class="view-btn" data-view="list" title="List View" aria-label="List View" aria-pressed="false"><i class="fa-solid fa-list"></i></button>
       </div>
     </div>
   </div>
@@ -84,6 +84,11 @@
         currentSort: sortVal,
         actionType: 'ajax'
       }) %>
+
+      <div class="view-toggle-btns">
+        <button class="view-btn active" title="Grid View" type="button" data-view="grid" aria-label="Grid View" aria-pressed="true"><i class="fa-solid fa-border-all"></i></button>
+        <button class="view-btn" title="List View" type="button" data-view="list" aria-label="List View" aria-pressed="false"><i class="fa-solid fa-list"></i></button>
+      </div>
     </div>
   </div>
 

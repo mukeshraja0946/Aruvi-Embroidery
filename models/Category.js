@@ -3,16 +3,16 @@ const fs = require('fs');
 const db = require('../config/db');
 
 const fallbackCategories = [
-  { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs', description: '400+ Designs', image_url: '/public/images/cat_traditional.jpg', display_order: 1 },
-  { id: 2, name: 'Blouse Designs', slug: 'blouse-designs', description: '300+ Designs', image_url: '/public/images/cat_blouse.jpg', display_order: 2 },
-  { id: 3, name: 'Saree Designs', slug: 'saree-designs', description: '350+ Designs', image_url: '/public/images/cat_border.jpg', display_order: 3 },
-  { id: 4, name: 'Shirt Designs', slug: 'shirt-designs', description: '250+ Designs', image_url: '/public/images/placeholder-preview.svg', display_order: 4 },
-  { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs', description: '300+ Designs', image_url: '/public/images/cat_monogram.jpg', display_order: 5 },
-  { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs', description: '500+ Designs', image_url: '/public/images/cat_kids.jpg', display_order: 6 }
+  { id: 1, name: 'Animals & Birds Design', slug: 'animals-birds-designs', description: '400+ Designs', image_url: '/public/images/cat_traditional.jpg', icon: 'fa-solid fa-dove', display_order: 1, show_on_home: 1 },
+  { id: 2, name: 'Blouse Designs', slug: 'blouse-designs', description: '300+ Designs', image_url: '/public/images/cat_blouse.jpg', icon: 'fa-solid fa-vest', display_order: 2, show_on_home: 1 },
+  { id: 3, name: 'Saree Designs', slug: 'saree-designs', description: '350+ Designs', image_url: '/public/images/cat_border.jpg', icon: 'fa-solid fa-wand-magic-sparkles', display_order: 3, show_on_home: 1 },
+  { id: 4, name: 'Shirt Designs', slug: 'shirt-designs', description: '250+ Designs', image_url: '/public/images/placeholder-preview.svg', icon: 'fa-solid fa-shirt', display_order: 4, show_on_home: 1 },
+  { id: 5, name: 'Shirt Logo Designs', slug: 'shirt-logo-designs', description: '300+ Designs', image_url: '/public/images/cat_monogram.jpg', icon: 'fa-solid fa-crown', display_order: 5, show_on_home: 1 },
+  { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs', description: '500+ Designs', image_url: '/public/images/cat_kids.jpg', icon: 'fa-solid fa-shapes', display_order: 6, show_on_home: 1 }
 ];
 
 class Category {
-  static async getAll({ sort = null, search = null, status = null } = {}) {
+  static async getAll({ sort = null, search = null, status = null, showOnHomeOnly = false, hideEmpty = false } = {}) {
     if (db.isConnected()) {
       try {
         let whereClauses = [];
@@ -21,6 +21,9 @@ class Category {
           whereClauses.push('c.is_active = 1');
         } else if (status === 'inactive') {
           whereClauses.push('c.is_active = 0');
+        }
+        if (showOnHomeOnly) {
+          whereClauses.push('(c.show_on_home = 1 OR c.show_on_home IS NULL)');
         }
         if (search && search.trim()) {
           const q = `%${search.trim()}%`;
@@ -38,10 +41,16 @@ class Category {
         const sql = `SELECT c.*, COUNT(d.id) as design_count FROM categories c LEFT JOIN designs d ON c.id = d.category_id AND d.is_active = 1 ${whereClause} GROUP BY c.id ${orderSql}`;
         const rows = await db.query(sql, params);
         if (rows && Array.isArray(rows)) {
-          return rows.map(r => ({
+          let mapped = rows.map(r => ({
             ...r,
+            icon: r.icon || 'fa-solid fa-shapes',
+            show_on_home: r.show_on_home !== undefined ? (r.show_on_home === 1 || r.show_on_home === true) : true,
             design_count: parseInt(r.design_count || 0, 10)
           }));
+          if (hideEmpty) {
+            mapped = mapped.filter(r => r.design_count > 0);
+          }
+          return mapped;
         }
       } catch (err) {
         console.error('Category.getAll DB error:', err.message);
@@ -64,15 +73,19 @@ class Category {
 
     let list = fallbackCategories.map(cat => ({
       ...cat,
+      icon: cat.icon || 'fa-solid fa-shapes',
+      show_on_home: cat.show_on_home !== undefined ? cat.show_on_home : 1,
       is_active: cat.is_active !== undefined ? cat.is_active : 1,
       design_count: fallbackCounts[cat.id] || 0
     }));
     if (status === 'active') list = list.filter(c => c.is_active === 1);
     else if (status === 'inactive') list = list.filter(c => c.is_active === 0);
+    if (showOnHomeOnly) list = list.filter(c => c.show_on_home === 1 || c.show_on_home === true);
     if (search && search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(c => (c.name && c.name.toLowerCase().includes(q)) || (c.description && c.description.toLowerCase().includes(q)));
     }
+    if (hideEmpty) list = list.filter(c => (c.design_count || 0) > 0);
     if (sort === 'name') list.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
     else if (sort === 'count') list.sort((a,b) => (b.design_count || 0) - (a.design_count || 0));
     else if (sort === 'newest') list.sort((a,b) => (b.id || 0) - (a.id || 0));
@@ -139,27 +152,46 @@ class Category {
     ) || null;
   }
 
-  static async create({ name, slug, description, image_url, display_order = 0 }) {
+  static async create({ name, slug, description, image_url, icon = 'fa-solid fa-shapes', display_order = 0, show_on_home = 1 }) {
     if (db.isConnected()) {
-      const res = await db.query(
-        'INSERT INTO categories (name, slug, description, image_url, display_order) VALUES (?, ?, ?, ?, ?)',
-        [name, slug, description, image_url, display_order]
-      );
-      return res.insertId;
+      try {
+        const res = await db.query(
+          'INSERT INTO categories (name, slug, description, image_url, icon, display_order, show_on_home) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [name, slug, description, image_url, icon || 'fa-solid fa-shapes', display_order, (show_on_home === 0 || show_on_home === false || show_on_home === '0') ? 0 : 1]
+        );
+        return res.insertId;
+      } catch (err) {
+        // Fallback for pre-migration schema
+        const res = await db.query(
+          'INSERT INTO categories (name, slug, description, image_url, display_order) VALUES (?, ?, ?, ?, ?)',
+          [name, slug, description, image_url, display_order]
+        );
+        return res.insertId;
+      }
     }
     const newId = fallbackCategories.length + 1;
-    const item = { id: newId, name, slug, description, image_url, display_order };
+    const item = { id: newId, name, slug, description, image_url, icon, display_order, show_on_home: show_on_home ? 1 : 0 };
     fallbackCategories.push(item);
     return newId;
   }
 
-  static async update(id, { name, slug, description, image_url, display_order }) {
+  static async update(id, { name, slug, description, image_url, icon, display_order, show_on_home }) {
+    const isHome = (show_on_home === 0 || show_on_home === false || show_on_home === '0') ? 0 : 1;
     if (db.isConnected()) {
-      await db.query(
-        'UPDATE categories SET name = ?, slug = ?, description = ?, image_url = COALESCE(?, image_url), display_order = ? WHERE id = ?',
-        [name, slug, description, image_url, display_order, id]
-      );
-      return true;
+      try {
+        await db.query(
+          'UPDATE categories SET name = ?, slug = ?, description = ?, image_url = COALESCE(?, image_url), icon = ?, display_order = ?, show_on_home = ? WHERE id = ?',
+          [name, slug, description, image_url, icon || 'fa-solid fa-shapes', display_order, isHome, id]
+        );
+        return true;
+      } catch (err) {
+        // Fallback for pre-migration schema
+        await db.query(
+          'UPDATE categories SET name = ?, slug = ?, description = ?, image_url = COALESCE(?, image_url), display_order = ? WHERE id = ?',
+          [name, slug, description, image_url, display_order, id]
+        );
+        return true;
+      }
     }
     const cat = fallbackCategories.find(c => c.id == id);
     if (cat) {
@@ -167,7 +199,9 @@ class Category {
       cat.slug = slug;
       cat.description = description;
       if (image_url) cat.image_url = image_url;
+      if (icon) cat.icon = icon;
       cat.display_order = display_order;
+      if (show_on_home !== undefined) cat.show_on_home = isHome;
     }
     return true;
   }
