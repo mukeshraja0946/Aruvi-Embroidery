@@ -1295,6 +1295,60 @@
           </div>
         </div>
 
+        <!-- Database Connection Pool & Server Performance -->
+        <% if (typeof poolStatus !== 'undefined' && poolStatus) { %>
+        <div class="health-card" id="sectionPerformance" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #F0EAE1; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: 36px; height: 36px; border-radius: 8px; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center; font-size: 1rem;">
+                <i class="fa-solid fa-server"></i>
+              </div>
+              <div>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: #231815;">Database Connection Pool & Hostinger Resilience</h3>
+                <p style="margin: 0.2rem 0 0; font-size: 0.8rem; color: #786C65;">Real-time query timeout enforcement, connection limits, and memory utilization.</p>
+              </div>
+            </div>
+            <span class="badge-pill <%= poolStatus.queuedCount > 0 ? 'blocked' : 'writable' %>" style="font-size: 0.75rem;">
+              <%= poolStatus.isConnected ? 'Pool Healthy' : 'Pool Offline' %>
+            </span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div style="background: #FDFBF7; border: 1px solid #EFEAE3; border-radius: 8px; padding: 1rem;">
+              <span style="font-size: 0.75rem; color: #786C65; text-transform: uppercase; font-weight: 600;">Active / Max Connections</span>
+              <div style="font-size: 1.35rem; font-weight: 700; color: #231815; margin-top: 0.35rem;">
+                <%= poolStatus.activeConnections %> / <%= poolStatus.connectionLimit %>
+              </div>
+              <span style="font-size: 0.75rem; color: #8A7E76;"><%= poolStatus.idleConnections %> idle, <%= poolStatus.queuedCount %> queued</span>
+            </div>
+
+            <div style="background: #FDFBF7; border: 1px solid #EFEAE3; border-radius: 8px; padding: 1rem;">
+              <span style="font-size: 0.75rem; color: #786C65; text-transform: uppercase; font-weight: 600;">Slow Queries (> 1s)</span>
+              <div style="font-size: 1.35rem; font-weight: 700; color: <%= poolStatus.slowQueryCount > 0 ? '#B45309' : '#047857' %>; margin-top: 0.35rem;">
+                <%= poolStatus.slowQueryCount %>
+              </div>
+              <span style="font-size: 0.75rem; color: #8A7E76;">12s hard timeout active</span>
+            </div>
+
+            <div style="background: #FDFBF7; border: 1px solid #EFEAE3; border-radius: 8px; padding: 1rem;">
+              <span style="font-size: 0.75rem; color: #786C65; text-transform: uppercase; font-weight: 600;">Node.js RAM Usage</span>
+              <div style="font-size: 1.35rem; font-weight: 700; color: #231815; margin-top: 0.35rem;">
+                <%= (typeof memory !== 'undefined' && memory) ? memory.rssMb : 'N/A' %> MB
+              </div>
+              <span style="font-size: 0.75rem; color: #8A7E76;">Heap: <%= (typeof memory !== 'undefined' && memory) ? memory.heapUsedMb : 'N/A' %> MB</span>
+            </div>
+
+            <div style="background: #FDFBF7; border: 1px solid #EFEAE3; border-radius: 8px; padding: 1rem;">
+              <span style="font-size: 0.75rem; color: #786C65; text-transform: uppercase; font-weight: 600;">System Uptime</span>
+              <div style="font-size: 1.35rem; font-weight: 700; color: #231815; margin-top: 0.35rem;">
+                <%= (typeof uptime !== 'undefined') ? Math.floor(uptime / 60) + ' min' : 'Active' %>
+              </div>
+              <span style="font-size: 0.75rem; color: #8A7E76;">State: <%= (typeof systemState !== 'undefined') ? systemState : 'ready' %></span>
+            </div>
+          </div>
+        </div>
+        <% } %>
+
         <!-- Upload Route & Persistent Storage Health Check Card -->
         <div class="health-card" id="sectionStorage">
           <div class="storage-header-flex">

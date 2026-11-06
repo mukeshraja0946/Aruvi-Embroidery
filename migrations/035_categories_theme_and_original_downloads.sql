@@ -3,6 +3,9 @@
 -- Idempotent, MariaDB & MySQL compatible, information_schema guarded, no data loss.
 -- ============================================================================
 
+SET SESSION lock_wait_timeout = 10;
+SET SESSION wait_timeout = 30;
+
 -- ----------------------------------------------------------------------------
 -- PART 1: CATEGORIES COLUMNS & BACKFILL
 -- ----------------------------------------------------------------------------
@@ -56,10 +59,10 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- 7. Backfill categories
-UPDATE `categories` SET `show_on_home` = 1 WHERE `show_on_home` IS NULL OR `show_on_home` = 0;
-UPDATE `categories` SET `sort_order` = `id` WHERE `sort_order` IS NULL OR `sort_order` = 0;
-UPDATE `categories` SET `display_order` = `sort_order` WHERE `display_order` IS NULL OR `display_order` = 0;
-UPDATE `categories` SET `is_active` = 1 WHERE `is_active` IS NULL;
+UPDATE `categories` SET `show_on_home` = 1 WHERE `show_on_home` IS NULL OR `show_on_home` = 0 LIMIT 500;
+UPDATE `categories` SET `sort_order` = `id` WHERE `sort_order` IS NULL OR `sort_order` = 0 LIMIT 500;
+UPDATE `categories` SET `display_order` = `sort_order` WHERE `display_order` IS NULL OR `display_order` = 0 LIMIT 500;
+UPDATE `categories` SET `is_active` = 1 WHERE `is_active` IS NULL LIMIT 500;
 
 -- ----------------------------------------------------------------------------
 -- PART 2: THEME & APPEARANCE SETTINGS

@@ -11,8 +11,24 @@ const fallbackCategories = [
   { id: 6, name: 'T-Shirt Designs', slug: 't-shirt-designs', description: '500+ Designs', image_url: '/public/images/cat_kids.jpg', icon: 'fa-solid fa-shapes', sort_order: 6, display_order: 6, show_on_home: 1, is_active: 1 }
 ];
 
+// In-Memory 60-Second Cache for Categories & Aggregated Counts
+const categoryMemoryCache = new Map();
+const CATEGORY_CACHE_TTL_MS = 60000; // 60 seconds
+
 class Category {
+  static invalidateCache() {
+    categoryMemoryCache.clear();
+  }
+
   static async getAll({ sort = null, search = null, status = null, showOnHomeOnly = false, hideEmpty = false, parent = null } = {}) {
+    const cacheKey = JSON.stringify({ sort, search, status, showOnHomeOnly, hideEmpty, parent });
+    const cachedEntry = categoryMemoryCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cachedEntry && (now - cachedEntry.timestamp < CATEGORY_CACHE_TTL_MS)) {
+      return [...cachedEntry.data];
+    }
+
     if (db.isConnected()) {
       try {
         let whereClauses = [];
@@ -43,77 +59,87 @@ class Category {
 
         let orderSql = 'ORDER BY COALESCE(c.sort_order, c.display_order, c.id, 0) ASC, c.name ASC';
         if (sort === 'name') orderSql = 'ORDER BY c.name ASC';
-        else if (sort === 'count') orderSql = 'ORDER BY design_count DESC, c.name ASC';
+        else if (sort === 'count') orderSql = 'ORDER BY c.name ASC'; // Sorted in JS after count aggregation
         else if (sort === 'newest') orderSql = 'ORDER BY c.id DESC';
 
-        // Count ONLY active designs (d.is_active = 1) in a single grouped query
+        // 1. Fetch categories table ONLY (ultra-fast, zero join on designs table)
         const sql = `
           SELECT 
             c.*,
             COALESCE(c.sort_order, c.display_order, c.id, 0) AS final_order,
-            (SELECT COUNT(*) FROM categories child WHERE child.parent_id = c.id) AS children_count,
-            COUNT(DISTINCT d.id) AS design_count
+            (SELECT COUNT(*) FROM categories child WHERE child.parent_id = c.id) AS children_count
           FROM categories c
-          LEFT JOIN categories sub ON sub.parent_id = c.id
-          LEFT JOIN designs d ON (d.category_id = c.id OR d.category_id = sub.id) AND d.is_active = 1
           ${whereClause}
-          GROUP BY c.id
           ${orderSql}
         `;
-        const rows = await db.query(sql, params);
-        if (rows && Array.isArray(rows)) {
-          let mapped = rows.map(r => ({
-            ...r,
-            icon: r.icon || 'fa-solid fa-shapes',
-            card_image_key: r.card_image_key || null,
-            image_url: r.card_image_key || r.image_url || null,
-            sort_order: r.sort_order !== undefined ? r.sort_order : (r.display_order || r.id || 0),
-            show_on_home: r.show_on_home !== undefined ? (r.show_on_home === 1 || r.show_on_home === true || r.show_on_home === '1') : true,
-            is_active: r.is_active !== undefined ? (r.is_active === 1 || r.is_active === true || r.is_active === '1') : true,
-            children_count: parseInt(r.children_count || 0, 10),
-            has_children: parseInt(r.children_count || 0, 10) > 0,
-            design_count: parseInt(r.design_count || 0, 10)
-          }));
+        const catRows = await db.query(sql, params, { timeout: 4000 });
+
+        // 2. Fetch active design counts in ONE single indexed group query
+        let countMap = new Map();
+        try {
+          const countRows = await db.query(
+            'SELECT category_id, COUNT(*) AS cnt FROM designs WHERE is_active = 1 AND category_id IS NOT NULL GROUP BY category_id',
+            [],
+            { timeout: 3000 }
+          );
+          if (Array.isArray(countRows)) {
+            countRows.forEach(r => countMap.set(Number(r.category_id), Number(r.cnt)));
+          }
+        } catch (_) {}
+
+        if (catRows && Array.isArray(catRows)) {
+          // Pre-map child categories for fast hierarchical count rollup
+          const childrenMap = new Map();
+          catRows.forEach(c => {
+            if (c.parent_id) {
+              const pid = Number(c.parent_id);
+              if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+              childrenMap.get(pid).push(Number(c.id));
+            }
+          });
+
+          let mapped = catRows.map(r => {
+            const catId = Number(r.id);
+            let totalDesigns = countMap.get(catId) || 0;
+
+            // Include subcategory designs if present
+            const childIds = childrenMap.get(catId);
+            if (childIds && Array.isArray(childIds)) {
+              childIds.forEach(cid => {
+                totalDesigns += (countMap.get(cid) || 0);
+              });
+            }
+
+            return {
+              ...r,
+              icon: r.icon || 'fa-solid fa-shapes',
+              card_image_key: r.card_image_key || null,
+              image_url: r.card_image_key || r.image_url || null,
+              sort_order: r.sort_order !== undefined ? r.sort_order : (r.display_order || r.id || 0),
+              show_on_home: r.show_on_home !== undefined ? (r.show_on_home === 1 || r.show_on_home === true || r.show_on_home === '1') : true,
+              is_active: r.is_active !== undefined ? (r.is_active === 1 || r.is_active === true || r.is_active === '1') : true,
+              children_count: parseInt(r.children_count || 0, 10),
+              has_children: parseInt(r.children_count || 0, 10) > 0,
+              design_count: totalDesigns
+            };
+          });
+
+          if (sort === 'count') {
+            mapped.sort((a, b) => b.design_count - a.design_count);
+          }
+
           if (hideEmpty) {
             mapped = mapped.filter(r => r.design_count > 0);
           }
+
+          // Cache in memory
+          categoryMemoryCache.set(cacheKey, { timestamp: now, data: mapped });
           return mapped;
         }
       } catch (err) {
-        console.warn('[Category.getAll] Primary query notice, falling back to minimal resilient query:', err.message);
-        try {
-          let minWhere = [];
-          let minParams = [];
-          if (search && search.trim()) {
-            minWhere.push('c.name LIKE ?');
-            minParams.push(`%${search.trim()}%`);
-          }
-          const whereStr = minWhere.length > 0 ? 'WHERE ' + minWhere.join(' AND ') : '';
-          const minRows = await db.query(
-            `SELECT c.id, c.name, c.slug, c.image_url, COUNT(d.id) AS design_count 
-             FROM categories c 
-             LEFT JOIN designs d ON c.id = d.category_id AND d.is_active = 1 
-             ${whereStr} 
-             GROUP BY c.id ORDER BY c.id ASC`,
-            minParams
-          );
-          if (minRows && Array.isArray(minRows)) {
-            let mappedMin = minRows.map(r => ({
-              ...r,
-              icon: 'fa-solid fa-shapes',
-              show_on_home: true,
-              is_active: true,
-              children_count: 0,
-              has_children: false,
-              design_count: parseInt(r.design_count || 0, 10)
-            }));
-            if (hideEmpty) {
-              mappedMin = mappedMin.filter(r => r.design_count > 0);
-            }
-            return mappedMin;
-          }
-        } catch (minErr) {
-          console.error('[Category.getAll] Minimal fallback query failed:', minErr.message);
+        console.warn('[Category.getAll] Query notice, checking stale cache / fallback:', err.message);
+        if (cachedEntry) {
+          return [...cachedEntry.data];
         }
       }
     }

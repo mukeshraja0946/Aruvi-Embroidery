@@ -7,6 +7,20 @@ dotenv.config();
 
 const migrationsDir = path.resolve(__dirname, '..', 'migrations');
 
+let currentMigrationState = {
+  state: 'idle', // 'idle' | 'migrating' | 'ready' | 'degraded'
+  pendingCount: 0,
+  appliedCount: 0,
+  failedCount: 0,
+  durationMs: 0,
+  error: null,
+  lastRunAt: null
+};
+
+function getRunnerStatus() {
+  return { ...currentMigrationState };
+}
+
 /**
  * Extracts a human-readable, descriptive message from any error, including AggregateError
  */
@@ -302,10 +316,13 @@ const CANONICAL_REQUIRED_TABLES = [
 /**
  * Runs all pending numbered migrations in sequence with table presence verification
  */
-async function runPendingMigrations({ connection: existingConn, silent = false } = {}) {
+async function runPendingMigrations({ connection: existingConn, silent = false, notifyPassenger = false } = {}) {
   const config = getDbConfig();
   let conn = existingConn;
   let shouldClose = false;
+  const runStartTime = Date.now();
+  currentMigrationState.state = 'migrating';
+  currentMigrationState.error = null;
 
   try {
     if (!conn) {
@@ -317,6 +334,11 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
         throw new Error(`Database connection failed (${errorDesc}). Verify DB_HOST, DB_USER, DB_NAME in environment.`);
       }
     }
+
+    try {
+      await conn.query('SET SESSION lock_wait_timeout = 10');
+      await conn.query('SET SESSION wait_timeout = 30');
+    } catch (_) {}
 
     await ensureMigrationTable(conn);
     const { namesSet, versionsSet } = await getAppliedMigrations(conn);
@@ -422,9 +444,16 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       }
     }
 
-    if (appliedThisRun.length > 0) {
+    if (notifyPassenger && appliedThisRun.length > 0) {
       touchPassengerRestart();
     }
+
+    currentMigrationState.state = failedThisRun.length > 0 ? 'degraded' : 'ready';
+    currentMigrationState.pendingCount = 0;
+    currentMigrationState.appliedCount = appliedThisRun.length;
+    currentMigrationState.failedCount = failedThisRun.length;
+    currentMigrationState.durationMs = Date.now() - runStartTime;
+    currentMigrationState.lastRunAt = new Date().toISOString();
 
     // Post-migration table presence audit
     const missingTables = [];
@@ -445,7 +474,7 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       } else if (appliedThisRun.length === 0) {
         console.log(' ✨ Database schema is up to date. Zero pending migrations.');
       } else {
-        console.log(` ✨ Successfully applied ${appliedThisRun.length} pending migration(s).`);
+        console.log(` ✨ Successfully applied ${appliedThisRun.length} pending migration(s) in ${currentMigrationState.durationMs}ms.`);
       }
 
       if (missingTables.length > 0) {
@@ -464,11 +493,16 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       failedCount: failedThisRun.length,
       failedFiles: failedThisRun,
       missingTables,
+      durationMs: currentMigrationState.durationMs,
       dbServerVersion
     };
 
   } catch (outerErr) {
     const cleanOuterMsg = formatErrorMessage(outerErr);
+    currentMigrationState.state = 'degraded';
+    currentMigrationState.error = cleanOuterMsg;
+    currentMigrationState.durationMs = Date.now() - runStartTime;
+    currentMigrationState.lastRunAt = new Date().toISOString();
     console.error('❌ [Migration Runner Safe Catch]:', cleanOuterMsg);
     return {
       success: false,
@@ -478,6 +512,7 @@ async function runPendingMigrations({ connection: existingConn, silent = false }
       failedFiles: [{ file: 'connection', version: 'all', error: cleanOuterMsg }],
       missingTables: [],
       error: cleanOuterMsg,
+      durationMs: currentMigrationState.durationMs,
       dbServerVersion: 'Unknown'
     };
   } finally {
@@ -577,6 +612,8 @@ async function getMigrationStatus() {
 module.exports = {
   runPendingMigrations,
   getMigrationStatus,
+  getRunnerStatus,
+  touchPassengerRestart,
   splitSqlStatements,
   getAvailableMigrationFiles,
   formatErrorMessage

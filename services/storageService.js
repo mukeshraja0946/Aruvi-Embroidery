@@ -338,11 +338,14 @@ class StorageService {
 
     const now = Date.now();
     if (forceRefresh || (now - cachedFileCounts.lastUpdated > 10 * 60 * 1000)) {
-      try {
-        cachedFileCounts.public = countFilesInDirectory(this.getPublicDir()) + countFilesInDirectory(path.join(info.path, 'previews'));
-        cachedFileCounts.private = countFilesInDirectory(this.getPrivateDir()) + countFilesInDirectory(path.join(projectRoot, 'storage_private'));
-        cachedFileCounts.lastUpdated = now;
-      } catch (_) {}
+      cachedFileCounts.lastUpdated = now;
+      // Schedule directory scan asynchronously so server startup / listen is never blocked
+      setImmediate(() => {
+        try {
+          cachedFileCounts.public = countFilesInDirectory(this.getPublicDir()) + countFilesInDirectory(path.join(info.path, 'previews'));
+          cachedFileCounts.private = countFilesInDirectory(this.getPrivateDir()) + countFilesInDirectory(path.join(projectRoot, 'storage_private'));
+        } catch (_) {}
+      });
     }
 
     const publicFilesCount = cachedFileCounts.public;

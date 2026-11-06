@@ -13,6 +13,9 @@ function checkIsAjax(req) {
 }
 
 function errorHandler(err, req, res, next) {
+  if (res.headersSent) {
+    return next(err);
+  }
   const isCsrf = err.code === 'EBADCSRF' || (err.message && err.message.toLowerCase().includes('csrf'));
   const statusCode = isCsrf ? 403 : (err.status || err.statusCode || 500);
 

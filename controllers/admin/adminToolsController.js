@@ -1177,12 +1177,25 @@ exports.getSystemHealth = async (req, res, next) => {
     const { getRateLimitStatus } = require('../../middleware/rateLimiters');
     const rateLimitStatus = getRateLimitStatus(req);
     const storageStatus = storage.getStorageStatus ? storage.getStorageStatus() : { uploadsDir: storage.getUploadsDir(), isWritable: true };
+    const poolStatus = typeof db.getPoolStatus === 'function' ? db.getPoolStatus() : null;
+    const { getRunnerStatus } = require('../../services/migrationRunner');
+    const runnerStatus = typeof getRunnerStatus === 'function' ? getRunnerStatus() : null;
+    const memUsage = process.memoryUsage();
 
     res.render('admin/tools/system-health', {
       title: 'Database & System Health - Admin',
       health,
       rateLimitStatus,
       storageStatus,
+      poolStatus,
+      runnerStatus,
+      uptime: Math.floor(process.uptime()),
+      systemState: (req.app && req.app.locals.systemState) || 'ready',
+      memory: {
+        rssMb: Math.round(memUsage.rss / 1024 / 1024),
+        heapUsedMb: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(memUsage.heapTotal / 1024 / 1024)
+      },
       sessionStoreType: 'express-mysql-session',
       page: 'system-health'
     });

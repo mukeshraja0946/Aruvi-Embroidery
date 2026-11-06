@@ -110,14 +110,20 @@ exports.getShopPage = async (req, res, next) => {
 
 exports.getCategoriesPage = async (req, res, next) => {
   try {
-    const countDisplay = await Setting.get('category_count_display', 'exact');
-    const hideEmpty = await Setting.get('category_hide_empty', '0');
     const parentSlug = req.query.parent || null;
-    const allCategories = await Category.getAll({ status: 'active', hideEmpty: hideEmpty === '1', parent: parentSlug });
-    
-    // Pagination only if more than 24 categories
     const page = parseInt(req.query.page, 10) || 1;
     const limit = 24;
+
+    const [countDisplay, hideEmpty, allCategoriesRaw, featuredDesignsRaw, userPurchasedDesignIdsRaw, userWishlistRaw] = await Promise.all([
+      Setting.get('category_count_display', 'exact').catch(() => 'exact'),
+      Setting.get('category_hide_empty', '0').catch(() => '0'),
+      Category.getAll({ status: 'active', parent: parentSlug }).catch(() => []),
+      Design.getFeatured(6).catch(() => []),
+      req.user ? Order.getPurchasedDesignIdsByUser(req.user.id).catch(() => []) : Promise.resolve([]),
+      req.user ? Wishlist.getByUser(req.user.id).catch(() => []) : Promise.resolve([])
+    ]);
+
+    const allCategories = (hideEmpty === '1') ? allCategoriesRaw.filter(c => c.design_count > 0) : allCategoriesRaw;
     const totalCategories = allCategories.length;
     let categories = allCategories;
     let pagination = null;
@@ -137,18 +143,14 @@ exports.getCategoriesPage = async (req, res, next) => {
       };
     }
 
-    const featuredDesigns = await Design.getFeatured(6);
-    const userPurchasedDesignIds = req.user ? await Order.getPurchasedDesignIdsByUser(req.user.id) : [];
-    const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
-    const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.wishlist_id);
     res.render('shop/categories', {
       title: 'Categories - ARUVI EMBROIDERY STUDIO',
       categories,
       pagination,
       countDisplayMode: countDisplay,
-      featuredDesigns,
-      userPurchasedDesignIds,
-      userWishlistDesignIds
+      featuredDesigns: featuredDesignsRaw || [],
+      userPurchasedDesignIds: userPurchasedDesignIdsRaw || [],
+      userWishlistDesignIds: (userWishlistRaw || []).map(w => w.id || w.wishlist_id)
     });
   } catch (err) {
     next(err);
@@ -729,11 +731,6 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
     return fs.createReadStream(foundPath).pipe(res);
-  } catch (err) {
-    console.error('[Preview Download Route Error]:', err);
-    return res.status(500).json({ success: false, message: 'Error processing preview download: ' + err.message });
-  }
-};
   } catch (err) {
     console.error('[Preview Download Route Error]:', err);
     return res.status(500).json({ success: false, message: 'Error processing preview download: ' + err.message });

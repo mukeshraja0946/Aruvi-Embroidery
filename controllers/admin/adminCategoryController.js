@@ -3,7 +3,9 @@ const ActivityLog = require('../../models/ActivityLog');
 const Setting = require('../../models/Setting');
 
 function invalidateCategoryCaches(req) {
-  if (req.app && req.app.locals) {
+  Category.invalidateCache();
+  Setting.invalidateCache();
+  if (req && req.app && req.app.locals) {
     if (req.app.locals.siteSettings) {
       // Keep siteSettings up to date
     }

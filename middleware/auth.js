@@ -4,6 +4,19 @@ const Setting = require('../models/Setting');
 const Wishlist = require('../models/Wishlist');
 const previewService = require('../services/previewService');
 
+function safeTimeout(promise, fallback, ms = 3000) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([
+    promise.catch(() => fallback),
+    timeoutPromise
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 async function attachUserAndCart(req, res, next) {
   // Always initialize res.locals defaults to prevent EJS ReferenceError crashes
   res.locals.currentUser = null;
@@ -38,7 +51,7 @@ async function attachUserAndCart(req, res, next) {
   try {
     // 1. Session customer or admin user
     if (req.session && req.session.userId) {
-      const user = await User.findById(req.session.userId);
+      const user = await safeTimeout(User.findById(req.session.userId), null, 3000);
       if (user && user.is_active) {
         if (req.session && req.session.googlePicture) {
           user.profile_picture = req.session.googlePicture;
@@ -63,9 +76,9 @@ async function attachUserAndCart(req, res, next) {
     // 3. Cart Summary
     try {
       const cartSessionId = req.session ? req.session.cartSessionId : null;
-      const cart = await Cart.getCart(req.user ? req.user.id : null, cartSessionId);
-      res.locals.cart = cart;
-      res.locals.cartCount = cart.count || 0;
+      const cart = await safeTimeout(Cart.getCart(req.user ? req.user.id : null, cartSessionId), { items: [], total: 0, count: 0 }, 2500);
+      res.locals.cart = cart || { items: [], total: 0, count: 0 };
+      res.locals.cartCount = (cart && cart.count) ? cart.count : 0;
     } catch (cartErr) {
       console.error('Cart fetch error:', cartErr.message);
     }
@@ -73,9 +86,9 @@ async function attachUserAndCart(req, res, next) {
     // 3b. Wishlist Summary
     try {
       if (req.user && req.user.id) {
-        const userWishlist = await Wishlist.getByUser(req.user.id);
+        const userWishlist = await safeTimeout(Wishlist.getByUser(req.user.id), [], 2000);
         res.locals.userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.design_id || w.wishlist_id);
-        res.locals.wishlistCount = await Wishlist.getCount(req.user.id);
+        res.locals.wishlistCount = await safeTimeout(Wishlist.getCount(req.user.id), 0, 2000);
       }
     } catch (wishErr) {
       console.error('Wishlist fetch error:', wishErr.message);

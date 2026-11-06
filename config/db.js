@@ -8,16 +8,21 @@ let pool = null;
 let isConnected = false;
 let initPromise = null;
 
+let slowQueryCount = 0;
+const QUERY_TIMEOUT_MS = parseInt(process.env.DB_QUERY_TIMEOUT_MS || '12000', 10);
+
 let dbConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
+  port: parseInt(process.env.DB_PORT || '3306', 10),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'aruvi_embroidery',
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  connectTimeout: 5000,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
+  queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '100', 10),
+  connectTimeout: 10000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   multipleStatements: true,
   charset: 'utf8mb4'
 };
@@ -65,18 +70,21 @@ async function initPool() {
 
       // 2. Create pool to target database
       pool = mysql.createPool(dbConfig);
-      const connection = await pool.getConnection();
+      let connection = null;
 
       try {
+        connection = await pool.getConnection();
         const [vRows] = await connection.query('SELECT VERSION() AS version');
         if (vRows && vRows[0]) {
           dbServerVersion = vRows[0].version;
         }
       } catch (vErr) {
         console.warn('[DB Config Warning] Unable to retrieve server version:', vErr.message);
+      } finally {
+        if (connection) {
+          try { connection.release(); } catch (_) {}
+        }
       }
-
-      connection.release();
 
       // Database safety: Never auto-run schema.sql, seed.sql, TRUNCATE, or DROP on startup.
       // Migrations are run safely via `npm run migrate` and seed runs only manually via `npm run seed`.
@@ -113,15 +121,44 @@ function logQueryError(error, sql) {
 }
 
 /**
+ * Execute a query with a strict per-query timeout to prevent database locks from hanging the Node app
+ */
+async function executeWithTimeout(poolInstance, sql, params = [], timeoutMs = QUERY_TIMEOUT_MS) {
+  const queryStart = Date.now();
+  let timer = null;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`[DB Query Timeout] Query exceeded ${timeoutMs}ms limit: ${String(sql).slice(0, 100).replace(/\s+/g, ' ')}...`);
+      err.code = 'ETIMEDOUT';
+      reject(err);
+    }, timeoutMs);
+  });
+
+  try {
+    const queryPromise = poolInstance.query({ sql, timeout: timeoutMs }, params);
+    const [rows] = await Promise.race([queryPromise, timeoutPromise]);
+    const duration = Date.now() - queryStart;
+    if (duration > 1000) {
+      slowQueryCount++;
+      console.warn(`[Slow Query Notice] SQL took ${duration}ms: ${String(sql).slice(0, 120).replace(/\s+/g, ' ')}`);
+    }
+    return rows;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * Execute parameterized query
  */
-async function query(sql, params = []) {
+async function query(sql, params = [], options = {}) {
+  const customTimeout = options.timeout || QUERY_TIMEOUT_MS;
   if (initPromise) await initPromise;
 
   if (pool && isConnected) {
     try {
-      const [rows] = await pool.query(sql, params);
-      return rows;
+      return await executeWithTimeout(pool, sql, params, customTimeout);
     } catch (error) {
       error.sql = sql;
       error.params = params;
@@ -135,8 +172,7 @@ async function query(sql, params = []) {
       await initPool();
       if (pool && isConnected) {
         try {
-          const [rows] = await pool.query(sql, params);
-          return rows;
+          return await executeWithTimeout(pool, sql, params, customTimeout);
         } catch (error) {
           error.sql = sql;
           error.params = params;
@@ -151,11 +187,37 @@ async function query(sql, params = []) {
   }
 }
 
+function getPoolStatus() {
+  let activeConnections = 0;
+  let idleConnections = 0;
+  let queuedCount = 0;
+
+  if (pool && pool.pool) {
+    activeConnections = (pool.pool._allConnections ? pool.pool._allConnections.length : 0) -
+                        (pool.pool._freeConnections ? pool.pool._freeConnections.length : 0);
+    idleConnections = pool.pool._freeConnections ? pool.pool._freeConnections.length : 0;
+    queuedCount = pool.pool._connectionQueue ? pool.pool._connectionQueue.length : 0;
+  }
+
+  return {
+    connectionLimit: dbConfig.connectionLimit,
+    queueLimit: dbConfig.queueLimit,
+    activeConnections: Math.max(0, activeConnections),
+    idleConnections: Math.max(0, idleConnections),
+    queuedCount: Math.max(0, queuedCount),
+    slowQueryCount,
+    isConnected,
+    dbServerVersion
+  };
+}
+
 module.exports = {
   pool: () => pool,
   query,
   initPool,
   isConnected: () => isConnected,
+  getPoolStatus,
+  getSlowQueryCount: () => slowQueryCount,
   dbConfig
 };
 

@@ -40,16 +40,31 @@ const previewService = require('./services/previewService');
 
 const app = express();
 
-// Degraded mode tracking (never crashes the server)
+// System state tracking (starting | migrating | ready | degraded)
+app.locals.systemState = 'starting';
 app.locals.isDegraded = false;
 app.locals.degradedReasons = [];
 
 // Lightweight health check endpoint for Hostinger / uptime monitoring (zero DB/storage work)
-app.get('/healthz', (req, res) => {
+app.get('/healthz', async (req, res) => {
   const mem = process.memoryUsage();
-  res.status(200).json({
-    status: 'ok',
+  const db = require('./config/db');
+  const dbConnected = db.isConnected();
+  let dbStatus = 'starting';
+  if (app.locals.systemState === 'ready') {
+    dbStatus = dbConnected ? 'connected' : 'degraded';
+  } else if (app.locals.systemState === 'migrating') {
+    dbStatus = 'migrating';
+  } else if (app.locals.systemState === 'degraded') {
+    dbStatus = 'degraded';
+  }
+
+  const baseResponse = {
+    status: app.locals.isDegraded ? 'degraded' : 'ok',
     uptime: Math.floor(process.uptime()),
+    systemState: app.locals.systemState,
+    database: dbStatus,
+    pool: typeof db.getPoolStatus === 'function' ? db.getPoolStatus() : null,
     degraded: Boolean(app.locals.isDegraded),
     degradedReasons: app.locals.degradedReasons || [],
     memory: {
@@ -58,18 +73,72 @@ app.get('/healthz', (req, res) => {
       heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024)
     },
     timestamp: new Date().toISOString()
-  });
+  };
+
+  // Deep check runs quick SELECT 1 with a strict 3000ms timeout
+  if (req.query.deep === '1') {
+    try {
+      const deepCheck = await Promise.race([
+        db.query('SELECT 1 AS health', [], { timeout: 3000 }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Deep health check timed out after 3000ms')), 3000))
+      ]);
+      baseResponse.deepCheck = deepCheck ? 'passed' : 'fallback';
+      return res.status(200).json(baseResponse);
+    } catch (err) {
+      baseResponse.status = 'degraded';
+      baseResponse.deepCheck = 'failed';
+      baseResponse.deepCheckError = err.message;
+      return res.status(503).json(baseResponse);
+    }
+  }
+
+  res.status(200).json(baseResponse);
 });
 
-// Request timeout protection (25s) to prevent slow requests from hanging the process
+// Request timeout protection (25s) to prevent slow requests from hanging the process and triggering Nginx 504
 app.use((req, res, next) => {
   const isHeavy = req.path.includes('/upload-chunk') || req.path.includes('/backup');
   const timeoutMs = isHeavy ? 120000 : 25000;
+  const refId = `REQ_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
   const timer = setTimeout(() => {
     if (!res.headersSent) {
-      console.warn(`[Request Timeout Warning] Request exceeded ${timeoutMs / 1000}s timeout: ${req.method} ${req.originalUrl}`);
-      res.status(504).send('<!DOCTYPE html><html><head><title>Request Timeout</title><style>body{font-family:sans-serif;padding:3rem;text-align:center;color:#333;}</style></head><body><h1>504 Request Timeout</h1><p>The server took too long to process your request. Please try again.</p><p><a href="javascript:location.reload()">Reload Page</a> | <a href="/">Return Home</a></p></body></html>');
+      console.warn(`[Request Timeout Warning] [Ref: ${refId}] Request exceeded ${timeoutMs / 1000}s timeout: ${req.method} ${req.originalUrl}`);
+      res.status(503).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Service Temporarily Unavailable | Aruvi Embroidery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #FAF7F2; color: #2C2420; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+    .card { background: #FFFFFF; border-radius: 16px; padding: 40px 32px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(74, 30, 20, 0.08); border: 1px solid #EFE8E2; }
+    .icon { font-size: 48px; margin-bottom: 16px; line-height: 1; }
+    h1 { font-family: Georgia, serif; font-size: 24px; margin: 0 0 12px; color: #8B2635; }
+    p { font-size: 15px; line-height: 1.6; color: #665C54; margin: 0 0 20px; }
+    .ref { font-family: monospace; font-size: 12px; color: #9E8E84; background: #F6F2EE; padding: 6px 12px; border-radius: 6px; display: inline-block; margin-bottom: 24px; }
+    .btn { display: inline-block; background: #8B2635; color: #FFFFFF; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; transition: background 0.2s; }
+    .btn:hover { background: #6F1E2A; }
+    .links { margin-top: 18px; font-size: 13px; color: #8B2635; }
+    .links a { color: #8B2635; text-decoration: underline; margin: 0 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🌸</div>
+    <h1>Taking Longer Than Expected</h1>
+    <p>This page took longer than usual to load. The server is actively processing tasks. Please retry in a moment.</p>
+    <div class="ref">Reference: ${refId}</div>
+    <div>
+      <a href="javascript:location.reload()" class="btn">Retry Page</a>
+    </div>
+    <div class="links">
+      <a href="/">Return Home</a>
+      <a href="/shop">Browse Designs</a>
+    </div>
+  </div>
+</body>
+</html>`);
     }
   }, timeoutMs);
 
@@ -484,16 +553,24 @@ async function initializeDatabaseAndSchema() {
   if (hasInitializedDatabase) return;
   hasInitializedDatabase = true;
 
+  const migStart = Date.now();
+  app.locals.systemState = 'migrating';
+
   // 1. Automatically apply any pending database migrations before accepting requests
   try {
     const { runPendingMigrations } = require('./services/migrationRunner');
-    const migResult = await runPendingMigrations({ silent: false });
+    const migResult = await runPendingMigrations({ silent: false, notifyPassenger: false });
+    const migDuration = Date.now() - migStart;
     if (migResult && migResult.dbServerVersion) {
       databaseServerVersion = migResult.dbServerVersion;
     }
+    console.log(`⚡ Migrations: pending 0 / running 0 / done in ${migDuration} ms (applied ${migResult ? migResult.appliedCount : 0})`);
     if (migResult && migResult.failedCount > 0) {
       app.locals.isDegraded = true;
+      app.locals.systemState = 'degraded';
       app.locals.degradedReasons.push(`Database migrations had ${migResult.failedCount} issue(s)`);
+    } else {
+      app.locals.systemState = 'ready';
     }
   } catch (migErr) {
     const { formatErrorMessage } = require('./services/migrationRunner');
@@ -504,31 +581,34 @@ async function initializeDatabaseAndSchema() {
     console.error('   Action: Verify DB credentials in hPanel or run "npm run migrate"');
     console.error('====================================================');
     app.locals.isDegraded = true;
+    app.locals.systemState = 'degraded';
     app.locals.degradedReasons.push(`Database connection / migration error: ${cleanMsg}`);
   }
 
-  // 2. Schema Safety Check: compare required columns against information_schema
-  try {
-    const { checkSchemaSafetyOnStartup } = require('./services/schemaHealthService');
-    const schemaStatus = await checkSchemaSafetyOnStartup();
-    app.locals.schemaAlert = schemaStatus;
-    if (schemaStatus && !schemaStatus.isHealthy) {
-      app.locals.isDegraded = true;
-      app.locals.degradedReasons.push(`Database missing columns: ${schemaStatus.missingSummary || 'See System Health'}`);
+  // 2. Background non-blocking tasks (schema check, slug repair, stitch counts)
+  setTimeout(async () => {
+    console.log('⚡ Background tasks started');
+    try {
+      const { checkSchemaSafetyOnStartup } = require('./services/schemaHealthService');
+      const schemaStatus = await checkSchemaSafetyOnStartup();
+      app.locals.schemaAlert = schemaStatus;
+      if (schemaStatus && !schemaStatus.isHealthy) {
+        app.locals.isDegraded = true;
+        app.locals.degradedReasons.push(`Database missing columns: ${schemaStatus.missingSummary || 'See System Health'}`);
+      }
+    } catch (schemaErr) {
+      console.warn('[Startup Schema Check Warning]:', schemaErr.message);
     }
-  } catch (schemaErr) {
-    console.warn('[Startup Schema Check Warning]:', schemaErr.message);
-  }
 
-  // 3. Run auto-repairs for slugs and stitch counts
-  try {
-    const Design = require('./models/Design');
-    if (typeof Design.ensureDatabaseColumns === 'function') await Design.ensureDatabaseColumns();
-    if (typeof Design.repairInvalidDatabaseSlugs === 'function') await Design.repairInvalidDatabaseSlugs();
-    if (typeof Design.repairExistingStitchCounts === 'function') await Design.repairExistingStitchCounts();
-  } catch (err) {
-    console.warn('[Startup Repair Notice]:', err.message);
-  }
+    try {
+      const Design = require('./models/Design');
+      if (typeof Design.ensureDatabaseColumns === 'function') await Design.ensureDatabaseColumns();
+      if (typeof Design.repairInvalidDatabaseSlugs === 'function') await Design.repairInvalidDatabaseSlugs();
+      if (typeof Design.repairExistingStitchCounts === 'function') await Design.repairExistingStitchCounts();
+    } catch (err) {
+      console.warn('[Startup Repair Notice]:', err.message);
+    }
+  }, 1000).unref();
 }
 
 // Start Server: binds port immediately on 0.0.0.0 to satisfy Hostinger proxy health checks
@@ -543,6 +623,7 @@ function startServer() {
 
     console.log('====================================================');
     console.log(`🌸 Aruvi Embroidery Web App running on port ${PORT}`);
+    console.log(`⚡ Listening on port ${PORT} after ${elapsed} ms`);
     console.log(`⚡ SERVER STARTED on port ${PORT} in ${elapsed} ms, degraded=${Boolean(app.locals.isDegraded)}`);
     console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);
     console.log(`📦 Storage Driver: ${storageStatus.driver.toUpperCase()}`);
@@ -569,9 +650,12 @@ function startServer() {
 
 // Passenger or standalone startup check
 if (typeof PhusionPassenger !== 'undefined') {
+  const listenStartTime = serverStartTime;
   checkRequiredEnvVars();
   app.listen('passenger', () => {
-    console.log(`⚡ SERVER STARTED on Phusion Passenger, degraded=${Boolean(app.locals.isDegraded)}`);
+    const elapsed = Date.now() - listenStartTime;
+    console.log(`⚡ Listening on passenger after ${elapsed} ms`);
+    console.log(`⚡ SERVER STARTED on Phusion Passenger in ${elapsed} ms, degraded=${Boolean(app.locals.isDegraded)}`);
   });
   initializeDatabaseAndSchema().catch((err) => {
     console.warn('[Passenger Startup Notice] DB/Schema initialization notice:', err.message);

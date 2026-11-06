@@ -93,6 +93,11 @@ const defaultFeatureCards = {
   ]
 };
 
+// In-Memory 60-Second Cache for Settings & Branding
+let cachedSettings = null;
+let settingsCacheTimestamp = 0;
+const SETTINGS_CACHE_TTL_MS = 60000; // 60 seconds
+
 const fallbackSettings = {
   feature_cards: JSON.stringify(defaultFeatureCards),
   shop_name: 'ARUVI EMBROIDERY STUDIO',
@@ -343,10 +348,18 @@ class Setting {
     }
   }
 
+  static invalidateCache() {
+    cachedSettings = null;
+    settingsCacheTimestamp = 0;
+  }
+
   static async get(key, defaultValue = null) {
+    if (cachedSettings && cachedSettings[key] !== undefined) {
+      return cachedSettings[key];
+    }
     try {
       if (db.isConnected()) {
-        const rows = await db.query('SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1', [key]);
+        const rows = await db.query('SELECT setting_value FROM settings WHERE setting_key = ? LIMIT 1', [key], { timeout: 3000 });
         if (Array.isArray(rows) && rows.length > 0 && rows[0].setting_value !== null && rows[0].setting_value !== undefined) {
           return rows[0].setting_value;
         }
@@ -398,9 +411,14 @@ class Setting {
   }
 
   static async getAll() {
+    const now = Date.now();
+    if (cachedSettings && (now - settingsCacheTimestamp < SETTINGS_CACHE_TTL_MS)) {
+      return { ...cachedSettings };
+    }
+
     try {
       if (db.isConnected()) {
-        const rows = await db.query('SELECT setting_key, setting_value FROM settings');
+        const rows = await db.query('SELECT setting_key, setting_value FROM settings', [], { timeout: 3000 });
         if (Array.isArray(rows) && rows.length > 0) {
           rows.forEach(r => {
             if (r.setting_key && r.setting_value !== null && r.setting_value !== undefined) {
@@ -411,7 +429,11 @@ class Setting {
       }
     } catch (err) {
       console.error('[Setting.getAll error]:', err.message);
+      if (cachedSettings) {
+        return { ...cachedSettings }; // Return stale cache if DB is slow or offline
+      }
     }
+
     const storage = require('../config/storage');
     const resolved = { ...fallbackSettings };
     resolved.logo_url = storage.resolveBrandAsset('logo', resolved.logo_url);
@@ -422,6 +444,10 @@ class Setting {
     // Provide masked secrets for admin form
     resolved.razorpay_key_secret_masked = maskSecret(resolved.razorpay_key_secret);
     resolved.razorpay_webhook_secret_masked = maskSecret(resolved.razorpay_webhook_secret);
+
+    // Save to cache
+    cachedSettings = { ...resolved };
+    settingsCacheTimestamp = now;
 
     return resolved;
   }
@@ -538,6 +564,7 @@ class Setting {
     } catch (err) {
       console.error('[Setting.updateAll DB error]:', err.message);
     }
+    Setting.invalidateCache();
     return true;
   }
 

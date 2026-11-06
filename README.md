@@ -322,11 +322,47 @@ This automated tool executes:
 2. **JavaScript Syntax Verification:** Runs `node --check` across all 114 JavaScript files in the project to catch syntax errors or duplicate identifiers before deploy.
 3. **Environment Audit:** Validates DB connection parameters, `SESSION_SECRET`, `UPLOAD_DIR`, and Razorpay keys.
 
-### Troubleshooting Hostinger "503 Service Unavailable"
-If production ever returns `503 Service Unavailable - The server is temporarily busy`:
-1. **Check Runtime Logs:** In Hostinger hPanel &rarr; **Websites** &rarr; **Manage** &rarr; **Node.js** &rarr; **Runtime Logs**.
-2. **Immediate Health Check:** Access `https://aruviembroidery.com/healthz` — this zero-dependency probe returns server status, memory, and degraded mode diagnostics.
-3. **Restart Node App:** Click **Restart** in hPanel Node.js dashboard.
-4. **Safe Rollback:** If a bad deploy occurred, run `git revert HEAD` or check out the previous commit and deploy.
+### Troubleshooting Hostinger "503 Service Unavailable" & "504 Gateway Time-out"
+If production returns `503 Service Unavailable` or `504 Gateway Time-out (nginx)`:
+
+1. **Immediate Health Check:**
+   - Quick Ping: Access `https://aruviembroidery.com/healthz` — returns instantaneous (<5ms) JSON with uptime, RAM, systemState, and connection pool status without touching MySQL.
+   - Deep Ping: Access `https://aruviembroidery.com/healthz?deep=1` — tests live database connectivity with a strict 3-second timeout.
+
+2. **Restart Node App in hPanel:**
+   - Navigate to **hPanel** &rarr; **Websites** &rarr; **Manage** &rarr; **Node.js**.
+   - Click **Restart Application** or **Stop**, wait 5 seconds, then click **Start**.
+
+3. **Check Runtime Logs:**
+   - In **hPanel** &rarr; **Node.js** &rarr; **Runtime Logs**, look for:
+     * `⚡ Listening on port 3000 after X ms` (verifies port binding is immediate)
+     * `⚡ Migrations: pending 0 / running 0 / done in X ms`
+     * `[Slow Query Notice]` or `[DB Query Timeout]` lines
+     * Any fatal exceptions or process rejections logged with unique reference IDs.
+
+4. **Inspect Database Metadata Locks in phpMyAdmin:**
+   - If MySQL queries are blocked or connections are exhausted:
+     1. Open **phpMyAdmin** from hPanel.
+     2. In the **SQL** tab, execute:
+        ```sql
+        SHOW FULL PROCESSLIST;
+        ```
+     3. Check for any query with `State: Waiting for table metadata lock` or high `Time` values (> 15 seconds).
+     4. Note the blocking process `Id` and terminate it with:
+        ```sql
+        KILL <Process_Id>;
+        ```
+
+5. **Run Migrations Manually via CLI or phpMyAdmin:**
+   - If a schema migration is pending or locked:
+     * Option A (SSH): `node services/migrationRunner.js`
+     * Option B (phpMyAdmin): Open database `u101925264_...`, import `migrations/036_add_performance_indexes.sql` or `migrations/production_sync.sql`.
+
+6. **Safe Rollback:**
+   - If a deployment contains breaking changes, revert to the last working commit:
+     ```bash
+     git revert HEAD
+     git push origin main
+     ```
 
 

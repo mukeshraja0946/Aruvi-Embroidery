@@ -35,6 +35,12 @@ function saveFallbackDesigns(designs) {
 // Persistent fallback store (survives restarts in local offline fallback mode)
 const fallbackDesigns = loadFallbackDesigns();
 
+// In-Memory 60-Second Cache for Home Page Sections (Featured, Trending, New Arrivals)
+let _featuredCache = null;
+let _trendingCache = null;
+let _newArrivalsCache = null;
+let _homeCacheTime = 0;
+
 class Design {
   static async getAll({
     search = '',
@@ -765,19 +771,47 @@ class Design {
     return true;
   }
 
+  static invalidateHomeCache() {
+    _featuredCache = null;
+    _trendingCache = null;
+    _newArrivalsCache = null;
+    _homeCacheTime = 0;
+  }
+
   static async getFeatured(limit = 6) {
+    const now = Date.now();
+    if (_featuredCache && (now - _homeCacheTime < 60000)) {
+      return [..._featuredCache];
+    }
     const res = await this.getAll({ is_active_only: true, is_featured: true, limit });
-    return (res && Array.isArray(res.designs)) ? res.designs : [];
+    const list = (res && Array.isArray(res.designs)) ? res.designs : [];
+    _featuredCache = list;
+    _homeCacheTime = now;
+    return list;
   }
 
   static async getTrending(limit = 6) {
+    const now = Date.now();
+    if (_trendingCache && (now - _homeCacheTime < 60000)) {
+      return [..._trendingCache];
+    }
     const res = await this.getAll({ is_active_only: true, is_trending: true, limit });
-    return (res && Array.isArray(res.designs)) ? res.designs : [];
+    const list = (res && Array.isArray(res.designs)) ? res.designs : [];
+    _trendingCache = list;
+    _homeCacheTime = now;
+    return list;
   }
 
   static async getNewArrivals(limit = 6) {
+    const now = Date.now();
+    if (_newArrivalsCache && (now - _homeCacheTime < 60000)) {
+      return [..._newArrivalsCache];
+    }
     const res = await this.getAll({ is_active_only: true, sort: 'newest', limit });
-    return (res && Array.isArray(res.designs)) ? res.designs : [];
+    const list = (res && Array.isArray(res.designs)) ? res.designs : [];
+    _newArrivalsCache = list;
+    _homeCacheTime = now;
+    return list;
   }
 
   static async getRelated(categoryId, currentDesignId, limit = 4) {
