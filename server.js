@@ -495,22 +495,38 @@ app.use(attachUserAndCart);
 const { publicLimiter } = require('./middleware/rateLimiters');
 app.use(publicLimiter);
 
-// Routes
-const indexRoutes = require('./routes/indexRoutes');
-const shopRoutes = require('./routes/shopRoutes');
-const cartRoutes = require('./routes/cartRoutes');
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const checkoutRoutes = require('./routes/checkoutRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+// Resilient Route Mounting: wraps top-level require in try/catch to prevent crash loops
+function safeMountRoute(mountPath, modulePath, routeName) {
+  try {
+    const routeModule = require(modulePath);
+    app.use(mountPath, routeModule);
+    return true;
+  } catch (err) {
+    const refId = `ERR-ROUTE-${Date.now().toString(36).toUpperCase()}`;
+    console.error(`[CRITICAL] FAILED TO LOAD MODULE: ${modulePath} - ${err.stack || err.message} [Ref: #${refId}]`);
+    app.locals.isDegraded = true;
+    app.locals.degradedReasons.push(`Failed to load ${routeName || modulePath} (#${refId}): ${err.message}`);
 
-app.use('/', indexRoutes);
-app.use('/', shopRoutes);
-app.use('/', cartRoutes);
-app.use('/', authRoutes);
-app.use('/', userRoutes);
-app.use('/', checkoutRoutes);
-app.use('/', adminRoutes);
+    // Mount degraded fallback handler so requests return a clean notice instead of crashing or hanging
+    app.use(mountPath, (req, res, next) => {
+      if (res.headersSent) return next();
+      res.status(503).render('pages/error', {
+        title: 'Feature Temporarily Unavailable',
+        statusCode: 503,
+        message: `This section is temporarily unavailable while maintenance is being completed. Reference: #${refId}. The rest of the site remains operational.`
+      });
+    });
+    return false;
+  }
+}
+
+safeMountRoute('/', './routes/indexRoutes', 'Home & Info Routes');
+safeMountRoute('/', './routes/shopRoutes', 'Shop & Categories Routes');
+safeMountRoute('/', './routes/cartRoutes', 'Cart Routes');
+safeMountRoute('/', './routes/authRoutes', 'Auth Routes');
+safeMountRoute('/', './routes/userRoutes', 'User Dashboard Routes');
+safeMountRoute('/', './routes/checkoutRoutes', 'Checkout Routes');
+safeMountRoute('/', './routes/adminRoutes', 'Admin Panel Routes');
 
 // 404 Handler
 app.use((req, res, next) => {
@@ -650,20 +666,29 @@ function startServer() {
   return server;
 }
 
-// Passenger or standalone startup check
+// Unconditional Server Startup:
+// Hostinger's environment expects app.listen() to be called immediately when the entry file runs.
+// Do NOT guard startup with conditional require.main check because Hostinger's launcher may require()
+// the entry file, which would cause app.listen() to never be called within Hostinger's 3-second startup window.
+let activeServer = null;
+
 if (typeof PhusionPassenger !== 'undefined') {
   const listenStartTime = serverStartTime;
   checkRequiredEnvVars();
-  app.listen('passenger', () => {
+  activeServer = app.listen('passenger', () => {
     const elapsed = Date.now() - listenStartTime;
     console.log(`⚡ Listening on passenger after ${elapsed} ms`);
     console.log(`⚡ SERVER STARTED on Phusion Passenger in ${elapsed} ms, degraded=${Boolean(app.locals.isDegraded)}`);
   });
+  activeServer.on('error', (err) => {
+    console.error('[Passenger Server Error]:', err);
+  });
   initializeDatabaseAndSchema().catch((err) => {
     console.warn('[Passenger Startup Notice] DB/Schema initialization notice:', err.message);
   });
-} else if (require.main === module) {
-  startServer();
+} else {
+  activeServer = startServer();
 }
 
 module.exports = app;
+module.exports.server = activeServer;

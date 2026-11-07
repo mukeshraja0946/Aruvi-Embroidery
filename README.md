@@ -170,7 +170,14 @@ When pushing or pulling code updates to production:
    DB_USER=u101925264_aedesign
    DB_PASSWORD=your_production_password
    ```
-2. **Deploy updates (Git Push & Restart):**
+2. **Pre-flight Check (MANDATORY BEFORE EVERY GIT PUSH):**
+   Run the automated preflight audit to guarantee zero crash loops, verify all module requires and storage API calls load cleanly without TypeError, and ensure `server.js` calls `app.listen()` unconditionally:
+   ```bash
+   npm run preflight
+   ```
+   Do not commit or push if preflight reports any critical failures.
+
+3. **Deploy updates (Git Push & Restart):**
    ```bash
    git pull origin main
    npm install --production

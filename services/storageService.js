@@ -117,6 +117,14 @@ class StorageService {
     return (process.env.STORAGE_DRIVER || 'local').toLowerCase().trim();
   }
 
+  getStorageDriver() {
+    return this.getDriver();
+  }
+
+  initStorage() {
+    return this.initStorageDirs();
+  }
+
   resetLocationCache() {
     this._resolvedUploadsDir = null;
     this._detectionDetails = null;

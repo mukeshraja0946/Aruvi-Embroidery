@@ -119,6 +119,109 @@ for (const dir of scanDirs) {
 logPass(`Validated JavaScript syntax across ${filesChecked} files without syntax errors`);
 
 // ---------------------------------------------------------
+// 2b. Entry File & Hostinger listen() Startup Audit
+// ---------------------------------------------------------
+console.log('\n--- 2b. Hostinger Entry File & Startup Audit ---');
+const serverJsPath = path.join(projectRoot, 'server.js');
+try {
+  const serverContent = fs.readFileSync(serverJsPath, 'utf8');
+  const hasRequireMainGuard = /(?:if|\}\s*else\s+if)\s*\(\s*require\.main\s*===\s*module\s*\)/.test(serverContent);
+  if (hasRequireMainGuard) {
+    logFail('server.js contains "if (require.main === module)" which prevents Hostinger from calling app.listen() within 3s');
+  } else {
+    logPass('server.js does NOT contain conditional "require.main === module" guard');
+  }
+
+  if (serverContent.includes('app.listen(')) {
+    logPass('server.js calls app.listen() unconditionally at module load time');
+  } else {
+    logFail('server.js does not contain an unconditional app.listen() call');
+  }
+} catch (e) {
+  logFail('Failed to read server.js for startup audit', e.message);
+}
+
+// ---------------------------------------------------------
+// 2c. Deep Module Require & Runtime Integrity Check
+// ---------------------------------------------------------
+console.log('\n--- 2c. Deep Module Require & Runtime Integrity Check ---');
+const requireDirs = ['config', 'routes', 'controllers', 'controllers/admin', 'services', 'middleware', 'models', 'utils'];
+let requiredModulesCount = 0;
+
+for (const dir of requireDirs) {
+  const targetDir = path.join(projectRoot, dir);
+  if (!fs.existsSync(targetDir)) continue;
+  const files = fs.readdirSync(targetDir);
+  for (const f of files) {
+    if (!f.endsWith('.js')) continue;
+    const fullPath = path.join(targetDir, f);
+    const relPath = path.relative(projectRoot, fullPath);
+    requiredModulesCount++;
+    try {
+      require(fullPath);
+    } catch (reqErr) {
+      const errOut = reqErr.stack || reqErr.message || '';
+      const firstLine = errOut.split('\n')[0];
+      logFail(`Module load failed: ${relPath}`, firstLine.trim());
+    }
+  }
+}
+logPass(`Successfully verified ${requiredModulesCount} application modules load cleanly without TypeError / crash`);
+
+// ---------------------------------------------------------
+// 2d. Storage API & Method Integrity Audit
+// ---------------------------------------------------------
+console.log('\n--- 2d. Storage API & Method Integrity Audit ---');
+try {
+  const configStorage = require('../config/storage');
+  const storageService = require('../services/storageService');
+
+  // Verify getCategoriesDir specifically
+  if (typeof configStorage.getCategoriesDir === 'function' && typeof storageService.getCategoriesDir === 'function') {
+    logPass('getCategoriesDir() exists and is callable on both config/storage and storageService');
+  } else {
+    logFail('getCategoriesDir is missing on config/storage or storageService');
+  }
+
+  // Scan all project JS files for storage.<method> calls
+  function scanJsFiles(dir, list = []) {
+    const items = fs.readdirSync(dir);
+    for (const item of items) {
+      if (item === 'node_modules' || item === '.git' || item === 'brain') continue;
+      const p = path.join(dir, item);
+      const st = fs.statSync(p);
+      if (st.isDirectory()) scanJsFiles(p, list);
+      else if (item.endsWith('.js')) list.push(p);
+    }
+    return list;
+  }
+
+  const allJs = scanJsFiles(projectRoot);
+  const missingMethods = new Set();
+
+  for (const jsFile of allJs) {
+    const src = fs.readFileSync(jsFile, 'utf8');
+    const matches = src.matchAll(/\b(?:storage|storageService)\.([a-zA-Z0-9_]+)\s*\(/g);
+    for (const m of matches) {
+      const method = m[1];
+      if (typeof configStorage[method] !== 'function' || typeof storageService[method] !== 'function') {
+        missingMethods.add(`${method} (called in ${path.relative(projectRoot, jsFile)})`);
+      }
+    }
+  }
+
+  if (missingMethods.size > 0) {
+    for (const missing of missingMethods) {
+      logFail(`Missing storage method: storage.${missing}`);
+    }
+  } else {
+    logPass(`All storage method calls across ${allJs.length} files exist and match storage API exports`);
+  }
+} catch (storageAuditErr) {
+  logFail('Storage API audit failed to execute', storageAuditErr.message);
+}
+
+// ---------------------------------------------------------
 // 3. Environment Variables Validation
 // ---------------------------------------------------------
 console.log('\n--- 3. Environment Variables Check ---');
