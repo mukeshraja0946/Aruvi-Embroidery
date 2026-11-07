@@ -101,13 +101,6 @@
 
       <div class="footer-bottom" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <p style="margin: 0;">&copy; <%= new Date().getFullYear() %> <%= settings.shop_name || 'Aruvi Embroidery' %>. All Rights Reserved. Tagline: <em>"<%= settings.tagline || 'Where Threads Tell Stories' %>"</em>.</p>
-        <% if (typeof siteSettings === 'undefined' || siteSettings.theme_switcher_enabled !== '0') { %>
-          <div class="footer-theme-switcher" role="group" aria-label="Theme Selection" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.06); padding: 4px 8px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);">
-            <button type="button" class="footer-theme-btn" data-theme-val="light" aria-label="Light Theme" title="Light Theme" style="background: none; border: none; color: #E8E2D8; padding: 6px 10px; border-radius: 14px; cursor: pointer; font-size: 0.9rem; transition: background 0.15s ease;"><i class="fa-regular fa-sun"></i></button>
-            <button type="button" class="footer-theme-btn" data-theme-val="dark" aria-label="Dark Theme" title="Dark Theme" style="background: none; border: none; color: #E8E2D8; padding: 6px 10px; border-radius: 14px; cursor: pointer; font-size: 0.9rem; transition: background 0.15s ease;"><i class="fa-regular fa-moon"></i></button>
-            <button type="button" class="footer-theme-btn" data-theme-val="system" aria-label="System Theme" title="System Theme" style="background: none; border: none; color: #E8E2D8; padding: 6px 10px; border-radius: 14px; cursor: pointer; font-size: 0.9rem; transition: background 0.15s ease;"><i class="fa-solid fa-desktop"></i></button>
-          </div>
-        <% } %>
       </div>
     </div>
   </footer>

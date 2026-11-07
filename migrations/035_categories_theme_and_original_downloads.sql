@@ -68,9 +68,9 @@ UPDATE `categories` SET `is_active` = 1 WHERE `is_active` IS NULL LIMIT 500;
 -- PART 2: THEME & APPEARANCE SETTINGS
 -- ----------------------------------------------------------------------------
 
-INSERT IGNORE INTO `settings` (`key`, `value`) VALUES 
-('theme_switcher_enabled', '1'),
-('default_theme', 'system'),
+INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`) VALUES 
+('theme_switcher_enabled', '0'),
+('default_theme', 'light'),
 ('category_hide_empty', '0'),
 ('max_categories_on_home', ''),
 ('category_count_includes_subcategories', '1'),
@@ -78,7 +78,7 @@ INSERT IGNORE INTO `settings` (`key`, `value`) VALUES
 ('show_preview_download_button', '1');
 
 -- Ensure category_hide_empty defaults to 0 (show all categories)
-UPDATE `settings` SET `value` = '0' WHERE `key` = 'category_hide_empty' AND `value` = '1';
+UPDATE `settings` SET `setting_value` = '0' WHERE `setting_key` = 'category_hide_empty' AND `setting_value` = '1';
 
 -- ----------------------------------------------------------------------------
 -- PART 3: ORIGINAL FILES STORAGE COLUMNS

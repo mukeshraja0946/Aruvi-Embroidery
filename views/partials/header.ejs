@@ -7,28 +7,7 @@
   <meta name="description" content="ARUVI EMBROIDERY STUDIO - Premium digitized machine embroidery designs in DST, PES, JEF, and EXP formats. Instant download.">
   <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
   <meta name="theme-color" id="metaThemeColor" content="#FFFDF9">
-  <meta name="color-scheme" content="light dark">
-
-  <!-- Instant Pre-paint Theme Script (Eliminates White Flash) -->
-  <script>
-    (function() {
-      try {
-        var defaultTheme = '<%= (typeof siteSettings !== "undefined" && siteSettings.default_theme) ? siteSettings.default_theme : "system" %>';
-        var stored = localStorage.getItem('aruvi_theme') || '';
-        if (!stored) {
-          var m = document.cookie.match(/(?:^|;\s*)aruvi_theme=([^;]+)/);
-          if (m) stored = decodeURIComponent(m[1]);
-        }
-        var choice = stored || defaultTheme || 'system';
-        var isDark = choice === 'dark' || (choice === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        var activeTheme = isDark ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', activeTheme);
-        document.documentElement.setAttribute('data-theme-preference', choice);
-        var metaColor = document.getElementById('metaThemeColor');
-        if (metaColor) metaColor.content = isDark ? '#17090D' : '#FFFDF9';
-      } catch (e) {}
-    })();
-  </script>
+  <meta name="color-scheme" content="light">
 
   <!-- Favicon -->
   <link rel="icon" type="image/jpeg" href="<%= (typeof siteSettings !== 'undefined' && siteSettings.favicon_url) ? siteSettings.favicon_url : '/public/images/logo.jpg' %>">
@@ -93,12 +72,8 @@
 
         <!-- Logo (with Dark mode fallback support) -->
         <a href="/" class="brand-logo" aria-label="ARUVI EMBROIDERY Home">
-          <% 
-            const headerLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg';
-            const darkLogo = (typeof siteSettings !== 'undefined' && siteSettings.footer_logo_url) ? siteSettings.footer_logo_url : headerLogo;
-          %>
-          <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" onerror="this.onerror=null;this.src='/public/images/logo.jpg';" class="header-logo-img logo-light">
-          <img src="<%= darkLogo %>" alt="ARUVI EMBROIDERY" onerror="this.onerror=null;this.src='<%= headerLogo %>';" class="header-logo-img logo-dark" style="display: none;">
+          <% const headerLogo = (typeof siteSettings !== 'undefined' && siteSettings.logo_url) ? siteSettings.logo_url : '/public/images/logo.jpg'; %>
+          <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" onerror="this.onerror=null;this.src='/public/images/logo.jpg';" class="header-logo-img">
         </a>
 
         <!-- Navigation Links -->
@@ -127,21 +102,6 @@
 
         <!-- Right Action Icons -->
         <div class="header-actions">
-          <!-- Desktop Theme Switcher -->
-          <% const showThemeSwitcher = (typeof siteSettings === 'undefined' || siteSettings.theme_switcher_enabled !== '0'); %>
-          <% if (showThemeSwitcher) { %>
-            <div class="desktop-theme-switcher-wrap" id="desktopThemeSwitcherWrap">
-              <button type="button" class="header-icon-btn theme-switcher-toggle" id="desktopThemeToggleBtn" aria-label="Switch Theme" aria-haspopup="true" aria-expanded="false" title="Theme (Light / Dark / System)">
-                <i class="fa-solid fa-circle-half-stroke theme-active-icon"></i>
-              </button>
-              <div class="theme-dropdown-menu" id="desktopThemeDropdown" style="display: none;">
-                <button type="button" class="theme-dropdown-item" data-theme-val="light"><i class="fa-regular fa-sun"></i> <span>Light</span></button>
-                <button type="button" class="theme-dropdown-item" data-theme-val="dark"><i class="fa-regular fa-moon"></i> <span>Dark</span></button>
-                <button type="button" class="theme-dropdown-item" data-theme-val="system"><i class="fa-solid fa-desktop"></i> <span>System</span></button>
-              </div>
-            </div>
-          <% } %>
-
           <a href="/wishlist" class="header-icon-btn" aria-label="Wishlist (<%= _wishlistCount %> items)" title="Wishlist">
             <i class="fa-regular fa-heart"></i>
             <span class="header-badge wishlist-badge"><%= _wishlistCount %></span>
@@ -177,8 +137,7 @@
     <div class="mobile-drawer-top-fixed">
       <div class="mobile-drawer-header">
         <div class="drawer-logo">
-          <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" class="logo-light" onerror="this.onerror=null;this.src='/public/images/logo.jpg';">
-          <img src="<%= darkLogo %>" alt="ARUVI EMBROIDERY" class="logo-dark" style="display: none;" onerror="this.onerror=null;this.src='<%= headerLogo %>';">
+          <img src="<%= headerLogo %>" alt="ARUVI EMBROIDERY" onerror="this.onerror=null;this.src='/public/images/logo.jpg';">
         </div>
         <button class="mobile-drawer-close" id="closeMobileMenu" aria-label="Close Menu">
           <i class="fa-solid fa-xmark"></i>
@@ -264,31 +223,8 @@
       </nav>
     </div>
 
-    <!-- Drawer Footer: Appearance Block & View Cart Button -->
+    <!-- Drawer Footer: View Cart Button -->
     <div class="mobile-drawer-footer">
-      <% if (showThemeSwitcher) { %>
-        <div class="drawer-appearance-block" id="drawerAppearanceBlock">
-          <div class="appearance-block-title">
-            <i class="fa-solid fa-circle-half-stroke"></i>
-            <span>Appearance</span>
-          </div>
-          <div class="theme-segmented-ctrl" role="group" aria-label="Theme Selection">
-            <button type="button" class="theme-seg-btn" data-theme-val="light" aria-pressed="false" title="Light Theme">
-              <i class="fa-solid fa-sun"></i>
-              <span>Light</span>
-            </button>
-            <button type="button" class="theme-seg-btn" data-theme-val="dark" aria-pressed="false" title="Dark Theme">
-              <i class="fa-solid fa-moon"></i>
-              <span>Dark</span>
-            </button>
-            <button type="button" class="theme-seg-btn" data-theme-val="system" aria-pressed="true" title="System Theme">
-              <i class="fa-solid fa-desktop"></i>
-              <span>System</span>
-            </button>
-          </div>
-        </div>
-      <% } %>
-
       <div class="drawer-action-btns">
         <a href="/cart" class="btn btn-primary btn-block drawer-view-cart-btn">
           <i class="fa-solid fa-bag-shopping"></i>
@@ -305,8 +241,7 @@
       <button type="button" onclick="closeLoginModal()" style="position: absolute; top: 18px; right: 18px; background: none; border: none; font-size: 1.4rem; color: var(--text-muted, #8C7F79); cursor: pointer;" aria-label="Close">&times;</button>
       
       <div style="text-align: center; margin-bottom: 1.2rem;">
-        <img src="<%= headerLogo %>" alt="Aruvi Embroidery" class="logo-light" style="max-height: 48px; width: auto; margin-bottom: 0.8rem; object-fit: contain;">
-        <img src="<%= darkLogo %>" alt="Aruvi Embroidery" class="logo-dark" style="display: none; max-height: 48px; width: auto; margin-bottom: 0.8rem; object-fit: contain;">
+        <img src="<%= headerLogo %>" alt="Aruvi Embroidery" style="max-height: 48px; width: auto; margin-bottom: 0.8rem; object-fit: contain;">
         <h3 style="font-family: var(--font-heading); font-size: 1.6rem; font-weight: 700; color: var(--text-dark, #231815); margin-bottom: 4px;">Sign In Required</h3>
         <p style="font-size: 0.85rem; color: var(--text-muted, #8C7F79); margin: 0;">Please log in to your account to continue your purchase and instant file download.</p>
       </div>
@@ -410,113 +345,11 @@
       if (mobileDrawerOverlay) mobileDrawerOverlay.addEventListener('click', closeDrawer);
     });
 
-    // Theme Switcher Controller (Part 2: Light / Dark / System)
-    (function initThemeSwitcher() {
-      var defaultTheme = '<%= (typeof siteSettings !== "undefined" && siteSettings.default_theme) ? siteSettings.default_theme : "system" %>';
-
-      function getStoredTheme() {
-        try {
-          var s = localStorage.getItem('aruvi_theme');
-          if (s && ['light', 'dark', 'system'].indexOf(s) !== -1) return s;
-        } catch (_) {}
-        var m = document.cookie.match(/(?:^|;\s*)aruvi_theme=([^;]+)/);
-        if (m && ['light', 'dark', 'system'].indexOf(decodeURIComponent(m[1])) !== -1) {
-          return decodeURIComponent(m[1]);
-        }
-        return defaultTheme || 'system';
-      }
-
-      function applyTheme(choice) {
-        var isDark = choice === 'dark' || (choice === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        var activeTheme = isDark ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', activeTheme);
-        document.documentElement.setAttribute('data-theme-preference', choice);
-        
-        var metaColor = document.getElementById('metaThemeColor');
-        if (metaColor) metaColor.content = isDark ? '#17090D' : '#FFFDF9';
-
-        // Update segmented buttons
-        document.querySelectorAll('.theme-seg-btn, .theme-dropdown-item, .footer-theme-btn').forEach(function(btn) {
-          var val = btn.getAttribute('data-theme-val');
-          var isCurrent = val === choice;
-          btn.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
-          if (isCurrent) {
-            btn.classList.add('active');
-          } else {
-            btn.classList.remove('active');
-          }
-        });
-
-        // Update desktop toggle icon
-        var desktopIcon = document.getElementById('desktopThemeActiveIcon');
-        if (desktopIcon) {
-          if (choice === 'light') desktopIcon.className = 'fa-regular fa-sun';
-          else if (choice === 'dark') desktopIcon.className = 'fa-regular fa-moon';
-          else desktopIcon.className = 'fa-solid fa-circle-half-stroke';
-        }
-
-        try {
-          localStorage.setItem('aruvi_theme', choice);
-        } catch (_) {}
-        try {
-          document.cookie = 'aruvi_theme=' + encodeURIComponent(choice) + ';path=/;max-age=31536000;SameSite=Lax';
-        } catch (_) {}
-      }
-
-      // Initial apply & sync UI state
-      document.addEventListener('DOMContentLoaded', function() {
-        var currentChoice = getStoredTheme();
-        applyTheme(currentChoice);
-
-        // Wire segmented buttons in mobile drawer
-        document.querySelectorAll('.theme-seg-btn, .footer-theme-btn').forEach(function(btn) {
-          btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            var val = this.getAttribute('data-theme-val');
-            if (val) applyTheme(val);
-          });
-        });
-
-        // Wire desktop switcher toggle & dropdown
-        var desktopToggleBtn = document.getElementById('desktopThemeToggleBtn');
-        var desktopDropdown = document.getElementById('desktopThemeDropdown');
-        if (desktopToggleBtn && desktopDropdown) {
-          desktopToggleBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            var isHidden = desktopDropdown.style.display === 'none';
-            desktopDropdown.style.display = isHidden ? 'block' : 'none';
-            desktopToggleBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-          });
-
-          document.querySelectorAll('.theme-dropdown-item').forEach(function(item) {
-            item.addEventListener('click', function(e) {
-              e.preventDefault();
-              var val = this.getAttribute('data-theme-val');
-              if (val) applyTheme(val);
-              desktopDropdown.style.display = 'none';
-              desktopToggleBtn.setAttribute('aria-expanded', 'false');
-            });
-          });
-
-          document.addEventListener('click', function(e) {
-            if (!e.target.closest('#desktopThemeSwitcherWrap')) {
-              desktopDropdown.style.display = 'none';
-              desktopToggleBtn.setAttribute('aria-expanded', 'false');
-            }
-          });
-        }
-
-        // System theme live listener
-        if (window.matchMedia) {
-          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-            var current = getStoredTheme();
-            if (current === 'system') {
-              applyTheme('system');
-            }
-          });
-        }
-      });
-    })();
+    // Ensure clean light theme by removing any residual stored theme keys
+    try {
+      localStorage.removeItem('aruvi_theme');
+      document.cookie = 'aruvi_theme=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    } catch (_) {}
 
     document.addEventListener('DOMContentLoaded', () => {
       const loginForm = document.getElementById('loginModalForm');
