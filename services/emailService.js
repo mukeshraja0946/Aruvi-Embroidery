@@ -217,12 +217,44 @@ async function sendPurchaseConfirmationEmail(order) {
 
     const orderAddr = (order.shipping_address || order.user_address || order.address || '').trim();
 
+    const Setting = require('../models/Setting');
+    let tutorialText = null;
+    try {
+      tutorialText = await Setting.get('how_to_download_tutorial');
+    } catch (_) {}
+
+    const defaultSteps = [
+      '1. After successful payment, go to My Account -> My Orders.',
+      '2. Tap on your order to open the order details.',
+      '3. Tap the "Download" button next to each design.',
+      '4. The ZIP file will be saved to your phone or computer\'s Downloads folder.',
+      '5. Open the ZIP and use the DST/PES/JEF/EXP file in your embroidery machine software.',
+      'Need help? Contact us anytime from the Contact page.'
+    ];
+
+    const tutorialHtml = (tutorialText && tutorialText.trim())
+      ? tutorialText.trim().split('\n').map(l => l.trim()).filter(Boolean).map(l => `<p style="margin: 0 0 6px 0;">${l}</p>`).join('')
+      : `
+        <ol style="margin: 0 0 10px 0; padding-left: 20px; font-size: 0.9rem; color: #4A3B32; line-height: 1.6;">
+          <li style="margin-bottom: 4px;">After successful payment, go to <strong>My Account &rarr; My Orders</strong>.</li>
+          <li style="margin-bottom: 4px;">Tap on your order to open the order details.</li>
+          <li style="margin-bottom: 4px;">Tap the <strong>"Download"</strong> button next to each design.</li>
+          <li style="margin-bottom: 4px;">The ZIP file will be saved to your phone or computer's <strong>Downloads</strong> folder.</li>
+          <li style="margin-bottom: 4px;">Open the ZIP and use the <strong>DST/PES/JEF/EXP</strong> file in your embroidery machine software.</li>
+        </ol>
+        <p style="margin: 0; font-size: 0.85rem; color: #776A62;">Need help? <a href="${appUrl}/contact" style="color: #A93226; text-decoration: underline;">Contact us anytime from the Contact page</a>.</p>
+      `;
+
+    const tutorialPlain = (tutorialText && tutorialText.trim())
+      ? tutorialText.trim()
+      : defaultSteps.join('\n');
+
     const mailOptions = {
       from,
       replyTo: from,
       to: customerEmail,
       subject: `Order Confirmation #${orderId} – Aruvi Embroidery`,
-      text: `Hello ${customerName},\n\nThank you for your purchase from Aruvi Embroidery.\n\nYou have successfully purchased:\n${designName}\n\nYour payment has been successfully received.\n\nYour purchased design is now available for download from your account.\n\nDownload Link:\n${downloadUrl}\n\nOrder ID: ${orderId}\nAmount: ₹${amount}\nPayment Status: Paid${orderAddr ? `\nStudio / Address:\n${orderAddr}` : ''}\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
+      text: `Hello ${customerName},\n\nThank you for your purchase from Aruvi Embroidery.\n\nYou have successfully purchased:\n${designName}\n\nYour payment has been successfully received.\n\nYour purchased design is now available for download from your account.\n\nDownload Link:\n${downloadUrl}\n\nOrder ID: ${orderId}\nAmount: ₹${amount}\nPayment Status: Paid${orderAddr ? `\nStudio / Address:\n${orderAddr}` : ''}\n\nHow to Download Your Files:\n${tutorialPlain}\n\nRegards,\nAruvi Embroidery\nWhere Threads Tell Stories`,
       html: `
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
           <div style="background: #231815; color: #FFF; padding: 20px; text-align: center;">
@@ -242,6 +274,11 @@ async function sendPurchaseConfirmationEmail(order) {
               <p style="margin: 0 0 6px;"><strong>Amount:</strong> ₹${amount}</p>
               <p style="margin: 0 0 6px;"><strong>Payment Status:</strong> <span style="color: #2E7D32; font-weight: bold;">Paid</span></p>
               ${orderAddr ? `<p style="margin: 0;"><strong>Studio / Address:</strong> ${orderAddr}</p>` : ''}
+            </div>
+
+            <div style="background: #FDF9F5; border: 1px solid #EFE4D6; border-radius: 6px; padding: 16px; margin: 20px 0;">
+              <h4 style="margin: 0 0 10px 0; color: #231815; font-size: 1rem;">How to Download Your Files</h4>
+              ${tutorialHtml}
             </div>
 
             <p><a href="${downloadUrl}" style="display: inline-block; background: #2E7D32; color: #FFF; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Open My Downloads</a></p>

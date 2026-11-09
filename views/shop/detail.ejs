@@ -37,8 +37,8 @@
         <img id="mainDisplayImg" src="<%= initialMainImage %>" alt="<%= design.title %>" class="zoomable-detail-img" onerror="if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
         
         <% if (typeof siteSettings === 'undefined' || siteSettings.show_preview_download_button !== '0') { %>
-          <!-- Preview PNG Download Pill (available on preview image for all visitors) -->
-          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="downloadPreviewImage(event);" title="Download preview image as PNG" aria-label="Download design preview image as PNG">
+          <!-- Preview PNG / Original Download Pill (available on image for all visitors) -->
+          <button type="button" id="downloadPreviewBtn" class="download-preview-btn" onclick="downloadPreviewImage(event);" title="<%= design.has_clean_original ? 'Download Original File' : 'Download Preview Quality (Original not available)' %>" aria-label="Download design image">
             <i class="fa-solid fa-download"></i>
             <span>Download</span>
           </button>
@@ -423,7 +423,7 @@
 <div id="imageLightboxModal" class="image-lightbox-modal" style="display: none;" onclick="closeLightbox(event)">
   <button type="button" class="lightbox-close-btn" onclick="closeLightbox(event)" aria-label="Close Lightbox">&times;</button>
   <% if (typeof siteSettings === 'undefined' || siteSettings.show_preview_download_button !== '0') { %>
-    <button type="button" class="lightbox-download-btn" onclick="event.stopPropagation(); downloadPreviewImage(event, document.getElementById('lightboxImg')?.src);" aria-label="Download Preview" title="Download Preview">
+    <button type="button" class="lightbox-download-btn" onclick="event.stopPropagation(); downloadPreviewImage(event, document.getElementById('lightboxImg')?.src);" aria-label="Download Image" title="<%= design.has_clean_original ? 'Download Original File' : 'Download Preview Quality (Original not available)' %>">
       <i class="fa-solid fa-download"></i>
       <span>Download</span>
     </button>
@@ -441,8 +441,8 @@
     element.classList.add('active');
   }
 
-  // Download currently displayed preview / original image (Plain direct route - byte for byte fidelity)
-  function downloadPreviewImage(e, explicitSrc) {
+  // Download currently displayed preview / original image (Byte-for-byte fidelity with status check & user feedback)
+  async function downloadPreviewImage(e, explicitSrc) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -450,7 +450,11 @@
 
     const targetImgSrc = explicitSrc || document.getElementById('mainDisplayImg')?.src;
     if (!targetImgSrc) {
-      alert('Preview image not available for download.');
+      if (typeof showToast === 'function') {
+        showToast('Preview image not available for download.', 'error');
+      } else {
+        alert('Preview image not available for download.');
+      }
       return;
     }
 
@@ -460,7 +464,7 @@
     <% if (typeof siteSettings !== 'undefined' && siteSettings.require_login_preview_download === '1') { %>
       if (typeof window.isUserLoggedIn !== 'undefined' && !window.isUserLoggedIn) {
         if (typeof openLoginModal === 'function') {
-          openLoginModal(() => { window.location.href = downloadUrl; });
+          openLoginModal(() => { downloadPreviewImage(null, explicitSrc); });
           return;
         } else {
           window.location.href = `/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`;
@@ -469,8 +473,79 @@
       }
     <% } %>
 
-    // Plain direct browser download link: streams exact server bytes directly to disk
-    window.location.href = downloadUrl;
+    const btn = (e && e.currentTarget) ? e.currentTarget : document.getElementById('downloadPreviewBtn');
+    const originalHtml = btn ? btn.innerHTML : null;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Downloading...</span>';
+    }
+
+    try {
+      const response = await fetch(downloadUrl);
+      const contentType = response.headers.get('content-type') || '';
+
+      if (!response.ok || contentType.includes('text/html')) {
+        let errorMsg = 'Download failed - please try again';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) errorMsg = errData.message;
+        } catch (_) {}
+        if (typeof showToast === 'function') {
+          showToast(errorMsg, 'error');
+        } else {
+          alert(errorMsg);
+        }
+        return;
+      }
+
+      // Check if server indicated original was missing and served preview fallback
+      const originalStatus = response.headers.get('x-original-status');
+      if (originalStatus === 'missing-preview-fallback') {
+        if (typeof showToast === 'function') {
+          showToast('Preview quality (original not available - admin: please re-upload)', 'info');
+        }
+      }
+
+      // Extract filename from Content-Disposition header if available
+      const disposition = response.headers.get('content-disposition') || '';
+      let filename = '';
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      const regularMatch = disposition.match(/filename="?([^";]+)"?/i);
+      if (utf8Match && utf8Match[1]) {
+        filename = decodeURIComponent(utf8Match[1].trim());
+      } else if (regularMatch && regularMatch[1]) {
+        filename = regularMatch[1].trim();
+      }
+      if (!filename) {
+        const ext = contentType.includes('webp') ? '.webp' : '.png';
+        filename = '<%= (design.sku || design.title || "design").replace(/[/\\?%*:|"<>]/g, "-") %>' + ext;
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 2000);
+    } catch (err) {
+      console.error('[Download error]:', err);
+      if (typeof showToast === 'function') {
+        showToast('Download failed - please try again', 'error');
+      } else {
+        alert('Download failed - please try again');
+      }
+    } finally {
+      if (btn && originalHtml) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    }
   }
 
   // Tap-to-Zoom Pinch Lightbox Controller

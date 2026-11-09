@@ -1114,6 +1114,86 @@ class StorageService {
     return map[ext] || 'application/octet-stream';
   }
 
+  /**
+   * Detects real MIME type from file magic bytes, falling back to extension.
+   */
+  detectImageMime(filePath) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const fd = fs.openSync(filePath, 'r');
+        const buf = Buffer.alloc(16);
+        fs.readSync(fd, buf, 0, 16, 0);
+        fs.closeSync(fd);
+
+        // PNG: 89 50 4E 47 0D 0A 1A 0A
+        if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+          return 'image/png';
+        }
+        // JPEG: FF D8 FF
+        if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+          return 'image/jpeg';
+        }
+        // WEBP: RIFF ... WEBP
+        if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+          return 'image/webp';
+        }
+        // GIF: GIF87a / GIF89a
+        if (buf.toString('ascii', 0, 3) === 'GIF') {
+          return 'image/gif';
+        }
+      }
+    } catch (_) {}
+
+    const ext = path.extname(filePath).toLowerCase();
+    return this.getMimeType(ext);
+  }
+
+  /**
+   * Dedicated method to stream an authentic, byte-for-byte original file to the client.
+   * Guarantees:
+   * 1. Detects actual MIME type from file signature/extension (never assumes)
+   * 2. Sets Content-Disposition: attachment; filename="<filename>"
+   * 3. Sets Content-Length equal to exact file size on disk
+   * 4. Disables compression (Content-Encoding: identity)
+   * 5. Streams byte-for-byte without loading whole file into memory or resizing
+   * 6. Returns true on success, false if file missing or invalid
+   */
+  serveOriginalFile(res, filePath, customFilename = null, explicitMime = null) {
+    if (!filePath || !fs.existsSync(filePath)) {
+      return false;
+    }
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) {
+      return false;
+    }
+
+    const detectedMime = explicitMime || this.detectImageMime(filePath);
+    const ext = path.extname(filePath) || (detectedMime === 'image/png' ? '.png' : (detectedMime === 'image/jpeg' ? '.jpg' : '.bin'));
+    let cleanFilename = customFilename || path.basename(filePath);
+    if (!cleanFilename.toLowerCase().endsWith(ext.toLowerCase())) {
+      cleanFilename = `${cleanFilename.replace(/\.[a-zA-Z0-9]+$/, '')}${ext}`;
+    }
+    cleanFilename = cleanFilename.replace(/[/\\?%*:|"<>]/g, '_').trim();
+
+    // Set exact, immutable headers for byte-for-byte download
+    res.setHeader('Content-Type', detectedMime);
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`);
+    res.setHeader('Content-Encoding', 'identity');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-transform, private, no-cache');
+
+    const readStream = fs.createReadStream(filePath);
+    readStream.on('error', (err) => {
+      console.error('[StorageService Serve Original Stream Error]:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Stream error reading original file' });
+      }
+    });
+    readStream.pipe(res);
+    return true;
+  }
+
   isPathInsideRepoOrHbuilds(targetPath) {
     return isPathInsideRepoOrHbuilds(targetPath);
   }

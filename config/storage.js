@@ -39,6 +39,8 @@ const storageFacade = {
   saveCustomRequestFile: (file, originalName, mimeType) => storageService.saveCustomRequestFile(file, originalName, mimeType),
   savePrivateFile: (file, originalName, mimeType, designId = null) => storageService.savePrivateFile(file, originalName, mimeType, designId),
   saveOriginalFile: (file, originalName, mimeType) => storageService.saveOriginalFile(file, originalName, mimeType),
+  serveOriginalFile: (res, filePath, customFilename = null, explicitMime = null) => storageService.serveOriginalFile(res, filePath, customFilename, explicitMime),
+  detectImageMime: (filePath) => storageService.detectImageMime(filePath),
   buildPublicUrl: (keyOrPath) => storageService.buildPublicUrl(keyOrPath),
   buildThumbnailUrl: (keyOrPath) => storageService.buildThumbnailUrl(keyOrPath),
   generateThumbnail: (source, filename) => storageService.generateThumbnail(source, filename),

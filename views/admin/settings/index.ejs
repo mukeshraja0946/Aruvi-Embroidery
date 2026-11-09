@@ -1008,6 +1008,8 @@
               <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Leave blank to hide YouTube icon from footer.</small>
             </div>
           </div>
+        </div>
+
         <!-- Card 5: Machine Files & ZIP Upload Settings -->
         <div id="zip-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
           <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
@@ -1056,6 +1058,33 @@
               <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Controls whether detected formats (.DST, .PES, .JEF, .EXP) overwrite existing design formats.</small>
             </div>
           </div>
+        </div>
+
+        <!-- Card: "How to Download Your Files" Tutorial Settings -->
+        <div id="download-tutorial-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">
+                <i class="fa-solid fa-circle-question" style="color: var(--admin-primary); margin-right: 6px;"></i> "How to Download Your Files" Tutorial
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                Instructional tutorial text displayed in the collapsible box on My Orders, on the FAQ page, and in the order confirmation email.
+              </span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-rotate"></i> Multi-channel Sync</span>
+          </div>
+
+          <div style="margin-bottom: 0.5rem;">
+            <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Tutorial Steps / Instructions (Leave blank for default 5-step tutorial)</label>
+            <textarea name="how_to_download_tutorial" class="form-control" rows="7" style="height: auto; padding: 0.8rem; font-family: inherit; line-height: 1.5;" placeholder="1. After successful payment, go to My Account -> My Orders.
+2. Tap on your order to open the order details.
+3. Tap the &quot;Download&quot; button next to each design.
+4. The ZIP file will be saved to your phone or computer's Downloads folder.
+5. Open the ZIP and use the DST/PES/JEF/EXP file in your embroidery machine software.
+Need help? Contact us anytime from the Contact page."><%= (typeof settings !== 'undefined' && settings.how_to_download_tutorial) ? settings.how_to_download_tutorial : '' %></textarea>
+            <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Default text is used automatically if left empty.</small>
+          </div>
+        </div>
         <!-- Card 6: About Page Content & Statistics Management -->
         <div id="about-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
           <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">

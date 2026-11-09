@@ -8,6 +8,34 @@
 
   <div style="max-width: 850px; margin: 0 auto;">
     <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: var(--shadow-sm);">
+      <h3 style="font-size: 1.15rem; color: var(--primary); margin-bottom: 0.75rem;">How do I download my purchased embroidery files?</h3>
+      <%
+        const faqTutorial = (typeof siteSettings !== 'undefined' && siteSettings.how_to_download_tutorial && siteSettings.how_to_download_tutorial.trim())
+          ? siteSettings.how_to_download_tutorial.trim()
+          : ((typeof settings !== 'undefined' && settings.how_to_download_tutorial && settings.how_to_download_tutorial.trim()) ? settings.how_to_download_tutorial.trim() : null);
+      %>
+      <% if (faqTutorial) { %>
+        <div style="font-size: 0.95rem; color: var(--text-dark); line-height: 1.7;">
+          <%- faqTutorial.split('\n').map(l => l.trim()).filter(Boolean).map(l => `<p style="margin: 0 0 6px 0;">${l}</p>`).join('') %>
+        </div>
+      <% } else { %>
+        <div style="font-size: 0.95rem; color: var(--text-dark); line-height: 1.7;">
+          <p style="margin: 0 0 0.5rem 0; font-weight: 600;">How to Download Your Files:</p>
+          <ol style="margin: 0 0 0.8rem 1.4rem; padding: 0;">
+            <li style="margin-bottom: 4px;">After successful payment, go to <strong>My Account &rarr; My Orders</strong>.</li>
+            <li style="margin-bottom: 4px;">Tap on your order to open the order details.</li>
+            <li style="margin-bottom: 4px;">Tap the <strong>"Download"</strong> button next to each design.</li>
+            <li style="margin-bottom: 4px;">The ZIP file will be saved to your phone or computer's <strong>Downloads</strong> folder.</li>
+            <li style="margin-bottom: 4px;">Open the ZIP and use the <strong>DST/PES/JEF/EXP</strong> file in your embroidery machine software.</li>
+          </ol>
+          <p style="margin: 0.5rem 0 0 0; color: var(--text-muted); font-size: 0.9rem;">
+            Need help? <a href="/contact" style="color: var(--primary); font-weight: 600; text-decoration: underline;">Contact us anytime from the Contact page</a>.
+          </p>
+        </div>
+      <% } %>
+    </div>
+
+    <div style="background: white; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: var(--shadow-sm);">
       <h3 style="font-size: 1.15rem; color: var(--primary); margin-bottom: 0.5rem;">Q1: How do I receive my embroidery design files after payment?</h3>
       <p style="font-size: 0.95rem; color: var(--text-dark);">
         Immediately after successful Razorpay payment, your digital download link becomes active on the confirmation screen as well as in your <strong>User Dashboard</strong> under <em>Purchased Embroidery Downloads</em>.

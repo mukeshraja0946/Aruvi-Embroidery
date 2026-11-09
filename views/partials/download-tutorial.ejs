@@ -1,0 +1,84 @@
+<%
+  const customTutorial = (typeof siteSettings !== 'undefined' && siteSettings.how_to_download_tutorial && siteSettings.how_to_download_tutorial.trim()) 
+    ? siteSettings.how_to_download_tutorial.trim() 
+    : ((typeof settings !== 'undefined' && settings.how_to_download_tutorial && settings.how_to_download_tutorial.trim()) ? settings.how_to_download_tutorial.trim() : null);
+%>
+
+<details class="dash-tutorial-box" id="howToDownloadDetails">
+  <summary class="dash-tutorial-summary">
+    <div class="dash-tutorial-summary-left">
+      <span class="dash-tutorial-icon-pill">
+        <i class="fa-solid fa-circle-question"></i>
+      </span>
+      <div>
+        <span class="dash-tutorial-title">How to Download Your Files</span>
+        <span class="dash-tutorial-subtitle">Step-by-step instructions for your machine embroidery files</span>
+      </div>
+    </div>
+    <span class="dash-tutorial-toggle-badge">
+      <span class="dash-tutorial-toggle-text">Instructions</span>
+      <i class="fa-solid fa-chevron-down dash-tutorial-chevron"></i>
+    </span>
+  </summary>
+
+  <div class="dash-tutorial-content">
+    <% if (customTutorial) { %>
+      <div class="dash-tutorial-custom-text" style="font-size: 0.92rem; color: #4A3B32; line-height: 1.6;">
+        <%- customTutorial.split('\n').map(l => l.trim()).filter(Boolean).map(l => `<p style="margin: 0 0 8px 0;">${l}</p>`).join('') %>
+      </div>
+    <% } else { %>
+      <ol class="dash-tutorial-steps">
+        <li class="dash-tutorial-step">
+          <span class="dash-step-num">1</span>
+          <div class="dash-step-body">
+            <strong>Go to My Orders</strong>
+            <p>After successful payment, go to <strong>My Account &rarr; My Orders</strong>.</p>
+          </div>
+        </li>
+        <li class="dash-tutorial-step">
+          <span class="dash-step-num">2</span>
+          <div class="dash-step-body">
+            <strong>Open Order Details</strong>
+            <p>Tap on your order to open the order details screen.</p>
+          </div>
+        </li>
+        <li class="dash-tutorial-step">
+          <span class="dash-step-num">3</span>
+          <div class="dash-step-body">
+            <strong>Tap Download</strong>
+            <p>Tap the <strong>"Download"</strong> button next to each design.</p>
+          </div>
+        </li>
+        <li class="dash-tutorial-step">
+          <span class="dash-step-num">4</span>
+          <div class="dash-step-body">
+            <strong>Saved to Downloads</strong>
+            <p>The ZIP file will be saved to your phone or computer's <strong>Downloads</strong> folder.</p>
+          </div>
+        </li>
+        <li class="dash-tutorial-step">
+          <span class="dash-step-num">5</span>
+          <div class="dash-step-body">
+            <strong>Use on Machine</strong>
+            <p>Open the ZIP and use the <strong>DST/PES/JEF/EXP</strong> file in your embroidery machine software.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="dash-tutorial-help-note">
+        <i class="fa-solid fa-headset" style="color: var(--primary, #A93226); font-size: 1.1rem;"></i>
+        <span>Need help? <a href="/contact" style="color: var(--primary, #A93226); font-weight: 600; text-decoration: underline;">Contact us anytime from the Contact page</a>.</span>
+      </div>
+    <% } %>
+  </div>
+</details>
+
+<script>
+  (function() {
+    try {
+      var d = document.getElementById('howToDownloadDetails');
+      if (d && window.innerWidth >= 768) {
+        d.setAttribute('open', '');
+      }
+    } catch (_) {}
+  })();
+</script>

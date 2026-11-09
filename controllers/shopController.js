@@ -309,6 +309,15 @@ exports.getDesignDetail = async (req, res, next) => {
     const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
     const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.design_id || w.wishlist_id);
 
+    // Verify whether an authentic original file exists on disk
+    try {
+      const { findCleanOriginalForDesign } = require('./admin/adminToolsController');
+      const cleanOrig = await findCleanOriginalForDesign(design);
+      design.has_clean_original = Boolean(cleanOrig);
+    } catch (_) {
+      design.has_clean_original = false;
+    }
+
     res.render('shop/detail', {
       title: `${design.title} - Digital Embroidery Design | ARUVI EMBROIDERY STUDIO`,
       design,
@@ -501,31 +510,26 @@ exports.downloadPreviewPng = async (req, res, next) => {
 
     // 1. Try serving byte-for-byte original file if configured and available
     if (downloadSource === 'original') {
-      const origKey = design.preview_original_key || design.original_file_key || design.original_key;
-      let origPath = origKey ? storage.resolveFilePath(origKey) : null;
-      if (!origPath || !fs.existsSync(origPath)) {
-        // Also check by original filename in originals directory
-        if (design.original_name) {
-          const directOrig = path.join(storage.getOriginalsDir(), design.original_name);
-          if (fs.existsSync(directOrig)) origPath = directOrig;
-        }
-      }
-
+      const { findCleanOriginalForDesign } = require('./admin/adminToolsController');
+      const origPath = await findCleanOriginalForDesign(design);
       if (origPath && fs.existsSync(origPath)) {
-        const stat = fs.statSync(origPath);
         const ext = path.extname(origPath) || '.png';
-        const cleanName = design.original_name || `${(design.sku || design.title || 'design').replace(/[/\\?%*:|"<>]/g, '_')}${ext}`;
-        const mimeType = design.original_mime_type || storage.getMimeType(ext) || 'image/png';
+        const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
+        const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
+        const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '');
+        const downloadFilename = design.original_name || `${baseClean}${ext}`;
 
-        res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Length', stat.size);
-        res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
-        res.setHeader('Content-Disposition', `attachment; filename="${cleanName}"; filename*=UTF-8''${encodeURIComponent(cleanName)}`);
-        return fs.createReadStream(origPath).pipe(res);
+        const served = storage.serveOriginalFile(res, origPath, downloadFilename);
+        if (served) return;
       }
     }
 
     // 2. Serve direct preview image file without sharp re-compression or loss
+    console.warn(`[Original Download Notice]: Design ID ${design.id} (${design.sku || design.title}) has no stored original on disk. Serving preview quality fallback.`);
+    if (db.isConnected()) {
+      db.query('UPDATE designs SET needs_reupload = 1 WHERE id = ?', [design.id]).catch(() => {});
+    }
+
     const reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/placeholder-preview.png';
     const cleanRel = reqImgUrl.split('?')[0].replace(/^\//, '');
     const candidates = [
@@ -549,16 +553,19 @@ exports.downloadPreviewPng = async (req, res, next) => {
     }
 
     const stat = fs.statSync(foundPath);
-    const ext = path.extname(foundPath) || '.png';
+    const mimeType = storage.detectImageMime(foundPath) || 'image/png';
+    const ext = path.extname(foundPath) || (mimeType === 'image/webp' ? '.webp' : '.png');
     const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
-    const downloadFilename = `${baseClean}${ext}`;
-    const mimeType = storage.getMimeType(ext) || 'image/png';
+    const downloadFilename = `${baseClean}-preview-quality${ext}`;
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Length', stat.size);
-    res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
+    res.setHeader('Content-Encoding', 'identity');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Original-Status', 'missing-preview-fallback');
+    res.setHeader('Cache-Control', 'no-transform, private, no-cache');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
     return fs.createReadStream(foundPath).pipe(res);
   } catch (err) {
@@ -602,13 +609,13 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
     }
 
     const storage = require('../config/storage');
+    const { findCleanOriginalForDesign } = require('./admin/adminToolsController');
     const downloadSource = settings.design_download_source || 'original';
     const imageId = req.params.imageId;
 
     // Check if an original image exists for this design or imageId
     let origPath = null;
     let originalName = null;
-    let originalMime = null;
 
     if (downloadSource === 'original') {
       if (imageId && db.isConnected()) {
@@ -622,51 +629,39 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
             if (p && fs.existsSync(p)) {
               origPath = p;
               originalName = imgRow.original_name;
-              originalMime = imgRow.original_mime_type;
             }
           }
         } catch (_) {}
       }
 
       if (!origPath) {
-        const origKey = design.preview_original_key || design.original_file_key || design.original_key;
-        if (origKey) {
-          const p = storage.resolveFilePath(origKey);
-          if (p && fs.existsSync(p)) {
-            origPath = p;
-            originalName = design.original_name;
-            originalMime = design.original_mime_type;
-          }
-        }
-      }
-
-      // Check directly in originals directory if design has an original_name
-      if (!origPath && design.original_name) {
-        const directOrig = path.join(storage.getOriginalsDir(), design.original_name);
-        if (fs.existsSync(directOrig)) {
-          origPath = directOrig;
-          originalName = design.original_name;
+        origPath = await findCleanOriginalForDesign(design);
+        if (origPath) {
+          originalName = design.original_name || path.basename(origPath);
         }
       }
     }
 
-    // If original found on disk, stream byte-for-byte!
+    // 1. If original found on disk, stream byte-for-byte using storage.serveOriginalFile!
     if (origPath && fs.existsSync(origPath)) {
-      const stat = fs.statSync(origPath);
       const ext = path.extname(origPath) || '.png';
       const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
       const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '_').trim();
-      const downloadFilename = originalName || `${rawSku || rawTitle || 'design'}${ext}`;
-      const mimeType = originalMime || storage.getMimeType(ext) || 'image/png';
+      const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '');
+      const downloadFilename = originalName || `${baseClean}${ext}`;
 
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Length', stat.size);
-      res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
-      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
-      return fs.createReadStream(origPath).pipe(res);
+      const served = storage.serveOriginalFile(res, origPath, downloadFilename);
+      if (served) return;
     }
 
-    // Otherwise find the preview image file and stream it directly without sharp re-compression
+    // 2. If NO original exists on disk:
+    // Log notice and ensure needs_reupload flag is set for the Admin Original Files Check report
+    console.warn(`[Original Download Notice]: Design ID ${design.id} (${design.sku || design.title}) has no stored original on disk. Serving preview quality fallback.`);
+    if (db.isConnected()) {
+      db.query('UPDATE designs SET needs_reupload = 1 WHERE id = ?', [design.id]).catch(() => {});
+    }
+
+    // Otherwise find the preview image file and stream it directly
     let reqImgUrl = null;
     if (imageId) {
       if (db.isConnected()) {
@@ -679,7 +674,11 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
     }
 
     if (!reqImgUrl) {
-      reqImgUrl = req.query.imgUrl || design.primary_image || '/public/images/placeholder-preview.png';
+      reqImgUrl = req.query.imgUrl || design.primary_image;
+    }
+
+    if (!reqImgUrl) {
+      return res.status(404).json({ success: false, message: 'Image file not found on server' });
     }
 
     // Security check: strictly forbid machine embroidery files, archives, and system files
@@ -720,20 +719,24 @@ exports.downloadPreviewImageRoute = async (req, res, next) => {
     }
 
     if (!foundPath) {
-      return res.status(404).json({ success: false, message: 'Preview image file not found on server' });
+      return res.status(404).json({ success: false, message: 'Image file not found on server' });
     }
 
     const stat = fs.statSync(foundPath);
-    const ext = path.extname(foundPath) || '.png';
+    const mimeType = storage.detectImageMime(foundPath) || 'image/png';
+    const ext = path.extname(foundPath) || (mimeType === 'image/webp' ? '.webp' : '.png');
     const rawSku = (design.sku || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const rawTitle = (design.title || '').replace(/[/\\?%*:|"<>]/g, '-').trim();
     const baseClean = (rawSku || rawTitle || 'design').replace(/\.[a-zA-Z0-9]+$/, '') || 'design';
-    const downloadFilename = `${baseClean}${ext}`;
-    const mimeType = storage.getMimeType(ext) || 'image/png';
+    // Label clearly as preview quality so user/browser knows this is not the original
+    const downloadFilename = `${baseClean}-preview-quality${ext}`;
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Length', stat.size);
-    res.setHeader('Cache-Control', 'no-transform, public, max-age=86400');
+    res.setHeader('Content-Encoding', 'identity');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Original-Status', 'missing-preview-fallback');
+    res.setHeader('Cache-Control', 'no-transform, private, no-cache');
     res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`);
     return fs.createReadStream(foundPath).pipe(res);
   } catch (err) {
