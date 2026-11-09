@@ -354,11 +354,11 @@ textarea.form-control {
 .header-icon-btn {
   position: relative;
   color: var(--text-dark);
-  font-size: 20px;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
+  font-size: 18px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
   border-radius: 50%;
   background-color: #F7F3EE;
   display: inline-flex;
@@ -376,9 +376,9 @@ textarea.form-control {
 
 .header-icon-btn i,
 .header-icon-btn svg {
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5062,16 +5062,16 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    min-height: 36px !important;
-    max-width: 36px !important;
-    max-height: 36px !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
     padding: 0 !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
-    font-size: 18px !important;
+    font-size: 20px !important;
     color: #2D231E !important;
     background: transparent !important;
     border: none !important;
@@ -5090,8 +5090,8 @@ body:has(.mobile-nav-drawer.open) .header-badge {
 
   .brand-logo img,
   .brand-logo .header-logo-img {
-    height: 36px !important;
-    max-height: 36px !important;
+    height: 32px !important;
+    max-height: 32px !important;
     width: auto !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -5115,13 +5115,13 @@ body:has(.mobile-nav-drawer.open) .header-badge {
   }
 
   .header-icon-btn {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    min-height: 36px !important;
-    max-width: 36px !important;
-    max-height: 36px !important;
-    font-size: 18px !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
+    font-size: 16px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -5142,16 +5142,16 @@ body:has(.mobile-nav-drawer.open) .header-badge {
 
   .header-icon-btn i,
   .header-icon-btn svg {
-    font-size: 18px !important;
-    width: 18px !important;
-    height: 18px !important;
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     line-height: 1 !important;
   }
 
-  /* 44px invisible touch target area via ::after */
+  /* 44px comfortable touch target area via ::after */
   .header-icon-btn::after,
   .mobile-menu-toggle::after {
     content: '' !important;
@@ -5171,16 +5171,16 @@ body:has(.mobile-nav-drawer.open) .header-badge {
   .header-icon-btn .wishlist-badge,
   .header-icon-btn .header-badge {
     position: absolute !important;
-    top: -4px !important;
-    right: -4px !important;
-    font-size: 9.5px !important;
+    top: -3px !important;
+    right: -3px !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
-    min-width: 15px !important;
-    width: 15px !important;
-    height: 15px !important;
-    min-height: 15px !important;
-    max-width: 15px !important;
-    max-height: 15px !important;
+    min-width: 14px !important;
+    width: 14px !important;
+    height: 14px !important;
+    min-height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
     border-radius: 50% !important;
     display: flex !important;
     align-items: center !important;
@@ -7374,21 +7374,21 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
   }
 
-  /* Header icons touch targets (visual 36px, 44px touch via ::after) */
+  /* Header icons touch targets (visual 34px, 44px touch via ::after) */
   .header-icon-btn {
-    min-width: 36px !important;
-    min-height: 36px !important;
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 18px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 16px !important;
   }
 
   .mobile-menu-toggle {
-    min-width: 36px !important;
-    min-height: 36px !important;
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 18px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 20px !important;
   }
 
   .designs-page-container,

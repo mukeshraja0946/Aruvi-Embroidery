@@ -12,7 +12,205 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/public/css/main.css">
   <link rel="stylesheet" href="/public/css/admin.css">
-  <%- include('../../partials/preloader-css', { isPreview: true }) %>
+    <%- include('../../partials/preloader-css', { isPreview: true }) %>
+  <style>
+    /* Admin Settings Grid & Responsive Layout */
+    .admin-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.4rem;
+      margin-bottom: 1.4rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .admin-grid-3col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.4rem;
+      margin-bottom: 1.4rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    @media (max-width: 768px) {
+      .admin-grid-2col,
+      .admin-grid-3col {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+        margin-bottom: 1rem !important;
+      }
+    }
+
+    /* Form Control Standardization */
+    .admin-card-box .form-control {
+      height: 46px;
+      border-radius: 10px;
+      border: 1px solid var(--admin-border, #E2D7CC);
+      padding: 0 1rem;
+      font-size: 0.88rem;
+      color: var(--admin-text-dark, #2C1810);
+      background-color: #FFFFFF;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .admin-card-box textarea.form-control {
+      height: auto;
+      min-height: 84px;
+      padding: 0.8rem 1rem;
+      line-height: 1.5;
+    }
+    .admin-card-box select.form-control {
+      height: 46px;
+    }
+    .admin-card-box .form-control:focus {
+      border-color: var(--admin-primary, #A93226);
+      box-shadow: 0 0 0 3px rgba(169, 50, 38, 0.12);
+      outline: none;
+    }
+    .form-control.is-invalid-field {
+      border-color: #D32F2F !important;
+      background-color: #FFF8F8 !important;
+      box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.15) !important;
+    }
+    .field-error-msg {
+      color: #D32F2F;
+      font-size: 0.74rem;
+      font-weight: 600;
+      margin-top: 4px;
+      display: none;
+    }
+    .is-invalid-field + .field-error-msg {
+      display: block;
+    }
+
+    /* Consistent Section Card Boundaries */
+    .admin-card-box {
+      background: #FFFFFF;
+      border-radius: 14px;
+      border: 1px solid var(--admin-border, #E8DFD8);
+      box-shadow: 0 2px 10px rgba(44, 24, 16, 0.04);
+      margin-bottom: 1.8rem;
+      padding: 1.8rem;
+      box-sizing: border-box;
+    }
+    @media (max-width: 600px) {
+      .admin-card-box {
+        padding: 1.2rem !important;
+        margin-bottom: 1.2rem !important;
+        border-radius: 12px !important;
+      }
+    }
+
+    /* Sticky Save Changes Action Bar */
+    .admin-sticky-save-bar {
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-top: 2px solid var(--admin-border, #E2D7CC);
+      padding: 0.9rem 1.8rem;
+      margin: 2rem -2.5rem -2rem -2.5rem;
+      box-shadow: 0 -4px 16px rgba(44, 24, 16, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .admin-sticky-save-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .admin-sticky-save-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .admin-sticky-save-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .admin-save-btn {
+      height: 46px;
+      padding: 0 1.8rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+      border-radius: 10px;
+      background: var(--admin-primary, #A93226);
+      color: #FFFFFF;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(169, 50, 38, 0.25);
+      transition: all 0.2s ease;
+    }
+    .admin-save-btn:hover {
+      background: #8F271E;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(169, 50, 38, 0.32);
+    }
+    @media (max-width: 768px) {
+      .admin-sticky-save-bar {
+        padding: 0.8rem 1.2rem !important;
+        margin: 1.5rem -1.2rem -1.2rem -1.2rem !important;
+      }
+      .admin-sticky-save-content {
+        justify-content: center;
+      }
+      .admin-sticky-save-left {
+        display: none;
+      }
+      .admin-sticky-save-actions {
+        width: 100%;
+      }
+      .admin-save-btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    /* Floating Toast Alerts */
+    .admin-floating-toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 999999;
+      padding: 1rem 1.4rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      max-width: 90vw;
+      animation: slideInToast 0.3s ease-out;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    @keyframes slideInToast {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .admin-toast-success {
+      background: #1B5E20;
+      color: #FFFFFF;
+      border: 1px solid #4CAF50;
+    }
+    .admin-toast-error {
+      background: #B71C1C;
+      color: #FFFFFF;
+      border: 1px solid #EF5350;
+    }
+  </style>
 </head>
 <body class="admin-body">
 
@@ -186,7 +384,7 @@
             <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-rotate"></i> Global Auto-Sync Enabled</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.8rem;">
+          <div class="admin-grid-3col">
             <!-- Main Website Logo Upload -->
             <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 14px; padding: 1.4rem; text-align: center;">
               <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark); margin-bottom: 0.5rem;">Main Website Logo</strong>
@@ -784,78 +982,109 @@
             text-transform: uppercase;
           }
         </style>
-        </div>
 
         <!-- Card 2: Store Information -->
-        <div class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">
-          <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 1.2rem;">Store & Contact Information</h3>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.2rem;">
+        <div class="admin-card-box" id="store-info" style="margin-bottom: 1.8rem; padding: 1.8rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Shop Name *</label>
-              <input type="text" name="shop_name" class="form-control" value="<%= settings.shop_name || 'ARUVI EMBROIDERY STUDIO' %>" required>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">
+                <i class="fa-solid fa-store" style="color: var(--primary);"></i> Store & Contact Information
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                General store identity, customer communication contact points, and physical studio address.
+              </span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+              <i class="fa-solid fa-globe"></i> Live Store Profile
+            </span>
+          </div>
+
+          <div class="admin-grid-2col">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">Shop Name *</label>
+              <input type="text" name="shop_name" class="form-control" value="<%= settings.shop_name || 'ARUVI EMBROIDERY STUDIO' %>" required placeholder="e.g. ARUVI EMBROIDERY STUDIO">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Primary business title displayed across the site header and browser tabs.</small>
             </div>
 
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Brand Tagline *</label>
-              <input type="text" name="tagline" class="form-control" value="<%= settings.tagline || 'Where Threads Tell Stories' %>" required>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">Brand Tagline *</label>
+              <input type="text" name="tagline" class="form-control" value="<%= settings.tagline || 'Where Threads Tell Stories' %>" required placeholder="e.g. Where Threads Tell Stories">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Secondary slogan displayed below the logo and in announcements.</small>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.2rem;" id="contact">
+          <div class="admin-grid-2col" id="contact">
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Contact Email *</label>
-              <input type="email" name="contact_email" class="form-control" value="<%= settings.contact_email || 'aruviembroidery@gmail.com' %>" required>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">Contact Email *</label>
+              <input type="email" name="contact_email" class="form-control" value="<%= settings.contact_email || 'aruviembroidery@gmail.com' %>" required placeholder="e.g. contact@aruviembroidery.com">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Used for customer inquiries, support receipts, and system alerts.</small>
             </div>
 
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Contact Phone</label>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">Contact Phone</label>
               <input type="text" name="contact_phone" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.contact_phone !== undefined) ? settings.contact_phone : '' %>" placeholder="e.g. +91 98765 43210">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Public customer support WhatsApp / helpline phone number.</small>
             </div>
           </div>
 
-          <div style="margin-bottom: 1.2rem;">
-            <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Studio Location Address</label>
+          <div style="margin-bottom: 1.4rem;">
+            <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">Studio Location Address</label>
             <textarea name="address" rows="3" class="form-control" placeholder="e.g. Erode, Tamil Nadu, 638001, India"><%= (typeof settings !== 'undefined' && settings.address !== undefined) ? settings.address : '' %></textarea>
+            <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Detailed studio / workshop address shown on invoice and contact page.</small>
           </div>
 
-          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-top: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 10px;">
+          <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem; margin-top: 1.2rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 12px;">
               <div>
-                <strong style="display: block; font-size: 0.9rem; color: var(--admin-text-dark);">Contact Page Location Card & Map</strong>
-                <span style="font-size: 0.78rem; color: var(--admin-text-muted);">Enable or disable the "Our Location" card with map on the Contact Us page (Default: OFF).</span>
+                <strong style="display: block; font-size: 0.92rem; color: var(--admin-text-dark); margin-bottom: 3px;">
+                  <i class="fa-solid fa-map-location-dot" style="color: var(--primary); margin-right: 6px;"></i> Contact Page Location Card & Map
+                </strong>
+                <span style="font-size: 0.78rem; color: var(--admin-text-muted); display: block;">Enable or disable the "Our Location" card with map on the Contact Us page (Default: OFF).</span>
               </div>
-              <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; gap: 8px;">
-                <input type="checkbox" name="show_contact_map" value="1" <%= (typeof settings !== 'undefined' && settings.show_contact_map === '1') ? 'checked' : '' %> style="width: 18px; height: 18px;">
-                <span style="font-size: 0.85rem; font-weight: 600;">Show location/map</span>
+              <label style="display: inline-flex; align-items: center; cursor: pointer; gap: 8px; background: #FFFFFF; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--admin-border); user-select: none;">
+                <input type="checkbox" name="show_contact_map" id="showContactMapCheck" value="1" <%= (typeof settings !== 'undefined' && settings.show_contact_map === '1') ? 'checked' : '' %> onchange="toggleContactAddressLine(this.checked)" style="width: 18px; height: 18px; accent-color: var(--admin-primary); cursor: pointer;">
+                <span style="font-size: 0.84rem; font-weight: 600; color: var(--admin-text-dark);">Show location/map</span>
               </label>
             </div>
-            <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">Short Address Line (shows only if filled)</label>
-              <input type="text" name="contact_address_line" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.contact_address_line) ? settings.contact_address_line : '' %>" placeholder="e.g. Erode, Tamil Nadu, India">
+            <div id="contactAddressLineWrap" style="<%= (typeof settings !== 'undefined' && settings.show_contact_map === '1') ? '' : 'opacity: 0.55;' %> transition: opacity 0.2s ease;">
+              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">
+                Short Address Line <span style="font-weight: 400; color: var(--admin-text-muted);">(displayed on card if filled)</span>
+              </label>
+              <input type="text" name="contact_address_line" id="contactAddressLineInput" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.contact_address_line) ? settings.contact_address_line : '' %>" placeholder="e.g. Erode, Tamil Nadu, India" <%= (typeof settings !== 'undefined' && settings.show_contact_map === '1') ? '' : 'disabled' %> style="<%= (typeof settings !== 'undefined' && settings.show_contact_map === '1') ? '' : 'background: #F5EFEB; cursor: not-allowed;' %>">
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Brief one-line studio address shown prominently on the contact map card.</small>
             </div>
           </div>
         </div>
 
         <!-- Card 3: UPI Payment Details for QR Code -->
         <div class="admin-card-box" id="upi-details" style="margin-bottom: 1.8rem; padding: 1.8rem;">
-          <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 0.4rem;">
-            <i class="fa-solid fa-qrcode" style="color: var(--primary);"></i> UPI Payment Details (for Checkout QR Code)
-          </h3>
-          <p style="font-size: 0.82rem; color: var(--admin-text-muted); margin-bottom: 1.2rem;">
-            These details generate the dynamic UPI QR code on the customer checkout page for direct instant payments (GPay, PhonePe, Paytm, BHIM).
-          </p>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+          <div style="border-bottom: 1px solid var(--admin-border); padding-bottom: 0.8rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">UPI ID / VPA *</label>
+              <h3 style="font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--admin-text-dark); margin: 0 0 4px;">
+                <i class="fa-solid fa-qrcode" style="color: var(--primary);"></i> UPI Payment Details (for Checkout QR Code)
+              </h3>
+              <span style="font-size: 0.78rem; color: var(--admin-text-muted);">
+                Generates dynamic UPI QR codes on the customer checkout page for direct instant payments (GPay, PhonePe, Paytm, BHIM).
+              </span>
+            </div>
+            <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+              <i class="fa-solid fa-bolt"></i> Instant QR Active
+            </span>
+          </div>
+
+          <div class="admin-grid-2col">
+            <div>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">UPI ID / VPA *</label>
               <input type="text" name="upi_id" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.upi_id) ? settings.upi_id : (settings.upiId || 'aruviembroidery@upi') %>" placeholder="e.g. aruviembroidery@upi or 9876543210@paytm" required>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Virtual Payment Address where funds are deposited.</small>
             </div>
 
             <div>
-              <label class="form-label-custom" style="display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px;">UPI Merchant / Payee Name *</label>
+              <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">UPI Merchant / Payee Name *</label>
               <input type="text" name="upi_name" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.upi_name) ? settings.upi_name : (settings.upiMerchantName || 'ARUVI EMBROIDERY STUDIO') %>" placeholder="e.g. ARUVI EMBROIDERY STUDIO" required>
+              <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Business name shown on customer's banking app screen.</small>
             </div>
+          </div>
         </div>
 
         <!-- Card: Payment Gateway (Razorpay) -->
@@ -882,7 +1111,7 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+          <div class="admin-grid-2col">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px;">
                 Razorpay Key ID *
@@ -983,7 +1212,7 @@
             <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-link"></i> Live Footer Sync</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+          <div class="admin-grid-2col">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;"><i class="fa-brands fa-facebook" style="color: #1877F2; font-size: 1.25rem; vertical-align: middle; margin-right: 4px;"></i> Facebook URL</label>
               <input type="url" name="facebook_url" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.facebook_url !== undefined && settings.facebook_url !== null) ? settings.facebook_url : '' %>" placeholder="https://facebook.com/aruviembroidery">
@@ -1020,7 +1249,7 @@
             <span style="background: #E3F2FD; color: #1565C0; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-file-zipper"></i> ZIP Engine</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.2rem;">
+          <div class="admin-grid-2col">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
                 <i class="fa-solid fa-cloud-arrow-up" style="color: var(--admin-primary); margin-right: 4px;"></i> Max Allowed File Size per Upload (MB)
@@ -1038,7 +1267,7 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+          <div class="admin-grid-2col">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">
                 <i class="fa-solid fa-hard-drive" style="color: var(--admin-primary); margin-right: 4px;"></i> Bulk ZIP Upload Max Size (MB)
@@ -1096,7 +1325,7 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
           </div>
 
           <!-- Hero & Story Content -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+          <div class="admin-grid-2col">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">Hero Title</label>
               <input type="text" name="about_hero_title" class="form-control" value="<%= (typeof settings !== 'undefined' && settings.about_hero_title) ? settings.about_hero_title : 'About ARUVI' %>">
@@ -1175,7 +1404,7 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
             </small>
 
             <!-- Manual Stat Inputs -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="admin-grid-2col">
               <div>
                 <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Stat 1: Number & Label</label>
                 <div style="display: flex; gap: 8px;">
@@ -1208,7 +1437,7 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
           </div>
 
           <!-- Mission, Vision, Values -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem;">
+          <div class="admin-grid-3col">
             <div>
               <label class="form-label-custom" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Mission Title & Text</label>
               <input type="text" name="about_mission_title" class="form-control" value="<%= settings.about_mission_title || 'Our Mission' %>" style="margin-bottom: 6px;">
@@ -1237,7 +1466,7 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
             <span style="background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;"><i class="fa-solid fa-gem"></i> Detail Page</span>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem;">
+          <div class="admin-grid-2col">
             <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
               <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                 <div>
@@ -1337,7 +1566,7 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
           </div>
 
           <!-- General Format & Cards Display -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-bottom: 1.4rem;">
+          <div class="admin-grid-2col">
             <div style="background: #FAF6F0; border: 1px solid var(--admin-border); border-radius: 12px; padding: 1.2rem;">
               <label class="form-label-custom" style="display: block; font-size: 0.86rem; font-weight: 700; color: var(--admin-text-dark); margin-bottom: 6px;">
                 <i class="fa-solid fa-calculator" style="color: var(--admin-primary); margin-right: 4px;"></i> Number Formatting (Thousands Separators)
@@ -1369,7 +1598,7 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
               Rows only appear on the customer detail page when the design has a positive value. You can rename labels or toggle individual rows off globally.
             </p>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
+            <div class="admin-grid-2col">
               <!-- Front -->
               <div style="background: #FFF; border: 1px solid var(--admin-border); border-radius: 10px; padding: 1rem;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -1428,10 +1657,25 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
         <!-- Card 8: Trust / Feature Cards Manager (Synchronized across all pages) -->
         <%- include('../partials/feature-cards-editor') %>
 
-        <div style="display: flex; justify-content: flex-end;">
-          <button type="submit" class="btn btn-primary btn-lg" style="height: 48px; border-radius: 10px; font-weight: 600; padding: 0 2rem; display: inline-flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-floppy-disk"></i> Save & Synchronize Branding
-          </button>
+                <!-- Sticky Save Changes Action Bar -->
+        <div class="admin-sticky-save-bar" id="stickySaveBar">
+          <div class="admin-sticky-save-content">
+            <div class="admin-sticky-save-left">
+              <span style="width: 38px; height: 38px; border-radius: 10px; background: #FAF0EE; color: var(--admin-primary, #A93226); display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+                <i class="fa-solid fa-floppy-disk"></i>
+              </span>
+              <div>
+                <strong style="display: block; font-size: 0.94rem; color: var(--admin-text-dark, #2C1810);">Save Website Settings</strong>
+                <span style="display: block; font-size: 0.76rem; color: var(--admin-text-muted, #8C7B72);">Saves all modified settings and synchronizes live across store and emails.</span>
+              </div>
+            </div>
+            <div class="admin-sticky-save-actions">
+              <button type="submit" id="stickySaveBtn" class="admin-save-btn">
+                <i class="fa-solid fa-check"></i>
+                <span>Save Changes</span>
+              </button>
+            </div>
+          </div>
         </div>
 
       </form>
@@ -1441,6 +1685,106 @@ Need help? Contact us anytime from the Contact page."><%= (typeof settings !== '
 </div>
 
 <script>
+  // Contact Address Line Toggle
+  function toggleContactAddressLine(isChecked) {
+    var wrap = document.getElementById('contactAddressLineWrap');
+    var input = document.getElementById('contactAddressLineInput');
+    if (wrap && input) {
+      if (isChecked) {
+        wrap.style.opacity = '1';
+        input.disabled = false;
+        input.style.background = '#FFFFFF';
+        input.style.cursor = 'text';
+        input.focus();
+      } else {
+        wrap.style.opacity = '0.55';
+        input.disabled = true;
+        input.style.background = '#F5EFEB';
+        input.style.cursor = 'not-allowed';
+      }
+    }
+  }
+
+  // Floating Toast Alert Helper
+  function showAdminToast(message, type) {
+    type = type || 'success';
+    var existing = document.getElementById('adminDynamicToast');
+    if (existing) existing.remove();
+
+    var toast = document.createElement('div');
+    toast.id = 'adminDynamicToast';
+    toast.className = 'admin-floating-toast admin-toast-' + type;
+
+    var icon = type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+    toast.innerHTML = '<i class="fa-solid ' + icon + '" style="font-size: 1.25rem;"></i>' +
+      '<span>' + message + '</span>' +
+      '<button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:white; margin-left:12px; cursor:pointer; font-size:1.2rem; line-height:1;">&times;</button>';
+
+    document.body.appendChild(toast);
+    setTimeout(function() {
+      if (toast && toast.parentNode) {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-10px)';
+        setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+      }
+    }, 4500);
+  }
+
+  // Form Validation & Inline Highlights
+  document.addEventListener('DOMContentLoaded', function() {
+    var settingsForm = document.querySelector('form[action*="/admin/settings"]');
+    if (!settingsForm) return;
+
+    // Remove is-invalid-field class upon typing
+    settingsForm.querySelectorAll('input, select, textarea').forEach(function(field) {
+      field.addEventListener('input', function() {
+        if (field.classList.contains('is-invalid-field') && field.value.trim() !== '') {
+          field.classList.remove('is-invalid-field');
+        }
+      });
+    });
+
+    settingsForm.addEventListener('submit', function(e) {
+      var requiredFields = [
+        { name: 'shop_name', label: 'Shop Name' },
+        { name: 'tagline', label: 'Brand Tagline' },
+        { name: 'contact_email', label: 'Contact Email' }
+      ];
+
+      var firstInvalid = null;
+      var hasError = false;
+
+      requiredFields.forEach(function(req) {
+        var el = settingsForm.querySelector('[name="' + req.name + '"]');
+        if (el) {
+          if (!el.value || el.value.trim() === '') {
+            hasError = true;
+            el.classList.add('is-invalid-field');
+            if (!firstInvalid) firstInvalid = el;
+          } else {
+            el.classList.remove('is-invalid-field');
+          }
+        }
+      });
+
+      if (hasError) {
+        e.preventDefault();
+        showAdminToast('Please fill in all required fields marked with *', 'error');
+        if (firstInvalid) {
+          firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstInvalid.focus();
+        }
+        return false;
+      }
+
+      var saveBtn = document.getElementById('stickySaveBtn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving Settings...';
+      }
+    });
+  });
+
   function previewImg(input, targetId) {
     if (input.files && input.files[0]) {
       const reader = new FileReader();
