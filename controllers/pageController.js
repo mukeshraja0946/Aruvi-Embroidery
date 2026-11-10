@@ -377,11 +377,11 @@ exports.postCustomOrder = async (req, res, next) => {
       return res.status(500).json({
         success: false,
         referenceId: errorRef,
-        message: 'An unexpected error occurred while processing your request. Please try again or contact support.'
+        message: `Something went wrong while processing your request (Ref: ${errorRef}). Please try again or contact support.`
       });
     }
 
-    req.flash('error', `An unexpected error occurred (Ref: ${errorRef}). Please try again or contact support.`);
+    req.flash('error', `Something went wrong while processing your request (Ref: ${errorRef}). Please try again or contact support.`);
     req.flash('form_data', req.body);
     res.redirect('/custom-order');
   }

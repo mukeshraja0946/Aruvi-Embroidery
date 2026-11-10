@@ -74,76 +74,136 @@ class CustomRequest {
     const cleanTitle = (design_title || 'Custom Embroidery Request').trim();
     const cleanDesc = (description || '').trim();
     const cleanFormats = (preferred_formats || 'DST, PES, JEF, EXP').trim();
-    const cleanSize = size_hoop ? String(size_hoop).trim() : null;
+    const cleanSize = (size_hoop && String(size_hoop).trim() !== '') ? String(size_hoop).trim() : null;
     const parsedBudget = (budget !== null && budget !== '' && !isNaN(budget)) ? parseFloat(budget) : null;
-    const parsedDeadline = deadline ? String(deadline).trim() : null;
-    const parsedCategoryId = (category_id && !isNaN(category_id)) ? parseInt(category_id) : null;
+    const parsedDeadline = (deadline && String(deadline).trim() !== '' && !isNaN(Date.parse(deadline))) ? String(deadline).trim() : null;
+    const parsedCategoryId = (category_id && !isNaN(category_id)) ? parseInt(category_id, 10) : null;
 
     if (db.isConnected()) {
-      const conn = await db.getConnection();
+      let conn = null;
       try {
-        await conn.beginTransaction();
+        if (typeof db.getConnection === 'function') {
+          conn = await db.getConnection();
+          await conn.beginTransaction();
 
-        // 1. Insert temporary record to allocate autoincrement ID
-        const tempReqNum = `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-        const [insertRes] = await conn.query(
-          `INSERT INTO custom_requests (
-            request_number, user_id, name, email, phone, design_title, description,
-            category_id, preferred_formats, size_hoop, budget, deadline,
-            reference_image_key, status, admin_notes, quoted_price
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            tempReqNum,
-            userId || null,
-            cleanName,
-            cleanEmail,
-            cleanPhone,
-            cleanTitle,
-            cleanDesc,
-            parsedCategoryId,
-            cleanFormats,
-            cleanSize,
-            parsedBudget,
-            parsedDeadline,
-            reference_image_key || null,
-            status || 'new',
-            admin_notes || null,
-            quoted_price || null
-          ]
-        );
+          // 1. Insert temporary record to allocate autoincrement ID
+          const tempReqNum = `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          const [insertRes] = await conn.query(
+            `INSERT INTO custom_requests (
+              request_number, user_id, name, email, phone, design_title, description,
+              category_id, preferred_formats, size_hoop, budget, deadline,
+              reference_image_key, status, admin_notes, quoted_price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              tempReqNum,
+              userId || null,
+              cleanName,
+              cleanEmail,
+              cleanPhone,
+              cleanTitle,
+              cleanDesc,
+              parsedCategoryId,
+              cleanFormats,
+              cleanSize,
+              parsedBudget,
+              parsedDeadline,
+              reference_image_key || null,
+              status || 'new',
+              admin_notes || null,
+              quoted_price || null
+            ]
+          );
 
-        const newId = insertRes.insertId;
-        const requestNumber = CustomRequest.generateRequestNumber(newId);
+          const newId = insertRes.insertId;
+          const requestNumber = CustomRequest.generateRequestNumber(newId);
 
-        // 2. Update with official formatted request number (e.g. CR-20261101-0001)
-        await conn.query(
-          'UPDATE custom_requests SET request_number = ? WHERE id = ?',
-          [requestNumber, newId]
-        );
+          // 2. Update with official formatted request number (e.g. CR-20261101-0001)
+          await conn.query(
+            'UPDATE custom_requests SET request_number = ? WHERE id = ?',
+            [requestNumber, newId]
+          );
 
-        await conn.commit();
+          await conn.commit();
 
-        return {
-          id: newId,
-          request_number: requestNumber,
-          user_id: userId,
-          name: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          design_title: cleanTitle,
-          description: cleanDesc,
-          preferred_formats: cleanFormats,
-          size_hoop: cleanSize,
-          budget: parsedBudget,
-          deadline: parsedDeadline,
-          reference_image_key,
-          status: status || 'new'
-        };
+          return {
+            id: newId,
+            request_number: requestNumber,
+            user_id: userId,
+            name: cleanName,
+            email: cleanEmail,
+            phone: cleanPhone,
+            design_title: cleanTitle,
+            description: cleanDesc,
+            preferred_formats: cleanFormats,
+            size_hoop: cleanSize,
+            budget: parsedBudget,
+            deadline: parsedDeadline,
+            reference_image_key,
+            status: status || 'new'
+          };
+        } else {
+          // Direct db.query execution fallback
+          const tempReqNum = `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          const insertRes = await db.query(
+            `INSERT INTO custom_requests (
+              request_number, user_id, name, email, phone, design_title, description,
+              category_id, preferred_formats, size_hoop, budget, deadline,
+              reference_image_key, status, admin_notes, quoted_price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              tempReqNum,
+              userId || null,
+              cleanName,
+              cleanEmail,
+              cleanPhone,
+              cleanTitle,
+              cleanDesc,
+              parsedCategoryId,
+              cleanFormats,
+              cleanSize,
+              parsedBudget,
+              parsedDeadline,
+              reference_image_key || null,
+              status || 'new',
+              admin_notes || null,
+              quoted_price || null
+            ]
+          );
+
+          const newId = insertRes.insertId;
+          const requestNumber = CustomRequest.generateRequestNumber(newId);
+
+          await db.query(
+            'UPDATE custom_requests SET request_number = ? WHERE id = ?',
+            [requestNumber, newId]
+          );
+
+          return {
+            id: newId,
+            request_number: requestNumber,
+            user_id: userId,
+            name: cleanName,
+            email: cleanEmail,
+            phone: cleanPhone,
+            design_title: cleanTitle,
+            description: cleanDesc,
+            preferred_formats: cleanFormats,
+            size_hoop: cleanSize,
+            budget: parsedBudget,
+            deadline: parsedDeadline,
+            reference_image_key,
+            status: status || 'new'
+          };
+        }
       } catch (err) {
-        await conn.rollback();
+        if (conn) {
+          try { await conn.rollback(); } catch (_) {}
+        }
         throw err;
       } finally {
-        conn.release();
+        if (conn) {
+          try { conn.release(); } catch (_) {}
+        }
       }
     }
 

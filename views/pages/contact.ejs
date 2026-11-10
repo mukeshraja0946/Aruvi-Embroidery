@@ -178,22 +178,77 @@
           </div>
         </div>
 
-        <div class="contact-faq-accordion" style="display: flex; flex-direction: column; gap: 8px;">
-          <div class="faq-item-box" style="background: #F6F1EA; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
-            <span>How will I receive my design files?</span>
-            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+        <div class="contact-faq-accordion" id="contactFaqAccordion" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- FAQ 1 -->
+          <div class="contact-faq-item" style="background: #F6F1EA; border-radius: 8px; border: 1px solid rgba(45, 35, 30, 0.06); overflow: hidden;">
+            <button type="button" class="contact-faq-btn" aria-expanded="false" aria-controls="faq-ans-1" id="faq-q-1" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: transparent; border: none; text-align: left; font-family: inherit;">
+              <span>How will I receive my design files?</span>
+              <i class="fa-solid fa-chevron-down faq-chevron" style="font-size: 0.75rem; color: var(--text-muted); transition: transform 0.25s ease;" aria-hidden="true"></i>
+            </button>
+            <div class="contact-faq-panel" id="faq-ans-1" role="region" aria-labelledby="faq-q-1" style="display: none; padding: 0 0.9rem 0.75rem 0.9rem; font-size: 0.8rem; color: var(--text-muted); line-height: 1.55;">
+              Immediately after successful payment, your digital download link becomes active on the confirmation screen and is permanently available in your account under <a href="/user/orders" style="color: var(--primary); font-weight: 600; text-decoration: underline;">My Orders</a>.
+            </div>
           </div>
 
-          <div class="faq-item-box" style="background: #F6F1EA; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
-            <span>What file formats do you provide?</span>
-            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+          <!-- FAQ 2 -->
+          <div class="contact-faq-item" style="background: #F6F1EA; border-radius: 8px; border: 1px solid rgba(45, 35, 30, 0.06); overflow: hidden;">
+            <button type="button" class="contact-faq-btn" aria-expanded="false" aria-controls="faq-ans-2" id="faq-q-2" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: transparent; border: none; text-align: left; font-family: inherit;">
+              <span>What file formats do you provide?</span>
+              <i class="fa-solid fa-chevron-down faq-chevron" style="font-size: 0.75rem; color: var(--text-muted); transition: transform 0.25s ease;" aria-hidden="true"></i>
+            </button>
+            <div class="contact-faq-panel" id="faq-ans-2" role="region" aria-labelledby="faq-q-2" style="display: none; padding: 0 0.9rem 0.75rem 0.9rem; font-size: 0.8rem; color: var(--text-muted); line-height: 1.55;">
+              Each ZIP download includes multiple machine embroidery formats: <strong>DST</strong> (Tajima/Industrial), <strong>PES</strong> (Brother), <strong>JEF</strong> (Janome), <strong>EXP</strong> (Bernina/Melco), <strong>HUS/VP3</strong>, and <strong>XXX</strong>.
+            </div>
           </div>
 
-          <div class="faq-item-box" style="background: #F6F1EA; border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
-            <span>Can I request a custom design?</span>
-            <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem; color: var(--text-muted);"></i>
+          <!-- FAQ 3 -->
+          <div class="contact-faq-item" style="background: #F6F1EA; border-radius: 8px; border: 1px solid rgba(45, 35, 30, 0.06); overflow: hidden;">
+            <button type="button" class="contact-faq-btn" aria-expanded="false" aria-controls="faq-ans-3" id="faq-q-3" style="width: 100%; padding: 0.75rem 0.9rem; font-size: 0.82rem; font-weight: 600; color: var(--text-dark); display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: transparent; border: none; text-align: left; font-family: inherit;">
+              <span>Can I request a custom design?</span>
+              <i class="fa-solid fa-chevron-down faq-chevron" style="font-size: 0.75rem; color: var(--text-muted); transition: transform 0.25s ease;" aria-hidden="true"></i>
+            </button>
+            <div class="contact-faq-panel" id="faq-ans-3" role="region" aria-labelledby="faq-q-3" style="display: none; padding: 0 0.9rem 0.75rem 0.9rem; font-size: 0.8rem; color: var(--text-muted); line-height: 1.55;">
+              Yes! You can submit your reference artwork or photo via our <a href="/custom-order" style="color: var(--primary); font-weight: 600; text-decoration: underline;">Custom Order page</a>. Our expert digitizers will convert it into high-precision machine embroidery files.
+            </div>
           </div>
         </div>
+
+        <script>
+          (function () {
+            const accordion = document.getElementById('contactFaqAccordion');
+            if (!accordion) return;
+
+            accordion.querySelectorAll('.contact-faq-btn').forEach(btn => {
+              btn.addEventListener('click', function () {
+                const isExpanded = this.getAttribute('aria-expanded') === 'true';
+                const panel = document.getElementById(this.getAttribute('aria-controls'));
+                const chevron = this.querySelector('.faq-chevron');
+
+                // Close siblings
+                accordion.querySelectorAll('.contact-faq-btn').forEach(otherBtn => {
+                  if (otherBtn !== this) {
+                    otherBtn.setAttribute('aria-expanded', 'false');
+                    const otherPanel = document.getElementById(otherBtn.getAttribute('aria-controls'));
+                    const otherChevron = otherBtn.querySelector('.faq-chevron');
+                    if (otherPanel) otherPanel.style.display = 'none';
+                    if (otherChevron) otherChevron.style.transform = 'rotate(0deg)';
+                  }
+                });
+
+                // Toggle current
+                if (isExpanded) {
+                  this.setAttribute('aria-expanded', 'false');
+                  if (panel) panel.style.display = 'none';
+                  if (chevron) chevron.style.transform = 'rotate(0deg)';
+                } else {
+                  this.setAttribute('aria-expanded', 'true');
+                  if (panel) panel.style.display = 'block';
+                  if (chevron) chevron.style.transform = 'rotate(180deg)';
+                }
+              });
+            });
+          })();
+        </script>
       </div>
     </div>
   </div>

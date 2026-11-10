@@ -134,9 +134,9 @@
         <% }) %>
       </div>
 
-      <!-- Infinite Scroll / Load More (24 per page) -->
+      <!-- Infinite Scroll / Load More -->
       <div class="load-more-container" id="loadMoreContainer" style="<%= catPageNum >= totalPages ? 'display: none;' : '' %>">
-        <button type="button" class="load-more-btn" id="loadMoreBtn" data-page="<%= catPageNum %>" data-total-pages="<%= totalPages %>">
+        <button type="button" class="load-more-btn" id="loadMoreBtn" data-page="<%= catPageNum %>" data-total-pages="<%= totalPages %>" data-limit="<%= catPageLimit %>" data-total="<%= catTotalCount %>">
           <span>Load more (<%= Math.max(0, catTotalCount - (catPageNum * catPageLimit)) %> remaining)</span>
           <i class="fa-solid fa-arrow-down"></i>
         </button>

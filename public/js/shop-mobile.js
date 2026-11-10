@@ -339,7 +339,6 @@
   }
 
   // "Clear all" button in drawer: reset sort to "latest" and filters
-  const drawerClearBtn = document.getElementById('drawerClearBtn');
   const clearAllLink = document.querySelector('.clear-all-link');
   function handleDrawerClearAll(e) {
     if (filterForm) {
@@ -473,7 +472,7 @@
   // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
-  // 8. INFINITE SCROLL / LOAD MORE (24/page) WITH SKELETON CARDS
+  // 8. INFINITE SCROLL / LOAD MORE WITH SKELETON CARDS
   // -------------------------------------------------------------------------
   let isLoadingNextPage = false;
 
@@ -492,7 +491,10 @@
     const nextPage = currentPage + 1;
 
     // Show loading spinner / skeleton
-    if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+    if (loadMoreBtn) {
+      loadMoreBtn.disabled = true;
+      loadMoreBtn.style.display = 'none';
+    }
     if (loadMoreSpinner) loadMoreSpinner.style.display = 'flex';
 
     appendSkeletonCards(4);
@@ -501,7 +503,10 @@
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.set('page', nextPage);
       currentUrl.searchParams.set('ajax', '1');
-      currentUrl.searchParams.set('limit', '24');
+
+      // Preserve existing page limit if set on button or query string; do not hardcode 24
+      const currentLimit = parseInt(loadMoreBtn.dataset.limit, 10) || parseInt(currentUrl.searchParams.get('limit'), 10) || 24;
+      currentUrl.searchParams.set('limit', String(currentLimit));
 
       const res = await fetch(currentUrl.toString(), {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
@@ -516,31 +521,58 @@
       if (data.success && data.designs && data.designs.length > 0) {
         renderNewCards(data.designs, data.userPurchasedDesignIds || [], data.userWishlistDesignIds || []);
 
-        // Update button dataset
-        loadMoreBtn.dataset.page = data.currentPage;
-        loadMoreBtn.dataset.totalPages = data.totalPages;
+        const newPage = parseInt(data.currentPage, 10) || nextPage;
+        const newTotalPages = parseInt(data.totalPages, 10) || totalPages;
+        const totalDesigns = parseInt(data.total, 10) || parseInt(loadMoreBtn.dataset.total, 10) || 0;
+        const effLimit = parseInt(data.limit, 10) || currentLimit;
 
-        const remaining = Math.max(0, data.total - (data.currentPage * 24));
+        // Update button dataset
+        loadMoreBtn.dataset.page = String(newPage);
+        loadMoreBtn.dataset.totalPages = String(newTotalPages);
+        loadMoreBtn.dataset.limit = String(effLimit);
+        if (totalDesigns) loadMoreBtn.dataset.total = String(totalDesigns);
+
+        // Count real cards in DOM to compute exact remaining count
+        const currentLoadedCount = document.querySelectorAll('#designsGrid .listing-product-card').length;
+        const remaining = totalDesigns > 0 ? Math.max(0, totalDesigns - currentLoadedCount) : Math.max(0, (newTotalPages - newPage) * effLimit);
+
         const btnText = loadMoreBtn.querySelector('span');
         if (btnText) {
           btnText.textContent = remaining > 0 ? `Load more (${remaining} remaining)` : 'All designs loaded';
         }
 
-        if (data.currentPage >= data.totalPages) {
+        // Live update the results count header on the page
+        const rcLine2 = document.querySelector('.results-count-twoline .rc-line2');
+        if (rcLine2 && totalDesigns > 0) {
+          const dispTotal = totalDesigns >= 10 ? (totalDesigns + '+') : totalDesigns;
+          rcLine2.innerHTML = `<strong>1–${currentLoadedCount}</strong> of <strong>${dispTotal}</strong> designs`;
+        }
+
+        if (newPage >= newTotalPages || remaining <= 0) {
           if (loadMoreContainer) loadMoreContainer.style.display = 'none';
         } else {
-          if (loadMoreBtn) loadMoreBtn.style.display = 'inline-flex';
+          if (loadMoreBtn) {
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.style.display = 'inline-flex';
+          }
         }
 
         // Save current page in sessionStorage for scroll restoration
-        sessionStorage.setItem('aruvi_designs_page', String(data.currentPage));
+        sessionStorage.setItem('aruvi_designs_page', String(newPage));
       } else {
         if (loadMoreContainer) loadMoreContainer.style.display = 'none';
       }
     } catch (err) {
       console.error('Error loading more designs:', err);
       removeSkeletonCards();
-      if (loadMoreBtn) loadMoreBtn.style.display = 'inline-flex';
+      if (loadMoreBtn) {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.style.display = 'inline-flex';
+        const btnText = loadMoreBtn.querySelector('span');
+        if (btnText) {
+          btnText.textContent = 'Retry loading designs';
+        }
+      }
     } finally {
       if (loadMoreSpinner) loadMoreSpinner.style.display = 'none';
       isLoadingNextPage = false;

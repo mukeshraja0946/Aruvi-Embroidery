@@ -362,9 +362,9 @@
           <% }) %>
         </div>
 
-        <!-- Infinite Scroll / Load More (24 per page) -->
+        <!-- Infinite Scroll / Load More -->
         <div class="load-more-container" id="loadMoreContainer" style="<%= pageNum >= totalPages ? 'display: none;' : '' %>">
-          <button type="button" class="load-more-btn" id="loadMoreBtn" data-page="<%= pageNum %>" data-total-pages="<%= totalPages %>">
+          <button type="button" class="load-more-btn" id="loadMoreBtn" data-page="<%= pageNum %>" data-total-pages="<%= totalPages %>" data-limit="<%= pageLimit %>" data-total="<%= totalCount %>">
             <span>Load more (<%= Math.max(0, totalCount - (pageNum * pageLimit)) %> remaining)</span>
             <i class="fa-solid fa-arrow-down"></i>
           </button>

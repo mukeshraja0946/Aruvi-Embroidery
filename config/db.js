@@ -211,8 +211,23 @@ function getPoolStatus() {
   };
 }
 
+/**
+ * Acquire a connection from the pool for transactions
+ */
+async function getConnection() {
+  if (initPromise) await initPromise;
+  if (!pool) {
+    await initPool();
+  }
+  if (!pool) {
+    throw new Error('Database pool not initialized or unavailable');
+  }
+  return await pool.getConnection();
+}
+
 module.exports = {
   pool: () => pool,
+  getConnection,
   query,
   initPool,
   isConnected: () => isConnected,

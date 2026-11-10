@@ -2874,10 +2874,50 @@ textarea.form-control {
 }
 
 .checkout-feature-pills {
-  margin-top: 2rem;
-  background: #F6F1EA;
-  border-radius: 16px;
-  padding: 1.2rem 1.5rem;
+  margin-top: 28px !important;
+  background: #F6F1EA !important;
+  border-radius: 16px !important;
+  padding: 1.25rem 1.5rem !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px !important;
+  align-items: stretch !important;
+  box-sizing: border-box !important;
+}
+
+.checkout-feature-pills .hero-pill-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: #FFFFFF !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  border: 1px solid rgba(45, 35, 30, 0.06) !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.checkout-feature-pills .pill-icon {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 50% !important;
+  background: #F6F1EA !important;
+  color: var(--primary, #900C3F) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.95rem !important;
+  flex-shrink: 0 !important;
+}
+
+.checkout-feature-pills strong {
+  color: var(--text-dark, #2D231E) !important;
+  line-height: 1.3 !important;
+}
+
+.checkout-feature-pills span {
+  line-height: 1.3 !important;
 }
 
 .checkout-page-title {
@@ -2908,71 +2948,121 @@ textarea.form-control {
 
 /* Steps Bar */
 .checkout-steps-bar {
-  background: #FFFFFF;
-  border-radius: 16px;
-  border: 1px solid var(--border-light);
-  padding: 1.2rem 1.8rem;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  padding: 0;
+  margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  box-shadow: var(--shadow-sm);
+  gap: 10px;
+  width: 100%;
+  box-shadow: none;
 }
 
 .step-item {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  opacity: 0.5;
+  justify-content: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
 }
 
 .step-item.active {
+  background: var(--primary, #900C3F);
+  color: #FFFFFF;
   opacity: 1;
+  box-shadow: 0 3px 10px rgba(144, 12, 63, 0.18);
+  border: 1px solid var(--primary, #900C3F);
 }
 
-.step-num {
-  width: 34px;
-  height: 34px;
+.step-item.active .step-num {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
   border-radius: 50%;
-  background-color: var(--bg-soft);
-  color: var(--text-dark);
+  background: #FFFFFF;
+  color: var(--primary, #900C3F);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
-.step-item.active .step-num {
-  background-color: var(--primary);
-  color: #FFFFFF;
-}
-
-.step-info strong {
+.step-item.active .step-info strong {
   display: block;
   font-size: 0.88rem;
-  color: var(--text-dark);
-  margin-bottom: 1px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.step-info span {
-  font-size: 0.76rem;
-  color: var(--text-muted);
+.step-item.active .step-info span {
+  display: none;
+}
+
+.step-item:not(.active) {
+  background: #FFFFFF;
+  color: var(--text-muted, #7E726B);
+  opacity: 1;
+  border: 1px solid var(--border-light, #E8E0D5);
+}
+
+.step-item:not(.active) .step-num {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  background: #F4EFEA;
+  color: var(--text-muted, #7E726B);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.step-item:not(.active) .step-info strong {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted, #7E726B);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-item:not(.active) .step-info span {
+  display: none;
 }
 
 .step-chevron {
+  color: #C0B5AD;
   font-size: 0.8rem;
-  color: var(--text-muted);
-  opacity: 0.4;
+  flex-shrink: 0;
 }
 
 /* Section Box */
 .checkout-section-box {
   background: #FFFFFF;
-  border-radius: 16px;
-  border: 1px solid var(--border-light);
-  padding: 1.8rem;
+  border-radius: 14px;
+  border: 1px solid var(--border-light, #E8E0D5);
+  padding: 1.5rem;
   box-shadow: var(--shadow-sm);
-  margin-bottom: 1.8rem;
+  margin-bottom: 20px;
 }
 
 .section-box-header {
@@ -5048,11 +5138,11 @@ body:has(.mobile-nav-drawer.open) .header-badge {
   .site-header .navbar {
     display: flex !important;
     align-items: center !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    gap: 8px !important;
+    gap: 10px !important;
     flex-wrap: nowrap !important;
     box-sizing: border-box !important;
     padding: 0 !important;
@@ -6609,10 +6699,6 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     gap: 1rem !important;
   }
 
-  .checkout-steps-bar {
-    padding: 8px 10px !important;
-    margin-bottom: 1rem !important;
-  }
 
   /* 4. Category Pills: Horizontally Scrollable, 44px Height, Scroll-Snap, Real Counts */
   .category-pills-scroll-row {
@@ -7449,30 +7535,45 @@ body:has(.mobile-nav-drawer.open) .header-badge {
 
   /* Compact Checkout Steps Bar */
   .checkout-steps-bar {
-    padding: 0.55rem 0.65rem !important;
-    border-radius: 12px !important;
-    gap: 4px !important;
-    justify-content: space-between !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin-bottom: 1.1rem !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
   }
 
   .step-item {
-    gap: 5px !important;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    padding: 0 8px !important;
+    gap: 6px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
   }
 
   .step-num {
-    width: 24px !important;
-    height: 24px !important;
-    font-size: 0.72rem !important;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    font-size: 0.74rem !important;
     flex-shrink: 0 !important;
   }
 
   .step-info strong {
-    font-size: 0.72rem !important;
+    font-size: 0.76rem !important;
     white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .step-info span {
@@ -7480,7 +7581,9 @@ body:has(.mobile-nav-drawer.open) .header-badge {
   }
 
   .step-chevron {
-    font-size: 0.62rem !important;
+    font-size: 0.65rem !important;
+    color: #C0B5AD !important;
+    flex-shrink: 0 !important;
   }
 
   /* Compact Checkout Section Boxes & Card Formatting */
@@ -7621,9 +7724,26 @@ body:has(.mobile-nav-drawer.open) .header-badge {
   }
 
   .checkout-feature-pills {
-    margin-top: 1.2rem !important;
-    padding: 0.9rem 0.8rem !important;
-    border-radius: 12px !important;
+    margin-top: 28px !important;
+    padding: 1rem !important;
+    border-radius: 14px !important;
+    gap: 8px !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    box-sizing: border-box !important;
+  }
+
+  .checkout-feature-pills .hero-pill-item {
+    padding: 10px 12px !important;
+    gap: 10px !important;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
+  }
+
+  .checkout-feature-pills .pill-icon {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    font-size: 0.82rem !important;
   }
 
   /* 9. Product Detail Mobile Layout (Below 768px, Single Column) */
@@ -10289,8 +10409,8 @@ a.site-feature-card:focus-visible,
     scroll-snap-type: x proximity !important;
     scroll-padding-inline: 16px !important;
     padding-inline: 16px !important;
-    padding-block: 8px !important;
-    gap: 12px !important;
+    padding-block: 6px 10px !important;
+    gap: 10px !important;
     margin-left: -16px !important;
     margin-right: -16px !important;
     width: calc(100% + 32px) !important;
@@ -10306,19 +10426,58 @@ a.site-feature-card:focus-visible,
 
   .categories-wave-grid.swipe-row-mobile::after {
     content: '' !important;
-    flex: 0 0 4px !important;
-    min-width: 4px !important;
+    flex: 0 0 6px !important;
+    min-width: 6px !important;
     height: 1px !important;
   }
 
   .categories-wave-grid.swipe-row-mobile .category-wave-card {
-    flex: 0 0 clamp(150px, 42vw, 180px) !important;
-    width: clamp(150px, 42vw, 180px) !important;
-    max-width: clamp(150px, 42vw, 180px) !important;
-    min-width: clamp(150px, 42vw, 180px) !important;
+    flex: 0 0 clamp(130px, 36vw, 155px) !important;
+    width: clamp(130px, 36vw, 155px) !important;
+    max-width: clamp(130px, 36vw, 155px) !important;
+    min-width: clamp(130px, 36vw, 155px) !important;
     scroll-snap-align: start !important;
     box-sizing: border-box !important;
-    border-radius: 18px !important;
+    border-radius: 14px !important;
+  }
+
+  .categories-wave-grid.swipe-row-mobile .cat-wave-body {
+    height: 80px !important;
+    min-height: 80px !important;
+    max-height: 82px !important;
+    flex: 0 0 80px !important;
+    padding: 0 6px 6px 6px !important;
+  }
+
+  .categories-wave-grid.swipe-row-mobile .cat-wave-icon-wrap {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 0.82rem !important;
+    margin: -16px auto 3px auto !important;
+    border-width: 2px !important;
+  }
+
+  .categories-wave-grid.swipe-row-mobile .cat-wave-text-block {
+    padding: 0 22px 0 6px !important;
+  }
+
+  .categories-wave-grid.swipe-row-mobile .cat-wave-title {
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+    -webkit-line-clamp: 2 !important;
+  }
+
+  .categories-wave-grid.swipe-row-mobile .cat-wave-count {
+    font-size: 11px !important;
+    margin-top: 2px !important;
+  }
+
+  .categories-wave-grid.swipe-row-mobile .cat-wave-arrow-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.65rem !important;
+    bottom: 8px !important;
+    right: 8px !important;
   }
 
   .categories-page-grid {

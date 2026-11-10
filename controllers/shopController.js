@@ -78,6 +78,7 @@ exports.getShopPage = async (req, res, next) => {
         total,
         totalPages,
         currentPage,
+        limit,
         hasMore: currentPage < totalPages,
         userPurchasedDesignIds,
         userWishlistDesignIds
@@ -224,6 +225,7 @@ exports.getCategoryDetailPage = async (req, res, next) => {
         total,
         totalPages,
         currentPage,
+        limit,
         hasMore: currentPage < totalPages,
         userPurchasedDesignIds,
         userWishlistDesignIds
@@ -242,6 +244,7 @@ exports.getCategoryDetailPage = async (req, res, next) => {
       total,
       currentPage,
       totalPages,
+      limit,
       currentSort: sort || 'latest',
       currentSub: sub || '',
       search: search || ''

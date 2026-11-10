@@ -293,7 +293,8 @@ const MIGRATION_REQUIRED_TABLES = {
   '025': 'upload_sessions',
   '028': 'custom_requests',
   '031': 'bulk_replace_jobs',
-  '032': 'bulk_replace_jobs'
+  '032': 'bulk_replace_jobs',
+  '038': 'custom_requests'
 };
 
 const MIGRATION_REQUIRED_COLUMNS = {
@@ -301,7 +302,8 @@ const MIGRATION_REQUIRED_COLUMNS = {
   '029': { table: 'design_files', column: 'retired_at' },
   '030': { table: 'settings', column: 'setting_key' },
   '031': { table: 'design_files', column: 'retired_at' },
-  '032': { table: 'image_replace_log_items', column: 'old_files_json' }
+  '032': { table: 'image_replace_log_items', column: 'old_files_json' },
+  '038': { table: 'custom_requests', column: 'request_number' }
 };
 
 const CANONICAL_REQUIRED_TABLES = [
