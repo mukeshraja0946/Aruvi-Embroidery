@@ -46,9 +46,11 @@
     const fileLabel = document.getElementById('stitchSpreadsheetFileName');
     if (fileLabel) fileLabel.textContent = 'No file chosen';
 
-    // Handle selected rows count
-    const checkedBoxes = document.querySelectorAll('.design-checkbox:checked');
-    const selectedCount = checkedBoxes.length;
+    // Handle selected rows count (survives multi-page session storage)
+    const storedIds = (window.getSelectedAdminDesignIds && typeof window.getSelectedAdminDesignIds === 'function')
+      ? window.getSelectedAdminDesignIds()
+      : Array.from(document.querySelectorAll('.design-checkbox:checked')).map(cb => cb.value);
+    const selectedCount = storedIds.length;
     const selectedBadge = document.getElementById('stitchModalSelectedCount');
     if (selectedBadge) selectedBadge.textContent = selectedCount;
 
@@ -173,8 +175,9 @@
     const treatEmptyAsClear = document.getElementById('treatEmptyAsClearCheckbox')?.checked || false;
     const includeManualTotals = document.getElementById('includeManualTotalsCheckbox')?.checked || false;
 
-    const checkedBoxes = Array.from(document.querySelectorAll('.design-checkbox:checked'));
-    const selectedIds = checkedBoxes.map(cb => cb.value);
+    const selectedIds = (window.getSelectedAdminDesignIds && typeof window.getSelectedAdminDesignIds === 'function')
+      ? window.getSelectedAdminDesignIds()
+      : Array.from(document.querySelectorAll('.design-checkbox:checked')).map(cb => cb.value);
 
     const formData = new FormData();
     formData.append('_csrf', getCsrfToken());
@@ -538,6 +541,7 @@
       if (progressText) progressText.textContent = 'Completed successfully!';
 
       if (successBox) {
+        if (typeof window.clearSelectedDesigns === 'function') window.clearSelectedDesigns();
         successBox.style.display = 'block';
         const msg = document.getElementById('stitchApplySuccessMessage');
         if (msg) {

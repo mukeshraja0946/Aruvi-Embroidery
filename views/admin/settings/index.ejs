@@ -1313,6 +1313,12 @@
 Need help? Contact us anytime from the Contact page."><%= (typeof settings !== 'undefined' && settings.how_to_download_tutorial) ? settings.how_to_download_tutorial : '' %></textarea>
             <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Default text is used automatically if left empty.</small>
           </div>
+
+          <div style="margin-top: 1.2rem; margin-bottom: 0.5rem;">
+            <label class="form-label-custom" style="display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px;">File Usage Guide (Site-wide Default)</label>
+            <textarea name="file_usage_guide_default" class="form-control" rows="3" style="height: auto; padding: 0.8rem; font-family: inherit; line-height: 1.5;" placeholder="BIG DST - RRR, HSW, UME, Ricoma, Fortever, WOW, SGK, Vidya, Single Head Machines | JEF - USHA 450E, 550E | SMALL DST - Brother V3SE, BP3600, Bernina B700, Pfaff"><%= (typeof settings !== 'undefined' && settings.file_usage_guide_default) ? settings.file_usage_guide_default : '' %></textarea>
+            <small style="display: block; font-size: 0.74rem; color: var(--admin-text-muted); margin-top: 4px;">Site-wide default machine compatibility notes shown under file-type options on design detail pages. Can be overridden per design in Edit Design.</small>
+          </div>
         </div>
         <!-- Card 6: About Page Content & Statistics Management -->
         <div id="about-settings" class="admin-card-box" style="margin-bottom: 1.8rem; padding: 1.8rem;">

@@ -307,7 +307,7 @@ const MIGRATION_REQUIRED_COLUMNS = {
 };
 
 const CANONICAL_REQUIRED_TABLES = [
-  'users', 'categories', 'designs', 'design_images', 'design_files',
+  'users', 'categories', 'designs', 'design_images', 'design_files', 'design_file_variants',
   'orders', 'order_items', 'custom_requests', 'settings', 'banners',
   'coupons', 'reviews', 'wishlist', 'contact_messages', 'activity_logs',
   'download_logs', 'file_scan_results', 'import_jobs', 'email_campaigns',

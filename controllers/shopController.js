@@ -7,6 +7,7 @@ const Review = require('../models/Review');
 const Wishlist = require('../models/Wishlist');
 const Order = require('../models/Order');
 const Setting = require('../models/Setting');
+const DesignVariant = require('../models/DesignVariant');
 const db = require('../config/db');
 const watermarkService = require('../services/watermarkService');
 
@@ -312,6 +313,16 @@ exports.getDesignDetail = async (req, res, next) => {
     const userWishlist = req.user ? await Wishlist.getByUser(req.user.id) : [];
     const userWishlistDesignIds = (userWishlist || []).map(w => w.id || w.design_id || w.wishlist_id);
 
+    // Variants and machine usage guide
+    const variants = await DesignVariant.getByDesignId(design.id);
+    const siteUsageGuideDefault = await Setting.get('file_usage_guide_default', 'BIG DST - RRR, HSW, UME, Ricoma, Fortever, WOW, SGK, Vidya, Single Head Machines | JEF - USHA 450E, 550E | SMALL DST - Brother V3SE, BP3600, Bernina B700, Pfaff');
+    const fileUsageGuide = (design.file_usage_guide && design.file_usage_guide.trim()) ? design.file_usage_guide.trim() : siteUsageGuideDefault;
+
+    let purchasedVariantIds = [];
+    if (req.user) {
+      purchasedVariantIds = await Order.getPurchasedVariantIdsByUser(req.user.id, design.id);
+    }
+
     // Verify whether an authentic original file exists on disk
     try {
       const { findCleanOriginalForDesign } = require('./admin/adminToolsController');
@@ -329,7 +340,10 @@ exports.getDesignDetail = async (req, res, next) => {
       inWishlist,
       hasPurchased,
       userPurchasedDesignIds,
-      userWishlistDesignIds
+      userWishlistDesignIds,
+      variants: variants || [],
+      fileUsageGuide,
+      purchasedVariantIds: purchasedVariantIds || []
     });
   } catch (err) {
     next(err);

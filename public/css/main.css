@@ -2011,10 +2011,127 @@ textarea.form-control {
   border-radius: 9999px;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  pointer-events: none;
+  pointer-events: auto !important;
+  cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.15);
   user-select: none;
+  transition: all 0.2s ease;
+}
+
+.tap-zoom-badge:hover {
+  background: rgba(45, 35, 30, 0.9);
+  transform: scale(1.04);
+}
+
+/* Global Fullscreen Pinch / Tap-to-Zoom Lightbox Modal (Desktop & Mobile) */
+.image-lightbox-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 10, 8, 0.94);
+  z-index: 9999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.lightbox-viewport {
+  width: 100%;
+  height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+
+.lightbox-viewport:active {
+  cursor: grabbing;
+}
+
+.lightbox-viewport img {
+  max-width: 95vw;
+  max-height: 82vh;
+  object-fit: contain;
+  transition: transform 0.15s ease-out;
+  transform-origin: center center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.lightbox-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  border: none;
+  color: #FFFFFF;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.lightbox-close-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.lightbox-download-btn {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #A32A38;
+  color: #FFFFFF;
+  font-family: var(--font-body, inherit);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0 16px;
+  height: 38px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.lightbox-download-btn:hover {
+  background: #881D2A;
+  transform: translateY(-1px);
+  color: #FFFFFF;
+}
+
+.lightbox-download-btn:active {
+  transform: scale(0.96);
+}
+
+.lightbox-download-btn i {
+  font-size: 0.85rem;
+  color: #FFFFFF;
+}
+
+.lightbox-footer-hint {
+  position: absolute;
+  bottom: 20px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.78rem;
+  text-align: center;
+  pointer-events: none;
 }
 
 /* Summary Box */
@@ -2177,6 +2294,8 @@ textarea.form-control {
     height: 26px !important;
     padding: 0 8px !important;
     font-size: 0.68rem !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
   }
 }
 
@@ -7842,8 +7961,9 @@ body:has(.mobile-nav-drawer.open) .header-badge {
     gap: 5px !important;
     backdrop-filter: blur(4px) !important;
     -webkit-backdrop-filter: blur(4px) !important;
-    pointer-events: none !important;
-    z-index: 2 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    z-index: 4 !important;
   }
 
   .download-preview-btn {
@@ -10734,5 +10854,155 @@ a.site-feature-card:focus-visible,
   }
   .dash-tutorial-step {
     padding: 10px 12px;
+  }
+}
+
+/* ==========================================================================
+   TASK D: FILE TYPE / MACHINE VARIANTS SELECTION & FILE USAGE GUIDE
+   ========================================================================== */
+.variant-selection-section {
+  margin: 1.1rem 0;
+  padding: 1.1rem;
+  background: #FFFDF9;
+  border: 1px solid var(--border-light, #E8DCCF);
+  border-radius: 14px;
+}
+
+.variant-selection-header {
+  margin-bottom: 0.8rem;
+}
+
+.variant-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-dark, #2C2523);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.variant-label .req {
+  color: var(--primary, #A93226);
+}
+
+.variant-selection-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted, #7A6F68);
+  display: block;
+}
+
+.variant-pills-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.8rem;
+}
+
+.variant-pill-btn {
+  appearance: none;
+  border: 1.5px solid var(--border-light, #D5C7B8);
+  background: #FFFFFF;
+  color: var(--text-dark, #2C2523);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.variant-pill-btn:hover {
+  border-color: var(--primary, #A93226);
+  background: #FAF6F0;
+}
+
+.variant-pill-btn.is-selected {
+  border-color: var(--primary, #A93226) !important;
+  background: #FAF0E8 !important;
+  color: var(--primary, #A93226) !important;
+  box-shadow: 0 0 0 2px rgba(169, 50, 38, 0.2);
+}
+
+.variant-pill-btn.is-purchased {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #475569;
+}
+
+.variant-pill-btn.is-purchased.is-selected {
+  border-color: #DC2626 !important;
+  background: #FEF2F2 !important;
+  color: #991B1B !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+}
+
+.variant-pill-tag {
+  background: #E8F5E9;
+  color: #2E7D32;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.variant-alert-box {
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.file-usage-guide-box {
+  background: #FAF6F0;
+  border: 1px dashed #D5C7B8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 0.8rem;
+}
+
+.file-usage-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dark, #2C2523);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.file-usage-title i {
+  color: var(--primary, #A93226);
+}
+
+.file-usage-body {
+  font-size: 0.78rem;
+  color: #5C504A;
+  line-height: 1.45;
+}
+
+@media (max-width: 480px) {
+  .variant-pills-grid {
+    gap: 6px;
+  }
+  .variant-pill-btn {
+    padding: 7px 11px;
+    font-size: 0.82rem;
   }
 }

@@ -7,6 +7,7 @@ const Coupon = require('../models/Coupon');
 const Design = require('../models/Design');
 const Setting = require('../models/Setting');
 const User = require('../models/User');
+const DesignVariant = require('../models/DesignVariant');
 const Razorpay = require('razorpay');
 const emailService = require('../services/emailService');
 const errorLogger = require('../services/errorLogger');
@@ -195,8 +196,15 @@ exports.createRazorpayOrder = async (req, res, next) => {
     if (design_id) {
       const singleDesign = await Design.getById(design_id);
       if (singleDesign) {
+        const singleVariantId = req.body.variant_id ? parseInt(req.body.variant_id, 10) : null;
+        let singleVariant = null;
+        if (singleVariantId) {
+          singleVariant = await DesignVariant.getById(singleVariantId);
+        }
         cartItems = [{
           design_id: singleDesign.id,
+          variant_id: singleVariantId,
+          variant_name: singleVariant ? singleVariant.variant_name : null,
           title: singleDesign.title,
           slug: singleDesign.slug,
           price: parseFloat(singleDesign.price),
@@ -238,6 +246,35 @@ exports.createRazorpayOrder = async (req, res, next) => {
         });
       }
 
+      // Check variants and purchases before Razorpay payment order is created
+      if (item.variant_id) {
+        const alreadyPurchased = await Order.hasUserPurchasedVariant(userId, item.design_id, item.variant_id);
+        if (alreadyPurchased) {
+          return res.status(400).json({
+            success: false,
+            message: 'You Have Already Purchased This Design. Please Select Some Other File.',
+            referenceId: refId
+          });
+        }
+      } else {
+        const designVariants = await DesignVariant.getByDesignId(item.design_id);
+        if (designVariants && designVariants.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: `Please select a machine / file type for "${dbDesign.title}" before proceeding to checkout.`,
+            referenceId: refId
+          });
+        }
+        const alreadyPurchased = await Order.hasUserPurchasedDesign(userId, item.design_id);
+        if (alreadyPurchased) {
+          return res.status(400).json({
+            success: false,
+            message: `You have already purchased "${dbDesign.title}".`,
+            referenceId: refId
+          });
+        }
+      }
+
       const origP = parseFloat(dbDesign.price || 0);
       const saleP = (dbDesign.sale_price !== null && dbDesign.sale_price !== undefined && dbDesign.sale_price !== '') 
         ? parseFloat(dbDesign.sale_price) 
@@ -249,6 +286,8 @@ exports.createRazorpayOrder = async (req, res, next) => {
       verifiedItems.push({
         ...item,
         design_id: dbDesign.id,
+        variant_id: item.variant_id ? parseInt(item.variant_id, 10) : null,
+        variant_name: item.variant_name || null,
         title: dbDesign.title,
         price: origP,
         sale_price: saleP < origP ? saleP : null,

@@ -10,21 +10,25 @@ class Cart {
         let sql, params;
         if (userId) {
           sql = `
-            SELECT ci.id as cart_item_id, ci.design_id, ci.created_at,
+            SELECT ci.id as cart_item_id, ci.design_id, ci.variant_id, ci.created_at,
+                   dfv.variant_name, dfv.variant_group,
                    d.title, d.slug, d.price, d.sale_price, d.hoop_size, d.formats,
                    (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
             FROM cart_items ci
             JOIN designs d ON ci.design_id = d.id
+            LEFT JOIN design_file_variants dfv ON ci.variant_id = dfv.id
             WHERE ci.user_id = ?
           `;
           params = [userId];
         } else {
           sql = `
-            SELECT ci.id as cart_item_id, ci.design_id, ci.created_at,
+            SELECT ci.id as cart_item_id, ci.design_id, ci.variant_id, ci.created_at,
+                   dfv.variant_name, dfv.variant_group,
                    d.title, d.slug, d.price, d.sale_price, d.hoop_size, d.formats,
                    (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
             FROM cart_items ci
             JOIN designs d ON ci.design_id = d.id
+            LEFT JOIN design_file_variants dfv ON ci.variant_id = dfv.id
             WHERE ci.session_id = ?
           `;
           params = [sessionId];
@@ -75,8 +79,12 @@ class Cart {
         : origPrice;
       originalTotal += origPrice;
       subtotal += currentPrice;
+      const displayTitle = item.variant_name
+        ? `${item.title} - ${item.variant_name}`
+        : item.title;
       return {
         ...item,
+        display_title: displayTitle,
         price: origPrice,
         sale_price: currentPrice < origPrice ? currentPrice : null,
         effective_price: currentPrice,
@@ -95,17 +103,28 @@ class Cart {
     };
   }
 
-  static async addItem(userId, sessionId, designId) {
+  static async addItem(userId, sessionId, designId, variantId = null) {
     if (!designId) return false;
+    const vId = variantId ? parseInt(variantId, 10) : null;
     if (db.isConnected()) {
       try {
-        let checkSql = userId ? 'SELECT id FROM cart_items WHERE user_id = ? AND design_id = ?' : 'SELECT id FROM cart_items WHERE session_id = ? AND design_id = ?';
-        let checkParams = userId ? [userId, designId] : [sessionId, designId];
+        let checkSql, checkParams;
+        if (userId) {
+          checkSql = vId
+            ? 'SELECT id FROM cart_items WHERE user_id = ? AND design_id = ? AND variant_id = ?'
+            : 'SELECT id FROM cart_items WHERE user_id = ? AND design_id = ? AND variant_id IS NULL';
+          checkParams = vId ? [userId, designId, vId] : [userId, designId];
+        } else {
+          checkSql = vId
+            ? 'SELECT id FROM cart_items WHERE session_id = ? AND design_id = ? AND variant_id = ?'
+            : 'SELECT id FROM cart_items WHERE session_id = ? AND design_id = ? AND variant_id IS NULL';
+          checkParams = vId ? [sessionId, designId, vId] : [sessionId, designId];
+        }
         const existing = await db.query(checkSql, checkParams);
 
         if (Array.isArray(existing) && existing.length === 0) {
-          const insertSql = 'INSERT INTO cart_items (user_id, session_id, design_id) VALUES (?, ?, ?)';
-          await db.query(insertSql, [userId || null, userId ? null : sessionId, designId]);
+          const insertSql = 'INSERT INTO cart_items (user_id, session_id, design_id, variant_id) VALUES (?, ?, ?, ?)';
+          await db.query(insertSql, [userId || null, userId ? null : sessionId, designId, vId]);
         }
         return true;
       } catch (err) {
@@ -122,11 +141,22 @@ class Cart {
     return true;
   }
 
-  static async removeItem(userId, sessionId, designId) {
+  static async removeItem(userId, sessionId, designId, variantId = null) {
     if (db.isConnected()) {
       try {
-        let deleteSql = userId ? 'DELETE FROM cart_items WHERE user_id = ? AND design_id = ?' : 'DELETE FROM cart_items WHERE session_id = ? AND design_id = ?';
-        let deleteParams = userId ? [userId, designId] : [sessionId, designId];
+        const vId = variantId ? parseInt(variantId, 10) : null;
+        let deleteSql, deleteParams;
+        if (vId) {
+          deleteSql = userId
+            ? 'DELETE FROM cart_items WHERE user_id = ? AND design_id = ? AND variant_id = ?'
+            : 'DELETE FROM cart_items WHERE session_id = ? AND design_id = ? AND variant_id = ?';
+          deleteParams = userId ? [userId, designId, vId] : [sessionId, designId, vId];
+        } else {
+          deleteSql = userId
+            ? 'DELETE FROM cart_items WHERE user_id = ? AND design_id = ?'
+            : 'DELETE FROM cart_items WHERE session_id = ? AND design_id = ?';
+          deleteParams = userId ? [userId, designId] : [sessionId, designId];
+        }
         await db.query(deleteSql, deleteParams);
         return true;
       } catch (err) {
@@ -162,12 +192,14 @@ class Cart {
     if (!userId || !sessionId) return;
     if (db.isConnected()) {
       try {
-        const guestItems = await db.query('SELECT design_id FROM cart_items WHERE session_id = ?', [sessionId]);
+        const guestItems = await db.query('SELECT design_id, variant_id FROM cart_items WHERE session_id = ?', [sessionId]);
         if (Array.isArray(guestItems)) {
           for (const item of guestItems) {
-            const userItems = await db.query('SELECT id FROM cart_items WHERE user_id = ? AND design_id = ?', [userId, item.design_id]);
+            const userItems = item.variant_id
+              ? await db.query('SELECT id FROM cart_items WHERE user_id = ? AND design_id = ? AND variant_id = ?', [userId, item.design_id, item.variant_id])
+              : await db.query('SELECT id FROM cart_items WHERE user_id = ? AND design_id = ? AND variant_id IS NULL', [userId, item.design_id]);
             if (!userItems || userItems.length === 0) {
-              await db.query('INSERT INTO cart_items (user_id, session_id, design_id) VALUES (?, NULL, ?)', [userId, item.design_id]);
+              await db.query('INSERT INTO cart_items (user_id, session_id, design_id, variant_id) VALUES (?, NULL, ?, ?)', [userId, item.design_id, item.variant_id || null]);
             }
           }
           await db.query('DELETE FROM cart_items WHERE session_id = ?', [sessionId]);

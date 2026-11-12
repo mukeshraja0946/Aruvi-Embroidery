@@ -1144,7 +1144,7 @@
             <div class="dash-purchased-grid">
               <% purchasedDesigns.forEach(item => { %>
                 <% 
-                  const cleanTitle = item.title || item.slug || ('AED ' + (item.design_id || item.id));
+                  const cleanTitle = item.display_title || item.title || ('AED ' + (item.design_id || item.id));
                   const rawFmts = item.formats ? item.formats.split(',').map(f => f.trim().toUpperCase()).filter(Boolean) : ['DST'];
                   const formatsList = [...new Set(rawFmts)];
                   const pDate = item.purchase_date ? new Date(item.purchase_date).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US');
@@ -1219,14 +1219,23 @@
                       </div>
                     <% } %>
 
-                    <!-- Combined Download All (ZIP) Button -->
+                    <!-- Download Button -->
                     <div>
-                      <a href="/user/download/<%= item.design_id || item.id %>/all" download class="dash-download-btn">
-                        <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
-                      </a>
-                      <div class="dash-file-count-subtitle">
-                        Streams single ZIP containing all <%= (item.download_files && item.download_files.length) ? item.download_files.length : (item.file_count || 1) %> files
-                      </div>
+                      <% if (item.variant_id) { %>
+                        <a href="/user/download/<%= item.design_id || item.id %>/all?variant_id=<%= item.variant_id %>" download class="dash-download-btn">
+                          <i class="fa-solid fa-download"></i> Download <%= item.variant_name || 'Machine File' %>
+                        </a>
+                        <div class="dash-file-count-subtitle">
+                          Single file download for <%= item.variant_name %>
+                        </div>
+                      <% } else { %>
+                        <a href="/user/download/<%= item.design_id || item.id %>/all" download class="dash-download-btn">
+                          <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
+                        </a>
+                        <div class="dash-file-count-subtitle">
+                          Streams single ZIP containing all <%= (item.download_files && item.download_files.length) ? item.download_files.length : (item.file_count || 1) %> files
+                        </div>
+                      <% } %>
                     </div>
                   </div>
                 </div>

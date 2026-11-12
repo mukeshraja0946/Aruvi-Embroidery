@@ -75,6 +75,7 @@ router.post('/api/admin/reset/restore', resetLimiter, adminDashboardController.p
 // Products / Designs Management (supports both /admin/products and /admin/designs)
 router.get('/admin/products', adminDesignController.getDesigns);
 router.get('/admin/designs', adminDesignController.getDesigns);
+router.get('/admin/api/designs/all-ids', adminDesignController.getAllDesignIds);
 router.get('/admin/designs/next-sku', adminDesignController.getNextSku);
 
 router.get('/admin/products/create', adminDesignController.getCreateForm);

@@ -48,19 +48,123 @@ function showAdminToast(msg) {
 }
 
 // -----------------------------------------------------------------------------
-// Selection & Bulk Actions
+// Selection & Bulk Actions (Persistent Multi-Page Session Storage)
 // -----------------------------------------------------------------------------
 let pendingDeleteId = null;
+const ADMIN_SELECTED_DESIGNS_KEY = 'aruvi_admin_selected_designs';
+
+function getStoredSelectedDesignIds() {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_SELECTED_DESIGNS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.map(id => parseInt(id, 10)).filter(id => !isNaN(id)));
+    }
+  } catch (e) {
+    console.warn('Error reading stored design selections:', e);
+  }
+  return new Set();
+}
+
+function saveStoredSelectedDesignIds(idSet) {
+  try {
+    const arr = Array.from(idSet);
+    sessionStorage.setItem(ADMIN_SELECTED_DESIGNS_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.warn('Error saving design selections:', e);
+  }
+}
+
+function clearSelectedDesigns() {
+  try {
+    sessionStorage.removeItem(ADMIN_SELECTED_DESIGNS_KEY);
+  } catch (e) {}
+  document.querySelectorAll('.design-checkbox').forEach(cb => { cb.checked = false; });
+  const master = document.getElementById('selectAllCheckbox');
+  if (master) master.checked = false;
+  updateSelectedCount();
+}
+window.clearSelectedDesigns = clearSelectedDesigns;
+
+window.getSelectedAdminDesignIds = function() {
+  const stored = Array.from(getStoredSelectedDesignIds());
+  if (stored.length > 0) return stored;
+  const checked = document.querySelectorAll('.design-checkbox:checked');
+  return Array.from(checked).map(cb => parseInt(cb.value, 10)).filter(id => !isNaN(id));
+};
+
+function handleDesignCheckboxChange(cb) {
+  const set = getStoredSelectedDesignIds();
+  const id = parseInt(cb.value, 10);
+  if (!isNaN(id)) {
+    if (cb.checked) {
+      set.add(id);
+    } else {
+      set.delete(id);
+    }
+    saveStoredSelectedDesignIds(set);
+  }
+  updateSelectedCount();
+}
+window.handleDesignCheckboxChange = handleDesignCheckboxChange;
 
 function toggleSelectAllDesigns(master) {
+  const set = getStoredSelectedDesignIds();
   const checkboxes = document.querySelectorAll('.design-checkbox');
-  checkboxes.forEach(cb => cb.checked = master.checked);
+  checkboxes.forEach(cb => {
+    cb.checked = master.checked;
+    const id = parseInt(cb.value, 10);
+    if (!isNaN(id)) {
+      if (master.checked) set.add(id);
+      else set.delete(id);
+    }
+  });
+  saveStoredSelectedDesignIds(set);
   updateSelectedCount();
 }
 
+async function selectAllDesignsAcrossAllPages() {
+  const btn = document.getElementById('adminSelectAllMatchingBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Selecting all...';
+  }
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const res = await fetch('/admin/api/designs/all-ids?' + searchParams.toString(), {
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success && Array.isArray(data.ids)) {
+      const set = getStoredSelectedDesignIds();
+      data.ids.forEach(id => set.add(parseInt(id, 10)));
+      saveStoredSelectedDesignIds(set);
+      document.querySelectorAll('.design-checkbox').forEach(cb => { cb.checked = true; });
+      const master = document.getElementById('selectAllCheckbox');
+      if (master) master.checked = true;
+      updateSelectedCount();
+      showAdminToast(`All ${data.ids.length} designs selected across all pages.`);
+    } else {
+      alert(data.message || 'Unable to retrieve design IDs.');
+    }
+  } catch (err) {
+    console.error('Failed to select all matching designs:', err);
+    alert('Failed to select all designs. Please try again.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      const totalNum = window.TOTAL_FILTERED_DESIGNS || 0;
+      btn.innerHTML = `Select all <span id="adminTotalMatchingNum">${totalNum}</span> results across all pages`;
+    }
+  }
+}
+window.selectAllDesignsAcrossAllPages = selectAllDesignsAcrossAllPages;
+
 function updateSelectedCount() {
-  const checked = document.querySelectorAll('.design-checkbox:checked');
-  const count = checked.length;
+  const selectedSet = getStoredSelectedDesignIds();
+  const count = selectedSet.size;
+
   const btn = document.getElementById('deleteSelectedBtn');
   const numEl = document.getElementById('selectedCountNum');
   if (numEl) numEl.textContent = count;
@@ -87,12 +191,54 @@ function updateSelectedCount() {
   const stitchModalSelectedCountEl = document.getElementById('stitchModalSelectedCount');
   if (stitchModalSelectedCountEl) stitchModalSelectedCountEl.textContent = count;
 
+  // Sync checkboxes on current page
+  const pageCheckboxes = document.querySelectorAll('.design-checkbox');
+  let checkedOnCurrentPage = 0;
+  pageCheckboxes.forEach(cb => {
+    const id = parseInt(cb.value, 10);
+    const shouldBeChecked = selectedSet.has(id);
+    if (cb.checked !== shouldBeChecked) {
+      cb.checked = shouldBeChecked;
+    }
+    if (shouldBeChecked) checkedOnCurrentPage++;
+  });
+
   const master = document.getElementById('selectAllCheckbox');
-  const all = document.querySelectorAll('.design-checkbox');
-  if (master && all.length > 0) {
-    master.checked = checked.length === all.length;
+  if (master && pageCheckboxes.length > 0) {
+    master.checked = checkedOnCurrentPage === pageCheckboxes.length;
+  }
+
+  // Persistent Selection Bar
+  const bar = document.getElementById('adminBulkSelectionBar');
+  const textEl = document.getElementById('adminBulkSelectionText');
+  const selectAllBtn = document.getElementById('adminSelectAllMatchingBtn');
+  const totalNum = (typeof window.TOTAL_FILTERED_DESIGNS !== 'undefined') ? window.TOTAL_FILTERED_DESIGNS : count;
+
+  if (bar) {
+    if (count > 0) {
+      bar.style.display = 'flex';
+      if (textEl) {
+        textEl.innerHTML = `<strong>${count}</strong> design${count === 1 ? '' : 's'} selected across pages.`;
+      }
+      if (selectAllBtn) {
+        if (totalNum > count) {
+          selectAllBtn.style.display = 'inline-flex';
+          const span = document.getElementById('adminTotalMatchingNum');
+          if (span) span.textContent = totalNum;
+        } else {
+          selectAllBtn.style.display = 'none';
+        }
+      }
+    } else {
+      bar.style.display = 'none';
+    }
   }
 }
+
+// Restore selections on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  updateSelectedCount();
+});
 
 function confirmDeleteDesign(id, title) {
   pendingDeleteId = id;
@@ -235,16 +381,15 @@ function executeDeleteAllDesigns() {
 }
 
 function confirmDeleteSelectedDesigns() {
-  const checked = document.querySelectorAll('.design-checkbox:checked');
-  if (checked.length === 0) return;
-  if (confirm(`Are you sure you want to permanently delete the ${checked.length} selected design(s)?`)) {
+  const ids = window.getSelectedAdminDesignIds ? window.getSelectedAdminDesignIds() : [];
+  if (ids.length === 0) return;
+  if (confirm(`Are you sure you want to permanently delete the ${ids.length} selected design(s) across all pages?`)) {
     executeDeleteSelectedDesigns();
   }
 }
 
 function executeDeleteSelectedDesigns() {
-  const checked = document.querySelectorAll('.design-checkbox:checked');
-  const ids = Array.from(checked).map(cb => cb.value);
+  const ids = window.getSelectedAdminDesignIds ? window.getSelectedAdminDesignIds() : [];
   if (ids.length === 0) return;
 
   const csrf = getCsrfToken();
@@ -262,6 +407,7 @@ function executeDeleteSelectedDesigns() {
   .then(res => res.json())
   .then(data => {
     if (data.success) {
+      if (typeof clearSelectedDesigns === 'function') clearSelectedDesigns();
       showAdminToast(data.message || 'Selected designs deleted successfully.');
       setTimeout(() => window.location.reload(), 600);
     } else {
@@ -3469,6 +3615,10 @@ function debouncedFetchLiveCount() {
 }
 
 function getSelectedTableDesignIds() {
+  if (typeof window.getSelectedAdminDesignIds === 'function') {
+    const stored = window.getSelectedAdminDesignIds();
+    if (stored.length > 0) return stored;
+  }
   const checked = document.querySelectorAll('.design-checkbox:checked');
   return Array.from(checked).map(cb => parseInt(cb.value, 10)).filter(id => !isNaN(id));
 }
@@ -3893,6 +4043,7 @@ function executeApplyPriceUpdate() {
       successBox.style.display = 'block';
 
       if (data.success) {
+        if (typeof clearSelectedDesigns === 'function') clearSelectedDesigns();
         document.getElementById('bulkPriceSuccessText').textContent =
           `Successfully updated ${data.totalAffected || includedItems.length} designs in transaction audit log #${data.logId}.`;
       } else {

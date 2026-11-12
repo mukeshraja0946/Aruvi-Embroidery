@@ -42,7 +42,7 @@ let _newArrivalsCache = null;
 let _homeCacheTime = 0;
 
 class Design {
-  static async getAll({
+  static _buildWhereAndOrder({
     search = '',
     category_id = null,
     category_slug = null,
@@ -51,8 +51,6 @@ class Design {
     max_price = null,
     min_rating = null,
     sort = 'newest',
-    page = 1,
-    limit = 12,
     is_active_only = true,
     is_featured = null,
     is_trending = null,
@@ -67,118 +65,143 @@ class Design {
     const activeFileFilter = fileFilter || file_filter;
     const activeStitchFilter = stitchFilter || stitch_filter;
     const activePreviewFilter = previewFilter || preview_filter;
+
+    let whereClause = [];
+    let params = [];
+
+    if (is_active_only) {
+      whereClause.push('d.is_active = 1');
+    } else if (status === 'active') {
+      whereClause.push('d.is_active = 1');
+    } else if (status === 'inactive' || status === 'draft') {
+      whereClause.push('d.is_active = 0');
+    } else {
+      whereClause.push('d.is_active >= 0');
+    }
+
+    if (activeFileFilter === 'missing_zip') {
+      whereClause.push('NOT EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
+    } else if (activeFileFilter === 'has_zip') {
+      whereClause.push('EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
+    }
+
+    if (activeStitchFilter === 'missing' || activeStitchFilter === 'not_set') {
+      whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) <= 0 AND COALESCE(d.stitch_count_front, 0) <= 0 AND COALESCE(d.stitch_count_back, 0) <= 0 AND COALESCE(d.stitch_count_sleeve, 0) <= 0)');
+    } else if (activeStitchFilter === 'has_stitch') {
+      whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) > 0 OR COALESCE(d.stitch_count_front, 0) > 0 OR COALESCE(d.stitch_count_back, 0) > 0 OR COALESCE(d.stitch_count_sleeve, 0) > 0)');
+    }
+
+    if (activePreviewFilter === 'needs_reupload') {
+      whereClause.push('d.needs_reupload = 1');
+    } else if (activePreviewFilter === 'problems') {
+      whereClause.push('((d.primary_image IS NULL OR d.thumbnail_image IS NULL OR NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1) OR (SELECT COUNT(*) FROM design_images di2 WHERE di2.design_id = d.id AND di2.is_primary = 1) != 1) AND (d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di3 WHERE di3.design_id = d.id)))');
+    } else if (activePreviewFilter === 'missing_thumb') {
+      whereClause.push('((d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id)) AND (d.thumbnail_image IS NULL OR d.thumbnail_image = \'\' OR EXISTS (SELECT 1 FROM design_images di2 WHERE di2.design_id = d.id AND (di2.is_primary = 1 OR di2.display_order = 0) AND (di2.thumb_key IS NULL OR di2.thumb_key = \'\'))))');
+    } else if (activePreviewFilter === 'no_preview') {
+      whereClause.push('(d.primary_image IS NULL AND NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id))');
+    } else if (activePreviewFilter === 'has_preview') {
+      whereClause.push('(d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id))');
+    }
+
+    if (is_featured !== null && is_featured !== undefined) {
+      whereClause.push('d.is_featured = ?');
+      params.push(is_featured ? 1 : 0);
+    }
+
+    if (is_trending !== null && is_trending !== undefined) {
+      whereClause.push('d.is_trending = ?');
+      params.push(is_trending ? 1 : 0);
+    }
+
+    if (search) {
+      whereClause.push('(d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ? OR c.name LIKE ?)');
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    if (category_id) {
+      whereClause.push('d.category_id = ?');
+      params.push(parseInt(category_id));
+    } else if (category_slug) {
+      const cleanSlug = String(category_slug).trim().toLowerCase();
+      whereClause.push('(c.slug = ? OR c.slug = ? OR c.slug = ? OR c.slug LIKE ? OR LOWER(c.name) = ? OR LOWER(c.name) LIKE ?)');
+      params.push(
+        cleanSlug,
+        `${cleanSlug}-embroidery`,
+        `${cleanSlug}-designs`,
+        `${cleanSlug}%`,
+        cleanSlug,
+        `%${cleanSlug}%`
+      );
+    }
+
+    if (format) {
+      whereClause.push('d.formats LIKE ?');
+      params.push(`%${format}%`);
+    }
+
+    if (min_price !== null && min_price !== '') {
+      whereClause.push('COALESCE(d.sale_price, d.price) >= ?');
+      params.push(parseFloat(min_price));
+    }
+
+    if (max_price !== null && max_price !== '') {
+      whereClause.push('COALESCE(d.sale_price, d.price) <= ?');
+      params.push(parseFloat(max_price));
+    }
+
+    if (min_rating !== null && min_rating !== '') {
+      whereClause.push('d.average_rating >= ?');
+      params.push(parseFloat(min_rating));
+    }
+
+    const whereSql = whereClause.length ? 'WHERE ' + whereClause.join(' AND ') : '';
+
+    let orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
+    if (sort === 'price_asc' || sort === 'price_low') {
+      orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
+    } else if (sort === 'price_desc' || sort === 'price_high') {
+      orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
+    } else if (sort === 'stitches_asc' || sort === 'stitches_low') {
+      orderBy = 'ORDER BY (CASE WHEN COALESCE(d.stitch_count_total, d.stitch_count) IS NULL THEN 1 ELSE 0 END), COALESCE(d.stitch_count_total, d.stitch_count) ASC, d.id ASC';
+    } else if (sort === 'stitches_desc' || sort === 'stitches_high') {
+      orderBy = 'ORDER BY (CASE WHEN COALESCE(d.stitch_count_total, d.stitch_count) IS NULL THEN 1 ELSE 0 END), COALESCE(d.stitch_count_total, d.stitch_count) DESC, d.id DESC';
+    } else if (sort === 'popular' || sort === 'most_popular') {
+      orderBy = 'ORDER BY (COALESCE((SELECT COUNT(*) FROM order_items oi WHERE oi.design_id = d.id), 0) + COALESCE(d.download_count, 0) + COALESCE(d.total_sales, 0)) DESC, d.id DESC';
+    } else if (sort === 'top_rated' || sort === 'rating') {
+      orderBy = 'ORDER BY (CASE WHEN (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) > 0 THEN 1 ELSE 0 END) DESC, (SELECT AVG(r.rating) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) DESC, (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) DESC, d.id DESC';
+    } else if (sort === 'oldest') {
+      orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
+    } else {
+      orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
+    }
+
+    return { whereSql, params, orderBy };
+  }
+
+  static async getAllIds(options = {}) {
     if (db.isConnected()) {
       try {
-        let whereClause = [];
-        let params = [];
+        const { whereSql, params, orderBy } = this._buildWhereAndOrder(options);
+        const sql = `SELECT d.id FROM designs d LEFT JOIN categories c ON d.category_id = c.id ${whereSql} ${orderBy}`;
+        const rows = await db.query(sql, params);
+        return Array.isArray(rows) ? rows.map(r => r.id) : [];
+      } catch (err) {
+        console.error('[Design.getAllIds Error]:', err.message);
+        return [];
+      }
+    }
+    return fallbackDesigns.map(d => d.id);
+  }
 
-        if (is_active_only) {
-          whereClause.push('d.is_active = 1');
-        } else if (status === 'active') {
-          whereClause.push('d.is_active = 1');
-        } else if (status === 'inactive' || status === 'draft') {
-          whereClause.push('d.is_active = 0');
-        } else {
-          whereClause.push('d.is_active >= 0');
-        }
-
-        if (activeFileFilter === 'missing_zip') {
-          whereClause.push('NOT EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
-        } else if (activeFileFilter === 'has_zip') {
-          whereClause.push('EXISTS (SELECT 1 FROM design_files df WHERE df.design_id = d.id AND df.is_preview = 0)');
-        }
-
-        if (activeStitchFilter === 'missing' || activeStitchFilter === 'not_set') {
-          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) <= 0 AND COALESCE(d.stitch_count_front, 0) <= 0 AND COALESCE(d.stitch_count_back, 0) <= 0 AND COALESCE(d.stitch_count_sleeve, 0) <= 0)');
-        } else if (activeStitchFilter === 'has_stitch') {
-          whereClause.push('(COALESCE(d.stitch_count_total, d.stitch_count, 0) > 0 OR COALESCE(d.stitch_count_front, 0) > 0 OR COALESCE(d.stitch_count_back, 0) > 0 OR COALESCE(d.stitch_count_sleeve, 0) > 0)');
-        }
-
-        if (activePreviewFilter === 'needs_reupload') {
-          whereClause.push('d.needs_reupload = 1');
-        } else if (activePreviewFilter === 'problems') {
-          whereClause.push('((d.primary_image IS NULL OR d.thumbnail_image IS NULL OR NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id AND di.is_primary = 1) OR (SELECT COUNT(*) FROM design_images di2 WHERE di2.design_id = d.id AND di2.is_primary = 1) != 1) AND (d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di3 WHERE di3.design_id = d.id)))');
-        } else if (activePreviewFilter === 'missing_thumb') {
-          whereClause.push('((d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id)) AND (d.thumbnail_image IS NULL OR d.thumbnail_image = \'\' OR EXISTS (SELECT 1 FROM design_images di2 WHERE di2.design_id = d.id AND (di2.is_primary = 1 OR di2.display_order = 0) AND (di2.thumb_key IS NULL OR di2.thumb_key = \'\'))))');
-        } else if (activePreviewFilter === 'no_preview') {
-          whereClause.push('(d.primary_image IS NULL AND NOT EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id))');
-        } else if (activePreviewFilter === 'has_preview') {
-          whereClause.push('(d.primary_image IS NOT NULL OR EXISTS (SELECT 1 FROM design_images di WHERE di.design_id = d.id))');
-        }
-
-        if (is_featured !== null && is_featured !== undefined) {
-          whereClause.push('d.is_featured = ?');
-          params.push(is_featured ? 1 : 0);
-        }
-
-        if (is_trending !== null && is_trending !== undefined) {
-          whereClause.push('d.is_trending = ?');
-          params.push(is_trending ? 1 : 0);
-        }
-
-        if (search) {
-          whereClause.push('(d.title LIKE ? OR d.sku LIKE ? OR d.tags LIKE ? OR d.formats LIKE ? OR c.name LIKE ?)');
-          const searchPattern = `%${search}%`;
-          params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-        }
-
-        if (category_id) {
-          whereClause.push('d.category_id = ?');
-          params.push(parseInt(category_id));
-        } else if (category_slug) {
-          const cleanSlug = String(category_slug).trim().toLowerCase();
-          whereClause.push('(c.slug = ? OR c.slug = ? OR c.slug = ? OR c.slug LIKE ? OR LOWER(c.name) = ? OR LOWER(c.name) LIKE ?)');
-          params.push(
-            cleanSlug,
-            `${cleanSlug}-embroidery`,
-            `${cleanSlug}-designs`,
-            `${cleanSlug}%`,
-            cleanSlug,
-            `%${cleanSlug}%`
-          );
-        }
-
-        if (format) {
-          whereClause.push('d.formats LIKE ?');
-          params.push(`%${format}%`);
-        }
-
-        if (min_price !== null && min_price !== '') {
-          whereClause.push('COALESCE(d.sale_price, d.price) >= ?');
-          params.push(parseFloat(min_price));
-        }
-
-        if (max_price !== null && max_price !== '') {
-          whereClause.push('COALESCE(d.sale_price, d.price) <= ?');
-          params.push(parseFloat(max_price));
-        }
-
-        if (min_rating !== null && min_rating !== '') {
-          whereClause.push('d.average_rating >= ?');
-          params.push(parseFloat(min_rating));
-        }
-
-        const whereSql = whereClause.length ? 'WHERE ' + whereClause.join(' AND ') : '';
-
-        let orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
-        if (sort === 'price_asc' || sort === 'price_low') {
-          orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) ASC, d.id ASC';
-        } else if (sort === 'price_desc' || sort === 'price_high') {
-          orderBy = 'ORDER BY COALESCE(d.sale_price, d.price) DESC, d.id DESC';
-        } else if (sort === 'stitches_asc' || sort === 'stitches_low') {
-          orderBy = 'ORDER BY (CASE WHEN COALESCE(d.stitch_count_total, d.stitch_count) IS NULL THEN 1 ELSE 0 END), COALESCE(d.stitch_count_total, d.stitch_count) ASC, d.id ASC';
-        } else if (sort === 'stitches_desc' || sort === 'stitches_high') {
-          orderBy = 'ORDER BY (CASE WHEN COALESCE(d.stitch_count_total, d.stitch_count) IS NULL THEN 1 ELSE 0 END), COALESCE(d.stitch_count_total, d.stitch_count) DESC, d.id DESC';
-        } else if (sort === 'popular' || sort === 'most_popular') {
-          orderBy = 'ORDER BY (COALESCE((SELECT COUNT(*) FROM order_items oi WHERE oi.design_id = d.id), 0) + COALESCE(d.download_count, 0) + COALESCE(d.total_sales, 0)) DESC, d.id DESC';
-        } else if (sort === 'top_rated' || sort === 'rating') {
-          orderBy = 'ORDER BY (CASE WHEN (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) > 0 THEN 1 ELSE 0 END) DESC, (SELECT AVG(r.rating) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) DESC, (SELECT COUNT(r.id) FROM reviews r WHERE r.design_id = d.id AND r.is_approved = 1) DESC, d.id DESC';
-        } else if (sort === 'oldest') {
-          orderBy = 'ORDER BY d.created_at ASC, d.id ASC';
-        } else {
-          // default: latest
-          orderBy = 'ORDER BY d.created_at DESC, d.id DESC';
-        }
+  static async getAll(options = {}) {
+    const {
+      page = 1,
+      limit = 12
+    } = options;
+    if (db.isConnected()) {
+      try {
+        const { whereSql, params, orderBy } = this._buildWhereAndOrder(options);
 
         const offset = (page - 1) * limit;
 
@@ -957,6 +980,7 @@ class Design {
         { name: 'stitch_total_manual', def: 'TINYINT NOT NULL DEFAULT 0 AFTER `stitch_count_total`' },
         { name: 'hoop_size', def: 'VARCHAR(50) NULL DEFAULT NULL AFTER `category_id`' },
         { name: 'description', def: 'TEXT NULL DEFAULT NULL AFTER `slug`' },
+        { name: 'file_usage_guide', def: 'TEXT NULL DEFAULT NULL AFTER `description`' },
         { name: 'short_description', def: 'TEXT NULL DEFAULT NULL AFTER `sku`' },
         { name: 'sub_category', def: 'VARCHAR(100) NULL DEFAULT NULL AFTER `category_id`' },
         { name: 'sku', def: 'VARCHAR(100) NULL DEFAULT NULL AFTER `title`' },
@@ -1363,7 +1387,8 @@ class Design {
           reviews_count: revCountVal,
           import_image_filename: import_image_filename || null,
           import_zip_filename: import_zip_filename || null,
-          description: description || null
+          description: description || null,
+          file_usage_guide: data.file_usage_guide !== undefined ? data.file_usage_guide : null
         };
 
         const executeInsert = async (skuToUse) => {
@@ -1554,6 +1579,7 @@ class Design {
         if (backStitchVal !== undefined) addUpdateField('stitch_count_back', backStitchVal);
         if (sleeveStitchVal !== undefined) addUpdateField('stitch_count_sleeve', sleeveStitchVal);
         if (description !== undefined) addUpdateField('description', description || null);
+        if (data.file_usage_guide !== undefined) addUpdateField('file_usage_guide', data.file_usage_guide || null);
         if (dimensions !== undefined) addUpdateField('dimensions', dimensions || null);
         if (formats !== undefined) addUpdateField('formats', formats || '');
         if (is_featured !== undefined) addUpdateField('is_featured', is_featured ? 1 : 0);

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const Design = require('../../models/Design');
 const Category = require('../../models/Category');
 const Setting = require('../../models/Setting');
+const DesignVariant = require('../../models/DesignVariant');
 const db = require('../../config/db');
 const emailService = require('../../services/emailService');
 const storage = require('../../config/storage');
@@ -73,7 +74,51 @@ exports.getDesigns = async (req, res, next) => {
   }
 };
 
+/**
+ * Returns all design IDs matching the current query filters (survives multi-page selection)
+ */
+exports.getAllDesignIds = async (req, res, next) => {
+  try {
+    const { search, category, status, sort, fileFilter, stitchFilter, previewFilter } = req.query;
+
+    let categoryId = null;
+    let categorySlug = null;
+    if (category) {
+      const cat = await Category.getBySlug(category);
+      if (cat) categoryId = cat.id;
+      else categorySlug = category;
+    }
+
+    const ids = await Design.getAllIds({
+      is_active_only: false,
+      search: search || '',
+      category_id: categoryId,
+      category_slug: categorySlug,
+      status: status || null,
+      fileFilter: fileFilter || null,
+      stitchFilter: stitchFilter || null,
+      previewFilter: previewFilter || null,
+      sort: sort || 'newest'
+    });
+
+    return res.json({ success: true, count: ids.length, ids });
+  } catch (err) {
+    console.error('[getAllDesignIds Error]:', err);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve design IDs', error: err.message });
+  }
+};
+
 const AdmZip = require('adm-zip');
+
+function isJunkZipEntry(entryName) {
+  if (!entryName) return false;
+  const base = path.basename(entryName).toLowerCase();
+  const full = entryName.toLowerCase().replace(/\\/g, '/');
+  if (base === '.ds_store' || base === 'thumbs.db' || base === 'desktop.ini') return true;
+  if (base.startsWith('._') || base.endsWith('.tmp') || base.endsWith('.crdownload')) return true;
+  if (full.includes('__macosx/') || full.startsWith('__macosx')) return true;
+  return false;
+}
 
 exports.processUploadedFilesAndArchives = processUploadedFilesAndArchives;
 
@@ -114,20 +159,33 @@ function processUploadedFilesAndArchives(reqFiles) {
         const zip = new AdmZip(file.path);
         const entries = zip.getEntries();
 
-        const machineEntries = entries.filter(e => {
+        // Strip OS artifacts and junk entries from the archive
+        let hasJunk = false;
+        for (const e of entries) {
+          if (isJunkZipEntry(e.entryName)) {
+            zip.deleteFile(e);
+            hasJunk = true;
+          }
+        }
+
+        const machineEntries = zip.getEntries().filter(e => {
           if (e.isDirectory) return false;
           const eExt = path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase();
           return ['DST', 'PES', 'JEF', 'EXP'].includes(eExt);
         });
 
-        const fileCount = machineEntries.length > 0 ? machineEntries.length : (entries.filter(e => !e.isDirectory).length || 1);
+        const fileCount = machineEntries.length > 0 ? machineEntries.length : (zip.getEntries().filter(e => !e.isDirectory).length || 1);
         const detectedFormats = [...new Set(machineEntries.map(e => path.extname(e.entryName).toLowerCase().replace('.', '').toUpperCase()))];
         if (detectedFormats.length === 0) detectedFormats.push('DST');
 
         const uniqueZipFilename = `zip_pkg_${Date.now()}_${Math.round(Math.random() * 10000)}_${path.basename(file.originalname)}`;
         const destPath = path.join(targetDir, uniqueZipFilename);
 
-        fs.copyFileSync(file.path, destPath);
+        if (hasJunk) {
+          zip.writeZip(destPath);
+        } else {
+          fs.copyFileSync(file.path, destPath);
+        }
 
         packageFiles.push({
           originalname: file.originalname,
@@ -192,12 +250,15 @@ exports.getCreateForm = async (req, res, next) => {
     if (categories && categories.length > 0) {
       defaultSku = await Design.getNextSkuForCategory(categories[0].id);
     }
+    const siteUsageGuideDefault = await Setting.get('file_usage_guide_default', 'BIG DST - RRR, HSW, UME, Ricoma, Fortever, WOW, SGK, Vidya, Single Head Machines | JEF - USHA 450E, 550E | SMALL DST - Brother V3SE, BP3600, Bernina B700, Pfaff');
     res.render('admin/designs/form', {
       title: 'Add New Embroidery Design - Admin',
       design: null,
       categories,
       suggestedReviewCount,
-      defaultSku
+      defaultSku,
+      variants: [],
+      siteUsageGuideDefault
     });
   } catch (err) {
     next(err);
@@ -376,6 +437,25 @@ exports.postCreate = async (req, res, next) => {
 
     const finalActiveState = (status_draft === '1' || status_draft === 1 || status_draft === true) ? 0 : 1;
     
+    // Parse & Validate Variants if provided
+    let variants = [];
+    if (req.body.variants_json) {
+      try {
+        variants = typeof req.body.variants_json === 'string' ? JSON.parse(req.body.variants_json) : req.body.variants_json;
+      } catch (_) {
+        variants = [];
+      }
+    }
+    if (Array.isArray(variants) && variants.length > 0) {
+      const hasFile = variants.some(v => v.storage_key || v.file_id || v.original_name);
+      if (!hasFile) {
+        const errMsg = 'File-type variants are enabled, but no variant has an uploaded machine file. Please attach a machine file for at least one variant.';
+        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
+        req.flash('error', errMsg);
+        return res.redirect('back');
+      }
+    }
+
     // Process uploaded ZIP package
     const packageFiles = processUploadedFilesAndArchives(req.files);
 
@@ -404,6 +484,7 @@ exports.postCreate = async (req, res, next) => {
       sleeveStitchCount: sleeveCheck.value,
       totalStitchCount: finalTotalStitches,
       description: description !== undefined ? description : null,
+      file_usage_guide: req.body.file_usage_guide !== undefined ? (req.body.file_usage_guide ? req.body.file_usage_guide.trim() : null) : null,
       dimensions: dimensions ? String(dimensions).trim() : null,
       formats: detectedFormatsStr,
       is_featured: is_featured ? 1 : 0,
@@ -414,6 +495,28 @@ exports.postCreate = async (req, res, next) => {
       average_rating: parsedRating,
       reviews_count: parsedReviews
     });
+
+    // Save variants if configured
+    if (Array.isArray(variants) && variants.length > 0) {
+      for (let idx = 0; idx < variants.length; idx++) {
+        const v = variants[idx];
+        if (v && v.name) {
+          await DesignVariant.create({
+            design_id: designId,
+            variant_name: v.name,
+            variant_group: v.group || null,
+            file_id: v.file_id ? parseInt(v.file_id, 10) : null,
+            storage_key: v.storage_key || null,
+            file_name: v.original_name || null,
+            original_name: v.original_name || null,
+            file_size: v.file_size || 0,
+            file_format: v.file_format || null,
+            sort_order: idx,
+            is_active: v.is_active !== undefined ? (v.is_active ? 1 : 0) : 1
+          });
+        }
+      }
+    }
 
     // Save single ZIP package record in design_files if uploaded directly
     if (packageFiles.length > 0) {
@@ -605,6 +708,8 @@ exports.getEditForm = async (req, res, next) => {
     const { id } = req.params;
     const design = await Design.getById(id);
     const categories = await Category.getAll();
+    const variants = await DesignVariant.getAllByDesignId(id);
+    const siteUsageGuideDefault = await Setting.get('file_usage_guide_default', 'BIG DST - RRR, HSW, UME, Ricoma, Fortever, WOW, SGK, Vidya, Single Head Machines | JEF - USHA 450E, 550E | SMALL DST - Brother V3SE, BP3600, Bernina B700, Pfaff');
 
     if (!design) {
       req.flash('error', 'Design not found.');
@@ -614,7 +719,9 @@ exports.getEditForm = async (req, res, next) => {
     res.render('admin/designs/form', {
       title: `Edit ${design.title} - Admin`,
       design,
-      categories
+      categories,
+      variants: variants || [],
+      siteUsageGuideDefault
     });
   } catch (err) {
     next(err);
@@ -767,6 +874,25 @@ exports.postEdit = async (req, res, next) => {
 
     const finalActiveState = (status_draft === '1' || status_draft === 1 || status_draft === true) ? 0 : 1;
 
+    // Parse & Validate Variants if provided
+    let variants = [];
+    if (req.body.variants_json) {
+      try {
+        variants = typeof req.body.variants_json === 'string' ? JSON.parse(req.body.variants_json) : req.body.variants_json;
+      } catch (_) {
+        variants = [];
+      }
+    }
+    if (Array.isArray(variants) && variants.length > 0) {
+      const hasFile = variants.some(v => v.storage_key || v.file_id || v.original_name);
+      if (!hasFile) {
+        const errMsg = 'File-type variants are enabled, but no variant has an uploaded machine file. Please attach a machine file for at least one variant.';
+        if (isAjax) return res.status(400).json({ success: false, message: errMsg });
+        req.flash('error', errMsg);
+        return res.redirect('back');
+      }
+    }
+
     // Process uploaded ZIP package
     const packageFiles = processUploadedFilesAndArchives(req.files);
 
@@ -792,6 +918,7 @@ exports.postEdit = async (req, res, next) => {
       sleeveStitchCount: effectiveSleeve,
       totalStitchCount: finalTotalVal,
       description: description !== undefined ? description : (existingDesign.description || null),
+      file_usage_guide: req.body.file_usage_guide !== undefined ? (req.body.file_usage_guide ? req.body.file_usage_guide.trim() : null) : null,
       dimensions: dimensions !== undefined ? (dimensions ? String(dimensions).trim() : null) : (existingDesign.dimensions || null),
       formats: formats || existingDesign.formats || '',
       is_featured: is_featured ? 1 : 0,
@@ -802,6 +929,56 @@ exports.postEdit = async (req, res, next) => {
       average_rating: parsedRating,
       reviews_count: parsedReviews
     });
+
+    // Sync variants in database
+    if (Array.isArray(variants)) {
+      const existingVariants = await DesignVariant.getAllByDesignId(id);
+      const existingMap = new Map(existingVariants.map(v => [v.id, v]));
+      const keptIds = new Set();
+
+      for (let idx = 0; idx < variants.length; idx++) {
+        const v = variants[idx];
+        if (v && v.name) {
+          const vIdNum = v.id ? parseInt(v.id, 10) : null;
+          if (vIdNum && existingMap.has(vIdNum)) {
+            keptIds.add(vIdNum);
+            await DesignVariant.update(vIdNum, {
+              variant_name: v.name,
+              variant_group: v.group || null,
+              file_id: v.file_id ? parseInt(v.file_id, 10) : null,
+              storage_key: v.storage_key || null,
+              file_name: v.original_name || null,
+              original_name: v.original_name || null,
+              file_size: v.file_size || 0,
+              file_format: v.file_format || null,
+              sort_order: idx,
+              is_active: v.is_active !== undefined ? (v.is_active ? 1 : 0) : 1
+            });
+          } else {
+            const created = await DesignVariant.create({
+              design_id: id,
+              variant_name: v.name,
+              variant_group: v.group || null,
+              file_id: v.file_id ? parseInt(v.file_id, 10) : null,
+              storage_key: v.storage_key || null,
+              file_name: v.original_name || null,
+              original_name: v.original_name || null,
+              file_size: v.file_size || 0,
+              file_format: v.file_format || null,
+              sort_order: idx,
+              is_active: v.is_active !== undefined ? (v.is_active ? 1 : 0) : 1
+            });
+            if (created) keptIds.add(created.id);
+          }
+        }
+      }
+
+      for (const ev of existingVariants) {
+        if (!keptIds.has(ev.id)) {
+          await DesignVariant.delete(ev.id);
+        }
+      }
+    }
 
     // Save package files if uploaded directly without wiping existing files (only if not already present)
     if (packageFiles.length > 0) {

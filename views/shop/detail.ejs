@@ -44,7 +44,9 @@
           </button>
         <% } %>
 
-        <span class="tap-zoom-badge"><i class="fa-solid fa-magnifying-glass"></i> Tap to zoom</span>
+        <button type="button" id="tapToZoomBtn" class="tap-zoom-badge" onclick="event.stopPropagation(); openLightbox(document.getElementById('mainDisplayImg').src);" aria-label="Tap to zoom image">
+          <i class="fa-solid fa-magnifying-glass"></i> Tap to zoom
+        </button>
       </div>
 
       <div class="thumbnails-scroll-container hide-scrollbar">
@@ -277,19 +279,27 @@
       }
       </script>
 
+      <%
+        const hasVariants = (typeof variants !== 'undefined' && Array.isArray(variants) && variants.length > 0);
+        const purchasedVariantList = (typeof purchasedVariantIds !== 'undefined' && Array.isArray(purchasedVariantIds)) ? purchasedVariantIds : [];
+        const isFullyPurchasedLegacy = (!hasVariants && typeof hasPurchased !== 'undefined' && hasPurchased);
+      %>
+
       <!-- Add to Cart & Buy Now Actions -->
       <form action="/cart/add" method="POST" class="detail-action-form" id="addToCartForm">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="design_id" value="<%= design.id %>">
+        <input type="hidden" name="variant_id" id="addToCartVariantId" value="">
       </form>
 
       <form action="/cart/buy-now?_csrf=<%= csrfToken %>" method="POST" id="buyNowForm">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="design_id" value="<%= design.id %>">
+        <input type="hidden" name="variant_id" id="buyNowVariantId" value="">
       </form>
 
       <div class="detail-action-box" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 10px;">
-        <% if (typeof hasPurchased !== 'undefined' && hasPurchased) { %>
+        <% if (isFullyPurchasedLegacy) { %>
           <div class="purchased-download-banner" style="background: #FAF6F0; border: 1px solid #EFE6D9; padding: 1.25rem; border-radius: 16px; margin-bottom: 0.5rem; text-align: left;">
             <div style="display: flex; align-items: center; gap: 8px; color: #2E7D32; font-weight: 700; font-size: 1.05rem; margin-bottom: 0.6rem;">
               <i class="fa-solid fa-circle-check" style="font-size: 1.2rem; color: #2E7D32;"></i>
@@ -307,10 +317,65 @@
             </a>
           </div>
         <% } else { %>
-          <button type="submit" form="addToCartForm" class="btn btn-outline btn-block btn-lg" style="border-color: var(--primary); color: var(--primary);">
+          <% if (hasVariants) { %>
+            <!-- File Type Variant Selection -->
+            <div class="variant-selection-section" id="variantSelectionSection">
+              <div class="variant-selection-header">
+                <label class="variant-label">
+                  <span>Select File / Machine Type:</span>
+                  <span class="req">*</span>
+                </label>
+                <span class="variant-selection-hint">Choose one option before checkout</span>
+              </div>
+
+              <div class="variant-pills-grid" id="variantPillsGrid">
+                <% variants.forEach(v => { %>
+                  <% const isPurchased = purchasedVariantList.includes(v.id); %>
+                  <button type="button" 
+                          class="variant-pill-btn <%= isPurchased ? 'is-purchased' : '' %>" 
+                          data-variant-id="<%= v.id %>" 
+                          data-variant-name="<%= v.variant_name %>" 
+                          data-purchased="<%= isPurchased ? '1' : '0' %>">
+                    <span class="variant-pill-name"><%= v.variant_name %></span>
+                    <% if (isPurchased) { %>
+                      <span class="variant-pill-tag"><i class="fa-solid fa-circle-check"></i> Already purchased</span>
+                    <% } %>
+                  </button>
+                <% }) %>
+              </div>
+
+              <!-- Inline Alert for Already Purchased or Missing Selection -->
+              <div id="variantAlertBox" class="variant-alert-box" style="display: none;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="variantAlertMsg"></span>
+              </div>
+
+              <!-- Direct Download Box for an Already-Purchased Variant -->
+              <div id="variantPurchasedDownloadBox" class="variant-purchased-dl-box" style="display: none; margin-top: 8px; margin-bottom: 8px;">
+                <a href="#" id="variantDirectDownloadBtn" download class="btn btn-primary" style="padding: 0.65rem 1.1rem; font-size: 0.88rem; border-radius: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; background-color: #2E7D32;">
+                  <i class="fa-solid fa-download"></i> Download <span id="dlVariantName"></span>
+                </a>
+              </div>
+
+              <!-- File Usage Guide -->
+              <% if (typeof fileUsageGuide !== 'undefined' && fileUsageGuide) { %>
+                <div class="file-usage-guide-box">
+                  <div class="file-usage-title">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span>File Usage Guide</span>
+                  </div>
+                  <div class="file-usage-body">
+                    <%= fileUsageGuide %>
+                  </div>
+                </div>
+              <% } %>
+            </div>
+          <% } %>
+
+          <button type="submit" form="addToCartForm" id="detailAddToCartBtn" class="btn btn-outline btn-block btn-lg" style="border-color: var(--primary); color: var(--primary);">
             <i class="fa-solid fa-cart-shopping"></i> Add to Cart
           </button>
-          <button type="submit" form="buyNowForm" class="btn btn-primary btn-block btn-lg">
+          <button type="submit" form="buyNowForm" id="detailBuyNowBtn" class="btn btn-primary btn-block btn-lg">
             <i class="fa-solid fa-bag-shopping"></i> Buy Now
           </button>
           <div style="font-size: 0.82rem; color: #666; margin-top: 0.3rem; text-align: center;">
@@ -548,32 +613,58 @@
     }
   }
 
-  // Tap-to-Zoom Pinch Lightbox Controller
+  // Tap-to-Zoom Fullscreen Lightbox Controller (Pinch, Pan, Drag & Double-tap)
   let currentZoomScale = 1;
   let initialPinchDistance = 0;
   let initialScale = 1;
   let isLightboxOpen = false;
+  let panX = 0;
+  let panY = 0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+
+  function updateLightboxTransform() {
+    const img = document.getElementById('lightboxImg');
+    if (!img) return;
+    if (currentZoomScale <= 1) {
+      panX = 0;
+      panY = 0;
+      img.style.transform = 'scale(1) translate(0px, 0px)';
+      img.style.cursor = 'grab';
+    } else {
+      img.style.transform = `scale(${currentZoomScale}) translate(${panX / currentZoomScale}px, ${panY / currentZoomScale}px)`;
+      img.style.cursor = isDragging ? 'grabbing' : 'grab';
+    }
+  }
 
   function openLightbox(src) {
     const modal = document.getElementById('imageLightboxModal');
     const img = document.getElementById('lightboxImg');
     if (!modal || !img) return;
 
-    img.src = src;
+    img.src = src || document.getElementById('mainDisplayImg')?.src;
     currentZoomScale = 1;
+    panX = 0;
+    panY = 0;
     img.style.transform = 'scale(1) translate(0px, 0px)';
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     isLightboxOpen = true;
   }
 
   function closeLightbox(e) {
-    if (e && e.target && e.target.id === 'lightboxImg') return; // Don't close when tapping image
+    if (e && e.target && e.target.id === 'lightboxImg') return; // Don't close when clicking image
     const modal = document.getElementById('imageLightboxModal');
     if (!modal) return;
     modal.style.display = 'none';
     document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
     isLightboxOpen = false;
+    currentZoomScale = 1;
+    panX = 0;
+    panY = 0;
   }
 
   // Mobile swipe navigation for gallery
@@ -616,28 +707,36 @@
     }, { passive: true });
   });
 
-  // Pinch & Double-tap Zoom handling
+  // Lightbox Pinch, Pan, Drag, and Keyboard Zoom Handlers
   document.addEventListener('DOMContentLoaded', () => {
     const img = document.getElementById('lightboxImg');
     const viewport = document.getElementById('lightboxViewport');
     if (!img || !viewport) return;
 
     let lastTap = 0;
+
+    // Double tap toggle (Mobile)
     img.addEventListener('touchend', function(e) {
-      const currentTime = new Date().getTime();
+      if (e.touches.length > 0) return;
+      const currentTime = Date.now();
       const tapLength = currentTime - lastTap;
       if (tapLength < 300 && tapLength > 0) {
         e.preventDefault();
-        // Toggle 1x / 2.5x zoom
         if (currentZoomScale > 1) {
           currentZoomScale = 1;
+          panX = 0;
+          panY = 0;
         } else {
           currentZoomScale = 2.5;
         }
-        img.style.transform = `scale(${currentZoomScale})`;
+        updateLightboxTransform();
       }
       lastTap = currentTime;
     });
+
+    // Touch Pinch & Pan Handlers (Mobile)
+    let touchPanStartX = 0;
+    let touchPanStartY = 0;
 
     viewport.addEventListener('touchstart', function(e) {
       if (e.touches.length === 2) {
@@ -646,6 +745,9 @@
           e.touches[0].pageY - e.touches[1].pageY
         );
         initialScale = currentZoomScale;
+      } else if (e.touches.length === 1 && currentZoomScale > 1) {
+        touchPanStartX = e.touches[0].pageX - panX;
+        touchPanStartY = e.touches[0].pageY - panY;
       }
     }, { passive: true });
 
@@ -658,17 +760,49 @@
         );
         const scale = (dist / initialPinchDistance) * initialScale;
         currentZoomScale = Math.min(Math.max(1, scale), 4);
-        img.style.transform = `scale(${currentZoomScale})`;
+        updateLightboxTransform();
+      } else if (e.touches.length === 1 && currentZoomScale > 1) {
+        e.preventDefault();
+        panX = e.touches[0].pageX - touchPanStartX;
+        panY = e.touches[0].pageY - touchPanStartY;
+        updateLightboxTransform();
       }
     }, { passive: false });
 
-    // Desktop click-to-zoom
-    img.addEventListener('click', function(e) {
-      e.stopPropagation();
-      currentZoomScale = currentZoomScale > 1 ? 1 : 2.5;
-      img.style.transform = `scale(${currentZoomScale})`;
+    // Desktop Click-to-Zoom & Mouse Drag Pan
+    viewport.addEventListener('mousedown', function(e) {
+      if (e.target !== img && e.target !== viewport) return;
+      if (currentZoomScale > 1) {
+        isDragging = true;
+        dragStartX = e.clientX - panX;
+        dragStartY = e.clientY - panY;
+        e.preventDefault();
+      }
     });
 
+    window.addEventListener('mousemove', function(e) {
+      if (isDragging && isLightboxOpen && currentZoomScale > 1) {
+        panX = e.clientX - dragStartX;
+        panY = e.clientY - dragStartY;
+        updateLightboxTransform();
+      }
+    });
+
+    window.addEventListener('mouseup', function() {
+      if (isDragging) {
+        isDragging = false;
+        updateLightboxTransform();
+      }
+    });
+
+    img.addEventListener('click', function(e) {
+      e.stopPropagation();
+      // Toggle zoom
+      currentZoomScale = currentZoomScale > 1 ? 1 : 2.5;
+      updateLightboxTransform();
+    });
+
+    // Desktop Escape key to close
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && isLightboxOpen) {
         closeLightbox();
@@ -677,9 +811,94 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
+    const hasVariants = <%= (typeof variants !== 'undefined' && Array.isArray(variants) && variants.length > 0) ? 'true' : 'false' %>;
+    const addToCartVariantInput = document.getElementById('addToCartVariantId');
+    const buyNowVariantInput = document.getElementById('buyNowVariantId');
+    const addToCartBtn = document.getElementById('detailAddToCartBtn');
+    const buyNowBtn = document.getElementById('detailBuyNowBtn');
+    const variantAlertBox = document.getElementById('variantAlertBox');
+    const variantAlertMsg = document.getElementById('variantAlertMsg');
+    const variantDlBox = document.getElementById('variantPurchasedDownloadBox');
+    const directDlBtn = document.getElementById('variantDirectDownloadBtn');
+    const dlVariantName = document.getElementById('dlVariantName');
+    const variantPillBtns = document.querySelectorAll('.variant-pill-btn');
+
+    let currentSelectedVariantId = '';
+    let isSelectedVariantPurchased = false;
+
+    function showAlert(msg) {
+      if (variantAlertBox && variantAlertMsg) {
+        variantAlertMsg.textContent = msg;
+        variantAlertBox.style.display = 'flex';
+      }
+    }
+
+    function hideAlert() {
+      if (variantAlertBox) {
+        variantAlertBox.style.display = 'none';
+      }
+    }
+
+    if (hasVariants && variantPillBtns.length > 0) {
+      variantPillBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+          const vId = this.dataset.variantId;
+          const isPurchased = this.dataset.purchased === '1';
+          const vName = this.dataset.variantName || 'Selected File';
+
+          // Update active pill state
+          variantPillBtns.forEach(b => b.classList.remove('is-selected'));
+          this.classList.add('is-selected');
+
+          currentSelectedVariantId = vId;
+          isSelectedVariantPurchased = isPurchased;
+
+          if (isPurchased) {
+            showAlert('You Have Already Purchased This Design. Please Select Some Other File.');
+            if (addToCartBtn) { addToCartBtn.disabled = true; addToCartBtn.style.opacity = '0.5'; }
+            if (buyNowBtn) { buyNowBtn.disabled = true; buyNowBtn.style.opacity = '0.5'; }
+            if (addToCartVariantInput) addToCartVariantInput.value = '';
+            if (buyNowVariantInput) buyNowVariantInput.value = '';
+
+            if (variantDlBox && directDlBtn) {
+              directDlBtn.href = '/user/download/<%= design.id %>/all?variant_id=' + encodeURIComponent(vId);
+              if (dlVariantName) dlVariantName.textContent = vName;
+              variantDlBox.style.display = 'block';
+            }
+          } else {
+            hideAlert();
+            if (variantDlBox) variantDlBox.style.display = 'none';
+            if (addToCartBtn) { addToCartBtn.disabled = false; addToCartBtn.style.opacity = '1'; }
+            if (buyNowBtn) { buyNowBtn.disabled = false; buyNowBtn.style.opacity = '1'; }
+            if (addToCartVariantInput) addToCartVariantInput.value = vId;
+            if (buyNowVariantInput) buyNowVariantInput.value = vId;
+          }
+        });
+      });
+    }
+
+    function validateVariantSelection(e) {
+      if (!hasVariants) return true;
+      if (!currentSelectedVariantId) {
+        e.preventDefault();
+        showAlert('Please select a file / machine type to proceed.');
+        const section = document.getElementById('variantSelectionSection');
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return false;
+      }
+      if (isSelectedVariantPurchased) {
+        e.preventDefault();
+        showAlert('You Have Already Purchased This Design. Please Select Some Other File.');
+        return false;
+      }
+      return true;
+    }
+
     const addToCartForm = document.getElementById('addToCartForm');
     if (addToCartForm) {
       addToCartForm.addEventListener('submit', function(e) {
+        if (!validateVariantSelection(e)) return;
+
         if (typeof window.isUserLoggedIn !== 'undefined' && !window.isUserLoggedIn) {
           e.preventDefault();
           const returnUrl = window.location.pathname + window.location.search;
@@ -695,9 +914,11 @@
     const buyNowForm = document.getElementById('buyNowForm');
     if (buyNowForm) {
       buyNowForm.addEventListener('submit', function(e) {
+        if (!validateVariantSelection(e)) return;
+
         if (typeof window.isUserLoggedIn !== 'undefined' && !window.isUserLoggedIn) {
           e.preventDefault();
-          const returnUrl = '/cart/buy-now?design_id=<%= design.id %>';
+          const returnUrl = '/cart/buy-now?design_id=<%= design.id %>' + (currentSelectedVariantId ? '&variant_id=' + encodeURIComponent(currentSelectedVariantId) : '');
           if (typeof openLoginModal === 'function') {
             openLoginModal(() => buyNowForm.submit(), returnUrl);
           } else {

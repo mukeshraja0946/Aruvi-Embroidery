@@ -80,7 +80,7 @@
           <% if (order.items && order.items.length > 0) { %>
             <% order.items.forEach(item => { %>
               <%
-                const cleanTitle = item.title || item.slug || ('AED ' + (item.design_id || item.id));
+                const cleanTitle = item.variant_name ? `${item.title} - ${item.variant_name}` : (item.title || item.slug || ('AED ' + (item.design_id || item.id)));
                 const specText = item.hoop_size || item.dimensions || '';
                 const unitPrice = item.price_at_purchase !== undefined ? Number(item.price_at_purchase).toFixed(2) : (item.effective_price || item.price);
               %>
@@ -107,9 +107,15 @@
                 <td style="text-align: right;">
                   <% if (isPaid) { %>
                     <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                      <a href="/user/download/<%= item.design_id || item.id %>/all" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
-                        <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
-                      </a>
+                      <% if (item.variant_id) { %>
+                        <a href="/user/download/<%= item.design_id || item.id %>/all?variant_id=<%= item.variant_id %>" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
+                          <i class="fa-solid fa-download"></i> Download <%= item.variant_name || 'Machine File' %>
+                        </a>
+                      <% } else { %>
+                        <a href="/user/download/<%= item.design_id || item.id %>/all" download class="btn btn-primary btn-sm" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; background-color: var(--primary);">
+                          <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
+                        </a>
+                      <% } %>
                       <% if (item.download_files && item.download_files.length > 0) { %>
                         <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; max-width: 280px; margin-top: 4px;">
                           <% item.download_files.forEach(f => { %>
@@ -174,9 +180,15 @@
             <!-- Download or Unlock Area below -->
             <div class="order-m-item-action">
               <% if (isPaid) { %>
-                <a href="/user/download/<%= item.design_id || item.id %>/all" download class="order-m-download-btn">
-                  <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
-                </a>
+                <% if (item.variant_id) { %>
+                  <a href="/user/download/<%= item.design_id || item.id %>/all?variant_id=<%= item.variant_id %>" download class="order-m-download-btn">
+                    <i class="fa-solid fa-download"></i> Download <%= item.variant_name || 'Machine File' %>
+                  </a>
+                <% } else { %>
+                  <a href="/user/download/<%= item.design_id || item.id %>/all" download class="order-m-download-btn">
+                    <i class="fa-solid fa-file-zipper"></i> Download All (ZIP)
+                  </a>
+                <% } %>
                 <% if (item.download_files && item.download_files.length > 0) { %>
                   <div style="display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 8px;">
                     <% item.download_files.forEach(f => { %>

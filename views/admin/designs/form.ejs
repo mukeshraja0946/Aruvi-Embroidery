@@ -514,6 +514,131 @@
               </div>
             </div>
 
+            <!-- Card 2B: File Type Options (Machine Variants) -->
+            <div class="form-section-card" id="fileVariantsSection">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-layer-group" style="color: var(--admin-primary); font-size: 1.2rem;"></i>
+                  <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800;">File Type Options (Machine Variants)</h3>
+                </div>
+                <span style="font-size: 0.75rem; background: #EDE7F6; color: #5E35B1; font-weight: 700; padding: 3px 10px; border-radius: 12px;">
+                  <i class="fa-solid fa-sliders"></i> Optional Variant Selection
+                </span>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin: 0 0 1.2rem 0;">
+                Configure customer-selectable machine options (e.g., <strong>BIG DST</strong>, <strong>JEF - 450E</strong>, <strong>JEF - 550E</strong>, <strong>SMALL DST</strong>). Customers must choose one variant before purchase. If no variants are added, this design sells as a standard single package.
+              </p>
+
+              <!-- Hidden input holding JSON of variants -->
+              <input type="hidden" name="variants_json" id="variantsJsonInput" value="[]">
+
+              <!-- Hidden file input for uploading variant machine files -->
+              <input type="file" id="variantFileInput" accept=".zip,.rar,.dst,.pes,.jef,.exp,.png" style="display: none;">
+
+              <!-- Variants Repeater Table -->
+              <div style="overflow-x: auto; margin-bottom: 1rem;">
+                <table class="file-list-table" id="variantsTable" style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                    <tr style="border-bottom: 1px solid var(--admin-border);">
+                      <th style="padding: 8px 10px; font-size: 0.74rem; color: var(--admin-text-muted); text-align: left; width: 40px;">#</th>
+                      <th style="padding: 8px 10px; font-size: 0.74rem; color: var(--admin-text-muted); text-align: left; min-width: 140px;">OPTION / VARIANT NAME <span class="req" style="color:var(--admin-primary);">*</span></th>
+                      <th style="padding: 8px 10px; font-size: 0.74rem; color: var(--admin-text-muted); text-align: left; min-width: 100px;">GROUP (OPTIONAL)</th>
+                      <th style="padding: 8px 10px; font-size: 0.74rem; color: var(--admin-text-muted); text-align: left; min-width: 220px;">ASSIGNED DOWNLOAD FILE <span class="req" style="color:var(--admin-primary);">*</span></th>
+                      <th style="padding: 8px 10px; font-size: 0.74rem; color: var(--admin-text-muted); text-align: center; width: 70px;">ACTIVE</th>
+                      <th style="padding: 8px 10px; font-size: 0.74rem; color: var(--admin-text-muted); text-align: right; width: 100px;">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody id="variantsTableBody">
+                    <%
+                      const existingVariants = (typeof variants !== 'undefined' && Array.isArray(variants)) ? variants : [];
+                    %>
+                    <% if (existingVariants.length === 0) { %>
+                      <tr id="noVariantsRow">
+                        <td colspan="6" style="text-align: center; padding: 1.5rem 1rem; color: var(--admin-text-muted); font-size: 0.85rem;">
+                          <i class="fa-solid fa-shapes" style="font-size: 1.6rem; display: block; margin-bottom: 6px; opacity: 0.4;"></i>
+                          No machine variants added. Click below to add variant options (e.g. BIG DST, JEF - 450E).
+                        </td>
+                      </tr>
+                    <% } else { %>
+                      <% existingVariants.forEach((v, vIdx) => { %>
+                        <tr class="variant-row" data-variant-id="<%= v.id %>" style="border-bottom: 1px solid #F1E9E0;">
+                          <td style="padding: 8px 10px; font-weight: 700; color: var(--admin-text-muted); font-size: 0.8rem;" class="variant-idx-col">
+                            <%= vIdx + 1 %>
+                          </td>
+                          <td style="padding: 8px 10px;">
+                            <input type="text" class="form-control-custom variant-name-input" value="<%= v.variant_name %>" placeholder="e.g. BIG DST" style="height: 34px; font-size: 0.82rem;" required>
+                          </td>
+                          <td style="padding: 8px 10px;">
+                            <input type="text" class="form-control-custom variant-group-input" value="<%= v.variant_group || '' %>" placeholder="e.g. DST" style="height: 34px; font-size: 0.82rem;">
+                          </td>
+                          <td style="padding: 8px 10px;">
+                            <div class="variant-file-cell" style="display: flex; align-items: center; gap: 6px;">
+                              <input type="hidden" class="variant-file-id-input" value="<%= v.file_id || '' %>">
+                              <input type="hidden" class="variant-storage-key-input" value="<%= v.storage_key || '' %>">
+                              <input type="hidden" class="variant-original-name-input" value="<%= v.original_name || v.file_name || '' %>">
+                              <input type="hidden" class="variant-format-input" value="<%= v.file_format || '' %>">
+                              <input type="hidden" class="variant-size-input" value="<%= v.file_size || 0 %>">
+                              
+                              <% const hasFile = Boolean(v.storage_key || v.file_id || v.original_name || v.file_name); %>
+                              <div class="variant-file-badge" style="display: <%= hasFile ? 'inline-flex' : 'none' %>; align-items: center; gap: 5px; background: #E8F5E9; border: 1px solid #C8E6C9; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem;">
+                                <i class="fa-solid fa-file-circle-check" style="color: #2E7D32;"></i>
+                                <span class="variant-file-name-display" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #1B5E20;">
+                                  <%= v.original_name || v.file_name || 'Uploaded File' %>
+                                </span>
+                                <span class="variant-file-format-display" style="background: #2E7D32; color: #FFFFFF; font-size: 0.65rem; font-weight: 800; padding: 1px 4px; border-radius: 3px;">
+                                  <%= (v.file_format || 'FILE').toUpperCase() %>
+                                </span>
+                              </div>
+                              <button type="button" class="btn btn-sm btn-variant-upload-trigger" onclick="triggerVariantFileUpload(this)" style="background: #FAF6F0; border: 1px solid var(--admin-border); color: var(--admin-primary); padding: 4px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> <%= hasFile ? 'Replace File' : 'Upload File' %>
+                              </button>
+                            </div>
+                          </td>
+                          <td style="padding: 8px 10px; text-align: center;">
+                            <input type="checkbox" class="variant-active-checkbox" <%= (v.is_active === 1 || v.is_active === undefined) ? 'checked' : '' %> style="transform: scale(1.1); cursor: pointer;">
+                          </td>
+                          <td style="padding: 8px 10px; text-align: right; white-space: nowrap;">
+                            <div style="display: inline-flex; align-items: center; gap: 4px;">
+                              <button type="button" class="btn btn-sm" onclick="moveVariantRow(this, -1)" title="Move Up" style="background: #F1E9E0; padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.7rem;">
+                                <i class="fa-solid fa-arrow-up"></i>
+                              </button>
+                              <button type="button" class="btn btn-sm" onclick="moveVariantRow(this, 1)" title="Move Down" style="background: #F1E9E0; padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.7rem;">
+                                <i class="fa-solid fa-arrow-down"></i>
+                              </button>
+                              <button type="button" class="btn btn-sm" onclick="deleteVariantRow(this)" title="Delete Option" style="background: #FFEBEE; color: #C62828; padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.7rem;">
+                                <i class="fa-solid fa-trash-can"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      <% }) %>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Add Variant Button -->
+              <div style="display: flex; justify-content: flex-start; margin-bottom: 1.2rem;">
+                <button type="button" id="addVariantRowBtn" onclick="addNewVariantRow()" class="btn btn-sm" style="background: #FAF6F0; border: 1.5px dashed var(--admin-border); color: var(--admin-text-dark); font-weight: 700; border-radius: 8px; padding: 8px 16px; font-size: 0.82rem; cursor: pointer;">
+                  <i class="fa-solid fa-plus" style="color: var(--admin-primary); margin-right: 4px;"></i> Add File Option / Variant
+                </button>
+              </div>
+
+              <!-- File Usage Guide Block -->
+              <div style="background: #FAF6F0; border: 1px solid #EFE6D9; border-radius: 12px; padding: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <label class="form-label-custom" style="margin: 0; font-size: 0.85rem; font-weight: 700;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--admin-primary); margin-right: 4px;"></i> File Usage Guide (Machine Compatibility Notes)
+                  </label>
+                  <span style="font-size: 0.72rem; color: var(--admin-text-muted);">Optional per-design override</span>
+                </div>
+                <p style="font-size: 0.78rem; color: #7F8C8D; margin: 0 0 8px 0;">
+                  Displayed to customers directly below the file-type buttons on the detail page. Leave empty to use site-wide default.
+                </p>
+                <textarea name="file_usage_guide" id="fileUsageGuideInput" class="form-control-custom" rows="3" placeholder="Site-wide default: <%= typeof siteUsageGuideDefault !== 'undefined' ? siteUsageGuideDefault : 'BIG DST - RRR, HSW, UME... | JEF - USHA 450E, 550E | SMALL DST - Brother V3SE...' %>" style="height: auto; padding: 8px 10px; font-size: 0.82rem; line-height: 1.4;"><%= (design && design.file_usage_guide) ? design.file_usage_guide : '' %></textarea>
+              </div>
+            </div>
+
             <!-- Card 3: Ratings & Review Metadata -->
             <div class="form-section-card">
               <h3>Ratings & Review Metadata</h3>
@@ -1396,6 +1521,218 @@
       });
   }
 
+  /* =========================================================================
+     TASK D: FILE TYPE OPTIONS (VARIANTS) MANAGEMENT ENGINE
+     ========================================================================= */
+  let activeVariantRowForUpload = null;
+
+  function addNewVariantRow(data = {}) {
+    const tbody = document.getElementById('variantsTableBody');
+    const noRow = document.getElementById('noVariantsRow');
+    if (noRow) noRow.style.display = 'none';
+
+    const rowIdx = tbody.querySelectorAll('.variant-row').length + 1;
+    const tr = document.createElement('tr');
+    tr.className = 'variant-row';
+    tr.style.borderBottom = '1px solid #F1E9E0';
+    if (data.id) tr.dataset.variantId = data.id;
+
+    const hasFile = Boolean(data.storage_key || data.file_id || data.original_name);
+    const dispName = data.original_name || data.file_name || '';
+    const fmt = (data.file_format || (dispName ? dispName.split('.').pop() : 'FILE')).toUpperCase();
+
+    tr.innerHTML = `
+      <td style="padding: 8px 10px; font-weight: 700; color: var(--admin-text-muted); font-size: 0.8rem;" class="variant-idx-col">
+        ${rowIdx}
+      </td>
+      <td style="padding: 8px 10px;">
+        <input type="text" class="form-control-custom variant-name-input" value="${data.variant_name || ''}" placeholder="e.g. BIG DST" style="height: 34px; font-size: 0.82rem;" required>
+      </td>
+      <td style="padding: 8px 10px;">
+        <input type="text" class="form-control-custom variant-group-input" value="${data.variant_group || ''}" placeholder="e.g. DST" style="height: 34px; font-size: 0.82rem;">
+      </td>
+      <td style="padding: 8px 10px;">
+        <div class="variant-file-cell" style="display: flex; align-items: center; gap: 6px;">
+          <input type="hidden" class="variant-file-id-input" value="${data.file_id || ''}">
+          <input type="hidden" class="variant-storage-key-input" value="${data.storage_key || ''}">
+          <input type="hidden" class="variant-original-name-input" value="${dispName}">
+          <input type="hidden" class="variant-format-input" value="${fmt}">
+          <input type="hidden" class="variant-size-input" value="${data.file_size || 0}">
+
+          <div class="variant-file-badge" style="display: ${hasFile ? 'inline-flex' : 'none'}; align-items: center; gap: 5px; background: #E8F5E9; border: 1px solid #C8E6C9; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem;">
+            <i class="fa-solid fa-file-circle-check" style="color: #2E7D32;"></i>
+            <span class="variant-file-name-display" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #1B5E20;">
+              ${dispName || 'Uploaded File'}
+            </span>
+            <span class="variant-file-format-display" style="background: #2E7D32; color: #FFFFFF; font-size: 0.65rem; font-weight: 800; padding: 1px 4px; border-radius: 3px;">
+              ${fmt}
+            </span>
+          </div>
+          <button type="button" class="btn btn-sm btn-variant-upload-trigger" onclick="triggerVariantFileUpload(this)" style="background: #FAF6F0; border: 1px solid var(--admin-border); color: var(--admin-primary); padding: 4px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+            <i class="fa-solid fa-cloud-arrow-up"></i> ${hasFile ? 'Replace File' : 'Upload File'}
+          </button>
+        </div>
+      </td>
+      <td style="padding: 8px 10px; text-align: center;">
+        <input type="checkbox" class="variant-active-checkbox" ${data.is_active !== 0 ? 'checked' : ''} style="transform: scale(1.1); cursor: pointer;">
+      </td>
+      <td style="padding: 8px 10px; text-align: right; white-space: nowrap;">
+        <div style="display: inline-flex; align-items: center; gap: 4px;">
+          <button type="button" class="btn btn-sm" onclick="moveVariantRow(this, -1)" title="Move Up" style="background: #F1E9E0; padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.7rem;">
+            <i class="fa-solid fa-arrow-up"></i>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="moveVariantRow(this, 1)" title="Move Down" style="background: #F1E9E0; padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.7rem;">
+            <i class="fa-solid fa-arrow-down"></i>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="deleteVariantRow(this)" title="Delete Option" style="background: #FFEBEE; color: #C62828; padding: 4px 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.7rem;">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    renumberVariantRows();
+  }
+
+  function renumberVariantRows() {
+    const rows = document.querySelectorAll('#variantsTableBody .variant-row');
+    rows.forEach((r, idx) => {
+      const col = r.querySelector('.variant-idx-col');
+      if (col) col.textContent = idx + 1;
+    });
+  }
+
+  function moveVariantRow(btn, direction) {
+    const row = btn.closest('.variant-row');
+    if (!row) return;
+    if (direction === -1 && row.previousElementSibling && !row.previousElementSibling.id) {
+      row.parentNode.insertBefore(row, row.previousElementSibling);
+    } else if (direction === 1 && row.nextElementSibling) {
+      row.parentNode.insertBefore(row.nextElementSibling, row);
+    }
+    renumberVariantRows();
+  }
+
+  function deleteVariantRow(btn) {
+    const row = btn.closest('.variant-row');
+    if (!row) return;
+    row.remove();
+    const rows = document.querySelectorAll('#variantsTableBody .variant-row');
+    if (rows.length === 0) {
+      const noRow = document.getElementById('noVariantsRow');
+      if (noRow) noRow.style.display = '';
+    } else {
+      renumberVariantRows();
+    }
+  }
+
+  function triggerVariantFileUpload(btn) {
+    const row = btn.closest('.variant-row');
+    if (!row) return;
+    activeVariantRowForUpload = row;
+    const fileInput = document.getElementById('variantFileInput');
+    if (fileInput) {
+      fileInput.value = '';
+      fileInput.click();
+    }
+  }
+
+  async function handleVariantFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !activeVariantRowForUpload) return;
+    const row = activeVariantRowForUpload;
+    const triggerBtn = row.querySelector('.btn-variant-upload-trigger');
+    const origBtnHtml = triggerBtn ? triggerBtn.innerHTML : '';
+    if (triggerBtn) {
+      triggerBtn.disabled = true;
+      triggerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+    }
+
+    try {
+      if (typeof window.uploadFileInChunks !== 'function') {
+        throw new Error('Upload engine not ready. Please try again.');
+      }
+      const res = await window.uploadFileInChunks(file, 'machine', (pct) => {
+        if (triggerBtn) triggerBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading ${pct}%`;
+      });
+
+      if (!res || !res.file) throw new Error('Upload completed with unexpected response');
+
+      const uploadedFile = res.file;
+      row.querySelector('.variant-storage-key-input').value = uploadedFile.storage_key || '';
+      row.querySelector('.variant-original-name-input').value = uploadedFile.original_name || file.name;
+      row.querySelector('.variant-format-input').value = uploadedFile.file_format || (file.name.split('.').pop() || 'FILE').toUpperCase();
+      row.querySelector('.variant-size-input').value = uploadedFile.file_size || file.size;
+      row.querySelector('.variant-file-id-input').value = uploadedFile.id || '';
+
+      const badge = row.querySelector('.variant-file-badge');
+      if (badge) {
+        badge.style.display = 'inline-flex';
+        row.querySelector('.variant-file-name-display').textContent = uploadedFile.original_name || file.name;
+        row.querySelector('.variant-file-format-display').textContent = (uploadedFile.file_format || file.name.split('.').pop() || 'FILE').toUpperCase();
+      }
+
+      // If variant name is empty, auto-fill with filename without extension
+      const nameInput = row.querySelector('.variant-name-input');
+      if (nameInput && !nameInput.value.trim()) {
+        const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[_.-]+/g, ' ').toUpperCase();
+        nameInput.value = baseName;
+      }
+
+      if (triggerBtn) {
+        triggerBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Replace File';
+        triggerBtn.disabled = false;
+      }
+    } catch (err) {
+      alert('Upload failed: ' + (err.message || err));
+      if (triggerBtn) {
+        triggerBtn.innerHTML = origBtnHtml;
+        triggerBtn.disabled = false;
+      }
+    }
+  }
+
+  function serializeVariantsToJson() {
+    const rows = document.querySelectorAll('#variantsTableBody .variant-row');
+    const variants = [];
+    rows.forEach((row, idx) => {
+      const vId = row.dataset.variantId || null;
+      const name = (row.querySelector('.variant-name-input')?.value || '').trim();
+      const group = (row.querySelector('.variant-group-input')?.value || '').trim();
+      const storageKey = (row.querySelector('.variant-storage-key-input')?.value || '').trim();
+      const origName = (row.querySelector('.variant-original-name-input')?.value || '').trim();
+      const format = (row.querySelector('.variant-format-input')?.value || '').trim();
+      const size = parseInt(row.querySelector('.variant-size-input')?.value || '0', 10);
+      const fileId = (row.querySelector('.variant-file-id-input')?.value || '').trim();
+      const isActive = row.querySelector('.variant-active-checkbox')?.checked ? 1 : 0;
+      if (name) {
+        variants.push({
+          id: vId,
+          name,
+          group: group || null,
+          storage_key: storageKey || null,
+          original_name: origName || null,
+          file_format: format || null,
+          file_size: size || 0,
+          file_id: fileId || null,
+          sort_order: idx,
+          is_active: isActive
+        });
+      }
+    });
+
+    const input = document.getElementById('variantsJsonInput');
+    if (input) input.value = JSON.stringify(variants);
+    return variants;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const vfInput = document.getElementById('variantFileInput');
+    if (vfInput) {
+      vfInput.addEventListener('change', handleVariantFileChange);
+    }
+  });
+
   function initFormSubmit() {
     const form = document.getElementById('designForm');
     const publishBtn = document.getElementById('publishBtn');
@@ -1423,6 +1760,19 @@
 
       try {
         autoCalculateTotalStitches();
+        const activeVariants = serializeVariantsToJson();
+        if (activeVariants.length > 0) {
+          const hasFile = activeVariants.some(v => v.storage_key || v.file_id || v.original_name);
+          if (!hasFile) {
+            alert('File-type variants are enabled, but none of them have an uploaded machine file. Please upload a machine file for at least one variant.');
+            if (targetBtn) {
+              targetBtn.innerHTML = originalHtml;
+              if (publishBtn) publishBtn.disabled = false;
+              if (draftBtn) draftBtn.disabled = false;
+            }
+            return;
+          }
+        }
         const formData = new FormData(form);
         formData.append('is_ajax', '1');
         if (isDraft) {

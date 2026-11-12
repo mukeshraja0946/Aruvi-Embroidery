@@ -133,14 +133,21 @@ class Order {
 
         try {
           await db.query(
-            'INSERT INTO order_items (order_id, design_id, price_at_purchase, mrp, discount_amount) VALUES (?, ?, ?, ?, ?)',
-            [orderId, item.design_id, itemSelling, itemMrp, itemDiscount]
+            'INSERT INTO order_items (order_id, design_id, price_at_purchase, mrp, discount_amount, variant_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [orderId, item.design_id, itemSelling, itemMrp, itemDiscount, item.variant_id || null]
           );
         } catch (colErr) {
-          await db.query(
-            'INSERT INTO order_items (order_id, design_id, price_at_purchase) VALUES (?, ?, ?)',
-            [orderId, item.design_id, itemSelling]
-          );
+          try {
+            await db.query(
+              'INSERT INTO order_items (order_id, design_id, price_at_purchase, mrp, discount_amount) VALUES (?, ?, ?, ?, ?)',
+              [orderId, item.design_id, itemSelling, itemMrp, itemDiscount]
+            );
+          } catch (colErr2) {
+            await db.query(
+              'INSERT INTO order_items (order_id, design_id, price_at_purchase) VALUES (?, ?, ?)',
+              [orderId, item.design_id, itemSelling]
+            );
+          }
         }
       }
 
@@ -195,10 +202,11 @@ class Order {
 
       const order = rows[0];
       const itemsSql = `
-        SELECT oi.*, d.title, d.slug, d.hoop_size, d.dimensions, d.formats, d.price as d_mrp, d.sale_price as d_sale_price,
+        SELECT oi.*, dfv.variant_name, dfv.variant_group, d.title, d.slug, d.hoop_size, d.dimensions, d.formats, d.price as d_mrp, d.sale_price as d_sale_price,
                (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
         FROM order_items oi
         JOIN designs d ON oi.design_id = d.id
+        LEFT JOIN design_file_variants dfv ON oi.variant_id = dfv.id
         WHERE oi.order_id = ?
       `;
       order.items = await db.query(itemsSql, [order.id]);
@@ -221,10 +229,11 @@ class Order {
       const orders = await db.query('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC', [userId]);
       for (const order of orders) {
         order.items = await db.query(
-          `SELECT oi.*, d.title, d.slug,
+          `SELECT oi.*, dfv.variant_name, dfv.variant_group, d.title, d.slug,
                   (SELECT image_url FROM design_images WHERE design_id = d.id ORDER BY is_primary DESC, id ASC LIMIT 1) as primary_image
            FROM order_items oi
            JOIN designs d ON oi.design_id = d.id
+           LEFT JOIN design_file_variants dfv ON oi.variant_id = dfv.id
            WHERE oi.order_id = ?`,
           [order.id]
         );
@@ -348,11 +357,11 @@ class Order {
   static async getPurchasedDesignsByUser(userId) {
     if (db.isConnected()) {
       const sql = `
-        SELECT d.id as design_id, d.title, d.slug, d.hoop_size, d.formats,
+        SELECT MIN(oi.id) as order_item_id, oi.variant_id, dfv.variant_name, dfv.variant_group,
+               d.id as design_id, d.title, d.slug, d.hoop_size, d.formats,
                MAX(oi.price_at_purchase) as price_at_purchase,
                MAX(o.created_at) as purchase_date,
                MAX(o.order_number) as order_number,
-               MIN(oi.id) as order_item_id,
                COALESCE(
                  (SELECT file_path FROM design_files WHERE design_id = d.id AND is_preview = 1 ORDER BY id DESC LIMIT 1),
                  (SELECT image_url FROM design_images WHERE design_id = d.id AND is_primary = 1 ORDER BY id DESC LIMIT 1),
@@ -363,8 +372,9 @@ class Order {
         FROM orders o
         JOIN order_items oi ON o.id = oi.order_id
         JOIN designs d ON oi.design_id = d.id
+        LEFT JOIN design_file_variants dfv ON oi.variant_id = dfv.id
         WHERE o.user_id = ? AND (o.status = 'completed' OR LOWER(o.status) = 'paid')
-        GROUP BY d.id, d.title, d.slug, d.hoop_size, d.formats
+        GROUP BY d.id, COALESCE(oi.variant_id, 0), oi.variant_id, dfv.variant_name, dfv.variant_group, d.title, d.slug, d.hoop_size, d.formats
         ORDER BY purchase_date DESC
       `;
       return await db.query(sql, [userId]);
@@ -427,6 +437,48 @@ class Order {
     }
     const userOrders = fallbackOrders.filter(o => o.user_id == userId && (o.status === 'completed' || o.status === 'paid'));
     return userOrders.some(o => o.items && o.items.some(i => i.design_id == designId));
+  }
+
+  static async hasUserPurchasedVariant(userId, designId, variantId) {
+    if (!userId || !designId) return false;
+    if (!variantId) {
+      return this.hasUserPurchasedDesign(userId, designId);
+    }
+    if (db.isConnected()) {
+      try {
+        const sql = `
+          SELECT 1 FROM orders o
+          JOIN order_items oi ON o.id = oi.order_id
+          WHERE o.user_id = ? AND oi.design_id = ? AND oi.variant_id = ? AND (o.status = 'completed' OR LOWER(o.status) = 'paid')
+          LIMIT 1
+        `;
+        const rows = await db.query(sql, [userId, designId, variantId]);
+        return !!(rows && rows.length > 0);
+      } catch (err) {
+        console.error('hasUserPurchasedVariant error:', err.message);
+      }
+    }
+    return false;
+  }
+
+  static async getPurchasedVariantIdsByUser(userId, designId) {
+    if (!userId || !designId) return [];
+    if (db.isConnected()) {
+      try {
+        const sql = `
+          SELECT DISTINCT oi.variant_id
+          FROM orders o
+          JOIN order_items oi ON o.id = oi.order_id
+          WHERE o.user_id = ? AND oi.design_id = ? AND oi.variant_id IS NOT NULL AND (o.status = 'completed' OR LOWER(o.status) = 'paid')
+        `;
+        const rows = await db.query(sql, [userId, designId]);
+        return Array.isArray(rows) ? rows.map(r => r.variant_id) : [];
+      } catch (err) {
+        console.error('getPurchasedVariantIdsByUser error:', err.message);
+        return [];
+      }
+    }
+    return [];
   }
 
   static async getStats() {

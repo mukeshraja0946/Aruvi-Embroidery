@@ -409,6 +409,20 @@
         </form>
       </div>
 
+      <!-- Bulk Selection Persistent Indicator Bar -->
+      <div id="adminBulkSelectionBar" style="display: none; align-items: center; justify-content: space-between; background: #FFF8E1; border: 1px solid #FFE082; padding: 10px 16px; border-radius: 10px; margin-bottom: 1.2rem; font-size: 0.88rem; color: #5D4037; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <i class="fa-solid fa-circle-check" style="color: #F57F17; font-size: 1.1rem;"></i>
+          <span id="adminBulkSelectionText"><strong>0</strong> designs selected across pages.</span>
+          <button type="button" id="adminSelectAllMatchingBtn" style="display: none; background: #FFF; border: 1px solid #D97706; color: #B45309; font-weight: 600; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; transition: all 0.2s;" onclick="selectAllDesignsAcrossAllPages()">
+            Select all <span id="adminTotalMatchingNum"><%= typeof total !== 'undefined' ? total : 0 %></span> results across all pages
+          </button>
+        </div>
+        <button type="button" onclick="clearSelectedDesigns()" style="background: none; border: none; color: #C62828; font-weight: 600; text-decoration: underline; cursor: pointer; font-size: 0.84rem; white-space: nowrap;">
+          Clear selection
+        </button>
+      </div>
+
       <!-- Main Designs Table Card -->
       <div class="admin-card-box" style="padding: 0; overflow-x: auto; margin-bottom: 1.5rem; -webkit-overflow-scrolling: touch; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
         <table class="admin-table-styled" style="min-width: 1220px; width: 100%; border-collapse: collapse;">
@@ -441,7 +455,7 @@
                 %>
                 <tr id="designRow-<%= d.id %>">
                   <td style="text-align: center; width: 40px; vertical-align: middle; padding: 0.75rem 0.6rem;">
-                    <input type="checkbox" class="design-checkbox" value="<%= d.id %>" onchange="updateSelectedCount()">
+                    <input type="checkbox" class="design-checkbox" value="<%= d.id %>" onchange="handleDesignCheckboxChange(this)">
                   </td>
                   <td style="white-space: nowrap; vertical-align: middle; padding: 0.75rem 0.6rem;">
                     <strong style="color: var(--admin-text-muted); font-size: 0.82rem;">#<%= d.id %></strong>
@@ -2756,6 +2770,8 @@
 
 <script>
   window.CSRF_TOKEN = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+  window.TOTAL_FILTERED_DESIGNS = <%= typeof total !== "undefined" ? total : 0 %>;
+  window.CURRENT_PAGE_DESIGN_COUNT = <%= designs ? designs.length : 0 %>;
 </script>
 <script src="/public/js/admin/chunk-uploader.js?v=<%= Date.now() %>"></script>
 <script src="/public/js/admin/designs.js?v=<%= Date.now() %>"></script>

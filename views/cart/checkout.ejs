@@ -135,7 +135,14 @@
                 <img src="<%= thumbUrl %>" alt="<%= prev?.altText || item.title %>" width="60" height="60" loading="lazy" onerror="if (this.src !== '<%= largeUrl %>' && '<%= largeUrl %>' !== '/public/images/placeholder-preview.svg') { this.src = '<%= largeUrl %>'; } else if (this.src.indexOf('placeholder-preview.svg') === -1) { this.src = '/public/images/placeholder-preview.svg'; }">
               </div>
               <div class="summary-item-info">
-                <h4><%= item.title %></h4>
+                <h4><%= item.display_title || item.title %></h4>
+                <% if (item.variant_name) { %>
+                  <div style="margin-top: 2px; margin-bottom: 2px;">
+                    <span class="badge" style="background: #FAF0E8; color: var(--primary); border: 1px solid rgba(169,50,38,0.2); font-weight: 600; padding: 1px 6px; border-radius: 4px; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;">
+                      <i class="fa-solid fa-microchip" style="font-size: 9px;"></i> <%= item.variant_name %>
+                    </span>
+                  </div>
+                <% } %>
                 <span class="cat-label"><%= item.category_name || 'Embroidery Designs' %></span>
                 <span class="formats-label"><%= item.formats || '' %></span>
               </div>

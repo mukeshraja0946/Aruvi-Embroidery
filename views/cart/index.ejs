@@ -56,7 +56,14 @@
                   </a>
                 </div>
                 <div class="cart-item-meta">
-                  <h4><a href="/design/<%= item.slug %>"><%= item.title %></a></h4>
+                  <h4><a href="/design/<%= item.slug %>"><%= item.display_title || item.title %></a></h4>
+                  <% if (item.variant_name) { %>
+                    <div style="margin-top: 3px; margin-bottom: 3px;">
+                      <span class="badge" style="background: #FAF0E8; color: var(--primary); border: 1px solid rgba(169,50,38,0.2); font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-microchip" style="font-size: 10px;"></i> <%= item.variant_name %>
+                      </span>
+                    </div>
+                  <% } %>
                   <span class="cart-item-cat">Category: <%= item.category_name || 'Embroidery Designs' %></span>
                   <div class="format-pill-row" style="margin-bottom: 0;">
                     <% (item.formats ? item.formats.split(',').map(s => s.trim()).filter(Boolean) : []).forEach(fmt => { %>
@@ -96,6 +103,9 @@
                   <form action="/cart/remove" method="POST">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="design_id" value="<%= item.design_id %>">
+                    <% if (item.variant_id) { %>
+                      <input type="hidden" name="variant_id" value="<%= item.variant_id %>">
+                    <% } %>
                     <button type="submit" class="trash-btn" title="Remove item">
                       <i class="fa-regular fa-trash-can"></i>
                     </button>
